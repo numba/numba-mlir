@@ -10,7 +10,13 @@ from .lowering import mlir_NativeLowering
 
 import functools
 
-from numba_mlir.mlir.passes import MlirDumpPlier, MlirBackend, get_gpu_backend
+
+from numba_mlir.mlir.passes import (
+    MlirDumpPlier,
+    MlirBackend,
+    get_gpu_backend,
+    MlirReplaceParfors,
+)
 from numba.core.compiler_machinery import PassManager
 from numba.core.compiler import CompilerBase as orig_CompilerBase
 from numba.core.compiler import DefaultPassBuilder as orig_DefaultPassBuilder
@@ -98,6 +104,17 @@ class mlir_PassBuilder(orig_DefaultPassBuilder):
         pm.finalize()
         return pm
 
+    def define_replace_parfors_pipeline(state, name="nopython"):
+        pm = orig_DefaultPassBuilder.define_nopython_pipeline(state, name)
+
+        import numba_dpcomp.mlir.settings
+
+        if numba_dpcomp.mlir.settings.USE_MLIR:
+            pm.add_pass_after(MlirReplaceParfors, ParforPass)
+
+        pm.finalize()
+        return pm
+
 
 class mlir_compiler_pipeline(orig_CompilerBase):
     def define_pipelines(self):
@@ -130,3 +147,14 @@ def get_gpu_pipeline(fp64_truncate, use_64bit_index):
             return pms
 
     return mlir_compiler_gpu_pipeline
+
+
+class mlir_compiler_replace_parfors_pipeline(orig_CompilerBase):
+    def define_pipelines(self):
+        # this maintains the objmode fallback behaviour
+        pms = []
+        if not self.state.flags.force_pyobject:
+            pms.append(mlir_PassBuilder.define_replace_parfors_pipeline(self.state))
+        if self.state.status.can_fallback or self.state.flags.force_pyobject:
+            pms.append(mlir_PassBuilder.define_objectmode_pipeline(self.state))
+        return pms

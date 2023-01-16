@@ -955,3 +955,13 @@ def test_named_args_indirect():
 
     a, b, c, d = (2.0, 3.5, 4.7, 5.9)
     assert_equal(py_func2(a, b, c, d), jit_func2(a, b, c, d))
+
+def test_replace_parfor():
+    def py_func(a):
+        res = 0
+        for i in numba.prange(a):
+            res = res + i
+        return res
+
+    jit_func = njit(py_func, parallel=True, replace_parfors=True)
+    assert_equal(py_func(10), jit_func(10))
