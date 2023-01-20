@@ -8,7 +8,7 @@
 
 #include <mlir/IR/PatternMatch.h>
 
-namespace imex {
+namespace numba {
 struct ExpandCallVarargs : public mlir::OpRewritePattern<plier::PyCallOp> {
   using OpRewritePattern::OpRewritePattern;
 
@@ -31,4 +31,4 @@ protected:
               mlir::PatternRewriter &rewriter, mlir::ValueRange args,
               KWargs kwargs) const = 0;
 };
-} // namespace imex
+} // namespace numba

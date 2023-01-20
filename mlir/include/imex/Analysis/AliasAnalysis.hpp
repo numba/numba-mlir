@@ -10,7 +10,7 @@ namespace mlir {
 class Operation;
 }
 
-namespace imex {
+namespace numba {
 /// This class implements a local form of alias analysis that tries to identify
 /// the underlying values addressed by each value and performs a few basic
 /// checks to see if they alias.
@@ -26,4 +26,4 @@ protected:
 };
 
 mlir::StringRef getRestrictArgName();
-} // namespace imex
+} // namespace numba

@@ -11,9 +11,9 @@ class Pass;
 class RewritePatternSet;
 } // namespace mlir
 
-namespace imex {
+namespace numba {
 void populatePromoteToParallelPatterns(mlir::RewritePatternSet &patterns);
 
 /// This pass tries to promote `scf.for` ops to `scf.parallel`.
 std::unique_ptr<mlir::Pass> createPromoteToParallelPass();
-} // namespace imex
+} // namespace numba

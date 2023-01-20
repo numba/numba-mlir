@@ -56,7 +56,7 @@ private:
 };
 } // namespace
 
-std::unique_ptr<mlir::Pass> imex::createCompositePass(
+std::unique_ptr<mlir::Pass> numba::createCompositePass(
     std::string name, std::function<void(mlir::OpPassManager &)> populateFunc) {
   assert(!name.empty());
   assert(populateFunc);

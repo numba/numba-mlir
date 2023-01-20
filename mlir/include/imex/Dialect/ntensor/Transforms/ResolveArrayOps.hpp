@@ -12,7 +12,7 @@ class Pass;
 class RewritePatternSet;
 } // namespace mlir
 
-namespace imex {
+namespace numba {
 namespace ntensor {
 void populateResolveArrayOpsPatterns(mlir::RewritePatternSet &patterns);
 
@@ -20,4 +20,4 @@ void populateResolveArrayOpsPatterns(mlir::RewritePatternSet &patterns);
 /// ops like `resolve_index`, `subview`, `load`, `store` etc.
 std::unique_ptr<mlir::Pass> createResolveArrayOpsPass();
 } // namespace ntensor
-} // namespace imex
+} // namespace numba

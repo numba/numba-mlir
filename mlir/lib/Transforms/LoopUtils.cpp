@@ -84,7 +84,7 @@ static mlir::Value skipCasts(mlir::Value val) {
 };
 } // namespace
 
-bool imex::canLowerWhileToFor(mlir::scf::WhileOp whileOp) {
+bool numba::canLowerWhileToFor(mlir::scf::WhileOp whileOp) {
   auto &beforeBlock = whileOp.getBefore().front();
   auto iters = llvm::iterator_range<mlir::Block::iterator>(beforeBlock);
   auto iternext = getNextOp<plier::IternextOp>(iters);
@@ -99,7 +99,7 @@ bool imex::canLowerWhileToFor(mlir::scf::WhileOp whileOp) {
   return true;
 }
 
-llvm::SmallVector<mlir::scf::ForOp, 2> imex::lowerWhileToFor(
+llvm::SmallVector<mlir::scf::ForOp, 2> numba::lowerWhileToFor(
     mlir::scf::WhileOp whileOp, mlir::PatternRewriter &builder,
     llvm::function_ref<std::tuple<mlir::Value, mlir::Value, mlir::Value>(
         mlir::OpBuilder &, mlir::Location)>
@@ -136,7 +136,7 @@ llvm::SmallVector<mlir::scf::ForOp, 2> imex::lowerWhileToFor(
   auto &afterBlock = whileOp.getAfter().front();
 
   auto indexCast = [&](mlir::Value val) -> mlir::Value {
-    return ::imex::indexCast(builder, loc, val);
+    return ::numba::indexCast(builder, loc, val);
   };
 
   auto bounds = getBounds(builder, loc);
@@ -254,7 +254,7 @@ llvm::SmallVector<mlir::scf::ForOp, 2> imex::lowerWhileToFor(
   return results;
 }
 
-mlir::LogicalResult imex::lowerWhileToFor(
+mlir::LogicalResult numba::lowerWhileToFor(
     plier::GetiterOp getiter, mlir::PatternRewriter &builder,
     llvm::function_ref<std::tuple<mlir::Value, mlir::Value, mlir::Value>(
         mlir::OpBuilder &, mlir::Location)>
@@ -439,8 +439,8 @@ fuseIfLegal(scf::ParallelOp firstPloop, scf::ParallelOp &secondPloop,
   auto newSecondPloop = b.create<mlir::scf::ParallelOp>(
       secondPloop.getLoc(), secondPloop.getLowerBound(),
       secondPloop.getUpperBound(), secondPloop.getStep(), newInitVars);
-  if (secondPloop->hasAttr(imex::util::attributes::getParallelName()))
-    newSecondPloop->setAttr(imex::util::attributes::getParallelName(),
+  if (secondPloop->hasAttr(numba::util::attributes::getParallelName()))
+    newSecondPloop->setAttr(numba::util::attributes::getParallelName(),
                             mlir::UnitAttr::get(b.getContext()));
 
   newSecondPloop.getRegion().getBlocks().splice(
@@ -494,13 +494,13 @@ bool hasNoEffect(mlir::scf::ParallelOp currentPloop, mlir::Operation *op) {
 }
 } // namespace
 
-mlir::LogicalResult imex::naivelyFuseParallelOps(Region &region) {
+mlir::LogicalResult numba::naivelyFuseParallelOps(Region &region) {
   std::unique_ptr<mlir::AliasAnalysis> analysis;
   auto getAnalysis = [&]() -> mlir::AliasAnalysis & {
     if (!analysis) {
       auto parent = region.getParentOfType<mlir::FunctionOpInterface>();
       analysis = std::make_unique<mlir::AliasAnalysis>(parent);
-      analysis->addAnalysisImplementation(imex::LocalAliasAnalysis());
+      analysis->addAnalysisImplementation(numba::LocalAliasAnalysis());
     }
 
     return *analysis;
@@ -545,7 +545,7 @@ mlir::LogicalResult imex::naivelyFuseParallelOps(Region &region) {
   return mlir::success(changed);
 }
 
-LogicalResult imex::prepareForFusion(Region &region) {
+LogicalResult numba::prepareForFusion(Region &region) {
   DominanceInfo dom(region.getParentOp());
   bool changed = false;
   for (auto &block : region) {

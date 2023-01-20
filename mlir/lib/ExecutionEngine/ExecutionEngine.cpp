@@ -122,7 +122,7 @@ static void runOptimizationPasses(llvm::Module &M, llvm::TargetMachine &TM) {
 }
 
 /// A simple object cache following Lang's LLJITWithObjectCache example.
-class imex::ExecutionEngine::SimpleObjectCache : public llvm::ObjectCache {
+class numba::ExecutionEngine::SimpleObjectCache : public llvm::ObjectCache {
 public:
   void notifyObjectCompiled(const llvm::Module *m,
                             llvm::MemoryBufferRef objBuffer) override {
@@ -232,7 +232,7 @@ private:
 };
 } // namespace
 
-imex::ExecutionEngine::ExecutionEngine(ExecutionEngineOptions options)
+numba::ExecutionEngine::ExecutionEngine(ExecutionEngineOptions options)
     : cache(options.enableObjectCache ? new SimpleObjectCache() : nullptr),
       gdbListener(options.enableGDBNotificationListener
                       ? llvm::JITEventListener::createGDBRegistrationListener()
@@ -303,10 +303,10 @@ imex::ExecutionEngine::ExecutionEngine(ExecutionEngineOptions options)
   transformer = std::move(options.transformer);
 }
 
-imex::ExecutionEngine::~ExecutionEngine() {}
+numba::ExecutionEngine::~ExecutionEngine() {}
 
-llvm::Expected<imex::ExecutionEngine::ModuleHandle>
-imex::ExecutionEngine::loadModule(mlir::ModuleOp m) {
+llvm::Expected<numba::ExecutionEngine::ModuleHandle>
+numba::ExecutionEngine::loadModule(mlir::ModuleOp m) {
   assert(m);
 
   std::unique_ptr<llvm::LLVMContext> ctx(new llvm::LLVMContext);
@@ -351,7 +351,7 @@ imex::ExecutionEngine::loadModule(mlir::ModuleOp m) {
   return static_cast<ModuleHandle>(dylib);
 }
 
-void imex::ExecutionEngine::releaseModule(ModuleHandle handle) {
+void numba::ExecutionEngine::releaseModule(ModuleHandle handle) {
   assert(handle);
   auto dylib = static_cast<llvm::orc::JITDylib *>(handle);
   llvm::cantFail(jit->deinitialize(*dylib));
@@ -359,7 +359,7 @@ void imex::ExecutionEngine::releaseModule(ModuleHandle handle) {
 }
 
 llvm::Expected<void *>
-imex::ExecutionEngine::lookup(imex::ExecutionEngine::ModuleHandle handle,
+numba::ExecutionEngine::lookup(numba::ExecutionEngine::ModuleHandle handle,
                               llvm::StringRef name) const {
   assert(handle);
   auto dylib = static_cast<llvm::orc::JITDylib *>(handle);
@@ -385,7 +385,7 @@ imex::ExecutionEngine::lookup(imex::ExecutionEngine::ModuleHandle handle,
   return makeStringError("looked up function is null");
 }
 
-void imex::ExecutionEngine::dumpToObjectFile(llvm::StringRef filename) {
+void numba::ExecutionEngine::dumpToObjectFile(llvm::StringRef filename) {
   if (cache == nullptr) {
     llvm::errs() << "cannot dump ExecutionEngine object code to file: "
                     "object cache is disabled\n";

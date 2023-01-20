@@ -297,7 +297,7 @@ struct CommonOptsPass
     auto *ctx = &getContext();
     mlir::RewritePatternSet patterns(ctx);
 
-    imex::populateCommonOptsPatterns(patterns);
+    numba::populateCommonOptsPatterns(patterns);
 
     (void)mlir::applyPatternsAndFoldGreedily(getOperation(),
                                              std::move(patterns));
@@ -305,7 +305,7 @@ struct CommonOptsPass
 };
 } // namespace
 
-void imex::populateCanonicalizationPatterns(mlir::RewritePatternSet &patterns) {
+void numba::populateCanonicalizationPatterns(mlir::RewritePatternSet &patterns) {
   auto context = patterns.getContext();
   for (auto *dialect : context->getLoadedDialects())
     dialect->getCanonicalizationPatterns(patterns);
@@ -313,7 +313,7 @@ void imex::populateCanonicalizationPatterns(mlir::RewritePatternSet &patterns) {
     op.getCanonicalizationPatterns(patterns, context);
 }
 
-void imex::populateCommonOptsPatterns(mlir::RewritePatternSet &patterns) {
+void numba::populateCommonOptsPatterns(mlir::RewritePatternSet &patterns) {
   populateCanonicalizationPatterns(patterns);
 
   patterns.insert<
@@ -329,11 +329,11 @@ void imex::populateCommonOptsPatterns(mlir::RewritePatternSet &patterns) {
       // clang-format on
       >(patterns.getContext());
 
-  imex::populateIfRewritesPatterns(patterns);
-  imex::populateLoopRewritesPatterns(patterns);
-  imex::populateIndexPropagatePatterns(patterns);
+  numba::populateIfRewritesPatterns(patterns);
+  numba::populateLoopRewritesPatterns(patterns);
+  numba::populateIndexPropagatePatterns(patterns);
 }
 
-std::unique_ptr<mlir::Pass> imex::createCommonOptsPass() {
+std::unique_ptr<mlir::Pass> numba::createCommonOptsPass() {
   return std::make_unique<CommonOptsPass>();
 }

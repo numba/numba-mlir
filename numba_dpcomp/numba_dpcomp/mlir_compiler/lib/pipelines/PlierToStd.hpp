@@ -4,7 +4,7 @@
 
 #pragma once
 
-namespace imex {
+namespace numba {
 class PipelineRegistry;
 }
 
@@ -12,6 +12,6 @@ namespace llvm {
 class StringRef;
 }
 
-void registerPlierToStdPipeline(imex::PipelineRegistry &registry);
+void registerPlierToStdPipeline(numba::PipelineRegistry &registry);
 
 llvm::StringRef plierToStdPipelineName();

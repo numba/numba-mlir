@@ -7,7 +7,7 @@
 #include <mlir/IR/BuiltinTypes.h>
 #include <mlir/IR/OpDefinition.h>
 
-mlir::Attribute imex::getConstVal(mlir::Operation *op) {
+mlir::Attribute numba::getConstVal(mlir::Operation *op) {
   assert(op);
   if (!op->hasTrait<mlir::OpTrait::ConstantLike>())
     return {};
@@ -15,7 +15,7 @@ mlir::Attribute imex::getConstVal(mlir::Operation *op) {
   return op->getAttr("value");
 }
 
-mlir::Attribute imex::getConstVal(mlir::Value op) {
+mlir::Attribute numba::getConstVal(mlir::Value op) {
   assert(op);
   if (auto parent_op = op.getDefiningOp())
     return getConstVal(parent_op);
@@ -23,7 +23,7 @@ mlir::Attribute imex::getConstVal(mlir::Value op) {
   return {};
 }
 
-mlir::Attribute imex::getConstAttr(mlir::Type type, double val) {
+mlir::Attribute numba::getConstAttr(mlir::Type type, double val) {
   assert(type);
   if (type.isa<mlir::FloatType>())
     return mlir::FloatAttr::get(type, val);
@@ -34,7 +34,7 @@ mlir::Attribute imex::getConstAttr(mlir::Type type, double val) {
   return {};
 }
 
-int64_t imex::getIntAttrValue(mlir::IntegerAttr attr) {
+int64_t numba::getIntAttrValue(mlir::IntegerAttr attr) {
   assert(attr);
   auto attrType = attr.getType();
   if (attrType.isa<mlir::IndexType>())

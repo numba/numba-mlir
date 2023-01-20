@@ -13,7 +13,7 @@ class MLIRContext;
 class Pass;
 } // namespace mlir
 
-namespace imex {
+namespace numba {
 
 /// Convert operations from the imex_util dialect to the LLVM dialect.
 ///
@@ -22,4 +22,4 @@ namespace imex {
 /// function instead.
 std::unique_ptr<mlir::Pass> createUtilToLLVMPass(
     std::function<mlir::LowerToLLVMOptions(mlir::MLIRContext &)> optsGetter);
-} // namespace imex
+} // namespace numba

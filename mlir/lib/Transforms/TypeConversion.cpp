@@ -83,28 +83,28 @@ packResults(mlir::OpBuilder &rewriter, mlir::Location loc,
 }
 
 class ConvertEnvRegionYield
-    : public mlir::OpConversionPattern<imex::util::EnvironmentRegionYieldOp> {
+    : public mlir::OpConversionPattern<numba::util::EnvironmentRegionYieldOp> {
 public:
   using OpConversionPattern::OpConversionPattern;
 
   mlir::LogicalResult
-  matchAndRewrite(imex::util::EnvironmentRegionYieldOp op,
-                  imex::util::EnvironmentRegionYieldOp::Adaptor adaptor,
+  matchAndRewrite(numba::util::EnvironmentRegionYieldOp op,
+                  numba::util::EnvironmentRegionYieldOp::Adaptor adaptor,
                   mlir::ConversionPatternRewriter &rewriter) const override {
-    rewriter.replaceOpWithNewOp<imex::util::EnvironmentRegionYieldOp>(
+    rewriter.replaceOpWithNewOp<numba::util::EnvironmentRegionYieldOp>(
         op, unpackUnrealizedConversionCast(adaptor.getResults()));
     return mlir::success();
   }
 };
 
 class ConvertEnvRegion
-    : public mlir::OpConversionPattern<imex::util::EnvironmentRegionOp> {
+    : public mlir::OpConversionPattern<numba::util::EnvironmentRegionOp> {
 public:
   using OpConversionPattern::OpConversionPattern;
 
   mlir::LogicalResult
-  matchAndRewrite(imex::util::EnvironmentRegionOp op,
-                  imex::util::EnvironmentRegionOp::Adaptor adaptor,
+  matchAndRewrite(numba::util::EnvironmentRegionOp op,
+                  numba::util::EnvironmentRegionOp::Adaptor adaptor,
                   mlir::ConversionPatternRewriter &rewriter) const override {
     auto *converter = getTypeConverter();
     assert(converter && "Invalid type converter");
@@ -116,7 +116,7 @@ public:
     auto args = unpackUnrealizedConversionCast(adaptor.getArgs());
 
     auto loc = op.getLoc();
-    auto newRegOp = rewriter.create<imex::util::EnvironmentRegionOp>(
+    auto newRegOp = rewriter.create<numba::util::EnvironmentRegionOp>(
         loc, adaptor.getEnvironment(), args, resultTypes);
 
     auto &newRegion = newRegOp.getRegion();
@@ -260,7 +260,7 @@ public:
 };
 } // namespace
 
-void imex::populateControlFlowTypeConversionRewritesAndTarget(
+void numba::populateControlFlowTypeConversionRewritesAndTarget(
     mlir::TypeConverter &typeConverter, mlir::RewritePatternSet &patterns,
     mlir::ConversionTarget &target) {
   mlir::populateAnyFunctionOpInterfaceTypeConversionPattern(patterns,
@@ -294,8 +294,8 @@ void imex::populateControlFlowTypeConversionRewritesAndTarget(
         return std::nullopt;
       });
 
-  target.addDynamicallyLegalOp<imex::util::EnvironmentRegionOp>(
-      [&](imex::util::EnvironmentRegionOp op) -> llvm::Optional<bool> {
+  target.addDynamicallyLegalOp<numba::util::EnvironmentRegionOp>(
+      [&](numba::util::EnvironmentRegionOp op) -> llvm::Optional<bool> {
         if (typeConverter.isLegal(op.getArgs().getTypes()) &&
             typeConverter.isLegal(op.getResults().getTypes()))
           return true;
@@ -303,8 +303,8 @@ void imex::populateControlFlowTypeConversionRewritesAndTarget(
         return std::nullopt;
       });
 
-  target.addDynamicallyLegalOp<imex::util::EnvironmentRegionYieldOp>(
-      [&](imex::util::EnvironmentRegionYieldOp op) -> llvm::Optional<bool> {
+  target.addDynamicallyLegalOp<numba::util::EnvironmentRegionYieldOp>(
+      [&](numba::util::EnvironmentRegionYieldOp op) -> llvm::Optional<bool> {
         if (typeConverter.isLegal(op.getResults().getTypes()))
           return true;
 
@@ -322,16 +322,16 @@ void imex::populateControlFlowTypeConversionRewritesAndTarget(
 
 namespace {
 struct BuildTupleConversionPattern
-    : public mlir::OpConversionPattern<imex::util::BuildTupleOp> {
+    : public mlir::OpConversionPattern<numba::util::BuildTupleOp> {
   using OpConversionPattern::OpConversionPattern;
 
   mlir::LogicalResult
-  matchAndRewrite(imex::util::BuildTupleOp op,
-                  imex::util::BuildTupleOp::Adaptor adaptor,
+  matchAndRewrite(numba::util::BuildTupleOp op,
+                  numba::util::BuildTupleOp::Adaptor adaptor,
                   mlir::ConversionPatternRewriter &rewriter) const final {
     auto retType =
         mlir::TupleType::get(op.getContext(), adaptor.getArgs().getTypes());
-    rewriter.replaceOpWithNewOp<imex::util::BuildTupleOp>(op, retType,
+    rewriter.replaceOpWithNewOp<numba::util::BuildTupleOp>(op, retType,
                                                           adaptor.getArgs());
     return mlir::success();
   }
@@ -351,12 +351,12 @@ static bool isUniTuple(mlir::TupleType type) {
 }
 
 struct GetItemTupleConversionPattern
-    : public mlir::OpConversionPattern<imex::util::TupleExtractOp> {
+    : public mlir::OpConversionPattern<numba::util::TupleExtractOp> {
   using OpConversionPattern::OpConversionPattern;
 
   mlir::LogicalResult
-  matchAndRewrite(imex::util::TupleExtractOp op,
-                  imex::util::TupleExtractOp::Adaptor adaptor,
+  matchAndRewrite(numba::util::TupleExtractOp op,
+                  numba::util::TupleExtractOp::Adaptor adaptor,
                   mlir::ConversionPatternRewriter &rewriter) const final {
     auto container = adaptor.getSource();
     auto containerType = container.getType().dyn_cast<mlir::TupleType>();
@@ -384,14 +384,14 @@ struct GetItemTupleConversionPattern
         return mlir::failure();
     }
 
-    rewriter.replaceOpWithNewOp<imex::util::TupleExtractOp>(op, retType,
+    rewriter.replaceOpWithNewOp<numba::util::TupleExtractOp>(op, retType,
                                                             container, index);
     return mlir::success();
   }
 };
 } // namespace
 
-void imex::populateTupleTypeConverter(mlir::TypeConverter &typeConverter) {
+void numba::populateTupleTypeConverter(mlir::TypeConverter &typeConverter) {
   typeConverter.addConversion(
       [&typeConverter](mlir::TupleType type) -> llvm::Optional<mlir::Type> {
         auto count = static_cast<unsigned>(type.size());
@@ -415,19 +415,19 @@ void imex::populateTupleTypeConverter(mlir::TypeConverter &typeConverter) {
       });
 }
 
-void imex::populateTupleTypeConversionRewritesAndTarget(
+void numba::populateTupleTypeConversionRewritesAndTarget(
     mlir::TypeConverter &typeConverter, mlir::RewritePatternSet &patterns,
     mlir::ConversionTarget &target) {
   patterns.insert<BuildTupleConversionPattern, GetItemTupleConversionPattern>(
       typeConverter, patterns.getContext());
 
-  target.addDynamicallyLegalOp<imex::util::BuildTupleOp>(
-      [&typeConverter](imex::util::BuildTupleOp op) {
+  target.addDynamicallyLegalOp<numba::util::BuildTupleOp>(
+      [&typeConverter](numba::util::BuildTupleOp op) {
         return typeConverter.isLegal(op.getResult().getType());
       });
 
-  target.addDynamicallyLegalOp<imex::util::TupleExtractOp>(
-      [&typeConverter](imex::util::TupleExtractOp op) -> llvm::Optional<bool> {
+  target.addDynamicallyLegalOp<numba::util::TupleExtractOp>(
+      [&typeConverter](numba::util::TupleExtractOp op) -> llvm::Optional<bool> {
         auto inputType = op.getSource().getType();
         auto tupleType = typeConverter.convertType(inputType)
                              .dyn_cast_or_null<mlir::TupleType>();

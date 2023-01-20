@@ -12,7 +12,7 @@ class Type;
 class IntegerType;
 } // namespace mlir
 
-namespace imex {
+namespace numba {
 mlir::Value indexCast(mlir::OpBuilder &builder, mlir::Location loc,
                       mlir::Value src, mlir::Type dst_type);
 mlir::Value indexCast(mlir::OpBuilder &builder, mlir::Location loc,
@@ -24,4 +24,4 @@ mlir::IntegerType makeSignlessType(mlir::IntegerType type);
 bool canConvert(mlir::Type srcType, mlir::Type dstType);
 mlir::Value doConvert(mlir::OpBuilder &rewriter, mlir::Location loc,
                       mlir::Value val, mlir::Type dstType);
-} // namespace imex
+} // namespace numba

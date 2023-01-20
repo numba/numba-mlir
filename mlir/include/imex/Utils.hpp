@@ -12,7 +12,7 @@ namespace llvm {
 class Twine;
 }
 
-namespace imex {
+namespace numba {
 [[noreturn]] void reportError(const llvm::Twine &msg);
 
 template <typename T, typename H, typename F>
@@ -23,4 +23,4 @@ void scopedDiagHandler(T &ctx, H &&diag_handler, F &&func) {
       llvm::make_scope_exit([&]() { diagEngine.eraseHandler(diagId); });
   func();
 }
-} // namespace imex
+} // namespace numba

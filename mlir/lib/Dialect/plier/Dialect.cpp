@@ -122,7 +122,7 @@ static mlir::Value foldPrevCast(mlir::Value val, mlir::Type thisType) {
 static mlir::Value propagateCasts(mlir::Value val, mlir::Type thisType) {
   using fptr = mlir::Value (*)(mlir::Value, mlir::Type);
   const fptr handlers[] = {
-      &foldPrevCast<imex::util::SignCastOp>,
+      &foldPrevCast<numba::util::SignCastOp>,
       &foldPrevCast<CastOp>,
       &foldPrevCast<mlir::UnrealizedConversionCastOp>,
   };

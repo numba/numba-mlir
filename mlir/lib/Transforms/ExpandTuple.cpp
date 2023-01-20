@@ -20,7 +20,7 @@ static void flattenTuple(mlir::OpBuilder &builder, mlir::Location loc,
     if (auto tupleType = arg.getType().dyn_cast<mlir::TupleType>()) {
       for (auto [i, argType] : llvm::enumerate(tupleType.getTypes())) {
         auto ind = builder.createOrFold<mlir::arith::ConstantIndexOp>(loc, i);
-        auto res = builder.createOrFold<imex::util::TupleExtractOp>(
+        auto res = builder.createOrFold<numba::util::TupleExtractOp>(
             loc, argType, arg, ind);
         flattenTuple(builder, loc, res, ret);
       }
@@ -49,19 +49,19 @@ struct ExpandTupleReturn
 };
 
 class ExpandEnvRegionYield
-    : public mlir::OpConversionPattern<imex::util::EnvironmentRegionYieldOp> {
+    : public mlir::OpConversionPattern<numba::util::EnvironmentRegionYieldOp> {
 public:
   using OpConversionPattern::OpConversionPattern;
 
   mlir::LogicalResult
-  matchAndRewrite(imex::util::EnvironmentRegionYieldOp op,
-                  imex::util::EnvironmentRegionYieldOp::Adaptor adaptor,
+  matchAndRewrite(numba::util::EnvironmentRegionYieldOp op,
+                  numba::util::EnvironmentRegionYieldOp::Adaptor adaptor,
                   mlir::ConversionPatternRewriter &rewriter) const override {
     llvm::SmallVector<mlir::Value> newOperands;
     auto loc = op.getLoc();
     flattenTuple(rewriter, loc, adaptor.getResults(), newOperands);
 
-    rewriter.replaceOpWithNewOp<imex::util::EnvironmentRegionYieldOp>(
+    rewriter.replaceOpWithNewOp<numba::util::EnvironmentRegionYieldOp>(
         op, newOperands);
     return mlir::success();
   }
@@ -88,7 +88,7 @@ static llvm::Optional<mlir::Value> reconstructTuple(mlir::OpBuilder &builder,
       values = values.drop_front();
     }
   }
-  return builder.create<imex::util::BuildTupleOp>(loc, tupleType, vals);
+  return builder.create<numba::util::BuildTupleOp>(loc, tupleType, vals);
 }
 
 static llvm::Optional<mlir::Value> tupleToElem(mlir::OpBuilder &builder,
@@ -105,7 +105,7 @@ static llvm::Optional<mlir::Value> tupleToElem(mlir::OpBuilder &builder,
 
   mlir::Value index = builder.create<mlir::arith::ConstantIndexOp>(loc, 0);
   mlir::Value result =
-      builder.create<imex::util::TupleExtractOp>(loc, type, value, index);
+      builder.create<numba::util::TupleExtractOp>(loc, type, value, index);
   return result;
 }
 
@@ -115,7 +115,7 @@ struct ExpandTuplePass
 
   virtual void
   getDependentDialects(mlir::DialectRegistry &registry) const override {
-    registry.insert<imex::util::ImexUtilDialect>();
+    registry.insert<numba::util::ImexUtilDialect>();
     registry.insert<mlir::arith::ArithDialect>();
   }
 
@@ -154,7 +154,7 @@ struct ExpandTuplePass
     mlir::RewritePatternSet patterns(context);
     mlir::ConversionTarget target(*context);
 
-    imex::populateControlFlowTypeConversionRewritesAndTarget(typeConverter,
+    numba::populateControlFlowTypeConversionRewritesAndTarget(typeConverter,
                                                              patterns, target);
 
     patterns.insert<ExpandTupleReturn, ExpandEnvRegionYield>(typeConverter,
@@ -166,6 +166,6 @@ struct ExpandTuplePass
 };
 } // namespace
 
-std::unique_ptr<mlir::Pass> imex::createExpandTuplePass() {
+std::unique_ptr<mlir::Pass> numba::createExpandTuplePass() {
   return std::make_unique<ExpandTuplePass>();
 }

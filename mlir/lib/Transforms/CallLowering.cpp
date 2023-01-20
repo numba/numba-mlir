@@ -26,7 +26,7 @@ static mlir::Value skipCasts(mlir::Value val) {
   return val;
 };
 
-mlir::LogicalResult imex::ExpandCallVarargs::matchAndRewrite(
+mlir::LogicalResult numba::ExpandCallVarargs::matchAndRewrite(
     plier::PyCallOp op, mlir::PatternRewriter &rewriter) const {
   auto vararg = op.getVarargs();
   if (!vararg)
@@ -49,7 +49,7 @@ mlir::LogicalResult imex::ExpandCallVarargs::matchAndRewrite(
     auto index = rewriter.create<mlir::arith::ConstantIndexOp>(
         loc, static_cast<int64_t>(i));
     args[argsCount + i] =
-        rewriter.create<imex::util::TupleExtractOp>(loc, type, vararg, index);
+        rewriter.create<numba::util::TupleExtractOp>(loc, type, vararg, index);
   }
 
   auto resType = op.getType();
@@ -60,7 +60,7 @@ mlir::LogicalResult imex::ExpandCallVarargs::matchAndRewrite(
 }
 
 mlir::LogicalResult
-imex::CallOpLowering::matchAndRewrite(plier::PyCallOp op,
+numba::CallOpLowering::matchAndRewrite(plier::PyCallOp op,
                                       mlir::PatternRewriter &rewriter) const {
   if (op.getVarargs())
     return mlir::failure();

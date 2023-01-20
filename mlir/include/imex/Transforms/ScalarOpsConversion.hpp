@@ -10,7 +10,7 @@ class RewritePatternSet;
 class TypeConverter;
 } // namespace mlir
 
-namespace imex {
+namespace numba {
 /// Convert arith ops according to provided type converter.
 void populateArithConversionRewritesAndTarget(mlir::TypeConverter &converter,
                                               mlir::RewritePatternSet &patterns,
@@ -20,4 +20,4 @@ void populateArithConversionRewritesAndTarget(mlir::TypeConverter &converter,
 void populateMathConversionRewritesAndTarget(mlir::TypeConverter &converter,
                                              mlir::RewritePatternSet &patterns,
                                              mlir::ConversionTarget &target);
-} // namespace imex
+} // namespace numba

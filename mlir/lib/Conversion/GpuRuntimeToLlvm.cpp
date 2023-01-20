@@ -191,7 +191,7 @@ protected:
         loc, depsArray, nullPtr, depsArraySize);
 
     auto depsArrayPtrType = mlir::LLVM::LLVMPointerType::get(depsArrayType);
-    imex::AllocaInsertionPoint allocaHelper(op);
+    numba::AllocaInsertionPoint allocaHelper(op);
     auto depsArrayPtr = allocaHelper.insert(rewriter, [&]() {
       auto size = rewriter.create<mlir::LLVM::ConstantOp>(
           loc, llvmInt64Type, rewriter.getI64IntegerAttr(1));
@@ -252,7 +252,7 @@ private:
       llvm::SmallString<64> name = device.getValue();
       name.push_back('\0');
 
-      auto varName = imex::getUniqueLLVMGlobalName(mod, "device_name");
+      auto varName = numba::getUniqueLLVMGlobalName(mod, "device_name");
       data = mlir::LLVM::createGlobalString(loc, rewriter, varName, name,
                                             mlir::LLVM::Linkage::Internal);
     } else {
@@ -314,7 +314,7 @@ private:
     auto blob = blobAttr.getValue();
 
     auto loc = op.getLoc();
-    auto name = imex::getUniqueLLVMGlobalName(mod, "gpu_blob");
+    auto name = numba::getUniqueLLVMGlobalName(mod, "gpu_blob");
     auto data = mlir::LLVM::createGlobalString(loc, rewriter, name, blob,
                                                mlir::LLVM::Linkage::Internal);
     auto size = rewriter.create<mlir::LLVM::ConstantOp>(
@@ -368,7 +368,7 @@ private:
     llvm::SmallString<64> name = op.getKernel().getLeafReference().getValue();
     name.push_back('\0');
 
-    auto varName = imex::getUniqueLLVMGlobalName(mod, "kernel_name");
+    auto varName = numba::getUniqueLLVMGlobalName(mod, "kernel_name");
     auto data = mlir::LLVM::createGlobalString(loc, rewriter, varName, name,
                                                mlir::LLVM::Linkage::Internal);
     auto res =
@@ -414,7 +414,7 @@ private:
     auto depsArrayPtr =
         createDepsArray(rewriter, loc, op, adaptor.getAsyncDependencies());
 
-    imex::AllocaInsertionPoint allocaHelper(op);
+    numba::AllocaInsertionPoint allocaHelper(op);
     auto kernelParams = adaptor.getKernelOperands();
     auto paramsCount = static_cast<unsigned>(kernelParams.size());
     auto paramsArrayType =
@@ -623,7 +623,7 @@ private:
 
     auto eventIndexVar = createEventIndexVar(rewriter, loc, op);
 
-    imex::AllocaInsertionPoint allocaHelper(op);
+    numba::AllocaInsertionPoint allocaHelper(op);
     auto resultPtr = allocaHelper.insert(rewriter, [&]() {
       auto size = rewriter.create<mlir::LLVM::ConstantOp>(
           loc, llvmInt64Type, rewriter.getI64IntegerAttr(1));
@@ -723,7 +723,7 @@ private:
                   mlir::ConversionPatternRewriter &rewriter) const override {
     auto numDims = op.getNumResults();
     auto loc = op.getLoc();
-    imex::AllocaInsertionPoint allocaHelper(op);
+    numba::AllocaInsertionPoint allocaHelper(op);
     auto gridArrayPtr = allocaHelper.insert(rewriter, [&]() {
       auto size = rewriter.create<mlir::LLVM::ConstantOp>(
           loc, llvmInt64Type, rewriter.getI64IntegerAttr(numDims));
@@ -820,7 +820,7 @@ struct GPUToLLVMPass
     mlir::populateGpuToLLVMConversionPatterns(
         converter, patterns, mlir::gpu::getDefaultGpuBinaryAnnotation());
 
-    imex::populateControlFlowTypeConversionRewritesAndTarget(converter,
+    numba::populateControlFlowTypeConversionRewritesAndTarget(converter,
                                                              patterns, target);
 
     gpu_runtime::populateGpuToLLVMPatternsAndLegality(converter, patterns,

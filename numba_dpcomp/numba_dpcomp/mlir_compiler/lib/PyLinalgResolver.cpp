@@ -78,7 +78,7 @@ static py::object mapTypesToNumbaChecked(py::handle typesMod,
                                          mlir::TypeRange typesRange) {
   auto funcTypes = mapTypesToNumba(typesMod, typesRange);
   if (funcTypes.is_none())
-    imex::reportError(llvm::Twine("map_types_to_numba failed: ") +
+    numba::reportError(llvm::Twine("map_types_to_numba failed: ") +
                       toStr(typesRange));
   return funcTypes;
 }
@@ -100,7 +100,7 @@ static mlir::Value doSignCast(mlir::OpBuilder &builder, mlir::Location &loc,
   auto origType = val.getType();
   auto signlessType = makeSignlessType(origType);
   if (signlessType != origType)
-    val = builder.createOrFold<imex::util::SignCastOp>(loc, signlessType, val);
+    val = builder.createOrFold<numba::util::SignCastOp>(loc, signlessType, val);
 
   return val;
 }
@@ -109,7 +109,7 @@ static mlir::Value doSignCast(mlir::OpBuilder &builder, mlir::Location &loc,
                               mlir::Value val, mlir::Type dstType) {
   auto origType = val.getType();
   if (dstType != origType)
-    val = builder.createOrFold<imex::util::SignCastOp>(loc, dstType, val);
+    val = builder.createOrFold<numba::util::SignCastOp>(loc, dstType, val);
 
   return val;
 }
@@ -126,8 +126,8 @@ static bool isCompatibleType(mlir::Type type) {
 
   return type.isa<mlir::IntegerType, mlir::IndexType, mlir::FloatType,
                   mlir::ComplexType, mlir::RankedTensorType, mlir::MemRefType,
-                  mlir::NoneType, imex::util::TypeVarType,
-                  imex::ntensor::NTensorType>();
+                  mlir::NoneType, numba::util::TypeVarType,
+                  numba::ntensor::NTensorType>();
 }
 
 static bool isCompatibleTypeVal(mlir::Value val) {
@@ -153,12 +153,12 @@ static auto unwrapSsaVal(py::handle obj) {
 static auto unwrapType(py::handle obj) {
   if (py::hasattr(obj, "_ssa_val")) {
     auto val = unwrapSsaVal(obj);
-    if (auto type = val.getType().dyn_cast<imex::util::TypeVarType>())
+    if (auto type = val.getType().dyn_cast<numba::util::TypeVarType>())
       return type.getType();
   } else if (py::hasattr(obj, "_mlir_type")) {
     return unwrapMlir<mlir::Type>(obj.attr("_mlir_type").cast<py::capsule>());
   }
-  imex::reportError(llvm::Twine("Invalid type object: ") +
+  numba::reportError(llvm::Twine("Invalid type object: ") +
                     toStr(obj.get_type()));
 }
 
@@ -205,7 +205,7 @@ static llvm::Optional<py::object> getPyLiteral(mlir::Attribute attr) {
       if (intType.getWidth() == 1)
         return py::bool_(intAttr.getInt() != 0);
     }
-    return py::int_(imex::getIntAttrValue(intAttr));
+    return py::int_(numba::getIntAttrValue(intAttr));
   }
   if (auto floatAttr = attr.dyn_cast<mlir::FloatAttr>())
     return py::float_(floatAttr.getValueAsDouble());
@@ -219,30 +219,30 @@ static mlir::Value doCast(mlir::OpBuilder &builder, mlir::Location loc,
   if (srcType == dstType)
     return val;
 
-  if (imex::canConvert(srcType, dstType))
-    return imex::doConvert(builder, loc, val, dstType);
+  if (numba::canConvert(srcType, dstType))
+    return numba::doConvert(builder, loc, val, dstType);
 
   if (srcType.isa<mlir::MemRefType>() &&
-      dstType.isa<imex::ntensor::NTensorType>())
-    return builder.createOrFold<imex::ntensor::FromMemrefOp>(loc, dstType, val);
+      dstType.isa<numba::ntensor::NTensorType>())
+    return builder.createOrFold<numba::ntensor::FromMemrefOp>(loc, dstType, val);
 
-  if (srcType.isa<imex::ntensor::NTensorType>() &&
+  if (srcType.isa<numba::ntensor::NTensorType>() &&
       dstType.isa<mlir::MemRefType>())
-    return builder.createOrFold<imex::ntensor::ToMemrefOp>(loc, dstType, val);
+    return builder.createOrFold<numba::ntensor::ToMemrefOp>(loc, dstType, val);
 
   if (srcType.isa<mlir::RankedTensorType>() &&
-      dstType.isa<imex::ntensor::NTensorType>())
-    return builder.createOrFold<imex::ntensor::FromTensorOp>(loc, dstType, val);
+      dstType.isa<numba::ntensor::NTensorType>())
+    return builder.createOrFold<numba::ntensor::FromTensorOp>(loc, dstType, val);
 
-  if (srcType.isa<imex::ntensor::NTensorType>() &&
+  if (srcType.isa<numba::ntensor::NTensorType>() &&
       dstType.isa<mlir::RankedTensorType>())
-    return builder.createOrFold<imex::ntensor::ToTensorOp>(loc, dstType, val);
+    return builder.createOrFold<numba::ntensor::ToTensorOp>(loc, dstType, val);
 
-  if (srcType.isa<imex::ntensor::NTensorType>() &&
-      dstType.isa<imex::ntensor::NTensorType>())
-    return builder.createOrFold<imex::ntensor::CastOp>(loc, dstType, val);
+  if (srcType.isa<numba::ntensor::NTensorType>() &&
+      dstType.isa<numba::ntensor::NTensorType>())
+    return builder.createOrFold<numba::ntensor::CastOp>(loc, dstType, val);
 
-  imex::reportError(llvm::Twine("Cannot cast types :") + toStr(srcType) +
+  numba::reportError(llvm::Twine("Cannot cast types :") + toStr(srcType) +
                     " to " + toStr(dstType));
 }
 
@@ -274,7 +274,7 @@ struct PyLinalgResolver::Context {
     if (type.isa<mlir::NoneType>())
       return py::none();
 
-    if (auto typevar = type.dyn_cast<imex::util::TypeVarType>())
+    if (auto typevar = type.dyn_cast<numba::util::TypeVarType>())
       return createType(typevar.getType());
 
     if (makeLiteral) {
@@ -297,7 +297,7 @@ struct PyLinalgResolver::Context {
     auto mlirFunc =
         mlir::cast<mlir::func::FuncOp>(static_cast<mlir::Operation *>(func));
     mlirFunc.setPrivate();
-    mlirFunc->setAttr(imex::util::attributes::getForceInlineName(),
+    mlirFunc->setAttr(numba::util::attributes::getForceInlineName(),
                       mlir::UnitAttr::get(mlirFunc->getContext()));
     return mlirFunc;
   }
@@ -322,13 +322,13 @@ struct PyLinalgResolver::Context {
       return unwrapSsaVal(obj);
 
     if (py::isinstance(obj, type)) {
-      auto type = imex::util::TypeVarType::get(unwrapType(obj));
-      return builder.create<imex::util::UndefOp>(loc, type);
+      auto type = numba::util::TypeVarType::get(unwrapType(obj));
+      return builder.create<numba::util::UndefOp>(loc, type);
     }
 
     if (obj.is_none()) {
       auto type = mlir::NoneType::get(builder.getContext());
-      return builder.create<imex::util::UndefOp>(loc, type);
+      return builder.create<numba::util::UndefOp>(loc, type);
     }
 
     if (py::isinstance<py::iterable>(obj)) {
@@ -338,7 +338,7 @@ struct PyLinalgResolver::Context {
 
       mlir::ValueRange vr(elems);
       auto resType = mlir::TupleType::get(builder.getContext(), vr.getTypes());
-      return builder.create<imex::util::BuildTupleOp>(loc, resType, elems);
+      return builder.create<numba::util::BuildTupleOp>(loc, resType, elems);
     }
 
     if (py::isinstance<py::bool_>(obj)) {
@@ -351,7 +351,7 @@ struct PyLinalgResolver::Context {
       auto attr = builder.getI64IntegerAttr(obj.cast<int64_t>());
       auto res = builder.create<mlir::arith::ConstantOp>(loc, attr);
       auto intType = builder.getIntegerType(64, true);
-      return builder.create<imex::util::SignCastOp>(loc, intType, res);
+      return builder.create<numba::util::SignCastOp>(loc, intType, res);
     }
 
     if (py::isinstance<py::float_>(obj)) {
@@ -359,7 +359,7 @@ struct PyLinalgResolver::Context {
       return builder.create<mlir::arith::ConstantOp>(loc, attr);
     }
 
-    imex::reportError(llvm::Twine("Invalid element type: ") +
+    numba::reportError(llvm::Twine("Invalid element type: ") +
                       toStr(obj.get_type()));
   }
 
@@ -376,7 +376,7 @@ struct PyLinalgResolver::Context {
       mlir::Value res = builder.create<mlir::arith::ConstantIntOp>(
           loc, obj.cast<int64_t>(), intSignlessType);
       if (intSignlessType != intType)
-        res = builder.create<imex::util::SignCastOp>(loc, intType, res);
+        res = builder.create<numba::util::SignCastOp>(loc, intType, res);
 
       return res;
     } else if (resultType.isa<mlir::FloatType>() &&
@@ -400,7 +400,7 @@ private:
   llvm::Optional<py::object> makePyLiteral(py::capsule context,
                                            mlir::Value val) {
     assert(val);
-    if (auto buildTuple = val.getDefiningOp<imex::util::BuildTupleOp>()) {
+    if (auto buildTuple = val.getDefiningOp<numba::util::BuildTupleOp>()) {
       auto args = buildTuple.getArgs();
       auto count = static_cast<unsigned>(args.size());
       py::tuple ret(count);
@@ -410,10 +410,10 @@ private:
       return ret;
     }
 
-    if (auto cast = val.getDefiningOp<imex::util::SignCastOp>())
+    if (auto cast = val.getDefiningOp<numba::util::SignCastOp>())
       val = cast.getSource();
 
-    if (auto attr = imex::getConstVal<mlir::Attribute>(val))
+    if (auto attr = numba::getConstVal<mlir::Attribute>(val))
       return getPyLiteral(attr);
 
     return {};
@@ -427,17 +427,17 @@ static mlir::Value toTensor(mlir::Location loc, mlir::OpBuilder &builder,
   if (auto memrefType = srcType.dyn_cast<mlir::MemRefType>())
     return builder.create<mlir::bufferization::ToTensorOp>(loc, val);
 
-  if (auto ntensorType = srcType.dyn_cast<imex::ntensor::NTensorType>()) {
+  if (auto ntensorType = srcType.dyn_cast<numba::ntensor::NTensorType>()) {
     auto tensorType = mlir::RankedTensorType::get(ntensorType.getShape(),
                                                   ntensorType.getElementType());
-    return builder.create<imex::ntensor::ToTensorOp>(loc, tensorType, val);
+    return builder.create<numba::ntensor::ToTensorOp>(loc, tensorType, val);
   }
 
   return val;
 }
 
 static mlir::Type toNTensorType(mlir::ShapedType type) {
-  return imex::ntensor::NTensorType::get(type.getShape(),
+  return numba::ntensor::NTensorType::get(type.getShape(),
                                          type.getElementType());
 }
 
@@ -445,11 +445,11 @@ static mlir::Value toNTensor(mlir::Location loc, mlir::OpBuilder &builder,
                              mlir::Value val) {
   auto srcType = val.getType();
   if (auto memrefType = srcType.dyn_cast<mlir::MemRefType>())
-    return builder.create<imex::ntensor::FromMemrefOp>(
+    return builder.create<numba::ntensor::FromMemrefOp>(
         loc, toNTensorType(memrefType), val);
 
   if (auto tensorType = srcType.dyn_cast<mlir::RankedTensorType>())
-    return builder.create<imex::ntensor::FromTensorOp>(
+    return builder.create<numba::ntensor::FromTensorOp>(
         loc, toNTensorType(tensorType), val);
 
   return val;
@@ -480,9 +480,9 @@ static mlir::Value toMemref(mlir::Location loc, mlir::OpBuilder &builder,
     return builder.create<mlir::bufferization::ToMemrefOp>(loc, type, val);
   }
 
-  if (auto ntensorType = srcType.dyn_cast<imex::ntensor::NTensorType>()) {
+  if (auto ntensorType = srcType.dyn_cast<numba::ntensor::NTensorType>()) {
     auto type = getMemrefType(ntensorType, strided);
-    return builder.create<imex::ntensor::ToMemrefOp>(loc, type, val);
+    return builder.create<numba::ntensor::ToMemrefOp>(loc, type, val);
   }
 
   return val;
@@ -587,7 +587,7 @@ static auto getIterators(py::list iterators, mlir::MLIRContext &ctx) {
       if (str == "reduction")
         return mlir::utils::IteratorType::reduction;
 
-      imex::reportError(llvm::Twine("Invalid linalg iterator type: ") + str);
+      numba::reportError(llvm::Twine("Invalid linalg iterator type: ") + str);
     }();
   }
 
@@ -650,13 +650,13 @@ static py::object broadcastImpl(py::capsule context, py::tuple args,
         toNTensor(loc, builder, ctx.context.unwrapVal(loc, builder, obj));
 
     auto srcType = val.getType();
-    if (!srcType.isa<imex::ntensor::NTensorType>()) {
-      if (!imex::ntensor::NTensorType::isValidElementType(srcType))
-        imex::reportError(llvm::Twine("broadcast: invalid source type ") +
+    if (!srcType.isa<numba::ntensor::NTensorType>()) {
+      if (!numba::ntensor::NTensorType::isValidElementType(srcType))
+        numba::reportError(llvm::Twine("broadcast: invalid source type ") +
                           toStr(srcType));
 
-      auto retType = imex::ntensor::NTensorType::get(std::nullopt, srcType);
-      val = builder.create<imex::ntensor::FromElementsOp>(loc, retType, val);
+      auto retType = numba::ntensor::NTensorType::get(std::nullopt, srcType);
+      val = builder.create<numba::ntensor::FromElementsOp>(loc, retType, val);
     } else {
       rank = std::max(rank, srcType.cast<mlir::ShapedType>().getRank());
     }
@@ -671,7 +671,7 @@ static py::object broadcastImpl(py::capsule context, py::tuple args,
     resTypes[i] = arg.getType().cast<mlir::ShapedType>().clone(resShape);
 
   auto broadcast =
-      builder.create<imex::ntensor::BroadcastOp>(loc, resTypes, mlirArgs);
+      builder.create<numba::ntensor::BroadcastOp>(loc, resTypes, mlirArgs);
 
   llvm::SmallVector<mlir::Value> results(broadcast->getNumResults());
   if (!resultType.is_none()) {
@@ -681,21 +681,21 @@ static py::object broadcastImpl(py::capsule context, py::tuple args,
       auto srcType = res.getType().cast<mlir::ShapedType>();
       auto dstType = srcType.clone(resType);
       if (srcType != dstType) {
-        if (!imex::canConvert(srcType.getElementType(), resType))
-          imex::reportError(llvm::Twine("Cannont convert from ") +
+        if (!numba::canConvert(srcType.getElementType(), resType))
+          numba::reportError(llvm::Twine("Cannont convert from ") +
                             toStr(srcType.getElementType()) + " to " +
                             toStr(resType));
 
         auto bodyBuilder = [&](mlir::OpBuilder &b, mlir::Location l,
                                mlir::ValueRange vals) {
           assert(vals.size() == 1);
-          auto res = imex::doConvert(b, l, vals.front(), resType);
+          auto res = numba::doConvert(b, l, vals.front(), resType);
           assert(res);
-          b.create<imex::ntensor::ElementwiseYieldOp>(l, res);
+          b.create<numba::ntensor::ElementwiseYieldOp>(l, res);
         };
 
         res = builder
-                  .create<imex::ntensor::ElementwiseOp>(loc, dstType, res,
+                  .create<numba::ntensor::ElementwiseOp>(loc, dstType, res,
                                                         bodyBuilder)
                   .getResult(0);
       }
@@ -712,9 +712,9 @@ static py::object broadcastImpl(py::capsule context, py::tuple args,
     auto dstType = mlir::RankedTensorType::get(srcType.getShape(),
                                                srcType.getElementType());
     if (rank >= 0) {
-      res = builder.create<imex::ntensor::ToTensorOp>(loc, dstType, res);
+      res = builder.create<numba::ntensor::ToTensorOp>(loc, dstType, res);
     } else {
-      res = builder.create<imex::ntensor::LoadOp>(loc, res);
+      res = builder.create<numba::ntensor::LoadOp>(loc, res);
     }
     ret[i] = ctx.context.createVar(context, res);
   }
@@ -748,8 +748,8 @@ static py::object initTensorImpl(py::capsule context, py::iterable shape,
                   elemType);
   }
 
-  auto resType = imex::ntensor::NTensorType::get(staticShape, elemType);
-  mlir::Value res = builder.create<imex::ntensor::CreateArrayOp>(
+  auto resType = numba::ntensor::NTensorType::get(staticShape, elemType);
+  mlir::Value res = builder.create<numba::ntensor::CreateArrayOp>(
       loc, resType, dynamicShape, init);
   return ctx.context.createVar(context, res);
 }
@@ -834,7 +834,7 @@ static py::object indexImpl(py::capsule context, py::int_ dimObj) {
   auto &builder = ctx.builder;
   auto val = static_cast<int64_t>(dimObj);
   if (val < 0)
-    imex::reportError("Index cannot be negative");
+    numba::reportError("Index cannot be negative");
 
   auto dimVal =
       builder.create<mlir::linalg::IndexOp>(loc, static_cast<uint64_t>(val));
@@ -866,7 +866,7 @@ static py::object fromElementsImpl(py::capsule context, py::handle values,
   });
 
   if (vals.empty())
-    imex::reportError("Invalid from_elemets size");
+    numba::reportError("Invalid from_elemets size");
 
   auto resTensorType =
       mlir::RankedTensorType::get(mlir::ShapedType::kDynamic, type);
@@ -895,7 +895,7 @@ static py::object extractImpl(py::capsule context, py::handle value,
       toTensor(loc, builder, ctx.context.unwrapVal(loc, builder, value));
   auto tensorType = tensor.getType().dyn_cast<mlir::RankedTensorType>();
   if (!tensorType)
-    imex::reportError(llvm::Twine("extract: invalid source type ") +
+    numba::reportError(llvm::Twine("extract: invalid source type ") +
                       toStr(tensor.getType()));
 
   auto res =
@@ -920,7 +920,7 @@ static py::object reshapeImpl(py::capsule context, py::handle src,
   auto srcVal = toTensor(loc, builder, unwrapVal(src));
   auto srcType = srcVal.getType().dyn_cast<mlir::RankedTensorType>();
   if (!srcType)
-    imex::reportError(llvm::Twine("invalid reshape argument: ") +
+    numba::reportError(llvm::Twine("invalid reshape argument: ") +
                       toStr(srcVal.getType()));
 
   auto newDimsVals = [&]() {
@@ -943,7 +943,7 @@ static py::object reshapeImpl(py::capsule context, py::handle src,
       for (size_t i = 0; i < dimsCount; ++i) {
         auto ind = builder.create<mlir::arith::ConstantIndexOp>(loc, i);
         auto elemType = tupleType.getType(i);
-        auto item = builder.createOrFold<imex::util::TupleExtractOp>(
+        auto item = builder.createOrFold<numba::util::TupleExtractOp>(
             loc, elemType, dims, ind);
         ret[i] = dimCast(item);
       }
@@ -1053,12 +1053,12 @@ static py::object externalCallImpl(py::capsule context, py::str funcName,
   auto unwrapVal = [&](py::handle obj) {
     auto tensor =
         toNTensor(loc, builder, ctx.context.unwrapVal(loc, builder, obj));
-    auto tensorType = tensor.getType().dyn_cast<imex::ntensor::NTensorType>();
+    auto tensorType = tensor.getType().dyn_cast<numba::ntensor::NTensorType>();
     if (tensorType) {
-      auto commonType = imex::ntensor::NTensorType::get(
+      auto commonType = numba::ntensor::NTensorType::get(
           getDynShape(tensorType.getRank()), tensorType.getElementType());
       if (commonType != tensorType)
-        tensor = builder.create<imex::ntensor::CastOp>(loc, commonType, tensor);
+        tensor = builder.create<numba::ntensor::CastOp>(loc, commonType, tensor);
     }
     return tensor;
   };
@@ -1094,13 +1094,13 @@ static py::object externalCallImpl(py::capsule context, py::str funcName,
     if (f) {
       auto existingType = f.getFunctionType();
       if (existingType != funcType) {
-        imex::reportError(llvm::Twine("linalg_builder::external_call: "
+        numba::reportError(llvm::Twine("linalg_builder::external_call: "
                                       "invalid function redefinition: ") +
                           name + " " + toStr(existingType) + " and " +
                           toStr(funcType));
       }
     } else {
-      f = imex::addFunction(builder, mod, name, funcType);
+      f = numba::addFunction(builder, mod, name, funcType);
       if (decorate)
         f->setAttr("llvm.emit_c_interface",
                    mlir::UnitAttr::get(builder.getContext()));
@@ -1119,7 +1119,7 @@ static py::object externalCallImpl(py::capsule context, py::str funcName,
             if (py::isinstance<py::str>(v))
               return builder.getStringAttr(v.cast<std::string>());
 
-            imex::reportError(llvm::Twine("Unsupported attr type: ") +
+            numba::reportError(llvm::Twine("Unsupported attr type: ") +
                               py::str(v).cast<std::string>());
           }();
 
@@ -1232,13 +1232,13 @@ static py::object inlineFuncImpl(py::capsule context, py::handle func,
   auto funcType = bodyFunc.getFunctionType();
   auto funcArgsTypes = funcType.getInputs();
   if (funcArgsTypes.size() != argsValues.size())
-    imex::reportError(
+    numba::reportError(
         llvm::Twine("Invalid function arguments count, expected ") +
         llvm::Twine(argsValues.size()) + ", got" +
         llvm::Twine(funcArgsTypes.size()));
 
   if (funcType.getNumResults() != 1)
-    imex::reportError(llvm::Twine("Invalid number of return values: ") +
+    numba::reportError(llvm::Twine("Invalid number of return values: ") +
                       llvm::Twine(funcType.getNumResults()));
 
   auto castValues = [&](mlir::ValueRange vals, mlir::TypeRange types) {
@@ -1280,7 +1280,7 @@ static py::object undefImpl(py::capsule context, py::handle dtype) {
   auto &builder = ctx.builder;
   auto loc = ctx.loc;
   auto type = unwrapType(dtype);
-  auto ret = builder.createOrFold<imex::util::UndefOp>(loc, type);
+  auto ret = builder.createOrFold<numba::util::UndefOp>(loc, type);
   return ctx.context.createVar(context, ret);
 }
 
@@ -1300,7 +1300,7 @@ static py::object subviewImpl(py::capsule context, py::handle src,
 
   auto indexType = builder.getIndexType();
   auto indexCast = [&](mlir::Value val) -> mlir::OpFoldResult {
-    while (auto parent = val.getDefiningOp<imex::util::SignCastOp>())
+    while (auto parent = val.getDefiningOp<numba::util::SignCastOp>())
       val = parent.getSource();
 
     if (auto constVal = mlir::getConstantIntValue(val))
@@ -1326,7 +1326,7 @@ static py::object subviewImpl(py::capsule context, py::handle src,
       ret.resize(tupleType.size());
       for (auto i : llvm::seq(size_t(0), tupleType.size())) {
         auto ind = builder.create<mlir::arith::ConstantIndexOp>(loc, i);
-        ret[i] = indexCast(builder.createOrFold<imex::util::TupleExtractOp>(
+        ret[i] = indexCast(builder.createOrFold<numba::util::TupleExtractOp>(
             loc, tupleType.getType(i), val, ind));
       }
     } else {
@@ -1398,19 +1398,19 @@ static py::object forceCopyImpl(py::capsule context, py::handle src) {
   auto srcVal =
       toNTensor(loc, builder, ctx.context.unwrapVal(loc, builder, src));
 
-  auto valType = srcVal.getType().cast<imex::ntensor::NTensorType>();
+  auto valType = srcVal.getType().cast<numba::ntensor::NTensorType>();
   llvm::SmallVector<mlir::Value> dynamicSizes;
   for (auto [i, dim] : llvm::enumerate(valType.getShape())) {
     if (mlir::ShapedType::isDynamic(dim)) {
-      mlir::Value dimVal = builder.create<imex::ntensor::DimOp>(
+      mlir::Value dimVal = builder.create<numba::ntensor::DimOp>(
           loc, srcVal, static_cast<int64_t>(i));
       dynamicSizes.emplace_back(dimVal);
     }
   }
 
-  mlir::Value res = builder.create<imex::ntensor::CreateArrayOp>(
+  mlir::Value res = builder.create<numba::ntensor::CreateArrayOp>(
       loc, valType, dynamicSizes, /*initVal*/ mlir::Value{});
-  builder.create<imex::ntensor::CopyOp>(loc, srcVal, res);
+  builder.create<numba::ntensor::CopyOp>(loc, srcVal, res);
   return ctx.context.createVar(context, res);
 }
 
@@ -1497,10 +1497,10 @@ static py::object shapeImpl(py::capsule context, py::capsule ssaVal) {
   auto value = unwrapMlir<mlir::Value>(ssaVal);
   if (auto mlirType = value.getType().dyn_cast<mlir::ShapedType>()) {
     if (!mlirType.hasRank())
-      imex::reportError("Unranked shaped are not supported");
+      numba::reportError("Unranked shaped are not supported");
 
     bool isTensor = mlirType.isa<mlir::TensorType>();
-    bool isNTensor = mlirType.isa<imex::ntensor::NTensorType>();
+    bool isNTensor = mlirType.isa<numba::ntensor::NTensorType>();
     auto &builder = ctx.builder;
     auto loc = ctx.loc;
     auto rank = static_cast<unsigned>(mlirType.getRank());
@@ -1510,7 +1510,7 @@ static py::object shapeImpl(py::capsule context, py::capsule ssaVal) {
       if (isTensor) {
         mlirDim = builder.create<mlir::tensor::DimOp>(loc, value, i);
       } else if (isNTensor) {
-        mlirDim = builder.create<imex::ntensor::DimOp>(loc, value, i);
+        mlirDim = builder.create<numba::ntensor::DimOp>(loc, value, i);
       } else {
         mlirDim = builder.create<mlir::memref::DimOp>(loc, value, i);
       }
@@ -1519,7 +1519,7 @@ static py::object shapeImpl(py::capsule context, py::capsule ssaVal) {
     llvm::SmallVector<mlir::Type> shapeTypes(rank, builder.getIndexType());
     auto shapeType = mlir::TupleType::get(builder.getContext(), shapeTypes);
     auto shapeVar =
-        builder.create<imex::util::BuildTupleOp>(loc, shapeType, shapeVals);
+        builder.create<numba::util::BuildTupleOp>(loc, shapeType, shapeVals);
     return ctx.context.createVar(context, shapeVar.getResult());
   }
   return py::tuple();
@@ -1530,7 +1530,7 @@ static py::object stridesImpl(py::capsule context, py::capsule ssaVal) {
   auto value = unwrapMlir<mlir::Value>(ssaVal);
   if (auto mlirType = value.getType().dyn_cast<mlir::ShapedType>()) {
     if (!mlirType.hasRank())
-      imex::reportError("Unranked strides are not supported");
+      numba::reportError("Unranked strides are not supported");
 
     auto &builder = ctx.builder;
     auto loc = ctx.loc;
@@ -1543,7 +1543,7 @@ static py::object stridesImpl(py::capsule context, py::capsule ssaVal) {
     auto rank = static_cast<unsigned>(mlirType.getRank());
     llvm::SmallVector<mlir::Type> shapeTypes(rank, builder.getIndexType());
     auto shapeType = mlir::TupleType::get(builder.getContext(), shapeTypes);
-    auto shapeVar = builder.create<imex::util::BuildTupleOp>(
+    auto shapeVar = builder.create<numba::util::BuildTupleOp>(
         loc, shapeType, metadata.getStrides());
     return ctx.context.createVar(context, shapeVar.getResult());
   }
@@ -1588,20 +1588,20 @@ static py::object getitemImpl(py::capsule context, py::capsule ssaVal,
     auto elemType = shaped.getElementType();
 
     mlir::Value array;
-    auto ntensorType = imex::ntensor::NTensorType::get(shaped.getShape(),
+    auto ntensorType = numba::ntensor::NTensorType::get(shaped.getShape(),
                                                        shaped.getElementType());
     if (shaped.isa<mlir::MemRefType>()) {
       array =
-          builder.create<imex::ntensor::FromMemrefOp>(loc, ntensorType, value);
+          builder.create<numba::ntensor::FromMemrefOp>(loc, ntensorType, value);
     } else if (shaped.isa<mlir::RankedTensorType>()) {
       array =
-          builder.create<imex::ntensor::FromTensorOp>(loc, ntensorType, value);
-    } else if (shaped.isa<imex::ntensor::NTensorType>()) {
+          builder.create<numba::ntensor::FromTensorOp>(loc, ntensorType, value);
+    } else if (shaped.isa<numba::ntensor::NTensorType>()) {
       array = value;
     } else {
       throw py::index_error("Invalid shaped type");
     }
-    auto res = builder.create<imex::ntensor::GetitemOp>(loc, elemType, array,
+    auto res = builder.create<numba::ntensor::GetitemOp>(loc, elemType, array,
                                                         indexVal);
     return ctx.context.createVar(context, res.getResult());
   }
@@ -1614,14 +1614,14 @@ static py::object getitemImpl(py::capsule context, py::capsule ssaVal,
                              ", expected [0:" + llvm::Twine(maxIndex) + ")")
                                 .str());
 
-    if (auto parentOp = value.getDefiningOp<imex::util::BuildTupleOp>())
+    if (auto parentOp = value.getDefiningOp<numba::util::BuildTupleOp>())
       return ctx.context.createVar(
           context, parentOp.getOperand(static_cast<unsigned>(indexVal)));
 
     auto elemType = tupleType.getType(static_cast<size_t>(indexVal));
     auto ind = builder.create<mlir::arith::ConstantIndexOp>(loc, indexVal);
     auto item =
-        builder.create<imex::util::TupleExtractOp>(loc, elemType, value, ind);
+        builder.create<numba::util::TupleExtractOp>(loc, elemType, value, ind);
     return ctx.context.createVar(context, item.getResult());
   } else {
     throw py::index_error("Invalid getitem");
@@ -1686,7 +1686,7 @@ static py::object binopImpl(py::capsule context, py::capsule ssaVal,
   auto type = lhs.getType();
   if (!type.isa<mlir::IntegerType, mlir::IndexType, mlir::FloatType,
                 mlir::ShapedType>())
-    imex::reportError("Invalid binop arg type");
+    numba::reportError("Invalid binop arg type");
 
   auto isFloat = [&]() -> bool {
     if (auto shapedType = type.dyn_cast<mlir::ShapedType>())
@@ -1732,7 +1732,7 @@ static py::object binopImpl(py::capsule context, py::capsule ssaVal,
       return ctx.context.createVar(context, res);
     }
   }
-  imex::reportError("Unhandled binop type");
+  numba::reportError("Unhandled binop type");
 }
 
 static py::object unopImpl(py::capsule context, py::capsule ssaVal,
@@ -1744,7 +1744,7 @@ static py::object unopImpl(py::capsule context, py::capsule ssaVal,
 
   auto type = val.getType();
   if (!type.isa<mlir::IntegerType, mlir::IndexType, mlir::FloatType>())
-    imex::reportError("Invalid unop arg type");
+    numba::reportError("Invalid unop arg type");
 
   auto opName = static_cast<std::string>(op);
   mlir::Value res;
@@ -1762,7 +1762,7 @@ static py::object unopImpl(py::capsule context, py::capsule ssaVal,
       res = doSignCast(builder, loc, res, type);
     }
   } else {
-    imex::reportError("Unhandled unop type");
+    numba::reportError("Unhandled unop type");
   }
   return ctx.context.createVar(context, res);
 }
@@ -1811,7 +1811,7 @@ static PyLinalgResolver::Values unpackResults(PyBuilderContext &ctx,
 
     auto tupleType = mlir::TupleType::get(builder.getContext(), vr.getTypes());
     ret.emplace_back(
-        builder.create<imex::util::BuildTupleOp>(loc, tupleType, vr));
+        builder.create<numba::util::BuildTupleOp>(loc, tupleType, vr));
   } else {
     ret.emplace_back(unwrapVal(object));
   }

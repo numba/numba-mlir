@@ -73,7 +73,7 @@
 namespace {
 static int64_t getOptLevel(mlir::Operation *op) {
   assert(op);
-  auto attr = op->getAttr(imex::util::attributes::getOptLevelName())
+  auto attr = op->getAttr(numba::util::attributes::getOptLevelName())
                   .dyn_cast_or_null<mlir::IntegerAttr>();
   if (!attr)
     return 0;
@@ -139,7 +139,7 @@ static mlir::LogicalResult applyOptimizations(
     repeat = false;
     (void)mlir::applyPatternsAndFoldGreedily(op, patterns);
 
-    auto memOptRes = imex::optimizeMemoryOps(am);
+    auto memOptRes = numba::optimizeMemoryOps(am);
     if (!memOptRes)
       return op.emitError() << "Failed to build memssa analysis";
 
@@ -165,7 +165,7 @@ static void rerunScfPipeline(mlir::Operation *op) {
       mlir::StringAttr::get(op->getContext(), plierToScfPipelineName());
   auto mod = op->getParentOfType<mlir::ModuleOp>();
   assert(nullptr != mod);
-  imex::addPipelineJumpMarker(mod, marker);
+  numba::addPipelineJumpMarker(mod, marker);
 }
 
 static mlir::Value skipCasts(mlir::Value val) {
@@ -192,11 +192,11 @@ lowerPrange(plier::PyCallOp op, mlir::ValueRange operands,
             mlir::PatternRewriter &rewriter) {
   auto parent = op->getParentOp();
   auto setAttr = [](mlir::scf::ForOp op) {
-    op->setAttr(imex::util::attributes::getParallelName(),
+    op->setAttr(numba::util::attributes::getParallelName(),
                 mlir::UnitAttr::get(op->getContext()));
   };
   if (mlir::succeeded(
-          imex::lowerRange(op, operands, kwargs, rewriter, setAttr))) {
+          numba::lowerRange(op, operands, kwargs, rewriter, setAttr))) {
     rerunScfPipeline(parent);
     return mlir::success();
   }
@@ -348,7 +348,7 @@ struct ReshapeChangeLayout
   mlir::LogicalResult
   matchAndRewrite(mlir::memref::ReshapeOp op,
                   mlir::PatternRewriter &rewriter) const override {
-    auto cl = op.getSource().getDefiningOp<imex::util::ChangeLayoutOp>();
+    auto cl = op.getSource().getDefiningOp<numba::util::ChangeLayoutOp>();
     if (!cl)
       return mlir::failure();
 
@@ -400,7 +400,7 @@ struct ReshapeChangeLayout
     }
 
     auto trueBody = [&](mlir::OpBuilder &builder, mlir::Location loc) {
-      mlir::Value flat = builder.create<imex::util::MemrefApplyOffsetOp>(
+      mlir::Value flat = builder.create<numba::util::MemrefApplyOffsetOp>(
           loc, src.getType(), src);
 
       mlir::Value res = builder.create<mlir::memref::ReinterpretCastOp>(
@@ -548,7 +548,7 @@ void MakeStridedLayoutPass::runOnOperation() {
           auto arg = body.front().getArgument(i);
           arg.setType(newMemrefType);
           auto dst =
-              builder.create<imex::util::ChangeLayoutOp>(loc, memrefType, arg);
+              builder.create<numba::util::ChangeLayoutOp>(loc, memrefType, arg);
           arg.replaceAllUsesExcept(dst, dst);
         }
       }
@@ -609,7 +609,7 @@ void MakeStridedLayoutPass::runOnOperation() {
               assert(oldType.isa<mlir::MemRefType>());
               assert(newType.isa<mlir::MemRefType>());
               auto newArg =
-                  builder.create<imex::util::ChangeLayoutOp>(loc, newType, arg)
+                  builder.create<numba::util::ChangeLayoutOp>(loc, newType, arg)
                       .getResult();
               newOperands[i] = newArg;
             } else {
@@ -630,7 +630,7 @@ void MakeStridedLayoutPass::runOnOperation() {
               assert(newType.isa<mlir::MemRefType>());
               res.setType(newType);
               auto newRes =
-                  builder.create<imex::util::ChangeLayoutOp>(loc, oldType, res);
+                  builder.create<numba::util::ChangeLayoutOp>(loc, oldType, res);
               res.replaceAllUsesExcept(newRes, newRes);
             }
           }
@@ -765,7 +765,7 @@ struct OptimizeStridedLayoutPass
     auto *context = &getContext();
     mlir::RewritePatternSet patterns(context);
 
-    imex::populateCanonicalizationPatterns(patterns);
+    numba::populateCanonicalizationPatterns(patterns);
 
     patterns.insert<ChangeLayoutReturn>(context);
 
@@ -792,7 +792,7 @@ void FinalizeStridedLayoutPass::runOnOperation() {
 
   (void)mlir::applyPatternsAndFoldGreedily(op, std::move(patterns));
 
-  op->walk([&](imex::util::ChangeLayoutOp cl) {
+  op->walk([&](numba::util::ChangeLayoutOp cl) {
     cl.emitError("Layout change failed");
     signalPassFailure();
   });
@@ -802,8 +802,8 @@ static mlir::Value convertScalarType(mlir::OpBuilder &builder,
                                      mlir::Location loc, mlir::Value val,
                                      mlir::Type dstType) {
   auto srcType = val.getType();
-  if (imex::canConvert(srcType, dstType))
-    val = imex::doConvert(builder, loc, val, dstType);
+  if (numba::canConvert(srcType, dstType))
+    val = numba::doConvert(builder, loc, val, dstType);
 
   return val;
 }
@@ -815,7 +815,7 @@ struct GetitemToNtensor : public mlir::OpConversionPattern<plier::GetItemOp> {
   matchAndRewrite(plier::GetItemOp op, plier::GetItemOp::Adaptor adaptor,
                   mlir::ConversionPatternRewriter &rewriter) const override {
     auto src = adaptor.getValue();
-    auto srcType = src.getType().dyn_cast<imex::ntensor::NTensorType>();
+    auto srcType = src.getType().dyn_cast<numba::ntensor::NTensorType>();
     if (!srcType)
       return mlir::failure();
 
@@ -827,7 +827,7 @@ struct GetitemToNtensor : public mlir::OpConversionPattern<plier::GetItemOp> {
 
     auto index = adaptor.getIndex();
 
-    rewriter.replaceOpWithNewOp<imex::ntensor::GetitemOp>(op, resultType, src,
+    rewriter.replaceOpWithNewOp<numba::ntensor::GetitemOp>(op, resultType, src,
                                                           index);
     return mlir::success();
   }
@@ -840,7 +840,7 @@ struct SetitemToNtensor : public mlir::OpConversionPattern<plier::SetItemOp> {
   matchAndRewrite(plier::SetItemOp op, plier::SetItemOp::Adaptor adaptor,
                   mlir::ConversionPatternRewriter &rewriter) const override {
     auto src = adaptor.getTarget();
-    auto srcType = src.getType().dyn_cast<imex::ntensor::NTensorType>();
+    auto srcType = src.getType().dyn_cast<numba::ntensor::NTensorType>();
     if (!srcType)
       return mlir::failure();
 
@@ -848,19 +848,19 @@ struct SetitemToNtensor : public mlir::OpConversionPattern<plier::SetItemOp> {
     auto value = convertScalarType(rewriter, op->getLoc(), adaptor.getValue(),
                                    srcType.getElementType());
 
-    rewriter.replaceOpWithNewOp<imex::ntensor::SetitemOp>(op, src, index,
+    rewriter.replaceOpWithNewOp<numba::ntensor::SetitemOp>(op, src, index,
                                                           value);
     return mlir::success();
   }
 };
 
 struct NtensorGetitemToNtensor
-    : public mlir::OpConversionPattern<imex::ntensor::GetitemOp> {
+    : public mlir::OpConversionPattern<numba::ntensor::GetitemOp> {
   using OpConversionPattern::OpConversionPattern;
 
   mlir::LogicalResult
-  matchAndRewrite(imex::ntensor::GetitemOp op,
-                  imex::ntensor::GetitemOp::Adaptor adaptor,
+  matchAndRewrite(numba::ntensor::GetitemOp op,
+                  numba::ntensor::GetitemOp::Adaptor adaptor,
                   mlir::ConversionPatternRewriter &rewriter) const override {
     auto converter = getTypeConverter();
     assert(converter);
@@ -868,21 +868,21 @@ struct NtensorGetitemToNtensor
     if (!resultType)
       return mlir::failure();
 
-    rewriter.replaceOpWithNewOp<imex::ntensor::GetitemOp>(
+    rewriter.replaceOpWithNewOp<numba::ntensor::GetitemOp>(
         op, resultType, adaptor.getSource(), adaptor.getIndex());
     return mlir::success();
   }
 };
 
 struct NtensorSetitemToNtensor
-    : public mlir::OpConversionPattern<imex::ntensor::SetitemOp> {
+    : public mlir::OpConversionPattern<numba::ntensor::SetitemOp> {
   using OpConversionPattern::OpConversionPattern;
 
   mlir::LogicalResult
-  matchAndRewrite(imex::ntensor::SetitemOp op,
-                  imex::ntensor::SetitemOp::Adaptor adaptor,
+  matchAndRewrite(numba::ntensor::SetitemOp op,
+                  numba::ntensor::SetitemOp::Adaptor adaptor,
                   mlir::ConversionPatternRewriter &rewriter) const override {
-    rewriter.replaceOpWithNewOp<imex::ntensor::SetitemOp>(
+    rewriter.replaceOpWithNewOp<numba::ntensor::SetitemOp>(
         op, adaptor.getSource(), adaptor.getIndex(), adaptor.getValue());
     return mlir::success();
   }
@@ -896,8 +896,8 @@ struct BinopToNtensor : public mlir::OpConversionPattern<plier::BinOp> {
                   mlir::ConversionPatternRewriter &rewriter) const override {
     auto lhs = adaptor.getLhs();
     auto rhs = adaptor.getRhs();
-    if (!lhs.getType().isa<imex::ntensor::NTensorType>() &&
-        !rhs.getType().isa<imex::ntensor::NTensorType>())
+    if (!lhs.getType().isa<numba::ntensor::NTensorType>() &&
+        !rhs.getType().isa<numba::ntensor::NTensorType>())
       return mlir::failure();
 
     auto converter = getTypeConverter();
@@ -907,7 +907,7 @@ struct BinopToNtensor : public mlir::OpConversionPattern<plier::BinOp> {
       return mlir::failure();
 
     auto opName = op.getOp();
-    rewriter.replaceOpWithNewOp<imex::ntensor::BinaryOp>(op, resultType, lhs,
+    rewriter.replaceOpWithNewOp<numba::ntensor::BinaryOp>(op, resultType, lhs,
                                                          rhs, opName);
     return mlir::success();
   }
@@ -943,7 +943,7 @@ struct BuildSliceToNtensor
     auto begin = getVal(op.getBegin(), adaptor.getBegin());
     auto end = getVal(op.getEnd(), adaptor.getEnd());
     auto step = getVal(op.getStep(), adaptor.getStep());
-    rewriter.replaceOpWithNewOp<imex::ntensor::BuildSliceOp>(op, begin, end,
+    rewriter.replaceOpWithNewOp<numba::ntensor::BuildSliceOp>(op, begin, end,
                                                              step);
     return mlir::success();
   }
@@ -1004,7 +1004,7 @@ struct NumpyCallsToNtensor : public mlir::OpConversionPattern<plier::PyCallOp> {
     argNames.append(srcKwNames.begin(), srcKwNames.end());
 
     auto argNamesAttr = rewriter.getArrayAttr(argNames);
-    rewriter.replaceOpWithNewOp<imex::ntensor::CallOp>(op, resTypes, args,
+    rewriter.replaceOpWithNewOp<numba::ntensor::CallOp>(op, resTypes, args,
                                                        argNamesAttr, funcName);
     return mlir::success();
   }
@@ -1023,7 +1023,7 @@ struct NumpyAttrsToNtensor
   matchAndRewrite(plier::GetattrOp op, plier::GetattrOp::Adaptor adaptor,
                   mlir::ConversionPatternRewriter &rewriter) const override {
     auto src = adaptor.getValue();
-    if (!src.getType().isa<imex::ntensor::NTensorType>())
+    if (!src.getType().isa<numba::ntensor::NTensorType>())
       return mlir::failure();
 
     auto funcName = ("array." + op.getName()).str();
@@ -1043,7 +1043,7 @@ struct NumpyAttrsToNtensor
       return mlir::failure();
 
     auto argNamesAttr = rewriter.getArrayAttr(rewriter.getStringAttr(""));
-    rewriter.replaceOpWithNewOp<imex::ntensor::CallOp>(op, resultType, src,
+    rewriter.replaceOpWithNewOp<numba::ntensor::CallOp>(op, resultType, src,
                                                        argNamesAttr, funcName);
 
     return mlir::success();
@@ -1091,14 +1091,14 @@ static mlir::Value addElementConversion(mlir::OpBuilder &builder,
                                         mlir::Location loc,
                                         mlir::Value srcArray,
                                         mlir::Type dstType) {
-  auto srcType = srcArray.getType().cast<imex::ntensor::NTensorType>();
+  auto srcType = srcArray.getType().cast<numba::ntensor::NTensorType>();
   auto dstShaped = dstType.cast<mlir::ShapedType>();
   auto srcElementType = srcType.getElementType();
   auto dstElementType = dstShaped.getElementType();
   if (srcElementType == dstElementType)
     return srcArray;
 
-  auto dstArrayTupe = imex::ntensor::NTensorType::get(
+  auto dstArrayTupe = numba::ntensor::NTensorType::get(
       dstShaped.getShape(), dstElementType, srcType.getEnvironment(),
       srcType.getLayout());
 
@@ -1107,11 +1107,11 @@ static mlir::Value addElementConversion(mlir::OpBuilder &builder,
                          mlir::ValueRange vals) {
     assert(vals.size() == 1);
     mlir::Value res = b.create<plier::CastOp>(l, dstElementType, vals.front());
-    b.create<imex::ntensor::ElementwiseYieldOp>(l, res);
+    b.create<numba::ntensor::ElementwiseYieldOp>(l, res);
   };
 
   return builder
-      .create<imex::ntensor::ElementwiseOp>(loc, dstArrayTupe, srcArray,
+      .create<numba::ntensor::ElementwiseOp>(loc, dstArrayTupe, srcArray,
                                             bodyBuilder)
       .getResult(0);
 }
@@ -1128,8 +1128,8 @@ static mlir::Value castType(mlir::OpBuilder &builder, mlir::Location loc,
   if (srcType.isa<mlir::RankedTensorType>())
     return builder.create<mlir::tensor::CastOp>(loc, dstType, src);
 
-  if (srcType.isa<imex::ntensor::NTensorType>())
-    return builder.create<imex::ntensor::CastOp>(loc, dstType, src);
+  if (srcType.isa<numba::ntensor::NTensorType>())
+    return builder.create<numba::ntensor::CastOp>(loc, dstType, src);
 
   llvm_unreachable("Invalid shaped type");
 }
@@ -1141,10 +1141,10 @@ static llvm::Optional<mlir::Value> doCast(mlir::OpBuilder &builder,
   if (srcType == dstType)
     return src;
 
-  if (imex::canConvert(srcType, dstType))
-    return imex::doConvert(builder, loc, src, dstType);
+  if (numba::canConvert(srcType, dstType))
+    return numba::doConvert(builder, loc, src, dstType);
 
-  if (auto srcArrayType = srcType.dyn_cast<imex::ntensor::NTensorType>()) {
+  if (auto srcArrayType = srcType.dyn_cast<numba::ntensor::NTensorType>()) {
     auto dstShapedType = dstType.dyn_cast<mlir::ShapedType>();
     if (!dstShapedType)
       return std::nullopt;
@@ -1153,11 +1153,11 @@ static llvm::Optional<mlir::Value> doCast(mlir::OpBuilder &builder,
     if (dstShapedType.isa<mlir::MemRefType>()) {
       auto dstMemrefType = mlir::MemRefType::get(
           srcArrayType.getShape(), dstShapedType.getElementType());
-      res = builder.create<imex::ntensor::ToMemrefOp>(loc, dstMemrefType, res);
+      res = builder.create<numba::ntensor::ToMemrefOp>(loc, dstMemrefType, res);
     } else if (dstShapedType.isa<mlir::RankedTensorType>()) {
       auto dstTensorType = mlir::RankedTensorType::get(
           srcArrayType.getShape(), dstShapedType.getElementType());
-      res = builder.create<imex::ntensor::ToTensorOp>(loc, dstTensorType, res);
+      res = builder.create<numba::ntensor::ToTensorOp>(loc, dstTensorType, res);
     }
 
     return castType(builder, loc, res, dstShapedType);
@@ -1166,11 +1166,11 @@ static llvm::Optional<mlir::Value> doCast(mlir::OpBuilder &builder,
     if (!srcShapedType)
       return std::nullopt;
 
-    auto dstArrayType = dstType.dyn_cast<imex::ntensor::NTensorType>();
+    auto dstArrayType = dstType.dyn_cast<numba::ntensor::NTensorType>();
     if (!dstArrayType)
       return std::nullopt;
 
-    srcArrayType = imex::ntensor::NTensorType::get(
+    srcArrayType = numba::ntensor::NTensorType::get(
         dstArrayType.getShape(), srcShapedType.getElementType(),
         dstArrayType.getEnvironment(), dstArrayType.getLayout());
 
@@ -1179,12 +1179,12 @@ static llvm::Optional<mlir::Value> doCast(mlir::OpBuilder &builder,
       auto dstMemrefType = mlir::MemRefType::get(
           dstArrayType.getShape(), srcShapedType.getElementType());
       src = castType(builder, loc, src, dstMemrefType);
-      res = builder.create<imex::ntensor::FromMemrefOp>(loc, srcArrayType, src);
+      res = builder.create<numba::ntensor::FromMemrefOp>(loc, srcArrayType, src);
     } else if (srcShapedType.isa<mlir::RankedTensorType>()) {
       auto dstTensorType = mlir::RankedTensorType::get(
           dstArrayType.getShape(), srcShapedType.getElementType());
       src = castType(builder, loc, src, dstTensorType);
-      res = builder.create<imex::ntensor::FromTensorOp>(loc, srcArrayType, src);
+      res = builder.create<numba::ntensor::FromTensorOp>(loc, srcArrayType, src);
     }
     assert(res && "Expected tensor or memref type.");
     return addElementConversion(builder, loc, res, dstArrayType);
@@ -1221,14 +1221,14 @@ struct CastsToNtensor : public mlir::OpConversionPattern<plier::CastOp> {
       return mlir::success();
     }
 
-    if (imex::ntensor::NTensorType::isValidElementType(srcType) &&
-        dstType.isa<imex::ntensor::NTensorType>()) {
-      auto ntensorType = dstType.cast<imex::ntensor::NTensorType>();
+    if (numba::ntensor::NTensorType::isValidElementType(srcType) &&
+        dstType.isa<numba::ntensor::NTensorType>()) {
+      auto ntensorType = dstType.cast<numba::ntensor::NTensorType>();
       if (srcType != ntensorType.getElementType() ||
           !ntensorType.hasStaticShape())
         return mlir::failure();
 
-      rewriter.replaceOpWithNewOp<imex::ntensor::CreateArrayOp>(
+      rewriter.replaceOpWithNewOp<numba::ntensor::CreateArrayOp>(
           op, ntensorType, /*dynamicSizes*/ std::nullopt, src);
       return mlir::success();
     }
@@ -1243,16 +1243,16 @@ struct CastsToNtensor : public mlir::OpConversionPattern<plier::CastOp> {
 };
 
 struct UnitupleExtractToNtensor
-    : public mlir::OpConversionPattern<imex::util::TupleExtractOp> {
+    : public mlir::OpConversionPattern<numba::util::TupleExtractOp> {
   using OpConversionPattern::OpConversionPattern;
 
   mlir::LogicalResult
-  matchAndRewrite(imex::util::TupleExtractOp op,
-                  imex::util::TupleExtractOp::Adaptor adaptor,
+  matchAndRewrite(numba::util::TupleExtractOp op,
+                  numba::util::TupleExtractOp::Adaptor adaptor,
                   mlir::ConversionPatternRewriter &rewriter) const override {
     auto src = adaptor.getSource();
     auto elemType = isUniTuple(src.getType());
-    if (!elemType || !imex::ntensor::NTensorType::isValidElementType(*elemType))
+    if (!elemType || !numba::ntensor::NTensorType::isValidElementType(*elemType))
       return mlir::failure();
 
     auto converter = getTypeConverter();
@@ -1263,7 +1263,7 @@ struct UnitupleExtractToNtensor
       return mlir::failure();
 
     auto index = adaptor.getIndex();
-    rewriter.replaceOpWithNewOp<imex::ntensor::GetitemOp>(op, dstType, src,
+    rewriter.replaceOpWithNewOp<numba::ntensor::GetitemOp>(op, dstType, src,
                                                           index);
     return mlir::success();
   }
@@ -1271,7 +1271,7 @@ struct UnitupleExtractToNtensor
 
 static bool isNtensor(mlir::TypeConverter &converter, mlir::Type type) {
   return !!converter.convertType(type)
-               .dyn_cast_or_null<imex::ntensor::NTensorType>();
+               .dyn_cast_or_null<numba::ntensor::NTensorType>();
 }
 
 struct PlierToNtensorPass
@@ -1284,8 +1284,8 @@ struct PlierToNtensorPass
 
   virtual void
   getDependentDialects(mlir::DialectRegistry &registry) const override {
-    registry.insert<imex::ntensor::NTensorDialect>();
-    registry.insert<imex::util::ImexUtilDialect>();
+    registry.insert<numba::ntensor::NTensorDialect>();
+    registry.insert<numba::util::ImexUtilDialect>();
     registry.insert<mlir::func::FuncDialect>();
     registry.insert<plier::PlierDialect>();
   }
@@ -1297,10 +1297,10 @@ struct PlierToNtensorPass
     // Convert unknown types to itself
     typeConverter.addConversion([](mlir::Type type) { return type; });
 
-    imex::populateTupleTypeConverter(typeConverter);
+    numba::populateTupleTypeConverter(typeConverter);
     typeConverter.addConversion(
         [](plier::SliceType type) -> llvm::Optional<mlir::Type> {
-          return imex::ntensor::SliceType::get(type.getContext());
+          return numba::ntensor::SliceType::get(type.getContext());
         });
 
     auto addUnrealizedCast = [](mlir::OpBuilder &builder, mlir::Type type,
@@ -1316,9 +1316,9 @@ struct PlierToNtensorPass
     mlir::RewritePatternSet patterns(&context);
     mlir::ConversionTarget target(context);
 
-    imex::populateControlFlowTypeConversionRewritesAndTarget(typeConverter,
+    numba::populateControlFlowTypeConversionRewritesAndTarget(typeConverter,
                                                              patterns, target);
-    imex::populateTupleTypeConversionRewritesAndTarget(typeConverter, patterns,
+    numba::populateTupleTypeConversionRewritesAndTarget(typeConverter, patterns,
                                                        target);
 
     target.addDynamicallyLegalOp<plier::GetItemOp>(
@@ -1338,8 +1338,8 @@ struct PlierToNtensorPass
           return std::nullopt;
         });
 
-    target.addDynamicallyLegalOp<imex::ntensor::GetitemOp,
-                                 imex::ntensor::SetitemOp>(
+    target.addDynamicallyLegalOp<numba::ntensor::GetitemOp,
+                                 numba::ntensor::SetitemOp>(
         [&typeConverter](mlir::Operation *op) {
           return typeConverter.isLegal(op);
         });
@@ -1387,10 +1387,10 @@ struct PlierToNtensorPass
           return true;
         });
 
-    target.addDynamicallyLegalOp<imex::util::TupleExtractOp>(
-        [](imex::util::TupleExtractOp op) -> llvm::Optional<bool> {
+    target.addDynamicallyLegalOp<numba::util::TupleExtractOp>(
+        [](numba::util::TupleExtractOp op) -> llvm::Optional<bool> {
           if (auto elemType = isUniTuple(op.getSource().getType()))
-            if (imex::ntensor::NTensorType::isValidElementType(*elemType))
+            if (numba::ntensor::NTensorType::isValidElementType(*elemType))
               return false;
 
           return std::nullopt;
@@ -1398,7 +1398,7 @@ struct PlierToNtensorPass
 
     target.addIllegalOp<plier::BuildSliceOp>();
 
-    target.addLegalDialect<imex::ntensor::NTensorDialect>();
+    target.addLegalDialect<numba::ntensor::NTensorDialect>();
 
     patterns.insert<
         // clang-format off
@@ -1427,48 +1427,48 @@ private:
 };
 
 struct GetitemArrayOpLowering
-    : public mlir::OpRewritePattern<imex::ntensor::GetitemOp> {
+    : public mlir::OpRewritePattern<numba::ntensor::GetitemOp> {
   using OpRewritePattern::OpRewritePattern;
 
   mlir::LogicalResult
-  matchAndRewrite(imex::ntensor::GetitemOp op,
+  matchAndRewrite(numba::ntensor::GetitemOp op,
                   mlir::PatternRewriter &rewriter) const override {
     auto src = op.getSource();
-    if (!src.getType().isa<imex::ntensor::NTensorType>())
+    if (!src.getType().isa<numba::ntensor::NTensorType>())
       return mlir::failure();
 
     auto index = op.getIndex();
-    if (!index.getType().isa<imex::ntensor::NTensorType>())
+    if (!index.getType().isa<numba::ntensor::NTensorType>())
       return mlir::failure();
 
     mlir::StringRef opName = "array.__getitem__";
     auto resType = op.getType();
     mlir::Value args[] = {src, index};
-    rewriter.replaceOpWithNewOp<imex::ntensor::PrimitiveOp>(op, resType, args,
+    rewriter.replaceOpWithNewOp<numba::ntensor::PrimitiveOp>(op, resType, args,
                                                             opName);
     return mlir::success();
   }
 };
 
 struct SetitemArrayOpLowering
-    : public mlir::OpRewritePattern<imex::ntensor::SetitemOp> {
+    : public mlir::OpRewritePattern<numba::ntensor::SetitemOp> {
   using OpRewritePattern::OpRewritePattern;
 
   mlir::LogicalResult
-  matchAndRewrite(imex::ntensor::SetitemOp op,
+  matchAndRewrite(numba::ntensor::SetitemOp op,
                   mlir::PatternRewriter &rewriter) const override {
     auto src = op.getSource();
-    auto srcType = src.getType().dyn_cast<imex::ntensor::NTensorType>();
+    auto srcType = src.getType().dyn_cast<numba::ntensor::NTensorType>();
     if (!srcType || srcType.getRank() != 1)
       return mlir::failure();
 
     auto index = op.getIndex();
-    auto indexType = index.getType().dyn_cast<imex::ntensor::NTensorType>();
+    auto indexType = index.getType().dyn_cast<numba::ntensor::NTensorType>();
     if (!indexType || indexType.getRank() != 1)
       return mlir::failure();
 
     auto val = op.getValue();
-    auto valueType = val.getType().dyn_cast<imex::ntensor::NTensorType>();
+    auto valueType = val.getType().dyn_cast<numba::ntensor::NTensorType>();
     if (!valueType || valueType.getRank() != 1)
       return mlir::failure();
 
@@ -1477,9 +1477,9 @@ struct SetitemArrayOpLowering
 
     auto loc = op.getLoc();
     auto res =
-        rewriter.create<imex::ntensor::PrimitiveOp>(loc, srcType, args, opName)
+        rewriter.create<numba::ntensor::PrimitiveOp>(loc, srcType, args, opName)
             .getResult(0);
-    rewriter.create<imex::ntensor::CopyOp>(loc, res, src);
+    rewriter.create<numba::ntensor::CopyOp>(loc, res, src);
     rewriter.eraseOp(op);
     return mlir::success();
   }
@@ -1508,7 +1508,7 @@ static mlir::FailureOr<mlir::Attribute> getEnvAttr(mlir::Operation *op) {
   for (auto types : {mlir::TypeRange(op->getOperandTypes()),
                      mlir::TypeRange(op->getResultTypes())}) {
     for (auto type : types) {
-      auto tensor = type.dyn_cast<imex::ntensor::NTensorType>();
+      auto tensor = type.dyn_cast<numba::ntensor::NTensorType>();
       if (!tensor)
         continue;
 
@@ -1542,7 +1542,7 @@ rewritePrimitiveFunc(mlir::PatternRewriter &rewriter, mlir::Location loc,
 
   PyLinalgResolver::Values newRes;
   if (env != nullptr) {
-    auto regionOp = rewriter.create<imex::util::EnvironmentRegionOp>(
+    auto regionOp = rewriter.create<numba::util::EnvironmentRegionOp>(
         loc, env, /*args*/ std::nullopt, resultTypes);
     auto &newBody = regionOp.getRegion().front();
     rewriter.eraseOp(newBody.getTerminator());
@@ -1556,7 +1556,7 @@ rewritePrimitiveFunc(mlir::PatternRewriter &rewriter, mlir::Location loc,
     }
 
     auto results = castRetTypes(loc, rewriter, resultTypes, *res);
-    rewriter.create<imex::util::EnvironmentRegionYieldOp>(loc, results);
+    rewriter.create<numba::util::EnvironmentRegionYieldOp>(loc, results);
 
     auto regResults = regionOp.getResults();
     newRes.assign(regResults.begin(), regResults.end());
@@ -1573,13 +1573,13 @@ rewritePrimitiveFunc(mlir::PatternRewriter &rewriter, mlir::Location loc,
 }
 
 struct NtensorPrimitiveCallsLowering final
-    : public mlir::OpRewritePattern<imex::ntensor::PrimitiveOp> {
+    : public mlir::OpRewritePattern<numba::ntensor::PrimitiveOp> {
   NtensorPrimitiveCallsLowering(mlir::MLIRContext *context)
       : OpRewritePattern(context),
         resolver("numba_dpcomp.mlir.numpy.funcs", "registry") {}
 
   mlir::LogicalResult
-  matchAndRewrite(imex::ntensor::PrimitiveOp op,
+  matchAndRewrite(numba::ntensor::PrimitiveOp op,
                   mlir::PatternRewriter &rewriter) const override {
     auto env = getEnvAttr(op);
     if (mlir::failed(env))
@@ -1602,13 +1602,13 @@ private:
 };
 
 struct NtensorViewPrimitiveCallsLowering final
-    : public mlir::OpRewritePattern<imex::ntensor::ViewPrimitiveOp> {
+    : public mlir::OpRewritePattern<numba::ntensor::ViewPrimitiveOp> {
   NtensorViewPrimitiveCallsLowering(mlir::MLIRContext *context)
       : OpRewritePattern(context),
         resolver("numba_dpcomp.mlir.numpy.funcs", "registry") {}
 
   mlir::LogicalResult
-  matchAndRewrite(imex::ntensor::ViewPrimitiveOp op,
+  matchAndRewrite(numba::ntensor::ViewPrimitiveOp op,
                   mlir::PatternRewriter &rewriter) const override {
     auto env = getEnvAttr(op);
     if (mlir::failed(env))
@@ -1632,12 +1632,12 @@ private:
 };
 
 struct NumpyCallsResolver
-    : public mlir::OpRewritePattern<imex::ntensor::CallOp> {
+    : public mlir::OpRewritePattern<numba::ntensor::CallOp> {
   NumpyCallsResolver(mlir::MLIRContext *ctx, NumpyResolver &r)
       : OpRewritePattern(ctx), resolver(r) {}
 
   mlir::LogicalResult
-  matchAndRewrite(imex::ntensor::CallOp op,
+  matchAndRewrite(numba::ntensor::CallOp op,
                   mlir::PatternRewriter &rewriter) const override {
     auto funcName = op.getOp();
 
@@ -1654,28 +1654,28 @@ struct NumpyCallsResolver
       if (op.getNumResults() != 1 || args.size() < 1)
         return mlir::failure();
 
-      if (!op.getResult(0).getType().isa<imex::ntensor::NTensorType>() ||
-          !args[0].getType().isa<imex::ntensor::NTensorType>())
+      if (!op.getResult(0).getType().isa<numba::ntensor::NTensorType>() ||
+          !args[0].getType().isa<numba::ntensor::NTensorType>())
         return mlir::failure();
     }
 
     auto results = [&]() -> mlir::ValueRange {
       if (viewLike) {
         return rewriter
-            .create<imex::ntensor::ViewPrimitiveOp>(
+            .create<numba::ntensor::ViewPrimitiveOp>(
                 loc, op.getResult(0).getType(), args.front(),
                 llvm::ArrayRef(args).drop_front(), funcName)
             ->getResults();
       } else {
         return rewriter
-            .create<imex::ntensor::PrimitiveOp>(loc, op->getResultTypes(), args,
+            .create<numba::ntensor::PrimitiveOp>(loc, op->getResultTypes(), args,
                                                 funcName)
             .getResults();
       }
     }();
 
     for (auto [dst, src] : llvm::zip(outResults, results))
-      rewriter.create<imex::ntensor::CopyOp>(loc, src, dst);
+      rewriter.create<numba::ntensor::CopyOp>(loc, src, dst);
 
     rewriter.replaceOp(op, results);
     return mlir::success();
@@ -1783,18 +1783,18 @@ struct BuiltinCallsLowering : public mlir::OpRewritePattern<plier::PyCallOp> {
   }
 };
 
-struct BinOpsLowering : public mlir::OpRewritePattern<imex::ntensor::BinaryOp> {
+struct BinOpsLowering : public mlir::OpRewritePattern<numba::ntensor::BinaryOp> {
   using OpRewritePattern::OpRewritePattern;
 
   mlir::LogicalResult
-  matchAndRewrite(imex::ntensor::BinaryOp op,
+  matchAndRewrite(numba::ntensor::BinaryOp op,
                   mlir::PatternRewriter &rewriter) const override {
     auto name = op.getOp();
     for (auto it : plier::getOperators()) {
       if (it.op == name) {
         auto newName = (llvm::Twine("operator.") + it.name).str();
         mlir::Value args[] = {op.getLhs(), op.getRhs()};
-        rewriter.replaceOpWithNewOp<imex::ntensor::PrimitiveOp>(
+        rewriter.replaceOpWithNewOp<numba::ntensor::PrimitiveOp>(
             op, op->getResultTypes(), args, newName);
         return mlir::success();
       }
@@ -1809,8 +1809,8 @@ struct ResolveNtensorPass
 
   virtual void
   getDependentDialects(mlir::DialectRegistry &registry) const override {
-    registry.insert<imex::ntensor::NTensorDialect>();
-    registry.insert<imex::util::ImexUtilDialect>();
+    registry.insert<numba::ntensor::NTensorDialect>();
+    registry.insert<numba::util::ImexUtilDialect>();
     registry.insert<mlir::linalg::LinalgDialect>();
     registry.insert<mlir::memref::MemRefDialect>();
     registry.insert<mlir::tensor::TensorDialect>();
@@ -1837,8 +1837,8 @@ struct WrapParforRegionsPass
 
   virtual void
   getDependentDialects(mlir::DialectRegistry &registry) const override {
-    registry.insert<imex::ntensor::NTensorDialect>();
-    registry.insert<imex::util::ImexUtilDialect>();
+    registry.insert<numba::ntensor::NTensorDialect>();
+    registry.insert<numba::util::ImexUtilDialect>();
     registry.insert<mlir::scf::SCFDialect>();
   }
 
@@ -1846,10 +1846,10 @@ struct WrapParforRegionsPass
     auto op = getOperation();
 
     auto getOpEnv = [](mlir::Operation *op) -> llvm::Optional<mlir::Attribute> {
-      if (auto load = mlir::dyn_cast<imex::ntensor::LoadOp>(op))
+      if (auto load = mlir::dyn_cast<numba::ntensor::LoadOp>(op))
         return load.getArray().getType().getEnvironment();
 
-      if (auto store = mlir::dyn_cast<imex::ntensor::LoadOp>(op))
+      if (auto store = mlir::dyn_cast<numba::ntensor::LoadOp>(op))
         return store.getArray().getType().getEnvironment();
 
       return std::nullopt;
@@ -1857,7 +1857,7 @@ struct WrapParforRegionsPass
 
     mlir::OpBuilder builder(&getContext());
     auto attrName =
-        builder.getStringAttr(imex::util::attributes::getParallelName());
+        builder.getStringAttr(numba::util::attributes::getParallelName());
     llvm::SmallVector<std::pair<mlir::scf::ForOp, mlir::Attribute>>
         opsToProcess;
 
@@ -1896,14 +1896,14 @@ struct WrapParforRegionsPass
     for (auto [forOp, env] : opsToProcess) {
       auto resultTypes = forOp.getResultTypes();
       builder.setInsertionPoint(forOp);
-      auto envRegion = builder.create<imex::util::EnvironmentRegionOp>(
+      auto envRegion = builder.create<numba::util::EnvironmentRegionOp>(
           forOp.getLoc(), env, /*args*/ std::nullopt, resultTypes);
       auto &envRegionBlock = envRegion.getRegion().front();
       auto term = envRegionBlock.getTerminator();
       forOp->moveBefore(term);
       forOp->replaceAllUsesWith(envRegion.getResults());
       builder.setInsertionPoint(term);
-      builder.create<imex::util::EnvironmentRegionYieldOp>(term->getLoc(),
+      builder.create<numba::util::EnvironmentRegionYieldOp>(term->getLoc(),
                                                            forOp.getResults());
       term->erase();
     }
@@ -1917,18 +1917,18 @@ struct MarkInputShapesRanges
 
   virtual void
   getDependentDialects(mlir::DialectRegistry &registry) const override {
-    registry.insert<imex::util::ImexUtilDialect>();
+    registry.insert<numba::util::ImexUtilDialect>();
   }
 
   void runOnOperation() override {
     auto mod = getOperation();
 
     auto getRange = [&](int64_t min, int64_t max) {
-      return imex::util::IndexRangeAttr::get(&getContext(), min, max);
+      return numba::util::IndexRangeAttr::get(&getContext(), min, max);
     };
 
     auto attrName = mlir::StringAttr::get(
-        mod.getContext(), imex::util::attributes::getShapeRangeName());
+        mod.getContext(), numba::util::attributes::getShapeRangeName());
     mod.walk([&](mlir::FunctionOpInterface func) {
       if (func.isExternal())
         return;
@@ -1979,8 +1979,8 @@ struct ResolveNumpyFuncsPass
 
   virtual void
   getDependentDialects(mlir::DialectRegistry &registry) const override {
-    registry.insert<imex::ntensor::NTensorDialect>();
-    registry.insert<imex::util::ImexUtilDialect>();
+    registry.insert<numba::ntensor::NTensorDialect>();
+    registry.insert<numba::util::ImexUtilDialect>();
     registry.insert<mlir::arith::ArithDialect>();
   }
 
@@ -1988,7 +1988,7 @@ struct ResolveNumpyFuncsPass
     auto &ctx = getContext();
     mlir::RewritePatternSet patterns(&ctx);
 
-    imex::ntensor::populateResolveArrayOpsPatterns(patterns);
+    numba::ntensor::populateResolveArrayOpsPatterns(patterns);
 
     patterns.insert<NumpyCallsResolver>(&ctx, *resolver);
 
@@ -2073,11 +2073,11 @@ struct SimplifyExpandDims
 };
 
 struct LowerEnforceShape
-    : public mlir::OpRewritePattern<imex::util::EnforceShapeOp> {
+    : public mlir::OpRewritePattern<numba::util::EnforceShapeOp> {
   using OpRewritePattern::OpRewritePattern;
 
   mlir::LogicalResult
-  matchAndRewrite(imex::util::EnforceShapeOp op,
+  matchAndRewrite(numba::util::EnforceShapeOp op,
                   mlir::PatternRewriter &rewriter) const override {
     auto type = op.getType();
     auto src = op.getValue();
@@ -2509,7 +2509,7 @@ void PostPlierToLinalgInnerPass::runOnOperation() {
   auto &context = getContext();
   mlir::RewritePatternSet patterns(&context);
 
-  imex::populateCommonOptsPatterns(patterns);
+  numba::populateCommonOptsPatterns(patterns);
 
   patterns.insert<SimplifyExpandDims>(&context);
 
@@ -2527,7 +2527,7 @@ static void visitTypeRecursive(mlir::Type type, F &&visitor) {
 }
 
 static bool isContigiousArray(mlir::Type type) {
-  auto tensor = type.dyn_cast<imex::ntensor::NTensorType>();
+  auto tensor = type.dyn_cast<numba::ntensor::NTensorType>();
   if (!tensor)
     return false;
 
@@ -2592,7 +2592,7 @@ void LinalgOptInnerPass::runOnOperation() {
   auto &context = getContext();
   mlir::RewritePatternSet patterns(&context);
 
-  imex::populateCommonOptsPatterns(patterns);
+  numba::populateCommonOptsPatterns(patterns);
 
   patterns.insert<
       // clang-format off
@@ -2674,7 +2674,7 @@ struct BufferizeExtractSlice
         loc, viewType, src, offsets, sizes, strides);
 
     if (viewType != dstType)
-      view = rewriter.create<imex::util::ChangeLayoutOp>(loc, dstType, view);
+      view = rewriter.create<numba::util::ChangeLayoutOp>(loc, dstType, view);
 
     rewriter.replaceOp(op, view);
     return mlir::success();
@@ -2772,14 +2772,14 @@ struct AdditionalBufferize
 
   virtual void
   getDependentDialects(mlir::DialectRegistry &registry) const override {
-    registry.insert<imex::util::ImexUtilDialect>();
+    registry.insert<numba::util::ImexUtilDialect>();
   }
 
   void runOnOperation() override {
     auto *context = &getContext();
 
     mlir::bufferization::BufferizeTypeConverter typeConverter;
-    imex::populateTupleTypeConverter(typeConverter);
+    numba::populateTupleTypeConverter(typeConverter);
 
     auto materializeTupleCast =
         [](mlir::OpBuilder &builder, mlir::Type type, mlir::ValueRange inputs,
@@ -2800,9 +2800,9 @@ struct AdditionalBufferize
     mlir::RewritePatternSet patterns(context);
     mlir::ConversionTarget target(*context);
 
-    imex::populateControlFlowTypeConversionRewritesAndTarget(typeConverter,
+    numba::populateControlFlowTypeConversionRewritesAndTarget(typeConverter,
                                                              patterns, target);
-    imex::populateTupleTypeConversionRewritesAndTarget(typeConverter, patterns,
+    numba::populateTupleTypeConversionRewritesAndTarget(typeConverter, patterns,
                                                        target);
     target
         .addIllegalOp<mlir::tensor::ReshapeOp, mlir::tensor::ExtractSliceOp>();
@@ -2830,7 +2830,7 @@ struct MarkArgsRestrictPass
 
   void runOnOperation() override {
     mlir::OpBuilder builder(&getContext());
-    auto attrName = builder.getStringAttr(imex::getRestrictArgName());
+    auto attrName = builder.getStringAttr(numba::getRestrictArgName());
     auto attr = builder.getUnitAttr();
     getOperation()->walk([&](mlir::FunctionOpInterface func) {
       auto numArgs = func.getNumArguments();
@@ -2848,7 +2848,7 @@ struct CloneArgsPass
 
   virtual void
   getDependentDialects(mlir::DialectRegistry &registry) const override {
-    registry.insert<imex::util::ImexUtilDialect>();
+    registry.insert<numba::util::ImexUtilDialect>();
   }
 
   void runOnOperation() override;
@@ -2894,14 +2894,14 @@ struct ReplaceClones
   mlir::LogicalResult
   matchAndRewrite(mlir::bufferization::CloneOp op,
                   mlir::PatternRewriter &rewriter) const override {
-    rewriter.replaceOpWithNewOp<imex::util::RetainOp>(op, op.getType(),
+    rewriter.replaceOpWithNewOp<numba::util::RetainOp>(op, op.getType(),
                                                       op.getSource());
     return mlir::success();
   }
 };
 
 struct LowerCloneOpsPass
-    : public imex::RewriteWrapperPass<LowerCloneOpsPass, void, void,
+    : public numba::RewriteWrapperPass<LowerCloneOpsPass, void, void,
                                       ReplaceClones> {};
 
 struct ReplaceMemrefCopy : public mlir::OpRewritePattern<mlir::memref::CopyOp> {
@@ -2918,7 +2918,7 @@ struct ReplaceMemrefCopy : public mlir::OpRewritePattern<mlir::memref::CopyOp> {
 };
 
 struct LowerCopyOpsPass
-    : public imex::RewriteWrapperPass<LowerCopyOpsPass, void, void,
+    : public numba::RewriteWrapperPass<LowerCopyOpsPass, void, void,
                                       ReplaceMemrefCopy> {};
 
 struct PostLinalgOptInnerPass
@@ -2938,13 +2938,13 @@ void PostLinalgOptInnerPass::runOnOperation() {
   auto &context = getContext();
   mlir::RewritePatternSet patterns(&context);
 
-  imex::populateCommonOptsPatterns(patterns);
+  numba::populateCommonOptsPatterns(patterns);
 
   patterns.insert<OptimizeGlobalsConstsLoad, OptimizeSingleElemCopy>(&context);
 
   auto additionalOpt = [](mlir::func::FuncOp op) {
-    (void)imex::prepareForFusion(op.getRegion());
-    return imex::naivelyFuseParallelOps(op.getRegion());
+    (void)numba::prepareForFusion(op.getRegion());
+    return numba::naivelyFuseParallelOps(op.getRegion());
   };
 
   if (mlir::failed(applyOptimizations(func, std::move(patterns),
@@ -2959,7 +2959,7 @@ struct MoveArithIntoRegionPass
 
   virtual void
   getDependentDialects(mlir::DialectRegistry &registry) const override {
-    registry.insert<imex::util::ImexUtilDialect>();
+    registry.insert<numba::util::ImexUtilDialect>();
     registry.insert<mlir::arith::ArithDialect>();
     registry.insert<mlir::math::MathDialect>();
   }
@@ -2985,7 +2985,7 @@ struct MoveArithIntoRegionPass
       if (iter == block->end())
         continue;
 
-      auto region = mlir::dyn_cast<imex::util::EnvironmentRegionOp>(*(++iter));
+      auto region = mlir::dyn_cast<numba::util::EnvironmentRegionOp>(*(++iter));
       if (!region)
         continue;
 
@@ -3007,7 +3007,7 @@ struct MoveArithIntoRegionPass
 };
 
 struct FixDeallocPlacementPass
-    : public imex::RewriteWrapperPass<FixDeallocPlacementPass,
+    : public numba::RewriteWrapperPass<FixDeallocPlacementPass,
                                       mlir::func::FuncOp, void,
                                       FixDeallocPlacement> {};
 
@@ -3082,11 +3082,11 @@ struct MakeGenericReduceInnermost
 };
 
 struct MakeGenericReduceInnermostPass
-    : public imex::RewriteWrapperPass<MakeGenericReduceInnermostPass, void,
+    : public numba::RewriteWrapperPass<MakeGenericReduceInnermostPass, void,
                                       void, MakeGenericReduceInnermost> {};
 
 static void populateCommonOptPass(mlir::OpPassManager &pm) {
-  pm.addPass(imex::createCompositePass(
+  pm.addPass(numba::createCompositePass(
       "PlierToLinalgCommonOptPass", [](mlir::OpPassManager &p) {
         p.addNestedPass<mlir::func::FuncOp>(mlir::createCSEPass());
         p.addNestedPass<mlir::func::FuncOp>(mlir::createCanonicalizerPass());
@@ -3101,22 +3101,22 @@ static void populatePlierToLinalgGenPipeline(mlir::OpPassManager &pm) {
   pm.addNestedPass<mlir::func::FuncOp>(mlir::createCanonicalizerPass());
   pm.addPass(std::make_unique<ResolveNumpyFuncsPass>());
   pm.addNestedPass<mlir::func::FuncOp>(mlir::createCanonicalizerPass());
-  pm.addNestedPass<mlir::func::FuncOp>(imex::ntensor::createCopyRemovalPass());
+  pm.addNestedPass<mlir::func::FuncOp>(numba::ntensor::createCopyRemovalPass());
   populateCommonOptPass(pm);
-  pm.addPass(imex::ntensor::createPropagateEnvironmentPass());
+  pm.addPass(numba::ntensor::createPropagateEnvironmentPass());
   pm.addPass(std::make_unique<ResolveNtensorPass>());
-  pm.addPass(imex::createForceInlinePass());
+  pm.addPass(numba::createForceInlinePass());
   pm.addPass(mlir::createSymbolDCEPass());
   populateCommonOptPass(pm);
   pm.addNestedPass<mlir::func::FuncOp>(
       std::make_unique<WrapParforRegionsPass>());
   pm.addPass(mlir::createCanonicalizerPass());
-  pm.addNestedPass<mlir::func::FuncOp>(imex::createNtensorAliasAnalysisPass());
-  pm.addNestedPass<mlir::func::FuncOp>(imex::createNtensorToLinalgPass());
+  pm.addNestedPass<mlir::func::FuncOp>(numba::createNtensorAliasAnalysisPass());
+  pm.addNestedPass<mlir::func::FuncOp>(numba::createNtensorToLinalgPass());
   pm.addPass(std::make_unique<MarkInputShapesRanges>());
-  pm.addPass(imex::createCompositePass(
+  pm.addPass(numba::createCompositePass(
       "PostPlierToLinalgPass", [](mlir::OpPassManager &p) {
-        p.addPass(imex::createShapeIntegerRangePropagationPass());
+        p.addPass(numba::createShapeIntegerRangePropagationPass());
         p.addNestedPass<mlir::func::FuncOp>(mlir::createCSEPass());
         p.addNestedPass<mlir::func::FuncOp>(
             std::make_unique<PostPlierToLinalgInnerPass>());
@@ -3125,17 +3125,17 @@ static void populatePlierToLinalgGenPipeline(mlir::OpPassManager &pm) {
 
 static void populatePlierToLinalgOptPipeline(mlir::OpPassManager &pm) {
   pm.addPass(
-      imex::createCompositePass("LinalgOptPass", [](mlir::OpPassManager &p) {
-        p.addPass(imex::createShapeIntegerRangePropagationPass());
+      numba::createCompositePass("LinalgOptPass", [](mlir::OpPassManager &p) {
+        p.addPass(numba::createShapeIntegerRangePropagationPass());
         p.addNestedPass<mlir::func::FuncOp>(mlir::createCSEPass());
         p.addNestedPass<mlir::func::FuncOp>(
             std::make_unique<LinalgOptInnerPass>());
       }));
 
-  pm.addPass(imex::createNtensorToMemrefPass());
+  pm.addPass(numba::createNtensorToMemrefPass());
   pm.addPass(mlir::createCanonicalizerPass());
 
-  pm.addPass(imex::createMakeSignlessPass());
+  pm.addPass(numba::createMakeSignlessPass());
   pm.addPass(mlir::createCanonicalizerPass());
 
   pm.addPass(mlir::createReconcileUnrealizedCastsPass());
@@ -3182,26 +3182,26 @@ static void populatePlierToLinalgOptPipeline(mlir::OpPassManager &pm) {
   pm.addNestedPass<mlir::func::FuncOp>(
       mlir::createConvertLinalgToParallelLoopsPass());
   pm.addNestedPass<mlir::func::FuncOp>(mlir::createCanonicalizerPass());
-  pm.addPass(imex::createForceInlinePass());
+  pm.addPass(numba::createForceInlinePass());
   pm.addPass(mlir::createSymbolDCEPass());
 
-  pm.addPass(imex::createPromoteBoolMemrefPass());
-  pm.addNestedPass<mlir::func::FuncOp>(imex::createUpliftMathPass());
+  pm.addPass(numba::createPromoteBoolMemrefPass());
+  pm.addNestedPass<mlir::func::FuncOp>(numba::createUpliftMathPass());
   pm.addNestedPass<mlir::func::FuncOp>(mlir::createCanonicalizerPass());
   pm.addNestedPass<mlir::func::FuncOp>(
       mlir::createLoopInvariantCodeMotionPass());
 
-  pm.addPass(imex::createShapeIntegerRangePropagationPass());
+  pm.addPass(numba::createShapeIntegerRangePropagationPass());
   pm.addPass(std::make_unique<MarkArgsRestrictPass>());
-  pm.addPass(imex::createCompositePass(
+  pm.addPass(numba::createCompositePass(
       "PostLinalgOptPass", [](mlir::OpPassManager &p) {
         p.addNestedPass<mlir::func::FuncOp>(
             std::make_unique<MoveArithIntoRegionPass>());
         p.addNestedPass<mlir::func::FuncOp>(mlir::createCSEPass());
         p.addNestedPass<mlir::func::FuncOp>(
-            imex::createCanonicalizeReductionsPass());
+            numba::createCanonicalizeReductionsPass());
         p.addNestedPass<mlir::func::FuncOp>(
-            imex::createPromoteToParallelPass());
+            numba::createPromoteToParallelPass());
         // ToDo: This pass also tries to do some simple fusion, whic should be
         // split in separate pass
         p.addNestedPass<mlir::func::FuncOp>(
@@ -3210,7 +3210,7 @@ static void populatePlierToLinalgOptPipeline(mlir::OpPassManager &pm) {
 
   // Uplifting FMAs con interfere with other optimizations, like loop reduction
   // uplifting. Move it after main optimization pass.
-  pm.addNestedPass<mlir::func::FuncOp>(imex::createUpliftFMAPass());
+  pm.addNestedPass<mlir::func::FuncOp>(numba::createUpliftFMAPass());
   pm.addNestedPass<mlir::func::FuncOp>(mlir::createCanonicalizerPass());
   pm.addNestedPass<mlir::func::FuncOp>(
       std::make_unique<FixDeallocPlacementPass>());
@@ -3220,7 +3220,7 @@ static void populatePlierToLinalgOptPipeline(mlir::OpPassManager &pm) {
 } // namespace
 
 // ToDo: how does this sink stuff actually works?
-void registerPlierToLinalgPipeline(imex::PipelineRegistry &registry) {
+void registerPlierToLinalgPipeline(numba::PipelineRegistry &registry) {
   registry.registerPipeline([](auto sink) {
     auto stage = getHighLoweringStage();
     sink(plierToLinalgGenPipelineName(), {plierToStdPipelineName()},

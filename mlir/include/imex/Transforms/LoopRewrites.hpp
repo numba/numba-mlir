@@ -9,7 +9,7 @@ class MLIRContext;
 class RewritePatternSet;
 } // namespace mlir
 
-namespace imex {
+namespace numba {
 void populateLoopRewritesPatterns(mlir::RewritePatternSet &patterns);
 
-} // namespace imex
+} // namespace numba

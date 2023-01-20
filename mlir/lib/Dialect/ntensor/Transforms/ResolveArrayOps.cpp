@@ -14,7 +14,7 @@
 
 static bool isIndexOrSlice(mlir::Type type) {
   return type
-      .isa<imex::ntensor::SliceType, mlir::IndexType, mlir::IntegerType>();
+      .isa<numba::ntensor::SliceType, mlir::IndexType, mlir::IntegerType>();
 }
 
 static bool isValidGetitemIndex(mlir::Type type) {
@@ -34,7 +34,7 @@ static mlir::Value convertIndex(mlir::OpBuilder &builder, mlir::Location loc,
     if (intType.getSignedness() != mlir::IntegerType::Signless) {
       auto signlessType =
           mlir::IntegerType::get(builder.getContext(), intType.getWidth());
-      value = builder.create<imex::util::SignCastOp>(loc, signlessType, value);
+      value = builder.create<numba::util::SignCastOp>(loc, signlessType, value);
     }
 
     auto indexType = builder.getIndexType();
@@ -54,7 +54,7 @@ computeIndices(mlir::OpBuilder &builder, mlir::Location loc, mlir::Value value,
   auto shapedType = value.getType().cast<mlir::ShapedType>();
 
   auto getDim = [&](unsigned dim) -> mlir::Value {
-    return builder.create<imex::ntensor::DimOp>(loc, value, dim);
+    return builder.create<numba::ntensor::DimOp>(loc, value, dim);
   };
 
   auto foldConst = [&](mlir::Value val) -> mlir::OpFoldResult {
@@ -70,9 +70,9 @@ computeIndices(mlir::OpBuilder &builder, mlir::Location loc, mlir::Value value,
                                       mlir::OpFoldResult, bool> {
     auto valType = indexVal.getType();
     auto len = getDim(dim);
-    if (valType.isa<imex::ntensor::SliceType>()) {
+    if (valType.isa<numba::ntensor::SliceType>()) {
       auto resolved =
-          builder.create<imex::ntensor::ResolveSliceOp>(loc, indexVal, len);
+          builder.create<numba::ntensor::ResolveSliceOp>(loc, indexVal, len);
 
       auto begin = resolved.getBegin();
       auto step = resolved.getStep();
@@ -80,7 +80,7 @@ computeIndices(mlir::OpBuilder &builder, mlir::Location loc, mlir::Value value,
       return {foldConst(begin), foldConst(size), foldConst(step), true};
     } else {
       mlir::Value index = convertIndex(builder, loc, indexVal);
-      index = builder.create<imex::ntensor::ResolveIndexOp>(loc, index, len);
+      index = builder.create<numba::ntensor::ResolveIndexOp>(loc, index, len);
       return {index, builder.getIndexAttr(1), builder.getIndexAttr(1), false};
     }
   };
@@ -106,7 +106,7 @@ computeIndices(mlir::OpBuilder &builder, mlir::Location loc, mlir::Value value,
 
     for (auto [i, val] : llvm::enumerate(tupleType)) {
       auto getitemInd = builder.create<mlir::arith::ConstantIndexOp>(loc, i);
-      auto ind = builder.createOrFold<imex::util::TupleExtractOp>(
+      auto ind = builder.createOrFold<numba::util::TupleExtractOp>(
           loc, val, index, getitemInd);
       bool isSlice = false;
       std::tie(offsets[i], sizes[i], strides[i], isSlice) = getPos(ind, i);
@@ -139,17 +139,17 @@ static mlir::Value makeSubview(mlir::OpBuilder &builder, mlir::Location loc,
                                llvm::ArrayRef<mlir::OpFoldResult> sizes,
                                llvm::ArrayRef<mlir::OpFoldResult> strides,
                                llvm::ArrayRef<unsigned> dimIndices) {
-  auto srcType = src.getType().cast<imex::ntensor::NTensorType>();
+  auto srcType = src.getType().cast<numba::ntensor::NTensorType>();
   auto srcRank = static_cast<unsigned>(srcType.getRank());
   auto dstRank = dimIndices.size();
   assert(srcRank > 0);
   assert(dstRank > 0);
   assert(dstRank <= srcRank);
 
-  auto resType = imex::ntensor::SubviewOp::inferResultType(srcType, offsets,
+  auto resType = numba::ntensor::SubviewOp::inferResultType(srcType, offsets,
                                                            sizes, strides);
 
-  mlir::Value view = builder.create<imex::ntensor::SubviewOp>(
+  mlir::Value view = builder.create<numba::ntensor::SubviewOp>(
       loc, resType, src, offsets, sizes, strides);
 
   if (srcRank != dstRank) {
@@ -157,7 +157,7 @@ static mlir::Value makeSubview(mlir::OpBuilder &builder, mlir::Location loc,
                                                     builder.getIndexAttr(0));
     llvm::SmallVector<mlir::OpFoldResult> newStrides(srcRank,
                                                      builder.getIndexAttr(1));
-    auto viewType = view.getType().cast<imex::ntensor::NTensorType>();
+    auto viewType = view.getType().cast<numba::ntensor::NTensorType>();
 
     llvm::SmallVector<int64_t> dstShape(dstRank);
     for (auto [i, ind] : llvm::enumerate(dimIndices)) {
@@ -169,9 +169,9 @@ static mlir::Value makeSubview(mlir::OpBuilder &builder, mlir::Location loc,
       }
     }
 
-    auto reducedType = imex::ntensor::SubviewOp::inferRankReducedResultType(
+    auto reducedType = numba::ntensor::SubviewOp::inferRankReducedResultType(
         dstShape, viewType, newOfsets, sizes, newStrides);
-    view = builder.create<imex::ntensor::SubviewOp>(
+    view = builder.create<numba::ntensor::SubviewOp>(
         loc, reducedType, view, newOfsets, sizes, newStrides);
     resType = reducedType;
   }
@@ -196,12 +196,12 @@ toValues(mlir::OpBuilder &builder, mlir::Location loc,
 }
 
 static bool isCompatibleSetitemValue(mlir::Type valueType,
-                                     imex::ntensor::NTensorType targetType) {
-  if (imex::canConvert(targetType.getElementType(), valueType))
+                                     numba::ntensor::NTensorType targetType) {
+  if (numba::canConvert(targetType.getElementType(), valueType))
     return true;
 
-  if (auto valueArray = valueType.dyn_cast<imex::ntensor::NTensorType>())
-    return imex::canConvert(valueArray.getElementType(),
+  if (auto valueArray = valueType.dyn_cast<numba::ntensor::NTensorType>())
+    return numba::canConvert(valueArray.getElementType(),
                             targetType.getElementType());
 
   return false;
@@ -209,14 +209,14 @@ static bool isCompatibleSetitemValue(mlir::Type valueType,
 
 namespace {
 struct SetitemOpLowering
-    : public mlir::OpRewritePattern<imex::ntensor::SetitemOp> {
+    : public mlir::OpRewritePattern<numba::ntensor::SetitemOp> {
   using OpRewritePattern::OpRewritePattern;
 
   mlir::LogicalResult
-  matchAndRewrite(imex::ntensor::SetitemOp op,
+  matchAndRewrite(numba::ntensor::SetitemOp op,
                   mlir::PatternRewriter &rewriter) const override {
     auto target = op.getSource();
-    auto targetType = target.getType().dyn_cast<imex::ntensor::NTensorType>();
+    auto targetType = target.getType().dyn_cast<numba::ntensor::NTensorType>();
     if (!targetType)
       return mlir::failure();
 
@@ -244,44 +244,44 @@ struct SetitemOpLowering
 
       auto newArray = [&]() -> mlir::Value {
         if (auto srcType =
-                value.getType().dyn_cast<imex::ntensor::NTensorType>()) {
+                value.getType().dyn_cast<numba::ntensor::NTensorType>()) {
           auto dstElementType = targetType.getElementType();
           if (srcType.getElementType() != dstElementType) {
             auto bodyBuilder = [&](mlir::OpBuilder &b, mlir::Location l,
                                    mlir::ValueRange vals) {
               assert(vals.size() == 1);
-              auto res = imex::doConvert(b, l, vals.front(), dstElementType);
+              auto res = numba::doConvert(b, l, vals.front(), dstElementType);
               assert(res);
-              b.create<imex::ntensor::ElementwiseYieldOp>(l, res);
+              b.create<numba::ntensor::ElementwiseYieldOp>(l, res);
             };
 
             return rewriter
-                .create<imex::ntensor::ElementwiseOp>(loc, targetType, value,
+                .create<numba::ntensor::ElementwiseOp>(loc, targetType, value,
                                                       bodyBuilder)
                 .getResult(0);
           }
           return value;
         }
 
-        auto dstType = dst.getType().cast<imex::ntensor::NTensorType>();
+        auto dstType = dst.getType().cast<numba::ntensor::NTensorType>();
         mlir::SmallVector<mlir::Value> dynamicDims;
         auto rank = static_cast<unsigned>(dstType.getRank());
         dynamicDims.reserve(rank);
         for (auto i : llvm::seq(0u, rank)) {
           if (dstType.isDynamicDim(i))
             dynamicDims.emplace_back(
-                rewriter.create<imex::ntensor::DimOp>(loc, dst, i));
+                rewriter.create<numba::ntensor::DimOp>(loc, dst, i));
         }
         auto dstVal =
-            imex::doConvert(rewriter, loc, value, dstType.getElementType());
+            numba::doConvert(rewriter, loc, value, dstType.getElementType());
         assert(dstVal);
-        return rewriter.create<imex::ntensor::CreateArrayOp>(
+        return rewriter.create<numba::ntensor::CreateArrayOp>(
             loc, dstType, dynamicDims, dstVal);
       }();
-      rewriter.replaceOpWithNewOp<imex::ntensor::CopyOp>(op, newArray, dst);
+      rewriter.replaceOpWithNewOp<numba::ntensor::CopyOp>(op, newArray, dst);
     } else {
       // Is single element
-      rewriter.replaceOpWithNewOp<imex::ntensor::StoreOp>(
+      rewriter.replaceOpWithNewOp<numba::ntensor::StoreOp>(
           op, value, target, toValues(rewriter, loc, offsets));
     }
 
@@ -290,30 +290,30 @@ struct SetitemOpLowering
 };
 
 struct SetitemMaskOpLowering
-    : public mlir::OpRewritePattern<imex::ntensor::SetitemOp> {
+    : public mlir::OpRewritePattern<numba::ntensor::SetitemOp> {
   using OpRewritePattern::OpRewritePattern;
 
   mlir::LogicalResult
-  matchAndRewrite(imex::ntensor::SetitemOp op,
+  matchAndRewrite(numba::ntensor::SetitemOp op,
                   mlir::PatternRewriter &rewriter) const override {
     auto target = op.getSource();
-    auto targetType = target.getType().dyn_cast<imex::ntensor::NTensorType>();
+    auto targetType = target.getType().dyn_cast<numba::ntensor::NTensorType>();
     if (!targetType)
       return mlir::failure();
 
     auto mask = op.getIndex();
-    auto maskType = mask.getType().dyn_cast<imex::ntensor::NTensorType>();
+    auto maskType = mask.getType().dyn_cast<numba::ntensor::NTensorType>();
     if (!maskType || maskType.getElementType() != rewriter.getI1Type() ||
         maskType.getRank() != targetType.getRank() ||
         maskType.getEnvironment() != targetType.getEnvironment())
       return mlir::failure();
 
     auto val = op.getValue();
-    if (!imex::ntensor::NTensorType::isValidElementType(val.getType()))
+    if (!numba::ntensor::NTensorType::isValidElementType(val.getType()))
       return mlir::failure();
 
     auto elemType = targetType.getElementType();
-    if (!imex::canConvert(val.getType(), elemType))
+    if (!numba::canConvert(val.getType(), elemType))
       return mlir::failure();
 
     auto loc = op.getLoc();
@@ -323,11 +323,11 @@ struct SetitemMaskOpLowering
     for (auto i : llvm::seq(0u, rank)) {
       if (targetType.isDynamicDim(i))
         dynamicDims.emplace_back(
-            rewriter.create<imex::ntensor::DimOp>(loc, target, i));
+            rewriter.create<numba::ntensor::DimOp>(loc, target, i));
     }
-    auto dstVal = imex::doConvert(rewriter, loc, val, elemType);
+    auto dstVal = numba::doConvert(rewriter, loc, val, elemType);
     assert(dstVal);
-    val = rewriter.create<imex::ntensor::CreateArrayOp>(loc, targetType,
+    val = rewriter.create<numba::ntensor::CreateArrayOp>(loc, targetType,
                                                         dynamicDims, dstVal);
 
     auto bodyBuilder = [&](mlir::OpBuilder &b, mlir::Location l,
@@ -337,31 +337,31 @@ struct SetitemMaskOpLowering
       auto val = vals[1];
       auto src = vals[2];
       mlir::Value res = b.create<mlir::arith::SelectOp>(l, cond, val, src);
-      b.create<imex::ntensor::ElementwiseYieldOp>(l, res);
+      b.create<numba::ntensor::ElementwiseYieldOp>(l, res);
     };
 
     mlir::Value args[] = {mask, val, target};
     auto res = rewriter
-                   .create<imex::ntensor::ElementwiseOp>(loc, targetType, args,
+                   .create<numba::ntensor::ElementwiseOp>(loc, targetType, args,
                                                          bodyBuilder)
                    .getResult(0);
 
-    rewriter.create<imex::ntensor::CopyOp>(loc, res, target);
+    rewriter.create<numba::ntensor::CopyOp>(loc, res, target);
     rewriter.eraseOp(op);
     return mlir::success();
   }
 };
 
 struct GetitemOpLowering
-    : public mlir::OpRewritePattern<imex::ntensor::GetitemOp> {
+    : public mlir::OpRewritePattern<numba::ntensor::GetitemOp> {
   using OpRewritePattern::OpRewritePattern;
 
   mlir::LogicalResult
-  matchAndRewrite(imex::ntensor::GetitemOp op,
+  matchAndRewrite(numba::ntensor::GetitemOp op,
                   mlir::PatternRewriter &rewriter) const override {
     auto value = op.getSource();
     auto index = op.getIndex();
-    if (!value.getType().isa<imex::ntensor::NTensorType>())
+    if (!value.getType().isa<numba::ntensor::NTensorType>())
       return mlir::failure();
 
     if (!isValidGetitemIndex(index.getType()))
@@ -383,10 +383,10 @@ struct GetitemOpLowering
                         dimsIndices);
       auto resType = op.getResult().getType();
       if (res.getType() != resType)
-        res = rewriter.create<imex::ntensor::CastOp>(loc, resType, res);
+        res = rewriter.create<numba::ntensor::CastOp>(loc, resType, res);
     } else {
       // Is single element
-      res = rewriter.create<imex::ntensor::LoadOp>(
+      res = rewriter.create<numba::ntensor::LoadOp>(
           loc, value, toValues(rewriter, loc, offsets));
     }
     assert(res.getType() == op.getResult().getType() && "Invalid result type");
@@ -409,11 +409,11 @@ static llvm::Optional<mlir::Type> isUnituple(mlir::Type type) {
 }
 
 struct GetitemUnitupleOpLowering
-    : public mlir::OpRewritePattern<imex::ntensor::GetitemOp> {
+    : public mlir::OpRewritePattern<numba::ntensor::GetitemOp> {
   using OpRewritePattern::OpRewritePattern;
 
   mlir::LogicalResult
-  matchAndRewrite(imex::ntensor::GetitemOp op,
+  matchAndRewrite(numba::ntensor::GetitemOp op,
                   mlir::PatternRewriter &rewriter) const override {
     auto value = op.getSource();
     auto index = op.getIndex();
@@ -423,36 +423,36 @@ struct GetitemUnitupleOpLowering
     auto valType = value.getType();
     auto elemType = isUnituple(valType);
     if (!elemType || *elemType != op.getType() ||
-        !imex::ntensor::NTensorType::isValidElementType(*elemType))
+        !numba::ntensor::NTensorType::isValidElementType(*elemType))
       return mlir::failure();
 
     auto count = static_cast<int64_t>(valType.cast<mlir::TupleType>().size());
-    auto arrayType = imex::ntensor::NTensorType::get(count, *elemType);
+    auto arrayType = numba::ntensor::NTensorType::get(count, *elemType);
 
     auto loc = op->getLoc();
 
     llvm::SmallVector<mlir::Value> elements(static_cast<size_t>(count));
     for (auto i : llvm::seq<int64_t>(0, count)) {
       auto idx = rewriter.create<mlir::arith::ConstantIndexOp>(loc, i);
-      elements[i] = rewriter.create<imex::util::TupleExtractOp>(loc, *elemType,
+      elements[i] = rewriter.create<numba::util::TupleExtractOp>(loc, *elemType,
                                                                 value, idx);
     }
 
-    auto array = rewriter.create<imex::ntensor::FromElementsOp>(loc, arrayType,
+    auto array = rewriter.create<numba::ntensor::FromElementsOp>(loc, arrayType,
                                                                 elements);
 
     auto dynArrayType =
-        imex::ntensor::NTensorType::get(mlir::ShapedType::kDynamic, *elemType);
+        numba::ntensor::NTensorType::get(mlir::ShapedType::kDynamic, *elemType);
     auto dynArray =
-        rewriter.create<imex::ntensor::CastOp>(loc, dynArrayType, array);
-    rewriter.replaceOpWithNewOp<imex::ntensor::GetitemOp>(op, op.getType(),
+        rewriter.create<numba::ntensor::CastOp>(loc, dynArrayType, array);
+    rewriter.replaceOpWithNewOp<numba::ntensor::GetitemOp>(op, op.getType(),
                                                           dynArray, index);
     return mlir::success();
   }
 };
 } // namespace
 
-void imex::ntensor::populateResolveArrayOpsPatterns(
+void numba::ntensor::populateResolveArrayOpsPatterns(
     mlir::RewritePatternSet &patterns) {
   patterns.insert<SetitemOpLowering, SetitemMaskOpLowering, GetitemOpLowering,
                   GetitemUnitupleOpLowering>(patterns.getContext());
@@ -466,15 +466,15 @@ struct ResolveArrayOpsPass
   virtual void
   getDependentDialects(mlir::DialectRegistry &registry) const override {
     registry.insert<mlir::arith::ArithDialect>();
-    registry.insert<imex::ntensor::NTensorDialect>();
-    registry.insert<imex::util::ImexUtilDialect>();
+    registry.insert<numba::ntensor::NTensorDialect>();
+    registry.insert<numba::util::ImexUtilDialect>();
   }
 
   void runOnOperation() override {
     auto &ctx = getContext();
     mlir::RewritePatternSet patterns(&ctx);
 
-    imex::ntensor::populateResolveArrayOpsPatterns(patterns);
+    numba::ntensor::populateResolveArrayOpsPatterns(patterns);
 
     (void)mlir::applyPatternsAndFoldGreedily(getOperation(),
                                              std::move(patterns));
@@ -482,6 +482,6 @@ struct ResolveArrayOpsPass
 };
 } // namespace
 
-std::unique_ptr<mlir::Pass> imex::ntensor::createResolveArrayOpsPass() {
+std::unique_ptr<mlir::Pass> numba::ntensor::createResolveArrayOpsPass() {
   return std::make_unique<ResolveArrayOpsPass>();
 }

@@ -46,11 +46,11 @@ struct ParallelToTbb : public mlir::OpRewritePattern<mlir::scf::ParallelOp> {
   mlir::LogicalResult
   matchAndRewrite(mlir::scf::ParallelOp op,
                   mlir::PatternRewriter &rewriter) const override {
-    if (mlir::isa<imex::util::ParallelOp>(op->getParentOp()))
+    if (mlir::isa<numba::util::ParallelOp>(op->getParentOp()))
       return mlir::failure();
 
     bool needParallel =
-        op->hasAttr(imex::util::attributes::getParallelName()) ||
+        op->hasAttr(numba::util::attributes::getParallelName()) ||
         !op->getParentOfType<mlir::scf::ParallelOp>();
     if (!needParallel)
       return mlir::failure();
@@ -60,7 +60,7 @@ struct ParallelToTbb : public mlir::OpRewritePattern<mlir::scf::ParallelOp> {
     if (!func)
       return mlir::failure();
     if (auto mc = func->getAttrOfType<mlir::IntegerAttr>(
-            imex::util::attributes::getMaxConcurrencyName()))
+            numba::util::attributes::getMaxConcurrencyName()))
       maxConcurrency = mc.getInt();
 
     if (maxConcurrency <= 1)
@@ -94,7 +94,7 @@ struct ParallelToTbb : public mlir::OpRewritePattern<mlir::scf::ParallelOp> {
     if (initVals.size() != op.getNumResults())
       return mlir::failure();
 
-    imex::AllocaInsertionPoint allocaIP(op);
+    numba::AllocaInsertionPoint allocaIP(op);
 
     auto loc = op.getLoc();
     mlir::BlockAndValueMapping mapping;
@@ -147,7 +147,7 @@ struct ParallelToTbb : public mlir::OpRewritePattern<mlir::scf::ParallelOp> {
       }
       auto newOp =
           mlir::cast<mlir::scf::ParallelOp>(builder.clone(*op, mapping));
-      newOp->removeAttr(imex::util::attributes::getParallelName());
+      newOp->removeAttr(numba::util::attributes::getParallelName());
       assert(newOp->getNumResults() == reduceVars.size());
       newOp.getLowerBoundMutable().assign(lowerBound);
       newOp.getUpperBoundMutable().assign(upperBound);
@@ -158,7 +158,7 @@ struct ParallelToTbb : public mlir::OpRewritePattern<mlir::scf::ParallelOp> {
       }
     };
 
-    rewriter.create<imex::util::ParallelOp>(loc, origLowerBound, origUpperBound,
+    rewriter.create<numba::util::ParallelOp>(loc, origLowerBound, origUpperBound,
                                             origStep, bodyBuilder);
 
     auto reduceBodyBuilder = [&](mlir::OpBuilder &builder, mlir::Location loc,
@@ -217,7 +217,7 @@ isAnyArgDefinedInsideRegions(llvm::MutableArrayRef<mlir::Region> regs,
 
 struct LoopInfo {
   mlir::Operation *outermostLoop = nullptr;
-  imex::util::ParallelOp innermostParallel;
+  numba::util::ParallelOp innermostParallel;
 };
 
 static llvm::Optional<LoopInfo> getLoopInfo(mlir::Operation *op) {
@@ -230,11 +230,11 @@ static llvm::Optional<LoopInfo> getLoopInfo(mlir::Operation *op) {
       break;
 
     if (mlir::isa<mlir::scf::WhileOp, mlir::scf::ForOp, mlir::scf::ParallelOp,
-                  imex::util::ParallelOp>(parent))
+                  numba::util::ParallelOp>(parent))
       ret.outermostLoop = parent;
 
-    if (!ret.innermostParallel && mlir::isa<imex::util::ParallelOp>(parent))
-      ret.innermostParallel = mlir::cast<imex::util::ParallelOp>(parent);
+    if (!ret.innermostParallel && mlir::isa<numba::util::ParallelOp>(parent))
+      ret.innermostParallel = mlir::cast<numba::util::ParallelOp>(parent);
 
     parent = parent->getParentOp();
   }
@@ -289,7 +289,7 @@ struct HoistBufferAllocs
       return mlir::failure();
 
     auto mc = func->getAttrOfType<mlir::IntegerAttr>(
-        imex::util::attributes::getMaxConcurrencyName());
+        numba::util::attributes::getMaxConcurrencyName());
     if (loopInfo->innermostParallel && !mc)
       return mlir::failure();
 
@@ -350,7 +350,7 @@ struct HoistBufferAllocs
                                                       offsets, sizes, strides);
 
       if (view.getType() != oldType) {
-        view = rewriter.create<imex::util::MemrefApplyOffsetOp>(loc, oldType,
+        view = rewriter.create<numba::util::MemrefApplyOffsetOp>(loc, oldType,
                                                                 view);
         view = rewriter.create<mlir::memref::CastOp>(loc, oldType, view);
       }
@@ -365,17 +365,17 @@ struct HoistBufferAllocs
 };
 
 struct ParallelToTbbPass
-    : public imex::RewriteWrapperPass<
+    : public numba::RewriteWrapperPass<
           ParallelToTbbPass, mlir::func::FuncOp,
-          imex::DependentDialectsList<imex::util::ImexUtilDialect,
+          numba::DependentDialectsList<numba::util::ImexUtilDialect,
                                       mlir::arith::ArithDialect,
                                       mlir::scf::SCFDialect>,
           ParallelToTbb> {};
 
 struct HoistBufferAllocsPass
-    : public imex::RewriteWrapperPass<
+    : public numba::RewriteWrapperPass<
           HoistBufferAllocsPass, mlir::func::FuncOp,
-          imex::DependentDialectsList<imex::util::ImexUtilDialect,
+          numba::DependentDialectsList<numba::util::ImexUtilDialect,
                                       mlir::scf::SCFDialect,
                                       mlir::memref::MemRefDialect>,
           HoistBufferAllocs> {};
@@ -390,7 +390,7 @@ static void populateParallelToTbbPipeline(mlir::OpPassManager &pm) {
 }
 } // namespace
 
-void registerParallelToTBBPipeline(imex::PipelineRegistry &registry) {
+void registerParallelToTBBPipeline(numba::PipelineRegistry &registry) {
   registry.registerPipeline([](auto sink) {
     auto stage = getLowerLoweringStage();
     auto llvm_pipeline = lowerToLLVMPipelineName();

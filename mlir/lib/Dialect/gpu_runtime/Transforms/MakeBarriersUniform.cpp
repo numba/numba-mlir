@@ -87,7 +87,7 @@ struct ConvertBarrierOp
       llvm::SmallVector<mlir::Value> results;
       results.reserve(yieldArgs.size());
       for (auto arg : yieldArgs) {
-        auto val = builder.create<imex::util::UndefOp>(loc, arg.getType());
+        auto val = builder.create<numba::util::UndefOp>(loc, arg.getType());
         results.emplace_back(val);
       }
 
@@ -141,7 +141,7 @@ struct MakeBarriersUniformPass
   virtual void
   getDependentDialects(mlir::DialectRegistry &registry) const override {
     registry.insert<gpu_runtime::GpuRuntimeDialect>();
-    registry.insert<imex::util::ImexUtilDialect>();
+    registry.insert<numba::util::ImexUtilDialect>();
     registry.insert<mlir::gpu::GPUDialect>();
     registry.insert<mlir::scf::SCFDialect>();
   }

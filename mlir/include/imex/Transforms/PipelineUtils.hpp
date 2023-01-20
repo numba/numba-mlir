@@ -10,8 +10,8 @@ class ModuleOp;
 class StringAttr;
 } // namespace mlir
 
-namespace imex {
+namespace numba {
 mlir::ArrayAttr getPipelineJumpMarkers(mlir::ModuleOp module);
 void addPipelineJumpMarker(mlir::ModuleOp module, mlir::StringAttr name);
 void removePipelineJumpMarker(mlir::ModuleOp module, mlir::StringAttr name);
-} // namespace imex
+} // namespace numba

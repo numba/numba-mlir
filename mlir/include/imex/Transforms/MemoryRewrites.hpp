@@ -14,9 +14,9 @@ class Pass;
 struct LogicalResult;
 } // namespace mlir
 
-namespace imex {
+namespace numba {
 llvm::Optional<mlir::LogicalResult>
 optimizeMemoryOps(mlir::AnalysisManager &am);
 
 std::unique_ptr<mlir::Pass> createMemoryOptPass();
-} // namespace imex
+} // namespace numba

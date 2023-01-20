@@ -62,7 +62,7 @@ struct ParallelLoopGPUMappingPass
 
   void runOnOperation() override {
     auto func = getOperation();
-    func->walk([&](imex::util::EnvironmentRegionOp envOp) {
+    func->walk([&](numba::util::EnvironmentRegionOp envOp) {
       if (!envOp.getEnvironment().isa<gpu_runtime::GPURegionDescAttr>())
         return;
 
@@ -202,7 +202,7 @@ struct InsertGPUAllocs
                     if (mlir::isa<mlir::scf::SCFDialect>(op->getDialect()) ||
                         mlir::isa<mlir::ViewLikeOpInterface,
                                   mlir::arith::SelectOp, mlir::func::CallOp,
-                                  imex::util::EnvironmentRegionOp>(op))
+                                  numba::util::EnvironmentRegionOp>(op))
                       // Ignore
                       continue;
                     if (mlir::isa<mlir::memref::AllocOp,
@@ -234,7 +234,7 @@ struct InsertGPUAllocs
 
     auto getEnv = [](mlir::Operation *op) -> mlir::FailureOr<mlir::Attribute> {
       assert(op && "Invalid op");
-      auto region = op->getParentOfType<imex::util::EnvironmentRegionOp>();
+      auto region = op->getParentOfType<numba::util::EnvironmentRegionOp>();
       if (!region ||
           !region.getEnvironment().isa<gpu_runtime::GPURegionDescAttr>())
         return mlir::failure();
@@ -365,7 +365,7 @@ struct InsertGPUAllocs
                                           allocType.getMemorySpace());
 
       bool hostShared = access.hostRead || access.hostWrite;
-      auto results = imex::util::wrapEnvRegion(
+      auto results = numba::util::wrapEnvRegion(
                          builder, src.getLoc(), access.env, memrefType,
                          [&](mlir::OpBuilder &b, mlir::Location loc) {
                            auto gpuAlloc = builder.create<mlir::gpu::AllocOp>(
@@ -389,7 +389,7 @@ struct InsertGPUAllocs
       src.replaceAllUsesExcept(results, filter);
 
       builder.setInsertionPoint(term);
-      imex::util::wrapEnvRegion(
+      numba::util::wrapEnvRegion(
           builder, src.getLoc(), access.env, std::nullopt,
           [&](mlir::OpBuilder &b, mlir::Location loc) {
             if (access.hostRead && access.deviceWrite)
@@ -404,7 +404,7 @@ struct InsertGPUAllocs
       if (auto alloc = mlir::dyn_cast<mlir::memref::AllocOp>(op)) {
         builder.setInsertionPoint(alloc);
         bool hostShared = access.hostRead || access.hostWrite;
-        auto results = imex::util::wrapEnvRegion(
+        auto results = numba::util::wrapEnvRegion(
             builder, op->getLoc(), access.env, alloc.getType(),
             [&](mlir::OpBuilder &b, mlir::Location loc) {
               auto gpuAlloc = builder.create<mlir::gpu::AllocOp>(
@@ -644,7 +644,7 @@ struct UnstrideMemrefsPass
   getDependentDialects(mlir::DialectRegistry &registry) const override {
     registry.insert<mlir::memref::MemRefDialect>();
     registry.insert<mlir::gpu::GPUDialect>();
-    registry.insert<imex::util::ImexUtilDialect>();
+    registry.insert<numba::util::ImexUtilDialect>();
   }
 
   void runOnOperation() override {
@@ -669,7 +669,7 @@ static llvm::Optional<mlir::Value> getGpuStream(mlir::OpBuilder &builder,
     return {};
 
   mlir::Attribute device;
-  if (auto envRegion = op->getParentOfType<imex::util::EnvironmentRegionOp>())
+  if (auto envRegion = op->getParentOfType<numba::util::EnvironmentRegionOp>())
     if (auto desc = envRegion.getEnvironment()
                         .dyn_cast<gpu_runtime::GPURegionDescAttr>())
       device = desc.getDevice();
@@ -1187,12 +1187,12 @@ public:
   }
 };
 
-class ConvertUndef : public mlir::OpConversionPattern<imex::util::UndefOp> {
+class ConvertUndef : public mlir::OpConversionPattern<numba::util::UndefOp> {
 public:
   using OpConversionPattern::OpConversionPattern;
 
   mlir::LogicalResult
-  matchAndRewrite(imex::util::UndefOp op, imex::util::UndefOp::Adaptor adaptor,
+  matchAndRewrite(numba::util::UndefOp op, numba::util::UndefOp::Adaptor adaptor,
                   mlir::ConversionPatternRewriter &rewriter) const override {
     auto converter = getTypeConverter();
     assert(converter);
@@ -1296,8 +1296,8 @@ struct GPUToSpirvPass
 
       patterns.insert<
           ConvertReinterpretCastOp, ConvertCastOp<mlir::memref::CastOp>,
-          ConvertBitcastOp<imex::util::BitcastOp>,
-          ConvertBitcastOp<imex::util::MemrefBitcastOp>, ConvertLoadOp,
+          ConvertBitcastOp<numba::util::BitcastOp>,
+          ConvertBitcastOp<numba::util::MemrefBitcastOp>, ConvertLoadOp,
           ConvertStoreOp, ConvertAtomicOps, AllocaOpPattern, ConvertFunc,
           ConvertAssert, ConvertBarrierOp, ConvertMemFenceOp, ConvertUndef,
           ConvertGlobalOp, ConvertGetGlobalOp>(typeConverter, context);
@@ -1591,7 +1591,7 @@ struct ExpandDeviceFuncCallOp
   mlir::LogicalResult
   matchAndRewrite(mlir::func::CallOp op,
                   mlir::PatternRewriter &rewriter) const override {
-    auto region = op->getParentOfType<imex::util::EnvironmentRegionOp>();
+    auto region = op->getParentOfType<numba::util::EnvironmentRegionOp>();
     if (!region || !region.getEnvironment()
                         .isa_and_nonnull<gpu_runtime::GPURegionDescAttr>())
       return mlir::failure();
@@ -1627,7 +1627,7 @@ struct ExpandDeviceFuncCallOp
         auto funcType =
             rewriter.getFunctionType(newInputs, origFuncType.getResults());
 
-        func = imex::addFunction(rewriter, mod, deviceFuncName, funcType);
+        func = numba::addFunction(rewriter, mod, deviceFuncName, funcType);
         auto cifaceName = rewriter.getStringAttr("llvm.emit_c_interface");
 
         if (origFunc->hasAttr(cifaceName))
@@ -1682,7 +1682,7 @@ struct TileParallelOp : public mlir::OpRewritePattern<mlir::scf::ParallelOp> {
   matchAndRewrite(mlir::scf::ParallelOp op,
                   mlir::PatternRewriter &rewriter) const override {
     // Process only loops inside gpu region.
-    auto envOp = op->getParentOfType<imex::util::EnvironmentRegionOp>();
+    auto envOp = op->getParentOfType<numba::util::EnvironmentRegionOp>();
     if (!envOp || !envOp.getEnvironment().isa<gpu_runtime::GPURegionDescAttr>())
       return mlir::failure();
 
@@ -1875,7 +1875,7 @@ struct TileParallelLoopsForGPUPass
   virtual void
   getDependentDialects(mlir::DialectRegistry &registry) const override {
     registry.insert<gpu_runtime::GpuRuntimeDialect>();
-    registry.insert<imex::util::ImexUtilDialect>();
+    registry.insert<numba::util::ImexUtilDialect>();
     registry.insert<mlir::arith::ArithDialect>();
     registry.insert<mlir::gpu::GPUDialect>();
     registry.insert<mlir::scf::SCFDialect>();
@@ -1896,7 +1896,7 @@ struct TileParallelLoopsForGPUPass
 static mlir::Value f64Tof32(mlir::OpBuilder &builder, mlir::Location loc,
                             mlir::Value src) {
   auto i64 = builder.getI64Type();
-  auto srcI64 = builder.create<imex::util::BitcastOp>(loc, i64, src);
+  auto srcI64 = builder.create<numba::util::BitcastOp>(loc, i64, src);
 
   auto zero = builder.create<mlir::arith::ConstantIntOp>(loc, 0, i64);
   auto absMask = builder.create<mlir::arith::ConstantIntOp>(
@@ -1991,7 +1991,7 @@ static mlir::Value f32Tof64(mlir::OpBuilder &builder, mlir::Location loc,
 
   res = builder.create<mlir::arith::SelectOp>(loc, isZero, srcI64, res);
 
-  res = builder.create<imex::util::BitcastOp>(loc, resType, res);
+  res = builder.create<numba::util::BitcastOp>(loc, resType, res);
   return res;
 }
 
@@ -2137,7 +2137,7 @@ struct TruncateF64ForGPUPass
             .getResult();
 
       if (srcType.isa<mlir::MemRefType>() && dstType.isa<mlir::MemRefType>())
-        return builder.create<imex::util::MemrefBitcastOp>(loc, dstType, src)
+        return builder.create<numba::util::MemrefBitcastOp>(loc, dstType, src)
             .getResult();
 
       return std::nullopt;
@@ -2148,11 +2148,11 @@ struct TruncateF64ForGPUPass
 
     mlir::RewritePatternSet patterns(ctx);
 
-    imex::populateArithConversionRewritesAndTarget(converter, patterns, target);
-    imex::populateMathConversionRewritesAndTarget(converter, patterns, target);
-    imex::populateControlFlowTypeConversionRewritesAndTarget(converter,
+    numba::populateArithConversionRewritesAndTarget(converter, patterns, target);
+    numba::populateMathConversionRewritesAndTarget(converter, patterns, target);
+    numba::populateControlFlowTypeConversionRewritesAndTarget(converter,
                                                              patterns, target);
-    imex::populateTupleTypeConversionRewritesAndTarget(converter, patterns,
+    numba::populateTupleTypeConversionRewritesAndTarget(converter, patterns,
                                                        target);
 
     patterns.insert<ConvertF64LoadOp, ConvertF64StoreOp,
@@ -2226,7 +2226,7 @@ struct TruncateF64ForGPUPass
             } else if (origType.isa<mlir::MemRefType>() &&
                        newType.isa<mlir::MemRefType>()) {
               auto loc = launch.getLoc();
-              mlir::Value newVal = builder.create<imex::util::MemrefBitcastOp>(
+              mlir::Value newVal = builder.create<numba::util::MemrefBitcastOp>(
                   loc, newType, origArg);
               newArgs.emplace_back(newVal);
             } else {

@@ -9,6 +9,6 @@ class RewritePatternSet;
 class MLIRContext;
 } // namespace mlir
 
-namespace imex {
+namespace numba {
 void populateIndexPropagatePatterns(mlir::RewritePatternSet &patterns);
 }

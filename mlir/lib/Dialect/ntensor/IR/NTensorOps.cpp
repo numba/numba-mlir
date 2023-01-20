@@ -31,7 +31,7 @@ struct NTensorInlinerInterface : public mlir::DialectInlinerInterface {
 };
 } // namespace
 
-void imex::ntensor::NTensorDialect::initialize() {
+void numba::ntensor::NTensorDialect::initialize() {
   addOperations<
 #define GET_OP_LIST
 #include "imex/Dialect/ntensor/IR/NTensorOps.cpp.inc"
@@ -50,7 +50,7 @@ void imex::ntensor::NTensorDialect::initialize() {
       >();
 }
 
-mlir::Operation *imex::ntensor::NTensorDialect::materializeConstant(
+mlir::Operation *numba::ntensor::NTensorDialect::materializeConstant(
     mlir::OpBuilder &builder, mlir::Attribute value, mlir::Type type,
     mlir::Location loc) {
   if (mlir::arith::ConstantOp::isBuildableWith(value, type))
@@ -63,20 +63,20 @@ mlir::Operation *imex::ntensor::NTensorDialect::materializeConstant(
   return nullptr;
 }
 
-bool imex::ntensor::NTensorBase::hasRank() const { return true; }
+bool numba::ntensor::NTensorBase::hasRank() const { return true; }
 
-llvm::ArrayRef<int64_t> imex::ntensor::NTensorBase::getShape() const {
+llvm::ArrayRef<int64_t> numba::ntensor::NTensorBase::getShape() const {
   return cast<NTensorType>().getShape();
 }
 
-imex::ntensor::NTensorBase imex::ntensor::NTensorBase::cloneWith(
+numba::ntensor::NTensorBase numba::ntensor::NTensorBase::cloneWith(
     llvm::Optional<llvm::ArrayRef<int64_t>> shape, Type elementType) const {
   auto t = cast<NTensorType>();
   return NTensorType::get(shape.value_or(getShape()), elementType,
                           t.getEnvironment(), t.getLayout());
 }
 
-bool imex::ntensor::NTensorBase::isValidElementType(Type type) {
+bool numba::ntensor::NTensorBase::isValidElementType(Type type) {
   return type.isIntOrIndexOrFloat();
 }
 
@@ -108,14 +108,14 @@ static mlir::Value computeCount(mlir::OpBuilder &builder, mlir::Location loc,
 
 namespace {
 struct ResolveSlicePropagate
-    : public mlir::OpRewritePattern<imex::ntensor::ResolveSliceOp> {
+    : public mlir::OpRewritePattern<numba::ntensor::ResolveSliceOp> {
   using OpRewritePattern::OpRewritePattern;
 
   mlir::LogicalResult
-  matchAndRewrite(imex::ntensor::ResolveSliceOp op,
+  matchAndRewrite(numba::ntensor::ResolveSliceOp op,
                   mlir::PatternRewriter &rewriter) const override {
     auto buildSlice =
-        op.getSlice().getDefiningOp<imex::ntensor::BuildSliceOp>();
+        op.getSlice().getDefiningOp<numba::ntensor::BuildSliceOp>();
     if (!buildSlice)
       return mlir::failure();
 
@@ -149,45 +149,45 @@ struct ResolveSlicePropagate
 };
 } // namespace
 
-void imex::ntensor::ResolveSliceOp::getCanonicalizationPatterns(
+void numba::ntensor::ResolveSliceOp::getCanonicalizationPatterns(
     ::mlir::RewritePatternSet &results, ::mlir::MLIRContext *context) {
   results.insert<ResolveSlicePropagate>(context);
 }
 
 namespace {
-struct LoadCastFold : public mlir::OpRewritePattern<imex::ntensor::LoadOp> {
+struct LoadCastFold : public mlir::OpRewritePattern<numba::ntensor::LoadOp> {
   using OpRewritePattern::OpRewritePattern;
 
   mlir::LogicalResult
-  matchAndRewrite(imex::ntensor::LoadOp op,
+  matchAndRewrite(numba::ntensor::LoadOp op,
                   mlir::PatternRewriter &rewriter) const override {
     auto array = op.getArray();
-    auto src = array.getDefiningOp<imex::ntensor::CastOp>();
+    auto src = array.getDefiningOp<numba::ntensor::CastOp>();
     if (!src)
       return mlir::failure();
 
     auto srcArray = src.getSource();
-    auto srcArrayType = srcArray.getType().cast<imex::ntensor::NTensorType>();
-    auto dstArrayType = array.getType().cast<imex::ntensor::NTensorType>();
+    auto srcArrayType = srcArray.getType().cast<numba::ntensor::NTensorType>();
+    auto dstArrayType = array.getType().cast<numba::ntensor::NTensorType>();
     if (srcArrayType.getElementType() != dstArrayType.getElementType() ||
         srcArrayType.getEnvironment() != dstArrayType.getEnvironment())
       return mlir::failure();
 
-    rewriter.replaceOpWithNewOp<imex::ntensor::LoadOp>(op, srcArray,
+    rewriter.replaceOpWithNewOp<numba::ntensor::LoadOp>(op, srcArray,
                                                        op.getIndices());
     return mlir::success();
   }
 };
 } // namespace
 
-void imex::ntensor::LoadOp::getCanonicalizationPatterns(
+void numba::ntensor::LoadOp::getCanonicalizationPatterns(
     ::mlir::RewritePatternSet &results, ::mlir::MLIRContext *context) {
   results.insert<LoadCastFold>(context);
 }
 
 static llvm::Optional<mlir::Value>
 foldLoadFromElements(mlir::Value src, mlir::ValueRange indices) {
-  auto fromElements = src.getDefiningOp<imex::ntensor::FromElementsOp>();
+  auto fromElements = src.getDefiningOp<numba::ntensor::FromElementsOp>();
   if (!fromElements)
     return std::nullopt;
 
@@ -204,14 +204,14 @@ foldLoadFromElements(mlir::Value src, mlir::ValueRange indices) {
     return std::nullopt;
 
   for (auto user : fromElements.getResult().getUsers())
-    if (!mlir::isa<imex::ntensor::LoadOp, imex::ntensor::DimOp>(user))
+    if (!mlir::isa<numba::ntensor::LoadOp, numba::ntensor::DimOp>(user))
       return std::nullopt;
 
   return args[idx];
 }
 
 mlir::OpFoldResult
-imex::ntensor::LoadOp::fold(llvm::ArrayRef<mlir::Attribute> /*operands*/) {
+numba::ntensor::LoadOp::fold(llvm::ArrayRef<mlir::Attribute> /*operands*/) {
   if (auto result = foldLoadFromElements(getArray(), getIndices()))
     return *result;
 
@@ -219,44 +219,44 @@ imex::ntensor::LoadOp::fold(llvm::ArrayRef<mlir::Attribute> /*operands*/) {
 }
 
 namespace {
-struct StoreCastFold : public mlir::OpRewritePattern<imex::ntensor::StoreOp> {
+struct StoreCastFold : public mlir::OpRewritePattern<numba::ntensor::StoreOp> {
   using OpRewritePattern::OpRewritePattern;
 
   mlir::LogicalResult
-  matchAndRewrite(imex::ntensor::StoreOp op,
+  matchAndRewrite(numba::ntensor::StoreOp op,
                   mlir::PatternRewriter &rewriter) const override {
     auto array = op.getArray();
-    auto src = array.getDefiningOp<imex::ntensor::CastOp>();
+    auto src = array.getDefiningOp<numba::ntensor::CastOp>();
     if (!src)
       return mlir::failure();
 
     auto srcArray = src.getSource();
-    auto srcArrayType = srcArray.getType().cast<imex::ntensor::NTensorType>();
-    auto dstArrayType = array.getType().cast<imex::ntensor::NTensorType>();
+    auto srcArrayType = srcArray.getType().cast<numba::ntensor::NTensorType>();
+    auto dstArrayType = array.getType().cast<numba::ntensor::NTensorType>();
     if (srcArrayType.getElementType() != dstArrayType.getElementType() ||
         srcArrayType.getEnvironment() != dstArrayType.getEnvironment())
       return mlir::failure();
 
     auto val = op.getValue();
-    rewriter.replaceOpWithNewOp<imex::ntensor::StoreOp>(op, val, srcArray,
+    rewriter.replaceOpWithNewOp<numba::ntensor::StoreOp>(op, val, srcArray,
                                                         op.getIndices());
     return mlir::success();
   }
 };
 } // namespace
 
-void imex::ntensor::StoreOp::getCanonicalizationPatterns(
+void numba::ntensor::StoreOp::getCanonicalizationPatterns(
     ::mlir::RewritePatternSet &results, ::mlir::MLIRContext *context) {
   results.insert<StoreCastFold>(context);
 }
 
 namespace {
 struct ResolveIndexPropagate
-    : public mlir::OpRewritePattern<imex::ntensor::ResolveIndexOp> {
+    : public mlir::OpRewritePattern<numba::ntensor::ResolveIndexOp> {
   using OpRewritePattern::OpRewritePattern;
 
   mlir::LogicalResult
-  matchAndRewrite(imex::ntensor::ResolveIndexOp op,
+  matchAndRewrite(numba::ntensor::ResolveIndexOp op,
                   mlir::PatternRewriter &rewriter) const override {
     auto res = handleSliceIndexVars(rewriter, op->getLoc(), op.getIndex(),
                                     op.getSize());
@@ -266,12 +266,12 @@ struct ResolveIndexPropagate
 };
 } // namespace
 
-void imex::ntensor::DimOp::getAsmResultNames(
+void numba::ntensor::DimOp::getAsmResultNames(
     llvm::function_ref<void(mlir::Value, mlir::StringRef)> setNameFn) {
   setNameFn(getResult(), "dim");
 }
 
-void imex::ntensor::DimOp::build(mlir::OpBuilder &builder,
+void numba::ntensor::DimOp::build(mlir::OpBuilder &builder,
                                  mlir::OperationState &result,
                                  mlir::Value source, int64_t index) {
   auto loc = result.location;
@@ -279,20 +279,20 @@ void imex::ntensor::DimOp::build(mlir::OpBuilder &builder,
   build(builder, result, source, indexValue);
 }
 
-llvm::Optional<int64_t> imex::ntensor::DimOp::getConstantIndex() {
+llvm::Optional<int64_t> numba::ntensor::DimOp::getConstantIndex() {
   if (auto val = mlir::getConstantIntValue(getIndex()))
     return *val;
 
   return {};
 }
 
-mlir::Speculation::Speculatability imex::ntensor::DimOp::getSpeculatability() {
+mlir::Speculation::Speculatability numba::ntensor::DimOp::getSpeculatability() {
   auto constantIndex = getConstantIndex();
   if (!constantIndex)
     return mlir::Speculation::NotSpeculatable;
 
   auto rankedType =
-      mlir::dyn_cast<imex::ntensor::NTensorType>(getSource().getType());
+      mlir::dyn_cast<numba::ntensor::NTensorType>(getSource().getType());
   if (!rankedType)
     return mlir::Speculation::NotSpeculatable;
 
@@ -301,7 +301,7 @@ mlir::Speculation::Speculatability imex::ntensor::DimOp::getSpeculatability() {
   return mlir::Speculation::Speculatable;
 }
 
-mlir::LogicalResult imex::ntensor::DimOp::verify() {
+mlir::LogicalResult numba::ntensor::DimOp::verify() {
   // Assume unknown index to be in range.
   llvm::Optional<int64_t> index = getConstantIndex();
   if (!index)
@@ -309,7 +309,7 @@ mlir::LogicalResult imex::ntensor::DimOp::verify() {
 
   // Check that constant index is not knowingly out of range.
   auto type = getSource().getType();
-  if (auto tensorType = type.dyn_cast<imex::ntensor::NTensorType>()) {
+  if (auto tensorType = type.dyn_cast<numba::ntensor::NTensorType>()) {
     if (*index >= tensorType.getRank())
       return emitOpError("index is out of range");
   } else {
@@ -320,13 +320,13 @@ mlir::LogicalResult imex::ntensor::DimOp::verify() {
 
 namespace {
 struct FromTensorDimPropagate
-    : public mlir::OpRewritePattern<imex::ntensor::DimOp> {
+    : public mlir::OpRewritePattern<numba::ntensor::DimOp> {
   using OpRewritePattern::OpRewritePattern;
 
   mlir::LogicalResult
-  matchAndRewrite(imex::ntensor::DimOp op,
+  matchAndRewrite(numba::ntensor::DimOp op,
                   mlir::PatternRewriter &rewriter) const override {
-    auto src = op.getSource().getDefiningOp<imex::ntensor::FromTensorOp>();
+    auto src = op.getSource().getDefiningOp<numba::ntensor::FromTensorOp>();
     if (!src)
       return mlir::failure();
 
@@ -343,11 +343,11 @@ struct ToTensorDimPropagate
   mlir::LogicalResult
   matchAndRewrite(mlir::tensor::DimOp op,
                   mlir::PatternRewriter &rewriter) const override {
-    auto src = op.getSource().getDefiningOp<imex::ntensor::ToTensorOp>();
+    auto src = op.getSource().getDefiningOp<numba::ntensor::ToTensorOp>();
     if (!src)
       return mlir::failure();
 
-    rewriter.replaceOpWithNewOp<imex::ntensor::DimOp>(op, src.getArray(),
+    rewriter.replaceOpWithNewOp<numba::ntensor::DimOp>(op, src.getArray(),
                                                       op.getIndex());
     return mlir::success();
   }
@@ -420,14 +420,14 @@ struct ExtractSliceDimPropagate
 };
 } // namespace
 
-void imex::ntensor::DimOp::getCanonicalizationPatterns(
+void numba::ntensor::DimOp::getCanonicalizationPatterns(
     ::mlir::RewritePatternSet &results, ::mlir::MLIRContext *context) {
   results.insert<FromTensorDimPropagate, ToTensorDimPropagate,
                  LinalgGenericDimPropagate, ExtractSliceDimPropagate>(context);
 }
 
 mlir::OpFoldResult
-imex::ntensor::DimOp::fold(llvm::ArrayRef<mlir::Attribute> /*operands*/) {
+numba::ntensor::DimOp::fold(llvm::ArrayRef<mlir::Attribute> /*operands*/) {
   auto idxVal = getConstantIndex();
   if (!idxVal || *idxVal < 0)
     return nullptr;
@@ -443,7 +443,7 @@ imex::ntensor::DimOp::fold(llvm::ArrayRef<mlir::Attribute> /*operands*/) {
   if (idx < shape.size() && !mlir::ShapedType::isDynamic(shape[idx]))
     return getIndexVal(shape[idx]);
 
-  if (auto cast = src.getDefiningOp<imex::ntensor::CastOp>()) {
+  if (auto cast = src.getDefiningOp<numba::ntensor::CastOp>()) {
     getSourceMutable().assign(cast.getSource());
     return getResult();
   }
@@ -451,8 +451,8 @@ imex::ntensor::DimOp::fold(llvm::ArrayRef<mlir::Attribute> /*operands*/) {
   return nullptr;
 }
 
-imex::ntensor::NTensorType imex::ntensor::SubviewOp::inferResultType(
-    imex::ntensor::NTensorType sourceType,
+numba::ntensor::NTensorType numba::ntensor::SubviewOp::inferResultType(
+    numba::ntensor::NTensorType sourceType,
     mlir::ArrayRef<int64_t> staticOffsets, mlir::ArrayRef<int64_t> staticSizes,
     mlir::ArrayRef<int64_t> staticStrides) {
   unsigned rank = sourceType.getRank();
@@ -460,13 +460,13 @@ imex::ntensor::NTensorType imex::ntensor::SubviewOp::inferResultType(
   assert(staticOffsets.size() == rank && "staticOffsets length mismatch");
   assert(staticSizes.size() == rank && "staticSizes length mismatch");
   assert(staticStrides.size() == rank && "staticStrides length mismatch");
-  return imex::ntensor::NTensorType::get(
+  return numba::ntensor::NTensorType::get(
       staticSizes, sourceType.getElementType(), sourceType.getEnvironment(),
       sourceType.getLayout());
 }
 
-imex::ntensor::NTensorType imex::ntensor::SubviewOp::inferResultType(
-    imex::ntensor::NTensorType sourceShapedTensorType,
+numba::ntensor::NTensorType numba::ntensor::SubviewOp::inferResultType(
+    numba::ntensor::NTensorType sourceShapedTensorType,
     mlir::ArrayRef<mlir::OpFoldResult> offsets,
     mlir::ArrayRef<mlir::OpFoldResult> sizes,
     mlir::ArrayRef<mlir::OpFoldResult> strides) {
@@ -479,8 +479,8 @@ imex::ntensor::NTensorType imex::ntensor::SubviewOp::inferResultType(
                                     staticSizes, staticStrides);
 }
 
-imex::ntensor::NTensorType imex::ntensor::SubviewOp::inferRankReducedResultType(
-    mlir::ArrayRef<int64_t> resultShape, imex::ntensor::NTensorType sourceType,
+numba::ntensor::NTensorType numba::ntensor::SubviewOp::inferRankReducedResultType(
+    mlir::ArrayRef<int64_t> resultShape, numba::ntensor::NTensorType sourceType,
     mlir::ArrayRef<int64_t> offsets, mlir::ArrayRef<int64_t> sizes,
     mlir::ArrayRef<int64_t> strides) {
   auto inferredType = inferResultType(sourceType, offsets, sizes, strides);
@@ -493,13 +493,13 @@ imex::ntensor::NTensorType imex::ntensor::SubviewOp::inferRankReducedResultType(
              .has_value() &&
          "invalid rank reduction");
 
-  return imex::ntensor::NTensorType::get(
+  return numba::ntensor::NTensorType::get(
       resultShape, sourceType.getElementType(), sourceType.getEnvironment(),
       sourceType.getLayout());
 }
 
-imex::ntensor::NTensorType imex::ntensor::SubviewOp::inferRankReducedResultType(
-    mlir::ArrayRef<int64_t> resultShape, imex::ntensor::NTensorType sourceType,
+numba::ntensor::NTensorType numba::ntensor::SubviewOp::inferRankReducedResultType(
+    mlir::ArrayRef<int64_t> resultShape, numba::ntensor::NTensorType sourceType,
     mlir::ArrayRef<mlir::OpFoldResult> offsets,
     mlir::ArrayRef<mlir::OpFoldResult> sizes,
     mlir::ArrayRef<mlir::OpFoldResult> strides) {
@@ -514,9 +514,9 @@ imex::ntensor::NTensorType imex::ntensor::SubviewOp::inferRankReducedResultType(
 
 // Build a SubViewOp with mixed static and dynamic entries and custom result
 // type. If the type passed is nullptr, it is inferred.
-void imex::ntensor::SubviewOp::build(
+void numba::ntensor::SubviewOp::build(
     mlir::OpBuilder &b, mlir::OperationState &result,
-    imex::ntensor::NTensorType resultType, mlir::Value source,
+    numba::ntensor::NTensorType resultType, mlir::Value source,
     mlir::ArrayRef<mlir::OpFoldResult> offsets,
     mlir::ArrayRef<mlir::OpFoldResult> sizes,
     mlir::ArrayRef<mlir::OpFoldResult> strides,
@@ -526,10 +526,10 @@ void imex::ntensor::SubviewOp::build(
   dispatchIndexOpFoldResults(offsets, dynamicOffsets, staticOffsets);
   dispatchIndexOpFoldResults(sizes, dynamicSizes, staticSizes);
   dispatchIndexOpFoldResults(strides, dynamicStrides, staticStrides);
-  auto sourceType = source.getType().cast<imex::ntensor::NTensorType>();
+  auto sourceType = source.getType().cast<numba::ntensor::NTensorType>();
   // Structuring implementation this way avoids duplication between builders.
   if (!resultType) {
-    resultType = imex::ntensor::SubviewOp::inferResultType(
+    resultType = numba::ntensor::SubviewOp::inferResultType(
         sourceType, staticOffsets, staticSizes, staticStrides);
   }
   build(b, result, resultType, source, dynamicOffsets, dynamicSizes,
@@ -541,18 +541,18 @@ void imex::ntensor::SubviewOp::build(
 
 // Build a SubViewOp with mixed static and dynamic entries and inferred result
 // type.
-void imex::ntensor::SubviewOp::build(
+void numba::ntensor::SubviewOp::build(
     mlir::OpBuilder &b, mlir::OperationState &result, mlir::Value source,
     mlir::ArrayRef<mlir::OpFoldResult> offsets,
     mlir::ArrayRef<mlir::OpFoldResult> sizes,
     mlir::ArrayRef<mlir::OpFoldResult> strides,
     mlir::ArrayRef<mlir::NamedAttribute> attrs) {
-  build(b, result, imex::ntensor::NTensorType(), source, offsets, sizes,
+  build(b, result, numba::ntensor::NTensorType(), source, offsets, sizes,
         strides, attrs);
 }
 
 // Build a SubViewOp with static entries and inferred result type.
-void imex::ntensor::SubviewOp::build(
+void numba::ntensor::SubviewOp::build(
     mlir::OpBuilder &b, mlir::OperationState &result, mlir::Value source,
     mlir::ArrayRef<int64_t> offsets, mlir::ArrayRef<int64_t> sizes,
     mlir::ArrayRef<int64_t> strides,
@@ -574,9 +574,9 @@ void imex::ntensor::SubviewOp::build(
 
 // Build a SubViewOp with dynamic entries and custom result type. If the
 // type passed is nullptr, it is inferred.
-void imex::ntensor::SubviewOp::build(
+void numba::ntensor::SubviewOp::build(
     mlir::OpBuilder &b, mlir::OperationState &result,
-    imex::ntensor::NTensorType resultType, mlir::Value source,
+    numba::ntensor::NTensorType resultType, mlir::Value source,
     mlir::ArrayRef<int64_t> offsets, mlir::ArrayRef<int64_t> sizes,
     mlir::ArrayRef<int64_t> strides,
     mlir::ArrayRef<mlir::NamedAttribute> attrs) {
@@ -598,9 +598,9 @@ void imex::ntensor::SubviewOp::build(
 
 // Build a SubViewOp with dynamic entries and custom result type. If the type
 // passed is nullptr, it is inferred.
-void imex::ntensor::SubviewOp::build(
+void numba::ntensor::SubviewOp::build(
     mlir::OpBuilder &b, mlir::OperationState &result,
-    imex::ntensor::NTensorType resultType, mlir::Value source,
+    numba::ntensor::NTensorType resultType, mlir::Value source,
     mlir::ValueRange offsets, mlir::ValueRange sizes, mlir::ValueRange strides,
     mlir::ArrayRef<mlir::NamedAttribute> attrs) {
   mlir::SmallVector<mlir::OpFoldResult> offsetValues =
@@ -616,21 +616,21 @@ void imex::ntensor::SubviewOp::build(
 }
 
 // Build a SubViewOp with dynamic entries and inferred result type.
-void imex::ntensor::SubviewOp::build(
+void numba::ntensor::SubviewOp::build(
     mlir::OpBuilder &b, mlir::OperationState &result, mlir::Value source,
     mlir::ValueRange offsets, mlir::ValueRange sizes, mlir::ValueRange strides,
     mlir::ArrayRef<mlir::NamedAttribute> attrs) {
-  build(b, result, imex::ntensor::NTensorType(), source, offsets, sizes,
+  build(b, result, numba::ntensor::NTensorType(), source, offsets, sizes,
         strides, attrs);
 }
 
-void imex::ntensor::ResolveIndexOp::getCanonicalizationPatterns(
+void numba::ntensor::ResolveIndexOp::getCanonicalizationPatterns(
     ::mlir::RewritePatternSet &results, ::mlir::MLIRContext *context) {
   results.insert<ResolveIndexPropagate>(context);
 }
 
 // Copypasted from upstream tensor.
-llvm::SmallBitVector imex::ntensor::SubviewOp::getDroppedDims() {
+llvm::SmallBitVector numba::ntensor::SubviewOp::getDroppedDims() {
   mlir::ArrayRef<int64_t> resultShape = getType().getShape();
   mlir::SmallVector<mlir::OpFoldResult> mixedSizes = getMixedSizes();
   llvm::SmallBitVector droppedDims(mixedSizes.size());
@@ -650,8 +650,8 @@ llvm::SmallBitVector imex::ntensor::SubviewOp::getDroppedDims() {
   return droppedDims;
 }
 
-static bool isIdentitySubview(imex::ntensor::SubviewOp op) {
-  auto srcType = op.getSource().getType().cast<imex::ntensor::NTensorType>();
+static bool isIdentitySubview(numba::ntensor::SubviewOp op) {
+  auto srcType = op.getSource().getType().cast<numba::ntensor::NTensorType>();
   if (srcType != op.getResult().getType())
     return false;
 
@@ -668,7 +668,7 @@ static bool isIdentitySubview(imex::ntensor::SubviewOp op) {
       if (!dim)
         return false;
 
-      auto dimOp = dim.getDefiningOp<imex::ntensor::DimOp>();
+      auto dimOp = dim.getDefiningOp<numba::ntensor::DimOp>();
       if (!dimOp)
         return false;
 
@@ -689,16 +689,16 @@ static bool isIdentitySubview(imex::ntensor::SubviewOp op) {
 }
 
 mlir::OpFoldResult
-imex::ntensor::SubviewOp::fold(llvm::ArrayRef<mlir::Attribute> /*operands*/) {
+numba::ntensor::SubviewOp::fold(llvm::ArrayRef<mlir::Attribute> /*operands*/) {
   if (isIdentitySubview(*this))
     return getSource();
 
   return nullptr;
 }
 
-mlir::OpFoldResult imex::ntensor::FromTensorOp::fold(
+mlir::OpFoldResult numba::ntensor::FromTensorOp::fold(
     llvm::ArrayRef<mlir::Attribute> /*operands*/) {
-  if (auto to = getTensor().getDefiningOp<imex::ntensor::ToTensorOp>()) {
+  if (auto to = getTensor().getDefiningOp<numba::ntensor::ToTensorOp>()) {
     auto array = to.getArray();
     if (getType() == array.getType())
       return array;
@@ -707,8 +707,8 @@ mlir::OpFoldResult imex::ntensor::FromTensorOp::fold(
 }
 
 mlir::OpFoldResult
-imex::ntensor::ToTensorOp::fold(llvm::ArrayRef<mlir::Attribute> /*operands*/) {
-  if (auto from = getArray().getDefiningOp<imex::ntensor::FromTensorOp>()) {
+numba::ntensor::ToTensorOp::fold(llvm::ArrayRef<mlir::Attribute> /*operands*/) {
+  if (auto from = getArray().getDefiningOp<numba::ntensor::FromTensorOp>()) {
     auto val = from.getTensor();
     auto haveOnlySafeUses = [](mlir::Operation *op) -> bool {
       // Fold if we are the only user.
@@ -735,9 +735,9 @@ imex::ntensor::ToTensorOp::fold(llvm::ArrayRef<mlir::Attribute> /*operands*/) {
   return nullptr;
 }
 
-mlir::OpFoldResult imex::ntensor::FromMemrefOp::fold(
+mlir::OpFoldResult numba::ntensor::FromMemrefOp::fold(
     llvm::ArrayRef<mlir::Attribute> /*operands*/) {
-  if (auto to = getMemref().getDefiningOp<imex::ntensor::ToMemrefOp>()) {
+  if (auto to = getMemref().getDefiningOp<numba::ntensor::ToMemrefOp>()) {
     auto array = to.getArray();
     if (getType() == array.getType())
       return array;
@@ -746,8 +746,8 @@ mlir::OpFoldResult imex::ntensor::FromMemrefOp::fold(
 }
 
 mlir::OpFoldResult
-imex::ntensor::ToMemrefOp::fold(llvm::ArrayRef<mlir::Attribute> /*operands*/) {
-  if (auto from = getArray().getDefiningOp<imex::ntensor::FromMemrefOp>()) {
+numba::ntensor::ToMemrefOp::fold(llvm::ArrayRef<mlir::Attribute> /*operands*/) {
+  if (auto from = getArray().getDefiningOp<numba::ntensor::FromMemrefOp>()) {
     auto val = from.getMemref();
     if (getType() == val.getType())
       return val;
@@ -756,7 +756,7 @@ imex::ntensor::ToMemrefOp::fold(llvm::ArrayRef<mlir::Attribute> /*operands*/) {
 }
 
 // Copypasted from upstream tensor.
-mlir::LogicalResult imex::ntensor::SubviewOp::reifyResultShapes(
+mlir::LogicalResult numba::ntensor::SubviewOp::reifyResultShapes(
     mlir::OpBuilder &builder,
     mlir::ReifiedRankedShapedTypeDims &reifiedReturnShapes) {
   reifiedReturnShapes.resize(1);
@@ -779,7 +779,7 @@ mlir::LogicalResult imex::ntensor::SubviewOp::reifyResultShapes(
 }
 
 mlir::OpFoldResult
-imex::ntensor::CastOp::fold(llvm::ArrayRef<mlir::Attribute> /*operands*/) {
+numba::ntensor::CastOp::fold(llvm::ArrayRef<mlir::Attribute> /*operands*/) {
   mlir::Value current = getSource();
   while (auto parent = current.getDefiningOp<CastOp>()) {
     auto parentSource = parent.getSource();
@@ -791,13 +791,13 @@ imex::ntensor::CastOp::fold(llvm::ArrayRef<mlir::Attribute> /*operands*/) {
   return nullptr;
 }
 
-bool imex::ntensor::CastOp::areCastCompatible(mlir::TypeRange inputs,
+bool numba::ntensor::CastOp::areCastCompatible(mlir::TypeRange inputs,
                                               mlir::TypeRange outputs) {
   if (inputs.size() != 1 || outputs.size() != 1)
     return false;
   mlir::Type a = inputs.front(), b = outputs.front();
-  auto aT = a.dyn_cast<imex::ntensor::NTensorType>();
-  auto bT = b.dyn_cast<imex::ntensor::NTensorType>();
+  auto aT = a.dyn_cast<numba::ntensor::NTensorType>();
+  auto bT = b.dyn_cast<numba::ntensor::NTensorType>();
   if (!aT || !bT)
     return false;
 
@@ -807,7 +807,7 @@ bool imex::ntensor::CastOp::areCastCompatible(mlir::TypeRange inputs,
   return succeeded(mlir::verifyCompatibleShape(aT, bT));
 }
 
-void imex::ntensor::ElementwiseOp::build(
+void numba::ntensor::ElementwiseOp::build(
     ::mlir::OpBuilder &odsBuilder, ::mlir::OperationState &odsState,
     ::mlir::TypeRange resultTypes, ::mlir::ValueRange inputs,
     ::llvm::function_ref<void(::mlir::OpBuilder &, ::mlir::Location,
@@ -820,7 +820,7 @@ void imex::ntensor::ElementwiseOp::build(
     mlir::Block &bodyBlock = bodyRegion->front();
 
     for (auto input : inputs) {
-      auto srcType = input.getType().cast<imex::ntensor::NTensorType>();
+      auto srcType = input.getType().cast<numba::ntensor::NTensorType>();
       bodyBlock.addArgument(srcType.getElementType(), odsState.location);
     }
 
@@ -830,7 +830,7 @@ void imex::ntensor::ElementwiseOp::build(
   }
 }
 
-mlir::LogicalResult imex::ntensor::BroadcastOp::fold(
+mlir::LogicalResult numba::ntensor::BroadcastOp::fold(
     mlir::ArrayRef<mlir::Attribute> /*operands*/,
     llvm::SmallVectorImpl<mlir::OpFoldResult> &results) {
   assert(getInputs().size() == getResults().size());
@@ -848,11 +848,11 @@ mlir::LogicalResult imex::ntensor::BroadcastOp::fold(
 
 namespace {
 struct BroadcastSameStaticShape
-    : public mlir::OpRewritePattern<imex::ntensor::BroadcastOp> {
+    : public mlir::OpRewritePattern<numba::ntensor::BroadcastOp> {
   using OpRewritePattern::OpRewritePattern;
 
   mlir::LogicalResult
-  matchAndRewrite(imex::ntensor::BroadcastOp op,
+  matchAndRewrite(numba::ntensor::BroadcastOp op,
                   mlir::PatternRewriter &rewriter) const override {
     auto inputs = op.getInputs();
     if (inputs.size() < 2)
@@ -877,7 +877,7 @@ struct BroadcastSameStaticShape
 
       if (srcType != dstType) {
         newResults[i] =
-            rewriter.create<imex::ntensor::CastOp>(loc, dstType, src);
+            rewriter.create<numba::ntensor::CastOp>(loc, dstType, src);
       } else {
         newResults[i] = src;
       }
@@ -889,7 +889,7 @@ struct BroadcastSameStaticShape
 };
 } // namespace
 
-void imex::ntensor::BroadcastOp::getCanonicalizationPatterns(
+void numba::ntensor::BroadcastOp::getCanonicalizationPatterns(
     ::mlir::RewritePatternSet &results, ::mlir::MLIRContext *context) {
   results.insert<BroadcastSameStaticShape>(context);
 }
@@ -960,7 +960,7 @@ static bool parseArgList(
 }
 
 static void printArgList(mlir::OpAsmPrinter &printer,
-                         imex::ntensor::CallOp call, mlir::ValueRange args,
+                         numba::ntensor::CallOp call, mlir::ValueRange args,
                          mlir::ArrayAttr argsNames) {
   assert(args.size() == argsNames.size());
   printer << '(';

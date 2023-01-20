@@ -16,12 +16,12 @@
 
 namespace {
 struct ConvertChangeLayout
-    : public mlir::OpConversionPattern<imex::util::ChangeLayoutOp> {
+    : public mlir::OpConversionPattern<numba::util::ChangeLayoutOp> {
   using OpConversionPattern::OpConversionPattern;
 
   mlir::LogicalResult
-  matchAndRewrite(imex::util::ChangeLayoutOp op,
-                  imex::util::ChangeLayoutOp::Adaptor adaptor,
+  matchAndRewrite(numba::util::ChangeLayoutOp op,
+                  numba::util::ChangeLayoutOp::Adaptor adaptor,
                   mlir::ConversionPatternRewriter &rewriter) const override {
     auto converter = getTypeConverter();
     assert(converter);
@@ -32,7 +32,7 @@ struct ConvertChangeLayout
     if (!newResType)
       return mlir::failure();
 
-    rewriter.replaceOpWithNewOp<imex::util::ChangeLayoutOp>(
+    rewriter.replaceOpWithNewOp<numba::util::ChangeLayoutOp>(
         op, newResType, adaptor.getSource());
     return mlir::success();
   }
@@ -410,7 +410,7 @@ static llvm::Optional<mlir::Type> makeSignlessType(mlir::Type type) {
   return std::nullopt;
 }
 
-void imex::populateMakeSignlessRewritesAndTarget(
+void numba::populateMakeSignlessRewritesAndTarget(
     mlir::TypeConverter &converter, mlir::RewritePatternSet &patterns,
     mlir::ConversionTarget &target) {
   converter.addConversion(&makeSignlessType);
@@ -419,14 +419,14 @@ void imex::populateMakeSignlessRewritesAndTarget(
                                 mlir::ValueRange inputs,
                                 mlir::Location loc) -> mlir::Value {
     assert(inputs.size() == 1);
-    return builder.create<imex::util::SignCastOp>(loc, type, inputs.front());
+    return builder.create<numba::util::SignCastOp>(loc, type, inputs.front());
   };
   converter.addArgumentMaterialization(materializeSignCast);
   converter.addSourceMaterialization(materializeSignCast);
   converter.addTargetMaterialization(materializeSignCast);
 
   target.addDynamicallyLegalOp<
-      imex::util::ChangeLayoutOp, mlir::bufferization::ToMemrefOp,
+      numba::util::ChangeLayoutOp, mlir::bufferization::ToMemrefOp,
       mlir::bufferization::ToTensorOp, mlir::memref::AllocOp,
       mlir::memref::AllocaOp, mlir::memref::DeallocOp, mlir::memref::CastOp,
       mlir::memref::SubViewOp, mlir::tensor::EmptyOp,
@@ -453,7 +453,7 @@ struct MakeSignlessPass
 
   virtual void
   getDependentDialects(mlir::DialectRegistry &registry) const override {
-    registry.insert<imex::util::ImexUtilDialect>();
+    registry.insert<numba::util::ImexUtilDialect>();
     registry.insert<mlir::bufferization::BufferizationDialect>();
     registry.insert<mlir::linalg::LinalgDialect>();
     registry.insert<mlir::memref::MemRefDialect>();
@@ -469,14 +469,14 @@ struct MakeSignlessPass
     // Convert unknown types to itself
     converter.addConversion([](mlir::Type type) { return type; });
 
-    imex::populateTupleTypeConverter(converter);
+    numba::populateTupleTypeConverter(converter);
 
-    imex::populateMakeSignlessRewritesAndTarget(converter, patterns, target);
+    numba::populateMakeSignlessRewritesAndTarget(converter, patterns, target);
 
-    imex::populateTupleTypeConversionRewritesAndTarget(converter, patterns,
+    numba::populateTupleTypeConversionRewritesAndTarget(converter, patterns,
                                                        target);
 
-    imex::populateControlFlowTypeConversionRewritesAndTarget(converter,
+    numba::populateControlFlowTypeConversionRewritesAndTarget(converter,
                                                              patterns, target);
 
     auto op = getOperation();
@@ -487,6 +487,6 @@ struct MakeSignlessPass
 };
 } // namespace
 
-std::unique_ptr<mlir::Pass> imex::createMakeSignlessPass() {
+std::unique_ptr<mlir::Pass> numba::createMakeSignlessPass() {
   return std::make_unique<MakeSignlessPass>();
 }

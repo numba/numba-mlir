@@ -10,7 +10,7 @@ namespace mlir {
 class Pass;
 }
 
-namespace imex {
+namespace numba {
 /// Tries to promote loads/stores in scf.for to loop-carried variables.
 std::unique_ptr<mlir::Pass> createCanonicalizeReductionsPass();
-} // namespace imex
+} // namespace numba

@@ -137,7 +137,7 @@ struct CmpIndexCastSimplify
 };
 } // namespace
 
-void imex::populateIndexPropagatePatterns(mlir::RewritePatternSet &patterns) {
+void numba::populateIndexPropagatePatterns(mlir::RewritePatternSet &patterns) {
   patterns
       .insert<CmpIndexCastSimplify, ArithIndexCastSimplify<mlir::arith::SubIOp>,
               ArithIndexCastSimplify<mlir::arith::AddIOp>,

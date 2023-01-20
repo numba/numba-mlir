@@ -15,7 +15,7 @@ namespace mlir {
 class OpPassManager;
 }
 
-namespace imex {
+namespace numba {
 class PipelineRegistry {
 public:
   PipelineRegistry() = default;
@@ -44,4 +44,4 @@ public:
 private:
   std::vector<registry_entry_t> pipelines;
 };
-} // namespace imex
+} // namespace numba

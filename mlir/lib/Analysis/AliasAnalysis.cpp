@@ -21,10 +21,10 @@ static bool isRestrict(mlir::Value val) {
   auto blockArg = val.cast<mlir::BlockArgument>();
   auto func =
       mlir::cast<mlir::FunctionOpInterface>(blockArg.getOwner()->getParentOp());
-  return !!func.getArgAttr(blockArg.getArgNumber(), imex::getRestrictArgName());
+  return !!func.getArgAttr(blockArg.getArgNumber(), numba::getRestrictArgName());
 }
 
-mlir::AliasResult imex::LocalAliasAnalysis::aliasImpl(mlir::Value lhs,
+mlir::AliasResult numba::LocalAliasAnalysis::aliasImpl(mlir::Value lhs,
                                                       mlir::Value rhs) {
   if (lhs == rhs)
     return mlir::AliasResult::MustAlias;
@@ -38,4 +38,4 @@ mlir::AliasResult imex::LocalAliasAnalysis::aliasImpl(mlir::Value lhs,
   return mlir::LocalAliasAnalysis::aliasImpl(lhs, rhs);
 }
 
-llvm::StringRef imex::getRestrictArgName() { return "imex.restrict"; }
+llvm::StringRef numba::getRestrictArgName() { return "imex.restrict"; }

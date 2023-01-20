@@ -10,6 +10,6 @@ namespace mlir {
 class Pass;
 }
 
-namespace imex {
+namespace numba {
 std::unique_ptr<mlir::Pass> createForceInlinePass();
 }

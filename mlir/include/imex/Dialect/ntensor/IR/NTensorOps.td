@@ -21,7 +21,7 @@ include "mlir/IR/SubElementInterfaces.td"
 
 def NTensor_Dialect : Dialect {
   let name = "ntensor";
-  let cppNamespace = "::imex::ntensor";
+  let cppNamespace = "::numba::ntensor";
 
   let summary = "Dialect for Numpy-like types and operations.";
   let description = [{
@@ -63,7 +63,7 @@ class NTensor_OpBase<string mnemonic, list<Trait> traits = []>
 
 def NTensor_Tensor : NTensor_Type<"NTensor", "ntensor", [
   DeclareTypeInterfaceMethods<SubElementTypeInterface>, ShapedTypeInterface],
-  "::imex::ntensor::NTensorBase"> {
+  "::numba::ntensor::NTensorBase"> {
   let summary = "Multi-dimensional numpy-like array";
   let description = [{
     Multi-dimensional numpy-like array.
@@ -670,7 +670,7 @@ def ToMemrefOp : NTensor_OpBase<"to_memref",
 
 def ElementwiseOp : NTensor_OpBase<"elementwise", [
     SameOperandsShape,
-    SingleBlockImplicitTerminator<"::imex::ntensor::ElementwiseYieldOp">,
+    SingleBlockImplicitTerminator<"::numba::ntensor::ElementwiseYieldOp">,
     Pure]> {
   let summary = "Elementwise operation";
   let description = [{
@@ -698,7 +698,7 @@ def ElementwiseYieldOp : NTensor_OpBase<"elementwise_yield", [
   Pure,
   ReturnLike,
   Terminator,
-  HasParent<"::imex::ntensor::ElementwiseOp">
+  HasParent<"::numba::ntensor::ElementwiseOp">
   ]> {
 
   let summary = "Elementwise op region yield and termination operation";

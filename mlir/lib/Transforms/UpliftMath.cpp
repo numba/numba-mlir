@@ -198,7 +198,7 @@ struct UpliftFma : public mlir::OpRewritePattern<mlir::arith::AddFOp> {
   matchAndRewrite(mlir::arith::AddFOp op,
                   mlir::PatternRewriter &rewriter) const override {
     auto func = op->getParentOfType<mlir::func::FuncOp>();
-    if (!func || !func->hasAttr(imex::util::attributes::getFastmathName()))
+    if (!func || !func->hasAttr(numba::util::attributes::getFastmathName()))
       return mlir::failure();
 
     mlir::Value c;
@@ -232,7 +232,7 @@ struct UpliftMathPass
 
   void runOnOperation() override {
     mlir::RewritePatternSet patterns(&getContext());
-    imex::populateUpliftMathPatterns(patterns);
+    numba::populateUpliftMathPatterns(patterns);
     (void)mlir::applyPatternsAndFoldGreedily(getOperation(),
                                              std::move(patterns));
   }
@@ -250,27 +250,27 @@ struct UpliftFMAPass
 
   void runOnOperation() override {
     mlir::RewritePatternSet patterns(&getContext());
-    imex::populateUpliftFMAPatterns(patterns);
+    numba::populateUpliftFMAPatterns(patterns);
     (void)mlir::applyPatternsAndFoldGreedily(getOperation(),
                                              std::move(patterns));
   }
 };
 } // namespace
 
-void imex::populateUpliftMathPatterns(mlir::RewritePatternSet &patterns) {
+void numba::populateUpliftMathPatterns(mlir::RewritePatternSet &patterns) {
   patterns
       .insert<UpliftMathCalls, UpliftFabsCalls, UpliftCabsCalls, UpliftMinMax>(
           patterns.getContext());
 }
 
-void imex::populateUpliftFMAPatterns(mlir::RewritePatternSet &patterns) {
+void numba::populateUpliftFMAPatterns(mlir::RewritePatternSet &patterns) {
   patterns.insert<UpliftFma>(patterns.getContext());
 }
 
-std::unique_ptr<mlir::Pass> imex::createUpliftMathPass() {
+std::unique_ptr<mlir::Pass> numba::createUpliftMathPass() {
   return std::make_unique<UpliftMathPass>();
 }
 
-std::unique_ptr<mlir::Pass> imex::createUpliftFMAPass() {
+std::unique_ptr<mlir::Pass> numba::createUpliftFMAPass() {
   return std::make_unique<UpliftFMAPass>();
 }

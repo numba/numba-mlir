@@ -8,11 +8,11 @@
 
 #include "imex/Dialect/plier/Dialect.hpp"
 
-imex::ArgOpLowering::ArgOpLowering(mlir::MLIRContext *context)
+numba::ArgOpLowering::ArgOpLowering(mlir::MLIRContext *context)
     : OpRewritePattern(context) {}
 
 mlir::LogicalResult
-imex::ArgOpLowering::matchAndRewrite(plier::ArgOp op,
+numba::ArgOpLowering::matchAndRewrite(plier::ArgOp op,
                                      mlir::PatternRewriter &rewriter) const {
   auto func = op->getParentOfType<mlir::func::FuncOp>();
   if (!func)

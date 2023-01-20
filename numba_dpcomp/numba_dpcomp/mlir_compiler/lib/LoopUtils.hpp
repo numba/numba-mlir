@@ -22,7 +22,7 @@ namespace plier {
 class PyCallOp;
 }
 
-namespace imex {
+namespace numba {
 mlir::LogicalResult
 lowerRange(plier::PyCallOp op, mlir::ValueRange operands,
            llvm::ArrayRef<std::pair<llvm::StringRef, mlir::Value>> kwargs,

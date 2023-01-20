@@ -11,9 +11,9 @@ class RewritePatternSet;
 class TypeConverter;
 } // namespace mlir
 
-namespace imex {
+namespace numba {
 /// Convert util ops according to provided type converter.
 void populateUtilConversionPatterns(mlir::TypeConverter &converter,
                                     mlir::RewritePatternSet &patterns,
                                     mlir::ConversionTarget &target);
-} // namespace imex
+} // namespace numba

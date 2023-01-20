@@ -104,56 +104,56 @@ static mlir::PassPipelineRegistration<> scfToAffineReg(
 static mlir::PassPipelineRegistration<>
     cfgToScf("cfg-to-scf", "Convert function from CFG form to SCF ops",
              [](mlir::OpPassManager &pm) {
-               pm.addNestedPass<mlir::func::FuncOp>(imex::createCFGToSCFPass());
+               pm.addNestedPass<mlir::func::FuncOp>(numba::createCFGToSCFPass());
              });
 
 static mlir::PassPipelineRegistration<> expandTuple(
     "expand-tuple", "Expand tuple into individual elements",
-    [](mlir::OpPassManager &pm) { pm.addPass(imex::createExpandTuplePass()); });
+    [](mlir::OpPassManager &pm) { pm.addPass(numba::createExpandTuplePass()); });
 
 static mlir::PassPipelineRegistration<> ntensorResolveArrayOps(
     "ntensor-resolve-array-ops", "Resolve ntensor array ops into primitive ops",
     [](mlir::OpPassManager &pm) {
-      pm.addPass(imex::ntensor::createResolveArrayOpsPass());
+      pm.addPass(numba::ntensor::createResolveArrayOpsPass());
     });
 
 static mlir::PassPipelineRegistration<> ntensorPropagateEnv(
     "ntensor-propagate-env", "Propagate ntensor environment",
     [](mlir::OpPassManager &pm) {
-      pm.addPass(imex::ntensor::createPropagateEnvironmentPass());
+      pm.addPass(numba::ntensor::createPropagateEnvironmentPass());
     });
 
 static mlir::PassPipelineRegistration<>
     ntensorCopyRemoval("ntensor-copy-removal",
                        "This pass tries to remove redundant `ntensor.copy` ops",
                        [](mlir::OpPassManager &pm) {
-                         pm.addPass(imex::ntensor::createCopyRemovalPass());
+                         pm.addPass(numba::ntensor::createCopyRemovalPass());
                        });
 
 static mlir::PassPipelineRegistration<>
     ntensorAliasAnalysis("ntensor-alias-analysis",
                          "Run alias analysis on ntensor ops",
                          [](mlir::OpPassManager &pm) {
-                           pm.addPass(imex::createNtensorAliasAnalysisPass());
+                           pm.addPass(numba::createNtensorAliasAnalysisPass());
                          });
 
 static mlir::PassPipelineRegistration<>
     ntensorToMemref("ntensor-to-memref", "Convert ntensor array ops to memref",
                     [](mlir::OpPassManager &pm) {
-                      pm.addPass(imex::createNtensorToMemrefPass());
+                      pm.addPass(numba::createNtensorToMemrefPass());
                     });
 
 static mlir::PassPipelineRegistration<>
     ntensorToLinalg("ntensor-to-linalg", "Convert ntensor array ops to linalg",
                     [](mlir::OpPassManager &pm) {
-                      pm.addPass(imex::createNtensorToLinalgPass());
+                      pm.addPass(numba::createNtensorToLinalgPass());
                     });
 
 static mlir::PassPipelineRegistration<> makeSignless(
     "imex-make-signless",
     "Convert types of various signedness to corresponding signless type",
     [](mlir::OpPassManager &pm) {
-      pm.addPass(imex::createMakeSignlessPass());
+      pm.addPass(numba::createMakeSignlessPass());
     });
 
 static mlir::PassPipelineRegistration<> makeBarriersUniform(
@@ -171,13 +171,13 @@ static mlir::PassPipelineRegistration<> tileParallelLoopsGPU(
 
 static mlir::PassPipelineRegistration<> memoryOpts(
     "imex-memory-opts", "Apply memory optimizations",
-    [](mlir::OpPassManager &pm) { pm.addPass(imex::createMemoryOptPass()); });
+    [](mlir::OpPassManager &pm) { pm.addPass(numba::createMemoryOptPass()); });
 
 static mlir::PassPipelineRegistration<> canonicalizeReductions(
     "imex-canonicalize-reductions",
     "Tries to promote loads/stores in scf.for to loop-carried variables",
     [](mlir::OpPassManager &pm) {
-      pm.addPass(imex::createCanonicalizeReductionsPass());
+      pm.addPass(numba::createCanonicalizeReductionsPass());
     });
 
 static mlir::PassPipelineRegistration<> insertGPUGlobalReduce(
@@ -192,11 +192,11 @@ static mlir::PassPipelineRegistration<>
     promoteToParallel("imex-promote-to-parallel",
                       "Promotes scf.for to scf.parallel",
                       [](mlir::OpPassManager &pm) {
-                        pm.addPass(imex::createPromoteToParallelPass());
+                        pm.addPass(numba::createPromoteToParallelPass());
                       });
 
 static mlir::PassPipelineRegistration<> shapeIntegerRangePropagation(
     "imex-shape-int-range-opts", "Shape integer range optimizations",
     [](mlir::OpPassManager &pm) {
-      pm.addPass(imex::createShapeIntegerRangePropagationPass());
+      pm.addPass(numba::createShapeIntegerRangePropagationPass());
     });

@@ -10,7 +10,7 @@
 #include <mlir/IR/Builders.h>
 #include <mlir/IR/BuiltinOps.h>
 
-mlir::func::FuncOp imex::addFunction(mlir::OpBuilder &builder,
+mlir::func::FuncOp numba::addFunction(mlir::OpBuilder &builder,
                                      mlir::ModuleOp module,
                                      llvm::StringRef name,
                                      mlir::FunctionType type) {
@@ -24,7 +24,7 @@ mlir::func::FuncOp imex::addFunction(mlir::OpBuilder &builder,
   return func;
 }
 
-imex::AllocaInsertionPoint::AllocaInsertionPoint(mlir::Operation *inst) {
+numba::AllocaInsertionPoint::AllocaInsertionPoint(mlir::Operation *inst) {
   assert(nullptr != inst);
   auto parent = inst->getParentWithTrait<mlir::OpTrait::IsIsolatedFromAbove>();
   assert(parent->getNumRegions() == 1);
@@ -34,7 +34,7 @@ imex::AllocaInsertionPoint::AllocaInsertionPoint(mlir::Operation *inst) {
   insertionPoint = &block.front();
 }
 
-std::string imex::getUniqueLLVMGlobalName(mlir::ModuleOp mod,
+std::string numba::getUniqueLLVMGlobalName(mlir::ModuleOp mod,
                                           mlir::StringRef srcName) {
   auto globals = mod.getOps<mlir::LLVM::GlobalOp>();
   for (int i = 0;; ++i) {

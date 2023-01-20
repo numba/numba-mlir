@@ -4,7 +4,7 @@
 
 #pragma once
 
-namespace imex {
+namespace numba {
 class PipelineRegistry;
 }
 
@@ -12,7 +12,7 @@ namespace llvm {
 class StringRef;
 }
 
-void registerLowerToLLVMPipeline(imex::PipelineRegistry &registry);
+void registerLowerToLLVMPipeline(numba::PipelineRegistry &registry);
 
 llvm::StringRef preLowerToLLVMPipelineName();
 llvm::StringRef lowerToLLVMPipelineName();

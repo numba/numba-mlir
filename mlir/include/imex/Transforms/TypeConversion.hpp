@@ -11,7 +11,7 @@ class RewritePatternSet;
 class TypeConverter;
 } // namespace mlir
 
-namespace imex {
+namespace numba {
 void populateControlFlowTypeConversionRewritesAndTarget(
     mlir::TypeConverter &typeConverter, mlir::RewritePatternSet &patterns,
     mlir::ConversionTarget &target);
@@ -21,4 +21,4 @@ void populateTupleTypeConverter(mlir::TypeConverter &typeConverter);
 void populateTupleTypeConversionRewritesAndTarget(
     mlir::TypeConverter &typeConverter, mlir::RewritePatternSet &patterns,
     mlir::ConversionTarget &target);
-} // namespace imex
+} // namespace numba

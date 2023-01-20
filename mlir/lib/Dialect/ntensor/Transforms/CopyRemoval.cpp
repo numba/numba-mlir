@@ -19,7 +19,7 @@ struct CopyRemovalPass
 
   virtual void
   getDependentDialects(mlir::DialectRegistry &registry) const override {
-    registry.insert<imex::ntensor::NTensorDialect>();
+    registry.insert<numba::ntensor::NTensorDialect>();
   }
 
   void runOnOperation() override {
@@ -27,10 +27,10 @@ struct CopyRemovalPass
 
     llvm::SmallVector<mlir::Operation *> reads;
     llvm::SmallVector<mlir::Operation *> writes;
-    llvm::SmallVector<imex::ntensor::CopyOp> copies;
+    llvm::SmallVector<numba::ntensor::CopyOp> copies;
 
     root->walk([&](mlir::Operation *op) {
-      if (auto copy = mlir::dyn_cast<imex::ntensor::CopyOp>(op)) {
+      if (auto copy = mlir::dyn_cast<numba::ntensor::CopyOp>(op)) {
         copies.emplace_back(copy);
         reads.emplace_back(copy);
         writes.emplace_back(copy);
@@ -39,7 +39,7 @@ struct CopyRemovalPass
 
       // Only process ops operation on ntensor arrays.
       if (!llvm::any_of(op->getOperands(), [](mlir::Value arg) {
-            return arg.getType().isa<imex::ntensor::NTensorType>();
+            return arg.getType().isa<numba::ntensor::NTensorType>();
           }))
         return;
 
@@ -63,7 +63,7 @@ struct CopyRemovalPass
 
     auto &dom = getAnalysis<mlir::DominanceInfo>();
     auto &postDom = getAnalysis<mlir::PostDominanceInfo>();
-    auto &aa = getAnalysis<imex::LocalAliasAnalysis>();
+    auto &aa = getAnalysis<numba::LocalAliasAnalysis>();
 
     auto inBetween = [&](mlir::Operation *op, mlir::Operation *begin,
                          mlir::Operation *end) -> bool {
@@ -83,7 +83,7 @@ struct CopyRemovalPass
           continue;
 
         for (auto arg : write->getOperands()) {
-          if (!arg.getType().isa<imex::ntensor::NTensorType>())
+          if (!arg.getType().isa<numba::ntensor::NTensorType>())
             continue;
 
           if (!aa.alias(array, arg).isNo())
@@ -118,14 +118,14 @@ struct CopyRemovalPass
           auto loc = owner->getLoc();
           builder.setInsertionPoint(owner);
           newArg =
-              builder.create<imex::ntensor::CastOp>(loc, dst.getType(), newArg);
+              builder.create<numba::ntensor::CastOp>(loc, dst.getType(), newArg);
         }
 
         use.set(newArg);
       }
     }
 
-    auto getNextCopy = [&](imex::ntensor::CopyOp src) -> imex::ntensor::CopyOp {
+    auto getNextCopy = [&](numba::ntensor::CopyOp src) -> numba::ntensor::CopyOp {
       for (auto copy : copies) {
         if (src == copy)
           continue;
@@ -147,7 +147,7 @@ struct CopyRemovalPass
           continue;
 
         for (auto arg : read->getOperands()) {
-          if (!arg.getType().isa<imex::ntensor::NTensorType>())
+          if (!arg.getType().isa<numba::ntensor::NTensorType>())
             continue;
 
           if (!aa.alias(array, arg).isNo())
@@ -178,6 +178,6 @@ struct CopyRemovalPass
 };
 } // namespace
 
-std::unique_ptr<mlir::Pass> imex::ntensor::createCopyRemovalPass() {
+std::unique_ptr<mlir::Pass> numba::ntensor::createCopyRemovalPass() {
   return std::make_unique<CopyRemovalPass>();
 }
