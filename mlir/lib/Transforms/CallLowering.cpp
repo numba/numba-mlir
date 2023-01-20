@@ -61,7 +61,7 @@ mlir::LogicalResult numba::ExpandCallVarargs::matchAndRewrite(
 
 mlir::LogicalResult
 numba::CallOpLowering::matchAndRewrite(plier::PyCallOp op,
-                                      mlir::PatternRewriter &rewriter) const {
+                                       mlir::PatternRewriter &rewriter) const {
   if (op.getVarargs())
     return mlir::failure();
 

@@ -144,7 +144,7 @@ private:
 
 numba::MemorySSA::Node *
 numba::MemorySSA::createNode(mlir::Operation *op, NodeType type,
-                            llvm::ArrayRef<numba::MemorySSA::Node *> args) {
+                             llvm::ArrayRef<numba::MemorySSA::Node *> args) {
   auto ptr = allocator.Allocate(Node::computeSize(args.size()),
                                 std::alignment_of<Node>::value);
   auto node = new (ptr) Node(op, type, args);
@@ -153,19 +153,19 @@ numba::MemorySSA::createNode(mlir::Operation *op, NodeType type,
   return node;
 }
 
-numba::MemorySSA::Node *numba::MemorySSA::createDef(mlir::Operation *op,
-                                                  numba::MemorySSA::Node *arg) {
+numba::MemorySSA::Node *
+numba::MemorySSA::createDef(mlir::Operation *op, numba::MemorySSA::Node *arg) {
   return createNode(op, NodeType::Def, arg);
 }
 
-numba::MemorySSA::Node *numba::MemorySSA::createUse(mlir::Operation *op,
-                                                  numba::MemorySSA::Node *arg) {
+numba::MemorySSA::Node *
+numba::MemorySSA::createUse(mlir::Operation *op, numba::MemorySSA::Node *arg) {
   return createNode(op, NodeType::Use, arg);
 }
 
 numba::MemorySSA::Node *
 numba::MemorySSA::createPhi(mlir::Operation *op,
-                           llvm::ArrayRef<numba::MemorySSA::Node *> args) {
+                            llvm::ArrayRef<numba::MemorySSA::Node *> args) {
   return createNode(op, NodeType::Phi, args);
 }
 
@@ -342,7 +342,7 @@ bool checkPhisAlias(C &phiCache, numba::MemorySSA::Node *phi,
 
 template <typename F>
 numba::MemorySSA::Node *getDef(numba::MemorySSA::Node *def,
-                              mlir::Operation *useOp, F &&mayAlias) {
+                               mlir::Operation *useOp, F &&mayAlias) {
   while (true) {
     assert(nullptr != def);
     auto dom = def->getDominator();
@@ -417,8 +417,8 @@ auto hasMemEffect(mlir::Operation &op) {
 }
 
 numba::MemorySSA::Node *memSSAProcessRegion(mlir::Region &region,
-                                           numba::MemorySSA::Node *entryNode,
-                                           numba::MemorySSA &memSSA) {
+                                            numba::MemorySSA::Node *entryNode,
+                                            numba::MemorySSA &memSSA) {
   assert(nullptr != entryNode);
   // Only structured control flow is supported for now
   if (!llvm::hasSingleElement(region))
@@ -429,7 +429,8 @@ numba::MemorySSA::Node *memSSAProcessRegion(mlir::Region &region,
   for (auto &op : block) {
     if (!op.getRegions().empty()) {
       if (auto loop = mlir::dyn_cast<mlir::LoopLikeOpInterface>(op)) {
-        std::array<numba::MemorySSA::Node *, 2> phiArgs = {nullptr, currentNode};
+        std::array<numba::MemorySSA::Node *, 2> phiArgs = {nullptr,
+                                                           currentNode};
         auto phi = memSSA.createPhi(&op, phiArgs);
         auto result = memSSAProcessRegion(loop.getLoopBody(), phi, memSSA);
         if (nullptr == result)
@@ -529,7 +530,7 @@ numba::MemorySSA::Node *memSSAProcessRegion(mlir::Region &region,
               return res;
             } else {
               llvm::SmallVector<numba::MemorySSA::Node *> prevNodes(pred.size(),
-                                                                   nullptr);
+                                                                    nullptr);
               auto phi = _memSSA.createPhi(_op, prevNodes);
               phi->setDominator(_currentNode); // TODO: not very robust
               _currentNode->setPostDominator(phi);
@@ -622,7 +623,8 @@ numba::MemorySSA::NodesIterator &numba::MemorySSA::NodesIterator::operator++() {
   return *this;
 }
 
-numba::MemorySSA::NodesIterator numba::MemorySSA::NodesIterator::operator++(int) {
+numba::MemorySSA::NodesIterator
+numba::MemorySSA::NodesIterator::operator++(int) {
   auto tmp = *this;
   ++iterator;
   return tmp;
@@ -633,7 +635,8 @@ numba::MemorySSA::NodesIterator &numba::MemorySSA::NodesIterator::operator--() {
   return *this;
 }
 
-numba::MemorySSA::NodesIterator numba::MemorySSA::NodesIterator::operator--(int) {
+numba::MemorySSA::NodesIterator
+numba::MemorySSA::NodesIterator::operator--(int) {
   auto tmp = *this;
   --iterator;
   return tmp;

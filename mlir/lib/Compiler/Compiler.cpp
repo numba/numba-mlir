@@ -215,8 +215,8 @@ private:
 };
 
 numba::CompilerContext::CompilerContext(mlir::MLIRContext &ctx,
-                                       const Settings &settings,
-                                       const PipelineRegistry &registry)
+                                        const Settings &settings,
+                                        const PipelineRegistry &registry)
     : impl(std::make_unique<CompilerContextImpl>(ctx, settings, registry)) {}
 
 numba::CompilerContext::~CompilerContext() {}

@@ -54,7 +54,7 @@ struct Conversion {
     auto env = gpu_runtime::GPURegionDescAttr::get(&context, devAttr);
 
     return numba::ntensor::NTensorType::get(shape, elemType, env,
-                                           llvm::StringRef(layout));
+                                            llvm::StringRef(layout));
   }
 
 private:

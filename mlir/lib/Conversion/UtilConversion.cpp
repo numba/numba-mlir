@@ -83,8 +83,8 @@ struct ConvertEnvRegionYield
 } // namespace
 
 void numba::populateUtilConversionPatterns(mlir::TypeConverter &converter,
-                                          mlir::RewritePatternSet &patterns,
-                                          mlir::ConversionTarget &target) {
+                                           mlir::RewritePatternSet &patterns,
+                                           mlir::ConversionTarget &target) {
   patterns.insert<ConvertTakeContext>(converter, patterns.getContext());
 
   target.addDynamicallyLegalOp<numba::util::TakeContextOp>(

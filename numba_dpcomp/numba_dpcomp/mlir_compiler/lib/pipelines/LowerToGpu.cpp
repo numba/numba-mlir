@@ -190,7 +190,7 @@ struct RemoveNestedParallel
 // TODO: fix ParallelLoopToGpuPass
 struct RemoveNestedParallelPass
     : public numba::RewriteWrapperPass<RemoveNestedParallelPass, void, void,
-                                      RemoveNestedParallel> {};
+                                       RemoveNestedParallel> {};
 
 struct RemoveGpuRegion
     : public mlir::OpRewritePattern<numba::util::EnvironmentRegionOp> {
@@ -209,7 +209,7 @@ struct RemoveGpuRegion
 
 struct RemoveGpuRegionPass
     : public numba::RewriteWrapperPass<RemoveGpuRegionPass, void, void,
-                                      RemoveGpuRegion> {};
+                                       RemoveGpuRegion> {};
 
 struct KernelMemrefOpsMovementPass
     : public mlir::PassWrapper<KernelMemrefOpsMovementPass,
@@ -356,7 +356,7 @@ struct GPULowerDefaultLocalSize
 
         for (auto i : llvm::seq(0u, count)) {
           auto castedRes = numba::indexCast(builder, loc, res[i],
-                                           call.getResult(i).getType());
+                                            call.getResult(i).getType());
           call.getResult(i).replaceAllUsesWith(castedRes);
         }
       }
@@ -425,7 +425,7 @@ struct FlattenScfIf : public mlir::OpRewritePattern<mlir::scf::IfOp> {
 };
 
 struct FlattenScfPass : public numba::RewriteWrapperPass<FlattenScfPass, void,
-                                                        void, FlattenScfIf> {};
+                                                         void, FlattenScfIf> {};
 
 static mlir::LogicalResult processAllocUser(mlir::Operation *user,
                                             mlir::Operation *allocParent,
@@ -712,7 +712,7 @@ struct GenerateOutlineContextPass
     } else {
       builder.setInsertionPoint(body.front().getTerminator());
       builder.create<numba::util::ReleaseContextOp>(builder.getUnknownLoc(),
-                                                   ctx);
+                                                    ctx);
     }
   }
 };
@@ -888,7 +888,7 @@ struct LowerGpuRangePass
     patterns.insert<LowerGpuRange>(context);
 
     numba::util::EnvironmentRegionOp::getCanonicalizationPatterns(patterns,
-                                                                 context);
+                                                                  context);
 
     auto op = getOperation();
     (void)mlir::applyPatternsAndFoldGreedily(op, std::move(patterns));
@@ -1092,7 +1092,7 @@ struct LowerBuiltinCalls : public mlir::OpRewritePattern<mlir::func::CallOp> {
 
 struct LowerGpuBuiltinsPass
     : public numba::RewriteWrapperPass<LowerGpuBuiltinsPass, void, void,
-                                      LowerPlierCalls> {};
+                                       LowerPlierCalls> {};
 
 static llvm::Optional<gpu_runtime::FenceFlags>
 getFenceFlags(mlir::OpFoldResult arg) {
@@ -1532,8 +1532,8 @@ public:
 
 struct LowerGpuBuiltins3Pass
     : public numba::RewriteWrapperPass<LowerGpuBuiltins3Pass, void, void,
-                                      ConvertLocalArrayAllocOps,
-                                      ConvertPrivateArrayAllocOps> {};
+                                       ConvertLocalArrayAllocOps,
+                                       ConvertPrivateArrayAllocOps> {};
 
 class GpuLaunchSinkOpsPass
     : public mlir::PassWrapper<GpuLaunchSinkOpsPass,
@@ -1549,7 +1549,8 @@ public:
             auto isSinkingBeneficiary = [](mlir::Operation *op) -> bool {
               return isa<arith::ConstantOp, func::ConstantOp, arith::SelectOp,
                          arith::CmpIOp, arith::IndexCastOp, arith::MulIOp,
-                         arith::SubIOp, arith::AddIOp, numba::util::UndefOp>(op);
+                         arith::SubIOp, arith::AddIOp, numba::util::UndefOp>(
+                  op);
             };
 
             // Pull in instructions that can be sunk
@@ -1672,7 +1673,7 @@ struct SinkGpuDims : public mlir::OpRewritePattern<mlir::gpu::LaunchOp> {
 };
 
 struct SinkGpuDimsPass : public numba::RewriteWrapperPass<SinkGpuDimsPass, void,
-                                                         void, SinkGpuDims> {};
+                                                          void, SinkGpuDims> {};
 
 struct GPUToLLVMPass
     : public mlir::PassWrapper<GPUToLLVMPass,
@@ -1691,7 +1692,7 @@ struct GPUToLLVMPass
         converter, patterns, mlir::gpu::getDefaultGpuBinaryAnnotation());
 
     numba::populateControlFlowTypeConversionRewritesAndTarget(converter,
-                                                             patterns, target);
+                                                              patterns, target);
 
     gpu_runtime::populateGpuToLLVMPatternsAndLegality(converter, patterns,
                                                       target);

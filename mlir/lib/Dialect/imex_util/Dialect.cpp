@@ -645,7 +645,7 @@ struct ChangeLayoutCast : public mlir::OpRewritePattern<mlir::memref::CastOp> {
     mlir::Value newCast =
         rewriter.create<mlir::memref::CastOp>(loc, newDstType, src);
     rewriter.replaceOpWithNewOp<numba::util::ChangeLayoutOp>(op, dstType,
-                                                            newCast);
+                                                             newCast);
     return mlir::success();
   }
 };
@@ -915,8 +915,8 @@ struct ChangeLayoutIf : public mlir::OpRewritePattern<mlir::scf::YieldOp> {
           auto newType = newResultTypes[i];
           if (origType != newType) {
             res.setType(newType);
-            auto cl =
-                rewriter.create<numba::util::ChangeLayoutOp>(loc, origType, res);
+            auto cl = rewriter.create<numba::util::ChangeLayoutOp>(
+                loc, origType, res);
             res.replaceAllUsesExcept(cl, cl);
           }
         }
@@ -1070,7 +1070,8 @@ struct ChangeLayoutExpandShape
     auto loc = op->getLoc();
     mlir::Value newOp = rewriter.create<mlir::memref::ExpandShapeOp>(
         loc, *newDstType, src, reassoc);
-    rewriter.replaceOpWithNewOp<numba::util::ChangeLayoutOp>(op, dstType, newOp);
+    rewriter.replaceOpWithNewOp<numba::util::ChangeLayoutOp>(op, dstType,
+                                                             newOp);
     return mlir::success();
   }
 };
@@ -1141,7 +1142,7 @@ struct ChangeLayoutSelect
       auto result =
           rewriter.create<mlir::arith::SelectOp>(loc, cond, trueArg, falseArg);
       rewriter.replaceOpWithNewOp<numba::util::ChangeLayoutOp>(op, dstType,
-                                                              result);
+                                                               result);
 
       return mlir::success();
     }
@@ -1407,7 +1408,8 @@ struct SignCastLoadPropagate
         rewriter.createOrFold<mlir::memref::LoadOp>(loc, src, op.getIndices());
 
     if (newOp.getType() != op.getType())
-      newOp = rewriter.create<numba::util::SignCastOp>(loc, op.getType(), newOp);
+      newOp =
+          rewriter.create<numba::util::SignCastOp>(loc, op.getType(), newOp);
 
     rewriter.replaceOp(op, newOp);
     return mlir::success();
@@ -1430,7 +1432,7 @@ struct SignCastStorePropagate
     auto val = op.getValue();
     if (val.getType() != srcElemType)
       val = rewriter.create<numba::util::SignCastOp>(op.getLoc(), srcElemType,
-                                                    val);
+                                                     val);
 
     rewriter.replaceOpWithNewOp<mlir::memref::StoreOp>(op, val, src,
                                                        op.getIndices());
@@ -1505,7 +1507,8 @@ struct SignCastTensorCollapseShapePropagate
     auto newDstType = dstType.clone(dstType.getElementType());
 
     auto loc = prevOp->getLoc();
-    auto newSrc = rewriter.create<numba::util::SignCastOp>(loc, newSrcType, src);
+    auto newSrc =
+        rewriter.create<numba::util::SignCastOp>(loc, newSrcType, src);
     rewriter.replaceOpWithNewOp<mlir::tensor::CollapseShapeOp>(
         op, newDstType, newSrc, prevOp.getReassociation());
     return mlir::success();
@@ -1640,8 +1643,8 @@ struct SignCastForPropagate : public mlir::OpRewritePattern<mlir::scf::ForOp> {
       auto oldRersultType = initArgs[i].getType();
       mlir::Value newResult = newResults[i];
       if (newResult.getType() != oldRersultType)
-        newResult = rewriter.create<numba::util::SignCastOp>(loc, oldRersultType,
-                                                            newResult);
+        newResult = rewriter.create<numba::util::SignCastOp>(
+            loc, oldRersultType, newResult);
 
       newInitArgs[i] = newResult;
     }

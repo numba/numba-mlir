@@ -629,8 +629,8 @@ void MakeStridedLayoutPass::runOnOperation() {
               assert(oldType.isa<mlir::MemRefType>());
               assert(newType.isa<mlir::MemRefType>());
               res.setType(newType);
-              auto newRes =
-                  builder.create<numba::util::ChangeLayoutOp>(loc, oldType, res);
+              auto newRes = builder.create<numba::util::ChangeLayoutOp>(
+                  loc, oldType, res);
               res.replaceAllUsesExcept(newRes, newRes);
             }
           }
@@ -828,7 +828,7 @@ struct GetitemToNtensor : public mlir::OpConversionPattern<plier::GetItemOp> {
     auto index = adaptor.getIndex();
 
     rewriter.replaceOpWithNewOp<numba::ntensor::GetitemOp>(op, resultType, src,
-                                                          index);
+                                                           index);
     return mlir::success();
   }
 };
@@ -849,7 +849,7 @@ struct SetitemToNtensor : public mlir::OpConversionPattern<plier::SetItemOp> {
                                    srcType.getElementType());
 
     rewriter.replaceOpWithNewOp<numba::ntensor::SetitemOp>(op, src, index,
-                                                          value);
+                                                           value);
     return mlir::success();
   }
 };
@@ -908,7 +908,7 @@ struct BinopToNtensor : public mlir::OpConversionPattern<plier::BinOp> {
 
     auto opName = op.getOp();
     rewriter.replaceOpWithNewOp<numba::ntensor::BinaryOp>(op, resultType, lhs,
-                                                         rhs, opName);
+                                                          rhs, opName);
     return mlir::success();
   }
 };
@@ -944,7 +944,7 @@ struct BuildSliceToNtensor
     auto end = getVal(op.getEnd(), adaptor.getEnd());
     auto step = getVal(op.getStep(), adaptor.getStep());
     rewriter.replaceOpWithNewOp<numba::ntensor::BuildSliceOp>(op, begin, end,
-                                                             step);
+                                                              step);
     return mlir::success();
   }
 };
@@ -1005,7 +1005,7 @@ struct NumpyCallsToNtensor : public mlir::OpConversionPattern<plier::PyCallOp> {
 
     auto argNamesAttr = rewriter.getArrayAttr(argNames);
     rewriter.replaceOpWithNewOp<numba::ntensor::CallOp>(op, resTypes, args,
-                                                       argNamesAttr, funcName);
+                                                        argNamesAttr, funcName);
     return mlir::success();
   }
 
@@ -1044,7 +1044,7 @@ struct NumpyAttrsToNtensor
 
     auto argNamesAttr = rewriter.getArrayAttr(rewriter.getStringAttr(""));
     rewriter.replaceOpWithNewOp<numba::ntensor::CallOp>(op, resultType, src,
-                                                       argNamesAttr, funcName);
+                                                        argNamesAttr, funcName);
 
     return mlir::success();
   }
@@ -1112,7 +1112,7 @@ static mlir::Value addElementConversion(mlir::OpBuilder &builder,
 
   return builder
       .create<numba::ntensor::ElementwiseOp>(loc, dstArrayTupe, srcArray,
-                                            bodyBuilder)
+                                             bodyBuilder)
       .getResult(0);
 }
 
@@ -1179,12 +1179,14 @@ static llvm::Optional<mlir::Value> doCast(mlir::OpBuilder &builder,
       auto dstMemrefType = mlir::MemRefType::get(
           dstArrayType.getShape(), srcShapedType.getElementType());
       src = castType(builder, loc, src, dstMemrefType);
-      res = builder.create<numba::ntensor::FromMemrefOp>(loc, srcArrayType, src);
+      res =
+          builder.create<numba::ntensor::FromMemrefOp>(loc, srcArrayType, src);
     } else if (srcShapedType.isa<mlir::RankedTensorType>()) {
       auto dstTensorType = mlir::RankedTensorType::get(
           dstArrayType.getShape(), srcShapedType.getElementType());
       src = castType(builder, loc, src, dstTensorType);
-      res = builder.create<numba::ntensor::FromTensorOp>(loc, srcArrayType, src);
+      res =
+          builder.create<numba::ntensor::FromTensorOp>(loc, srcArrayType, src);
     }
     assert(res && "Expected tensor or memref type.");
     return addElementConversion(builder, loc, res, dstArrayType);
@@ -1252,7 +1254,8 @@ struct UnitupleExtractToNtensor
                   mlir::ConversionPatternRewriter &rewriter) const override {
     auto src = adaptor.getSource();
     auto elemType = isUniTuple(src.getType());
-    if (!elemType || !numba::ntensor::NTensorType::isValidElementType(*elemType))
+    if (!elemType ||
+        !numba::ntensor::NTensorType::isValidElementType(*elemType))
       return mlir::failure();
 
     auto converter = getTypeConverter();
@@ -1264,7 +1267,7 @@ struct UnitupleExtractToNtensor
 
     auto index = adaptor.getIndex();
     rewriter.replaceOpWithNewOp<numba::ntensor::GetitemOp>(op, dstType, src,
-                                                          index);
+                                                           index);
     return mlir::success();
   }
 };
@@ -1317,9 +1320,9 @@ struct PlierToNtensorPass
     mlir::ConversionTarget target(context);
 
     numba::populateControlFlowTypeConversionRewritesAndTarget(typeConverter,
-                                                             patterns, target);
+                                                              patterns, target);
     numba::populateTupleTypeConversionRewritesAndTarget(typeConverter, patterns,
-                                                       target);
+                                                        target);
 
     target.addDynamicallyLegalOp<plier::GetItemOp>(
         [&typeConverter](plier::GetItemOp op) -> llvm::Optional<bool> {
@@ -1445,7 +1448,7 @@ struct GetitemArrayOpLowering
     auto resType = op.getType();
     mlir::Value args[] = {src, index};
     rewriter.replaceOpWithNewOp<numba::ntensor::PrimitiveOp>(op, resType, args,
-                                                            opName);
+                                                             opName);
     return mlir::success();
   }
 };
@@ -1668,8 +1671,8 @@ struct NumpyCallsResolver
             ->getResults();
       } else {
         return rewriter
-            .create<numba::ntensor::PrimitiveOp>(loc, op->getResultTypes(), args,
-                                                funcName)
+            .create<numba::ntensor::PrimitiveOp>(loc, op->getResultTypes(),
+                                                 args, funcName)
             .getResults();
       }
     }();
@@ -1783,7 +1786,8 @@ struct BuiltinCallsLowering : public mlir::OpRewritePattern<plier::PyCallOp> {
   }
 };
 
-struct BinOpsLowering : public mlir::OpRewritePattern<numba::ntensor::BinaryOp> {
+struct BinOpsLowering
+    : public mlir::OpRewritePattern<numba::ntensor::BinaryOp> {
   using OpRewritePattern::OpRewritePattern;
 
   mlir::LogicalResult
@@ -1904,7 +1908,7 @@ struct WrapParforRegionsPass
       forOp->replaceAllUsesWith(envRegion.getResults());
       builder.setInsertionPoint(term);
       builder.create<numba::util::EnvironmentRegionYieldOp>(term->getLoc(),
-                                                           forOp.getResults());
+                                                            forOp.getResults());
       term->erase();
     }
   }
@@ -2801,9 +2805,9 @@ struct AdditionalBufferize
     mlir::ConversionTarget target(*context);
 
     numba::populateControlFlowTypeConversionRewritesAndTarget(typeConverter,
-                                                             patterns, target);
+                                                              patterns, target);
     numba::populateTupleTypeConversionRewritesAndTarget(typeConverter, patterns,
-                                                       target);
+                                                        target);
     target
         .addIllegalOp<mlir::tensor::ReshapeOp, mlir::tensor::ExtractSliceOp>();
     target.addLegalOp<mlir::memref::ReshapeOp>();
@@ -2895,14 +2899,14 @@ struct ReplaceClones
   matchAndRewrite(mlir::bufferization::CloneOp op,
                   mlir::PatternRewriter &rewriter) const override {
     rewriter.replaceOpWithNewOp<numba::util::RetainOp>(op, op.getType(),
-                                                      op.getSource());
+                                                       op.getSource());
     return mlir::success();
   }
 };
 
 struct LowerCloneOpsPass
     : public numba::RewriteWrapperPass<LowerCloneOpsPass, void, void,
-                                      ReplaceClones> {};
+                                       ReplaceClones> {};
 
 struct ReplaceMemrefCopy : public mlir::OpRewritePattern<mlir::memref::CopyOp> {
   using OpRewritePattern::OpRewritePattern;
@@ -2919,7 +2923,7 @@ struct ReplaceMemrefCopy : public mlir::OpRewritePattern<mlir::memref::CopyOp> {
 
 struct LowerCopyOpsPass
     : public numba::RewriteWrapperPass<LowerCopyOpsPass, void, void,
-                                      ReplaceMemrefCopy> {};
+                                       ReplaceMemrefCopy> {};
 
 struct PostLinalgOptInnerPass
     : public mlir::PassWrapper<PostLinalgOptInnerPass,
@@ -3008,8 +3012,8 @@ struct MoveArithIntoRegionPass
 
 struct FixDeallocPlacementPass
     : public numba::RewriteWrapperPass<FixDeallocPlacementPass,
-                                      mlir::func::FuncOp, void,
-                                      FixDeallocPlacement> {};
+                                       mlir::func::FuncOp, void,
+                                       FixDeallocPlacement> {};
 
 /// Move reduction iterators to the right to help later reduction simplification
 /// passes.
@@ -3083,7 +3087,7 @@ struct MakeGenericReduceInnermost
 
 struct MakeGenericReduceInnermostPass
     : public numba::RewriteWrapperPass<MakeGenericReduceInnermostPass, void,
-                                      void, MakeGenericReduceInnermost> {};
+                                       void, MakeGenericReduceInnermost> {};
 
 static void populateCommonOptPass(mlir::OpPassManager &pm) {
   pm.addPass(numba::createCompositePass(

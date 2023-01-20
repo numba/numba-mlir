@@ -101,15 +101,17 @@ static mlir::PassPipelineRegistration<> scfToAffineReg(
       pm.addNestedPass<mlir::func::FuncOp>(mlir::createSCFToAffinePass());
     });
 
-static mlir::PassPipelineRegistration<>
-    cfgToScf("cfg-to-scf", "Convert function from CFG form to SCF ops",
-             [](mlir::OpPassManager &pm) {
-               pm.addNestedPass<mlir::func::FuncOp>(numba::createCFGToSCFPass());
-             });
+static mlir::PassPipelineRegistration<> cfgToScf(
+    "cfg-to-scf", "Convert function from CFG form to SCF ops",
+    [](mlir::OpPassManager &pm) {
+      pm.addNestedPass<mlir::func::FuncOp>(numba::createCFGToSCFPass());
+    });
 
-static mlir::PassPipelineRegistration<> expandTuple(
-    "expand-tuple", "Expand tuple into individual elements",
-    [](mlir::OpPassManager &pm) { pm.addPass(numba::createExpandTuplePass()); });
+static mlir::PassPipelineRegistration<>
+    expandTuple("expand-tuple", "Expand tuple into individual elements",
+                [](mlir::OpPassManager &pm) {
+                  pm.addPass(numba::createExpandTuplePass());
+                });
 
 static mlir::PassPipelineRegistration<> ntensorResolveArrayOps(
     "ntensor-resolve-array-ops", "Resolve ntensor array ops into primitive ops",

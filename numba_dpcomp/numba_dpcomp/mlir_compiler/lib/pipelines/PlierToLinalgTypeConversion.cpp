@@ -62,7 +62,7 @@ struct Conversion {
       }
 
       return numba::ntensor::NTensorType::get(shape, elemType, /*env*/ {},
-                                             llvm::StringRef(layout));
+                                              llvm::StringRef(layout));
     }
 
     if (py::isinstance(obj, array)) {
@@ -76,7 +76,7 @@ struct Conversion {
       llvm::SmallVector<int64_t> shape(ndim, mlir::ShapedType::kDynamic);
 
       return numba::ntensor::NTensorType::get(shape, elemType, /*env*/ {},
-                                             llvm::StringRef(layout));
+                                              llvm::StringRef(layout));
     }
 
     return std::nullopt;

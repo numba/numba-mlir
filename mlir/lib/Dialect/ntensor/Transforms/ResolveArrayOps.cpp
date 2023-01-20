@@ -147,7 +147,7 @@ static mlir::Value makeSubview(mlir::OpBuilder &builder, mlir::Location loc,
   assert(dstRank <= srcRank);
 
   auto resType = numba::ntensor::SubviewOp::inferResultType(srcType, offsets,
-                                                           sizes, strides);
+                                                            sizes, strides);
 
   mlir::Value view = builder.create<numba::ntensor::SubviewOp>(
       loc, resType, src, offsets, sizes, strides);
@@ -202,7 +202,7 @@ static bool isCompatibleSetitemValue(mlir::Type valueType,
 
   if (auto valueArray = valueType.dyn_cast<numba::ntensor::NTensorType>())
     return numba::canConvert(valueArray.getElementType(),
-                            targetType.getElementType());
+                             targetType.getElementType());
 
   return false;
 }
@@ -257,7 +257,7 @@ struct SetitemOpLowering
 
             return rewriter
                 .create<numba::ntensor::ElementwiseOp>(loc, targetType, value,
-                                                      bodyBuilder)
+                                                       bodyBuilder)
                 .getResult(0);
           }
           return value;
@@ -328,7 +328,7 @@ struct SetitemMaskOpLowering
     auto dstVal = numba::doConvert(rewriter, loc, val, elemType);
     assert(dstVal);
     val = rewriter.create<numba::ntensor::CreateArrayOp>(loc, targetType,
-                                                        dynamicDims, dstVal);
+                                                         dynamicDims, dstVal);
 
     auto bodyBuilder = [&](mlir::OpBuilder &b, mlir::Location l,
                            mlir::ValueRange vals) {
@@ -343,7 +343,7 @@ struct SetitemMaskOpLowering
     mlir::Value args[] = {mask, val, target};
     auto res = rewriter
                    .create<numba::ntensor::ElementwiseOp>(loc, targetType, args,
-                                                         bodyBuilder)
+                                                          bodyBuilder)
                    .getResult(0);
 
     rewriter.create<numba::ntensor::CopyOp>(loc, res, target);
@@ -435,18 +435,18 @@ struct GetitemUnitupleOpLowering
     for (auto i : llvm::seq<int64_t>(0, count)) {
       auto idx = rewriter.create<mlir::arith::ConstantIndexOp>(loc, i);
       elements[i] = rewriter.create<numba::util::TupleExtractOp>(loc, *elemType,
-                                                                value, idx);
+                                                                 value, idx);
     }
 
     auto array = rewriter.create<numba::ntensor::FromElementsOp>(loc, arrayType,
-                                                                elements);
+                                                                 elements);
 
     auto dynArrayType =
         numba::ntensor::NTensorType::get(mlir::ShapedType::kDynamic, *elemType);
     auto dynArray =
         rewriter.create<numba::ntensor::CastOp>(loc, dynArrayType, array);
     rewriter.replaceOpWithNewOp<numba::ntensor::GetitemOp>(op, op.getType(),
-                                                          dynArray, index);
+                                                           dynArray, index);
     return mlir::success();
   }
 };

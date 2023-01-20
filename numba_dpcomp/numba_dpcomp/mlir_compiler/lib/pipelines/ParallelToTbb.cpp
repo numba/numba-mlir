@@ -158,8 +158,8 @@ struct ParallelToTbb : public mlir::OpRewritePattern<mlir::scf::ParallelOp> {
       }
     };
 
-    rewriter.create<numba::util::ParallelOp>(loc, origLowerBound, origUpperBound,
-                                            origStep, bodyBuilder);
+    rewriter.create<numba::util::ParallelOp>(
+        loc, origLowerBound, origUpperBound, origStep, bodyBuilder);
 
     auto reduceBodyBuilder = [&](mlir::OpBuilder &builder, mlir::Location loc,
                                  mlir::Value index, mlir::ValueRange args) {
@@ -351,7 +351,7 @@ struct HoistBufferAllocs
 
       if (view.getType() != oldType) {
         view = rewriter.create<numba::util::MemrefApplyOffsetOp>(loc, oldType,
-                                                                view);
+                                                                 view);
         view = rewriter.create<mlir::memref::CastOp>(loc, oldType, view);
       }
     }
@@ -368,16 +368,16 @@ struct ParallelToTbbPass
     : public numba::RewriteWrapperPass<
           ParallelToTbbPass, mlir::func::FuncOp,
           numba::DependentDialectsList<numba::util::ImexUtilDialect,
-                                      mlir::arith::ArithDialect,
-                                      mlir::scf::SCFDialect>,
+                                       mlir::arith::ArithDialect,
+                                       mlir::scf::SCFDialect>,
           ParallelToTbb> {};
 
 struct HoistBufferAllocsPass
     : public numba::RewriteWrapperPass<
           HoistBufferAllocsPass, mlir::func::FuncOp,
           numba::DependentDialectsList<numba::util::ImexUtilDialect,
-                                      mlir::scf::SCFDialect,
-                                      mlir::memref::MemRefDialect>,
+                                       mlir::scf::SCFDialect,
+                                       mlir::memref::MemRefDialect>,
           HoistBufferAllocs> {};
 
 static void populateParallelToTbbPipeline(mlir::OpPassManager &pm) {

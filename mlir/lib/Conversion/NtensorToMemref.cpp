@@ -25,7 +25,8 @@ struct DimOpLowering : public mlir::OpConversionPattern<numba::ntensor::DimOp> {
   matchAndRewrite(numba::ntensor::DimOp op,
                   numba::ntensor::DimOp::Adaptor adaptor,
                   mlir::ConversionPatternRewriter &rewriter) const override {
-    auto origType = op.getSource().getType().cast<numba::ntensor::NTensorType>();
+    auto origType =
+        op.getSource().getType().cast<numba::ntensor::NTensorType>();
     auto src = adaptor.getSource();
     if (!src.getType().isa<mlir::MemRefType>())
       return mlir::failure();
@@ -92,7 +93,8 @@ struct SubviewOpLowering
   matchAndRewrite(numba::ntensor::SubviewOp op,
                   numba::ntensor::SubviewOp::Adaptor adaptor,
                   mlir::ConversionPatternRewriter &rewriter) const override {
-    auto origType = op.getSource().getType().cast<numba::ntensor::NTensorType>();
+    auto origType =
+        op.getSource().getType().cast<numba::ntensor::NTensorType>();
     auto src = adaptor.getSource();
     auto srcType = src.getType().dyn_cast<mlir::MemRefType>();
     if (!srcType)
@@ -125,7 +127,8 @@ struct SubviewOpLowering
               loc, resType, src, offsets, sizes, strides);
 
           if (resType != dstType)
-            res = builder.create<numba::util::ChangeLayoutOp>(loc, dstType, res);
+            res =
+                builder.create<numba::util::ChangeLayoutOp>(loc, dstType, res);
 
           return res;
         });
@@ -477,10 +480,11 @@ struct NtensorToMemrefPass
     converter.addTargetMaterialization(addUnrealizedCast);
 
     numba::populateTupleTypeConversionRewritesAndTarget(converter, patterns,
-                                                       target);
+                                                        target);
     numba::populateControlFlowTypeConversionRewritesAndTarget(converter,
-                                                             patterns, target);
-    numba::populateNtensorToMemrefRewritesAndTarget(converter, patterns, target);
+                                                              patterns, target);
+    numba::populateNtensorToMemrefRewritesAndTarget(converter, patterns,
+                                                    target);
     numba::populateUtilConversionPatterns(converter, patterns, target);
 
     auto op = getOperation();

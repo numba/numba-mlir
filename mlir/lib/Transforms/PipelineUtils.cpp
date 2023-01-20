@@ -14,7 +14,8 @@ mlir::ArrayAttr numba::getPipelineJumpMarkers(mlir::ModuleOp module) {
       numba::util::attributes::getJumpMarkersName());
 }
 
-void numba::addPipelineJumpMarker(mlir::ModuleOp module, mlir::StringAttr name) {
+void numba::addPipelineJumpMarker(mlir::ModuleOp module,
+                                  mlir::StringAttr name) {
   assert(name);
   assert(!name.getValue().empty());
 
@@ -37,7 +38,7 @@ void numba::addPipelineJumpMarker(mlir::ModuleOp module, mlir::StringAttr name) 
 }
 
 void numba::removePipelineJumpMarker(mlir::ModuleOp module,
-                                    mlir::StringAttr name) {
+                                     mlir::StringAttr name) {
   assert(name);
   assert(!name.getValue().empty());
 

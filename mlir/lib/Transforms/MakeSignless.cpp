@@ -474,10 +474,10 @@ struct MakeSignlessPass
     numba::populateMakeSignlessRewritesAndTarget(converter, patterns, target);
 
     numba::populateTupleTypeConversionRewritesAndTarget(converter, patterns,
-                                                       target);
+                                                        target);
 
     numba::populateControlFlowTypeConversionRewritesAndTarget(converter,
-                                                             patterns, target);
+                                                              patterns, target);
 
     auto op = getOperation();
     if (mlir::failed(

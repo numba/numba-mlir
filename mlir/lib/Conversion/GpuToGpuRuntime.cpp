@@ -1192,7 +1192,8 @@ public:
   using OpConversionPattern::OpConversionPattern;
 
   mlir::LogicalResult
-  matchAndRewrite(numba::util::UndefOp op, numba::util::UndefOp::Adaptor adaptor,
+  matchAndRewrite(numba::util::UndefOp op,
+                  numba::util::UndefOp::Adaptor adaptor,
                   mlir::ConversionPatternRewriter &rewriter) const override {
     auto converter = getTypeConverter();
     assert(converter);
@@ -2148,12 +2149,13 @@ struct TruncateF64ForGPUPass
 
     mlir::RewritePatternSet patterns(ctx);
 
-    numba::populateArithConversionRewritesAndTarget(converter, patterns, target);
+    numba::populateArithConversionRewritesAndTarget(converter, patterns,
+                                                    target);
     numba::populateMathConversionRewritesAndTarget(converter, patterns, target);
     numba::populateControlFlowTypeConversionRewritesAndTarget(converter,
-                                                             patterns, target);
+                                                              patterns, target);
     numba::populateTupleTypeConversionRewritesAndTarget(converter, patterns,
-                                                       target);
+                                                        target);
 
     patterns.insert<ConvertF64LoadOp, ConvertF64StoreOp,
                     ConvertF64ReinterpretCastOp>(converter, ctx);

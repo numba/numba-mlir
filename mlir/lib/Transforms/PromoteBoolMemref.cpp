@@ -177,7 +177,8 @@ public:
   }
 };
 
-class ConvertRetainOp : public mlir::OpConversionPattern<numba::util::RetainOp> {
+class ConvertRetainOp
+    : public mlir::OpConversionPattern<numba::util::RetainOp> {
 public:
   using OpConversionPattern::OpConversionPattern;
 
@@ -191,7 +192,7 @@ public:
     if (!resType)
       return mlir::failure();
     rewriter.replaceOpWithNewOp<numba::util::RetainOp>(op, resType,
-                                                      adaptor.getSource());
+                                                       adaptor.getSource());
     return mlir::success();
   }
 };
@@ -241,9 +242,9 @@ struct PromoteBoolMemrefPass
     mlir::ConversionTarget target(context);
 
     numba::populateTupleTypeConversionRewritesAndTarget(typeConverter, patterns,
-                                                       target);
+                                                        target);
     numba::populateControlFlowTypeConversionRewritesAndTarget(typeConverter,
-                                                             patterns, target);
+                                                              patterns, target);
 
     numba::populatePromoteBoolMemrefConversionRewritesAndTarget(
         typeConverter, patterns, target);

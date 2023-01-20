@@ -56,8 +56,8 @@ struct ConvertCreateOp
                 builder.create<mlir::linalg::FillOp>(loc, initValue, result)
                     .getResult(0);
 
-          result =
-              builder.create<numba::ntensor::FromTensorOp>(loc, dstType, result);
+          result = builder.create<numba::ntensor::FromTensorOp>(loc, dstType,
+                                                                result);
           return result;
         });
 
@@ -263,7 +263,8 @@ struct ConvertCastOp : public mlir::OpRewritePattern<numba::ntensor::CastOp> {
               loc, srcTensorType, src);
           auto cast = builder.create<mlir::tensor::CastOp>(loc, dstTensorType,
                                                            srcTensor);
-          return builder.create<numba::ntensor::FromTensorOp>(loc, dstType, cast)
+          return builder
+              .create<numba::ntensor::FromTensorOp>(loc, dstType, cast)
               .getResult();
         });
     rewriter.replaceOp(op, results);
@@ -546,8 +547,9 @@ struct ConvertBroadcastOp
                    .getEnvironment();
     for (auto args : {inputs.drop_front(), results})
       for (auto arg : args)
-        if (arg.getType().cast<numba::ntensor::NTensorType>().getEnvironment() !=
-            env)
+        if (arg.getType()
+                .cast<numba::ntensor::NTensorType>()
+                .getEnvironment() != env)
           return mlir::failure();
 
     mlir::TypeRange resultTypes = op->getResultTypes();

@@ -13,7 +13,7 @@ numba::ArgOpLowering::ArgOpLowering(mlir::MLIRContext *context)
 
 mlir::LogicalResult
 numba::ArgOpLowering::matchAndRewrite(plier::ArgOp op,
-                                     mlir::PatternRewriter &rewriter) const {
+                                      mlir::PatternRewriter &rewriter) const {
   auto func = op->getParentOfType<mlir::func::FuncOp>();
   if (!func)
     return mlir::failure();

@@ -305,7 +305,8 @@ struct CommonOptsPass
 };
 } // namespace
 
-void numba::populateCanonicalizationPatterns(mlir::RewritePatternSet &patterns) {
+void numba::populateCanonicalizationPatterns(
+    mlir::RewritePatternSet &patterns) {
   auto context = patterns.getContext();
   for (auto *dialect : context->getLoadedDialects())
     dialect->getCanonicalizationPatterns(patterns);

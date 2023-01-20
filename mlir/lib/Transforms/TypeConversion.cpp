@@ -332,7 +332,7 @@ struct BuildTupleConversionPattern
     auto retType =
         mlir::TupleType::get(op.getContext(), adaptor.getArgs().getTypes());
     rewriter.replaceOpWithNewOp<numba::util::BuildTupleOp>(op, retType,
-                                                          adaptor.getArgs());
+                                                           adaptor.getArgs());
     return mlir::success();
   }
 };
@@ -385,7 +385,7 @@ struct GetItemTupleConversionPattern
     }
 
     rewriter.replaceOpWithNewOp<numba::util::TupleExtractOp>(op, retType,
-                                                            container, index);
+                                                             container, index);
     return mlir::success();
   }
 };

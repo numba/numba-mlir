@@ -360,7 +360,7 @@ void numba::ExecutionEngine::releaseModule(ModuleHandle handle) {
 
 llvm::Expected<void *>
 numba::ExecutionEngine::lookup(numba::ExecutionEngine::ModuleHandle handle,
-                              llvm::StringRef name) const {
+                               llvm::StringRef name) const {
   assert(handle);
   auto dylib = static_cast<llvm::orc::JITDylib *>(handle);
   auto expectedSymbol = jit->lookup(*dylib, name);

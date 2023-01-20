@@ -174,7 +174,7 @@ struct LoadCastFold : public mlir::OpRewritePattern<numba::ntensor::LoadOp> {
       return mlir::failure();
 
     rewriter.replaceOpWithNewOp<numba::ntensor::LoadOp>(op, srcArray,
-                                                       op.getIndices());
+                                                        op.getIndices());
     return mlir::success();
   }
 };
@@ -239,7 +239,7 @@ struct StoreCastFold : public mlir::OpRewritePattern<numba::ntensor::StoreOp> {
 
     auto val = op.getValue();
     rewriter.replaceOpWithNewOp<numba::ntensor::StoreOp>(op, val, srcArray,
-                                                        op.getIndices());
+                                                         op.getIndices());
     return mlir::success();
   }
 };
@@ -272,8 +272,8 @@ void numba::ntensor::DimOp::getAsmResultNames(
 }
 
 void numba::ntensor::DimOp::build(mlir::OpBuilder &builder,
-                                 mlir::OperationState &result,
-                                 mlir::Value source, int64_t index) {
+                                  mlir::OperationState &result,
+                                  mlir::Value source, int64_t index) {
   auto loc = result.location;
   auto indexValue = builder.create<mlir::arith::ConstantIndexOp>(loc, index);
   build(builder, result, source, indexValue);
@@ -348,7 +348,7 @@ struct ToTensorDimPropagate
       return mlir::failure();
 
     rewriter.replaceOpWithNewOp<numba::ntensor::DimOp>(op, src.getArray(),
-                                                      op.getIndex());
+                                                       op.getIndex());
     return mlir::success();
   }
 };
@@ -479,7 +479,8 @@ numba::ntensor::NTensorType numba::ntensor::SubviewOp::inferResultType(
                                     staticSizes, staticStrides);
 }
 
-numba::ntensor::NTensorType numba::ntensor::SubviewOp::inferRankReducedResultType(
+numba::ntensor::NTensorType
+numba::ntensor::SubviewOp::inferRankReducedResultType(
     mlir::ArrayRef<int64_t> resultShape, numba::ntensor::NTensorType sourceType,
     mlir::ArrayRef<int64_t> offsets, mlir::ArrayRef<int64_t> sizes,
     mlir::ArrayRef<int64_t> strides) {
@@ -498,7 +499,8 @@ numba::ntensor::NTensorType numba::ntensor::SubviewOp::inferRankReducedResultTyp
       sourceType.getLayout());
 }
 
-numba::ntensor::NTensorType numba::ntensor::SubviewOp::inferRankReducedResultType(
+numba::ntensor::NTensorType
+numba::ntensor::SubviewOp::inferRankReducedResultType(
     mlir::ArrayRef<int64_t> resultShape, numba::ntensor::NTensorType sourceType,
     mlir::ArrayRef<mlir::OpFoldResult> offsets,
     mlir::ArrayRef<mlir::OpFoldResult> sizes,
@@ -792,7 +794,7 @@ numba::ntensor::CastOp::fold(llvm::ArrayRef<mlir::Attribute> /*operands*/) {
 }
 
 bool numba::ntensor::CastOp::areCastCompatible(mlir::TypeRange inputs,
-                                              mlir::TypeRange outputs) {
+                                               mlir::TypeRange outputs) {
   if (inputs.size() != 1 || outputs.size() != 1)
     return false;
   mlir::Type a = inputs.front(), b = outputs.front();

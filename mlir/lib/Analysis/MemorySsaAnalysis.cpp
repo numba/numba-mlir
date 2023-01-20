@@ -26,7 +26,7 @@ static llvm::Optional<Meminfo> getMeminfo(mlir::Operation *op) {
 } // namespace
 
 numba::MemorySSAAnalysis::MemorySSAAnalysis(mlir::Operation *op,
-                                           mlir::AnalysisManager &am) {
+                                            mlir::AnalysisManager &am) {
   if (op->getNumRegions() != 1)
     return;
 

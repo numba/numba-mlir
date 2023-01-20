@@ -7,14 +7,14 @@
 #include <mlir/Transforms/DialectConversion.h>
 
 numba::CastOpLowering::CastOpLowering(mlir::TypeConverter &typeConverter,
-                                     mlir::MLIRContext *context,
-                                     CastOpLowering::cast_t cast_func)
+                                      mlir::MLIRContext *context,
+                                      CastOpLowering::cast_t cast_func)
     : OpRewritePattern(context), converter(typeConverter),
       castFunc(std::move(cast_func)) {}
 
 mlir::LogicalResult
 numba::CastOpLowering::matchAndRewrite(plier::CastOp op,
-                                      mlir::PatternRewriter &rewriter) const {
+                                       mlir::PatternRewriter &rewriter) const {
   auto src = op.getValue();
   auto srcType = src.getType();
   auto dstType = converter.convertType(op.getType());

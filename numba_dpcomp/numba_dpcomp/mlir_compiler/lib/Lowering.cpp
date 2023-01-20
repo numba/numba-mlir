@@ -229,7 +229,7 @@ private:
       return type;
 
     numba::reportError(llvm::Twine("Unhandled type: ") +
-                      py::str(obj).cast<std::string>());
+                       py::str(obj).cast<std::string>());
   }
 
   mlir::Type getType(py::handle inst) const {
@@ -282,7 +282,7 @@ private:
       jump(inst.attr("target"));
     } else {
       numba::reportError(llvm::Twine("lower_inst not handled: \"") +
-                        py::str(inst.get_type()).cast<std::string>() + "\"");
+                         py::str(inst.get_type()).cast<std::string>() + "\"");
     }
     currentInstr = nullptr;
   }
@@ -314,7 +314,7 @@ private:
     }
 
     numba::reportError(llvm::Twine("lower_assign not handled: \"") +
-                      py::str(value.get_type()).cast<std::string>() + "\"");
+                       py::str(value.get_type()).cast<std::string>() + "\"");
   }
 
   mlir::Value lowerExpr(py::handle expr) {
@@ -390,7 +390,7 @@ private:
       return builder.create<plier::BuildTupleOp>(loc, tupleType, args);
     }
     numba::reportError(llvm::Twine("Unhandled index type: ") +
-                      py::str(obj.get_type()).cast<std::string>());
+                       py::str(obj.get_type()).cast<std::string>());
   }
 
   mlir::Value lowerStaticGetitem(py::handle inst) {
@@ -457,7 +457,7 @@ private:
     auto pyFuncName = funcNameResolver(typemap(pyPunc));
     if (pyFuncName.is_none())
       numba::reportError(llvm::Twine("Can't resolve function: ") +
-                        py::str(typemap(pyPunc)).cast<std::string>());
+                         py::str(typemap(pyPunc)).cast<std::string>());
 
     auto funcName = pyFuncName.cast<std::string>();
 
@@ -499,7 +499,7 @@ private:
         return std::get<0>(elem).op;
 
     numba::reportError(llvm::Twine("resolve_op not handled: \"") +
-                      py::str(op).cast<std::string>() + "\"");
+                       py::str(op).cast<std::string>() + "\"");
   }
 
   mlir::Value lowerGetattr(py::handle inst) {
@@ -598,7 +598,7 @@ private:
     auto ret = getConstOrNull(val);
     if (!ret)
       numba::reportError(llvm::Twine("get_const unhandled type \"") +
-                        py::str(val.get_type()).cast<std::string>() + "\"");
+                         py::str(val.get_type()).cast<std::string>() + "\"");
     return ret;
   }
 
@@ -664,7 +664,7 @@ private:
                                                  falseArgs);
         } else {
           numba::reportError(llvm::Twine("Unhandled terminator: ") +
-                            term->getName().getStringRef());
+                             term->getName().getStringRef());
         }
       }
     }
@@ -672,7 +672,7 @@ private:
 };
 
 numba::CompilerContext::Settings getSettings(py::handle settings,
-                                            CallbackOstream &os) {
+                                             CallbackOstream &os) {
   numba::CompilerContext::Settings ret;
   ret.verify = settings["verify"].cast<bool>();
   ret.passStatistics = settings["pass_statistics"].cast<bool>();
@@ -891,7 +891,7 @@ py::capsule compileModule(const py::capsule &compiler,
   auto res = context->executionEngine.loadModule(mod->module);
   if (!res)
     numba::reportError(llvm::Twine("Failed to load MLIR module:\n") +
-                      llvm::toString(res.takeError()));
+                       llvm::toString(res.takeError()));
 
   return py::capsule(static_cast<void *>(res.get()));
 }
@@ -916,7 +916,7 @@ py::int_ getFunctionPointer(const py::capsule &compiler,
   auto res = context->executionEngine.lookup(handle, name);
   if (!res)
     numba::reportError(llvm::Twine("Failed to get function pointer:\n") +
-                      llvm::toString(res.takeError()));
+                       llvm::toString(res.takeError()));
 
   return py::int_(reinterpret_cast<intptr_t>(res.get()));
 }

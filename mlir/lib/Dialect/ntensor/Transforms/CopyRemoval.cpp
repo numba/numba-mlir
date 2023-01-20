@@ -117,15 +117,16 @@ struct CopyRemovalPass
         if (src.getType() != dst.getType()) {
           auto loc = owner->getLoc();
           builder.setInsertionPoint(owner);
-          newArg =
-              builder.create<numba::ntensor::CastOp>(loc, dst.getType(), newArg);
+          newArg = builder.create<numba::ntensor::CastOp>(loc, dst.getType(),
+                                                          newArg);
         }
 
         use.set(newArg);
       }
     }
 
-    auto getNextCopy = [&](numba::ntensor::CopyOp src) -> numba::ntensor::CopyOp {
+    auto getNextCopy =
+        [&](numba::ntensor::CopyOp src) -> numba::ntensor::CopyOp {
       for (auto copy : copies) {
         if (src == copy)
           continue;

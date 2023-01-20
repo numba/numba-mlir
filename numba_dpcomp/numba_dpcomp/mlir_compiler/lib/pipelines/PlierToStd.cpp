@@ -249,7 +249,8 @@ struct LowerGlobals : public mlir::OpConversionPattern<plier::GlobalOp> {
   }
 };
 
-struct UndefOpLowering : public mlir::OpConversionPattern<numba::util::UndefOp> {
+struct UndefOpLowering
+    : public mlir::OpConversionPattern<numba::util::UndefOp> {
   using OpConversionPattern::OpConversionPattern;
 
   mlir::LogicalResult
@@ -523,7 +524,7 @@ struct BinOpLowering : public mlir::OpConversionPattern<plier::BinOp> {
           auto res = (h.*mem)(rewriter, loc, convertedOperands, resType);
           if (res.getType() != resType)
             res = rewriter.createOrFold<numba::util::SignCastOp>(loc, resType,
-                                                                res);
+                                                                 res);
           rewriter.replaceOp(op, res);
           return mlir::success();
         }
@@ -572,8 +573,8 @@ struct BinOpTupleLowering : public mlir::OpConversionPattern<plier::BinOp> {
           auto elemType = type.getType(i);
           auto ind = rewriter.create<mlir::arith::ConstantIndexOp>(
               loc, static_cast<int64_t>(i));
-          auto elem = rewriter.create<numba::util::TupleExtractOp>(loc, elemType,
-                                                                  arg, ind);
+          auto elem = rewriter.create<numba::util::TupleExtractOp>(
+              loc, elemType, arg, ind);
           newArgs.emplace_back(elem);
           newTypes.emplace_back(elemType);
         }
@@ -581,7 +582,7 @@ struct BinOpTupleLowering : public mlir::OpConversionPattern<plier::BinOp> {
 
       auto newTupleType = mlir::TupleType::get(getContext(), newTypes);
       rewriter.replaceOpWithNewOp<numba::util::BuildTupleOp>(op, newTupleType,
-                                                            newArgs);
+                                                             newArgs);
       return mlir::success();
     }
 
@@ -940,7 +941,7 @@ struct BuildTupleConversionPattern
       return mlir::failure();
 
     rewriter.replaceOpWithNewOp<numba::util::BuildTupleOp>(op, retType,
-                                                          adaptor.getArgs());
+                                                           adaptor.getArgs());
     return mlir::success();
   }
 };
@@ -966,7 +967,7 @@ struct GetItemTupleConversionPattern
     auto index = numba::indexCast(rewriter, op->getLoc(), adaptor.getIndex());
 
     rewriter.replaceOpWithNewOp<numba::util::TupleExtractOp>(op, retType,
-                                                            container, index);
+                                                             container, index);
     return mlir::success();
   }
 };
@@ -1093,9 +1094,9 @@ void PlierToStdPass::runOnOperation() {
       >(typeConverter, context);
 
   numba::populateControlFlowTypeConversionRewritesAndTarget(typeConverter,
-                                                           patterns, target);
+                                                            patterns, target);
   numba::populateTupleTypeConversionRewritesAndTarget(typeConverter, patterns,
-                                                     target);
+                                                      target);
 
   if (mlir::failed(mlir::applyPartialConversion(getOperation(), target,
                                                 std::move(patterns))))

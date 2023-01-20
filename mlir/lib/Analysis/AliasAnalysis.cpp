@@ -21,11 +21,12 @@ static bool isRestrict(mlir::Value val) {
   auto blockArg = val.cast<mlir::BlockArgument>();
   auto func =
       mlir::cast<mlir::FunctionOpInterface>(blockArg.getOwner()->getParentOp());
-  return !!func.getArgAttr(blockArg.getArgNumber(), numba::getRestrictArgName());
+  return !!func.getArgAttr(blockArg.getArgNumber(),
+                           numba::getRestrictArgName());
 }
 
 mlir::AliasResult numba::LocalAliasAnalysis::aliasImpl(mlir::Value lhs,
-                                                      mlir::Value rhs) {
+                                                       mlir::Value rhs) {
   if (lhs == rhs)
     return mlir::AliasResult::MustAlias;
 

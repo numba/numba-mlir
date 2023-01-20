@@ -20,7 +20,7 @@ mlir::Type makeSignless(mlir::Type type) {
 } // namespace
 
 mlir::Value numba::indexCast(mlir::OpBuilder &builder, mlir::Location loc,
-                            mlir::Value val, mlir::Type dstType) {
+                             mlir::Value val, mlir::Type dstType) {
   auto srcType = val.getType();
   assert(srcType.isa<mlir::IndexType>() || dstType.isa<mlir::IndexType>());
   if (srcType == dstType)
@@ -39,7 +39,7 @@ mlir::Value numba::indexCast(mlir::OpBuilder &builder, mlir::Location loc,
 }
 
 mlir::Value numba::indexCast(mlir::OpBuilder &builder, mlir::Location loc,
-                            mlir::Value src) {
+                             mlir::Value src) {
   return indexCast(builder, loc, src,
                    mlir::IndexType::get(builder.getContext()));
 }
@@ -123,7 +123,8 @@ static mlir::Value intFloatCast(mlir::OpBuilder &rewriter, mlir::Location loc,
   auto srcIntType = val.getType().cast<mlir::IntegerType>();
   auto signlessType = numba::makeSignlessType(srcIntType);
   if (val.getType() != signlessType)
-    val = rewriter.createOrFold<numba::util::SignCastOp>(loc, signlessType, val);
+    val =
+        rewriter.createOrFold<numba::util::SignCastOp>(loc, signlessType, val);
 
   if (srcIntType.isSigned()) {
     return rewriter.createOrFold<mlir::arith::SIToFPOp>(loc, dstType, val);
@@ -262,7 +263,7 @@ bool numba::canConvert(mlir::Type srcType, mlir::Type dstType) {
 }
 
 mlir::Value numba::doConvert(mlir::OpBuilder &rewriter, mlir::Location loc,
-                            mlir::Value val, mlir::Type dstType) {
+                             mlir::Value val, mlir::Type dstType) {
   assert(dstType);
   auto srcType = val.getType();
   if (srcType == dstType)

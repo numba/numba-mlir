@@ -258,9 +258,9 @@ struct PropagateEnvironmentPass
         if (tensor.getEnvironment() == env)
           continue;
 
-        auto newType = numba::ntensor::NTensorType::get(tensor.getShape(),
-                                                       tensor.getElementType(),
-                                                       env, tensor.getLayout());
+        auto newType = numba::ntensor::NTensorType::get(
+            tensor.getShape(), tensor.getElementType(), env,
+            tensor.getLayout());
         mlir::Value newVal =
             builder.createOrFold<numba::ntensor::CastOp>(loc, newType, arg);
         operand.set(newVal);
@@ -275,9 +275,9 @@ struct PropagateEnvironmentPass
         if (tensor.getEnvironment() == env)
           continue;
 
-        auto newType = numba::ntensor::NTensorType::get(tensor.getShape(),
-                                                       tensor.getElementType(),
-                                                       env, tensor.getLayout());
+        auto newType = numba::ntensor::NTensorType::get(
+            tensor.getShape(), tensor.getElementType(), env,
+            tensor.getLayout());
         res.setType(newType);
         auto newRes = builder.create<numba::ntensor::CastOp>(loc, tensor, res);
         res.replaceAllUsesExcept(newRes.getResult(), newRes);
@@ -371,7 +371,8 @@ struct PropagateEnvironmentPass
 
     // Run some cleanup
     mlir::RewritePatternSet patterns(&getContext());
-    numba::ntensor::CastOp::getCanonicalizationPatterns(patterns, &getContext());
+    numba::ntensor::CastOp::getCanonicalizationPatterns(patterns,
+                                                        &getContext());
     (void)mlir::applyPatternsAndFoldGreedily(root, std::move(patterns));
   }
 };

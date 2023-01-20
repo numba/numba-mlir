@@ -11,9 +11,9 @@
 #include <mlir/IR/BuiltinOps.h>
 
 mlir::func::FuncOp numba::addFunction(mlir::OpBuilder &builder,
-                                     mlir::ModuleOp module,
-                                     llvm::StringRef name,
-                                     mlir::FunctionType type) {
+                                      mlir::ModuleOp module,
+                                      llvm::StringRef name,
+                                      mlir::FunctionType type) {
   mlir::OpBuilder::InsertionGuard guard(builder);
   // Insert before module terminator.
   builder.setInsertionPoint(module.getBody(),
@@ -35,7 +35,7 @@ numba::AllocaInsertionPoint::AllocaInsertionPoint(mlir::Operation *inst) {
 }
 
 std::string numba::getUniqueLLVMGlobalName(mlir::ModuleOp mod,
-                                          mlir::StringRef srcName) {
+                                           mlir::StringRef srcName) {
   auto globals = mod.getOps<mlir::LLVM::GlobalOp>();
   for (int i = 0;; ++i) {
     auto name =

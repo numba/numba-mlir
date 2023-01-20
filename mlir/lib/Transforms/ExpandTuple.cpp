@@ -155,7 +155,7 @@ struct ExpandTuplePass
     mlir::ConversionTarget target(*context);
 
     numba::populateControlFlowTypeConversionRewritesAndTarget(typeConverter,
-                                                             patterns, target);
+                                                              patterns, target);
 
     patterns.insert<ExpandTupleReturn, ExpandEnvRegionYield>(typeConverter,
                                                              context);
