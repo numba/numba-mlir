@@ -21,7 +21,7 @@ jobs:
       TBB_VER: 2021.6.0
       LEVEL_ZERO_VER: v1.6.2
       TBB_URL_PREFIX: https://github.com/oneapi-src/oneTBB/releases/download/
-      LLVM_SHA_FILE: /home/runner/work/mlir-extensions/mlir-extensions/llvm-sha.txt
+      LLVM_SHA_FILE: ${GITHUB_WORKSPACE}/llvm-sha.txt
 
     strategy:
       matrix:
