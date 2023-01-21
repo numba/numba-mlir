@@ -8,7 +8,6 @@ on:
   push:
     branches:
       - main
-      - numba-dev
   pull_request:
 
 jobs:
@@ -21,7 +20,7 @@ jobs:
       TBB_VER: 2021.6.0
       LEVEL_ZERO_VER: v1.6.2
       TBB_URL_PREFIX: https://github.com/oneapi-src/oneTBB/releases/download/
-      LLVM_SHA_FILE: /home/runner/work/mlir-extensions/mlir-extensions/llvm-sha.txt
+      LLVM_SHA_FILE: llvm-sha.txt
 
     strategy:
       matrix:
@@ -64,7 +63,7 @@ jobs:
       - name: Setup Cache Vars
         run: |
           echo 'LLVM_SHA<<EOF' >> $GITHUB_ENV
-          cat $LLVM_SHA_FILE >> $GITHUB_ENV
+          cat $GITHUB_WORKSPACE/$LLVM_SHA_FILE >> $GITHUB_ENV
           echo 'EOF' >> $GITHUB_ENV
 
       - name: Cache TBB
