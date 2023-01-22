@@ -163,7 +163,7 @@ struct Conversion {
     }
 
     if (py::isinstance(obj, dispatcherType))
-      return imex::util::OpaqueType::get(&context);
+      return numba::util::OpaqueType::get(&context);
 
     if (py::isinstance(obj, functionType))
       return mlir::FunctionType::get(&context, {}, {});
@@ -173,7 +173,7 @@ struct Conversion {
       if (!type)
         return std::nullopt;
 
-      return imex::util::TypeVarType::get(type);
+      return numba::util::TypeVarType::get(type);
     }
 
     if (py::isinstance(obj, omittedType)) {

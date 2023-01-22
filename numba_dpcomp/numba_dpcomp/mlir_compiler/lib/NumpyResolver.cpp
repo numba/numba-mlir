@@ -59,7 +59,7 @@ parseDefault(mlir::OpBuilder &builder, mlir::Location loc, py::handle obj) {
   }
   if (py::isinstance<py::none>(obj)) {
     auto type = builder.getNoneType();
-    return builder.create<imex::util::UndefOp>(loc, type).getResult();
+    return builder.create<numba::util::UndefOp>(loc, type).getResult();
   }
   if (py::isinstance<py::tuple>(obj)) {
     auto val = obj.cast<py::tuple>();
@@ -73,7 +73,7 @@ parseDefault(mlir::OpBuilder &builder, mlir::Location loc, py::handle obj) {
     }
     mlir::ValueRange values(elems);
     auto tupleType = builder.getTupleType(values.getTypes());
-    return builder.create<imex::util::BuildTupleOp>(loc, tupleType, values)
+    return builder.create<numba::util::BuildTupleOp>(loc, tupleType, values)
         .getResult();
   }
 

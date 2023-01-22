@@ -10,12 +10,12 @@
 
 namespace {
 struct ConvertTakeContext
-    : public mlir::OpConversionPattern<imex::util::TakeContextOp> {
+    : public mlir::OpConversionPattern<numba::util::TakeContextOp> {
   using OpConversionPattern::OpConversionPattern;
 
   mlir::LogicalResult
-  matchAndRewrite(imex::util::TakeContextOp op,
-                  imex::util::TakeContextOp::Adaptor adaptor,
+  matchAndRewrite(numba::util::TakeContextOp op,
+                  numba::util::TakeContextOp::Adaptor adaptor,
                   mlir::ConversionPatternRewriter &rewriter) const override {
     auto srcTypes = op.getResultTypes();
     auto count = static_cast<unsigned>(srcTypes.size());
@@ -30,19 +30,19 @@ struct ConvertTakeContext
 
     auto initFunc = adaptor.getInitFunc().value_or(mlir::SymbolRefAttr());
     auto releaseFunc = adaptor.getReleaseFunc().value_or(mlir::SymbolRefAttr());
-    rewriter.replaceOpWithNewOp<imex::util::TakeContextOp>(
+    rewriter.replaceOpWithNewOp<numba::util::TakeContextOp>(
         op, newTypes, initFunc, releaseFunc);
     return mlir::success();
   }
 };
 
 struct ConvertEnvRegion
-    : public mlir::OpConversionPattern<imex::util::EnvironmentRegionOp> {
+    : public mlir::OpConversionPattern<numba::util::EnvironmentRegionOp> {
   using OpConversionPattern::OpConversionPattern;
 
   mlir::LogicalResult
-  matchAndRewrite(imex::util::EnvironmentRegionOp op,
-                  imex::util::EnvironmentRegionOp::Adaptor adaptor,
+  matchAndRewrite(numba::util::EnvironmentRegionOp op,
+                  numba::util::EnvironmentRegionOp::Adaptor adaptor,
                   mlir::ConversionPatternRewriter &rewriter) const override {
     auto converter = getTypeConverter();
     assert(converter && "Invalid type converter");
@@ -53,7 +53,7 @@ struct ConvertEnvRegion
       return mlir::failure();
 
     auto loc = op.getLoc();
-    auto newOp = rewriter.create<imex::util::EnvironmentRegionOp>(
+    auto newOp = rewriter.create<numba::util::EnvironmentRegionOp>(
         loc, adaptor.getEnvironment(), adaptor.getArgs(), resultTypes);
     auto &newRegion = newOp.getRegion();
 
@@ -68,26 +68,26 @@ struct ConvertEnvRegion
 };
 
 struct ConvertEnvRegionYield
-    : public mlir::OpConversionPattern<imex::util::EnvironmentRegionYieldOp> {
+    : public mlir::OpConversionPattern<numba::util::EnvironmentRegionYieldOp> {
   using OpConversionPattern::OpConversionPattern;
 
   mlir::LogicalResult
-  matchAndRewrite(imex::util::EnvironmentRegionYieldOp op,
-                  imex::util::EnvironmentRegionYieldOp::Adaptor adaptor,
+  matchAndRewrite(numba::util::EnvironmentRegionYieldOp op,
+                  numba::util::EnvironmentRegionYieldOp::Adaptor adaptor,
                   mlir::ConversionPatternRewriter &rewriter) const override {
-    rewriter.replaceOpWithNewOp<imex::util::EnvironmentRegionYieldOp>(
+    rewriter.replaceOpWithNewOp<numba::util::EnvironmentRegionYieldOp>(
         op, adaptor.getOperands());
     return mlir::success();
   }
 };
 } // namespace
 
-void imex::populateUtilConversionPatterns(mlir::TypeConverter &converter,
-                                          mlir::RewritePatternSet &patterns,
-                                          mlir::ConversionTarget &target) {
+void numba::populateUtilConversionPatterns(mlir::TypeConverter &converter,
+                                           mlir::RewritePatternSet &patterns,
+                                           mlir::ConversionTarget &target) {
   patterns.insert<ConvertTakeContext>(converter, patterns.getContext());
 
-  target.addDynamicallyLegalOp<imex::util::TakeContextOp>(
+  target.addDynamicallyLegalOp<numba::util::TakeContextOp>(
       [&](mlir::Operation *op) -> llvm::Optional<bool> {
         for (auto range : {mlir::TypeRange(op->getOperandTypes()),
                            mlir::TypeRange(op->getResultTypes())})
@@ -101,8 +101,8 @@ void imex::populateUtilConversionPatterns(mlir::TypeConverter &converter,
   patterns.insert<ConvertEnvRegion, ConvertEnvRegionYield>(
       converter, patterns.getContext());
 
-  target.addDynamicallyLegalOp<imex::util::EnvironmentRegionOp,
-                               imex::util::EnvironmentRegionYieldOp>(
+  target.addDynamicallyLegalOp<numba::util::EnvironmentRegionOp,
+                               numba::util::EnvironmentRegionYieldOp>(
       [&](mlir::Operation *op) -> llvm::Optional<bool> {
         if (converter.isLegal(op))
           return true;

@@ -303,7 +303,7 @@ struct ScfIfRewriteTwoExits
         ret.emplace_back(cond);
         llvm::copy(exitOps, std::back_inserter(ret));
         for (auto user : thenValsUsers) {
-          auto val = builder.create<imex::util::UndefOp>(loc, user.getType());
+          auto val = builder.create<numba::util::UndefOp>(loc, user.getType());
           ret.emplace_back(val);
         }
         builder.create<mlir::scf::YieldOp>(loc, ret);
@@ -709,7 +709,7 @@ struct CFGToSCFPass
   virtual void
   getDependentDialects(mlir::DialectRegistry &registry) const override {
     registry.insert<mlir::scf::SCFDialect>();
-    registry.insert<imex::util::ImexUtilDialect>();
+    registry.insert<numba::util::ImexUtilDialect>();
   }
 
   void runOnOperation() override {
@@ -749,6 +749,6 @@ struct CFGToSCFPass
 };
 } // namespace
 
-std::unique_ptr<mlir::Pass> imex::createCFGToSCFPass() {
+std::unique_ptr<mlir::Pass> numba::createCFGToSCFPass() {
   return std::make_unique<CFGToSCFPass>();
 }

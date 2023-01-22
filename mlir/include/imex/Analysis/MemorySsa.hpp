@@ -22,7 +22,7 @@ class Operation;
 class Region;
 } // namespace mlir
 
-namespace imex {
+namespace numba {
 
 class MemorySSA {
 public:
@@ -105,5 +105,5 @@ private:
                    llvm::ArrayRef<Node *> args);
 };
 
-llvm::Optional<imex::MemorySSA> buildMemorySSA(mlir::Region &region);
-} // namespace imex
+llvm::Optional<numba::MemorySSA> buildMemorySSA(mlir::Region &region);
+} // namespace numba

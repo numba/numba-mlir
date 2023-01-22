@@ -12,10 +12,10 @@ class MLIRContext;
 class Pass;
 } // namespace mlir
 
-namespace imex {
+namespace numba {
 void populateCanonicalizationPatterns(mlir::RewritePatternSet &patterns);
 
 void populateCommonOptsPatterns(mlir::RewritePatternSet &patterns);
 
 std::unique_ptr<mlir::Pass> createCommonOptsPass();
-} // namespace imex
+} // namespace numba

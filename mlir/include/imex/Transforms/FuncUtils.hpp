@@ -22,7 +22,7 @@ namespace llvm {
 class StringRef;
 }
 
-namespace imex {
+namespace numba {
 mlir::func::FuncOp addFunction(mlir::OpBuilder &builder, mlir::ModuleOp module,
                                llvm::StringRef name, mlir::FunctionType type);
 
@@ -46,4 +46,4 @@ private:
 /// Generate unique name for llvm global based on provided srcName.
 std::string getUniqueLLVMGlobalName(mlir::ModuleOp mod,
                                     mlir::StringRef srcName);
-} // namespace imex
+} // namespace numba

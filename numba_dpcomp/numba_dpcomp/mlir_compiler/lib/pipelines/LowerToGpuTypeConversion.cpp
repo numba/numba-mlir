@@ -53,8 +53,8 @@ struct Conversion {
         &context, obj.attr("filter_string").cast<std::string>());
     auto env = gpu_runtime::GPURegionDescAttr::get(&context, devAttr);
 
-    return imex::ntensor::NTensorType::get(shape, elemType, env,
-                                           llvm::StringRef(layout));
+    return numba::ntensor::NTensorType::get(shape, elemType, env,
+                                            llvm::StringRef(layout));
   }
 
 private:

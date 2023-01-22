@@ -38,35 +38,35 @@ struct ImexUtilInlinerInterface : public mlir::DialectInlinerInterface {
 };
 } // namespace
 
-llvm::StringRef imex::util::attributes::getFastmathName() {
+llvm::StringRef numba::util::attributes::getFastmathName() {
   return "imex.fastmath";
 }
 
-llvm::StringRef imex::util::attributes::getJumpMarkersName() {
+llvm::StringRef numba::util::attributes::getJumpMarkersName() {
   return "imex.pipeline_jump_markers";
 }
 
-llvm::StringRef imex::util::attributes::getParallelName() {
+llvm::StringRef numba::util::attributes::getParallelName() {
   return "imex.parallel";
 }
 
-llvm::StringRef imex::util::attributes::getMaxConcurrencyName() {
+llvm::StringRef numba::util::attributes::getMaxConcurrencyName() {
   return "imex.max_concurrency";
 }
 
-llvm::StringRef imex::util::attributes::getForceInlineName() {
+llvm::StringRef numba::util::attributes::getForceInlineName() {
   return "imex.force_inline";
 }
 
-llvm::StringRef imex::util::attributes::getOptLevelName() {
+llvm::StringRef numba::util::attributes::getOptLevelName() {
   return "imex.opt_level";
 }
 
-llvm::StringRef imex::util::attributes::getShapeRangeName() {
+llvm::StringRef numba::util::attributes::getShapeRangeName() {
   return "imex.shape_range";
 }
 
-namespace imex {
+namespace numba {
 namespace util {
 
 void ImexUtilDialect::initialize() {
@@ -379,7 +379,7 @@ struct EnforceShapeDim
   matchAndRewrite(mlir::ShapedDimOpInterface op,
                   mlir::PatternRewriter &rewriter) const override {
     auto enforceOp =
-        op.getShapedValue().getDefiningOp<imex::util::EnforceShapeOp>();
+        op.getShapedValue().getDefiningOp<numba::util::EnforceShapeOp>();
     if (!enforceOp)
       return mlir::failure();
 
@@ -461,7 +461,7 @@ void RetainOp::build(mlir::OpBuilder &builder, mlir::OperationState &state,
 }
 
 static mlir::Value getChangeLayoutParent(mlir::Value val) {
-  if (auto parent = val.getDefiningOp<imex::util::ChangeLayoutOp>())
+  if (auto parent = val.getDefiningOp<numba::util::ChangeLayoutOp>())
     return parent.getSource();
 
   return {};
@@ -541,11 +541,11 @@ static mlir::MemRefType getFullyDynamicType(mlir::Type type) {
 }
 
 struct ChangeLayoutIdentity
-    : public mlir::OpRewritePattern<imex::util::ChangeLayoutOp> {
+    : public mlir::OpRewritePattern<numba::util::ChangeLayoutOp> {
   using OpRewritePattern::OpRewritePattern;
 
   mlir::LogicalResult
-  matchAndRewrite(imex::util::ChangeLayoutOp op,
+  matchAndRewrite(numba::util::ChangeLayoutOp op,
                   mlir::PatternRewriter &rewriter) const override {
     auto src = op.getSource();
     auto srcType = src.getType().cast<mlir::MemRefType>();
@@ -564,7 +564,7 @@ struct ChangeLayoutDim : public mlir::OpRewritePattern<mlir::memref::DimOp> {
   mlir::LogicalResult
   matchAndRewrite(mlir::memref::DimOp op,
                   mlir::PatternRewriter &rewriter) const override {
-    auto cl = op.getSource().getDefiningOp<imex::util::ChangeLayoutOp>();
+    auto cl = op.getSource().getDefiningOp<numba::util::ChangeLayoutOp>();
     if (!cl)
       return mlir::failure();
 
@@ -581,7 +581,7 @@ struct ChangeLayoutClone
   mlir::LogicalResult
   matchAndRewrite(mlir::bufferization::CloneOp op,
                   mlir::PatternRewriter &rewriter) const override {
-    auto cl = op.getInput().getDefiningOp<imex::util::ChangeLayoutOp>();
+    auto cl = op.getInput().getDefiningOp<numba::util::ChangeLayoutOp>();
     if (!cl)
       return mlir::failure();
 
@@ -590,7 +590,7 @@ struct ChangeLayoutClone
 
     auto loc = op.getLoc();
     auto res = rewriter.createOrFold<mlir::bufferization::CloneOp>(loc, src);
-    rewriter.replaceOpWithNewOp<imex::util::ChangeLayoutOp>(op, dstType, res);
+    rewriter.replaceOpWithNewOp<numba::util::ChangeLayoutOp>(op, dstType, res);
     return mlir::success();
   }
 };
@@ -610,7 +610,7 @@ struct PropagateCloneType
 
     auto loc = op.getLoc();
     auto res = rewriter.createOrFold<mlir::bufferization::CloneOp>(loc, src);
-    rewriter.replaceOpWithNewOp<imex::util::ChangeLayoutOp>(op, dstType, res);
+    rewriter.replaceOpWithNewOp<numba::util::ChangeLayoutOp>(op, dstType, res);
     return mlir::success();
   }
 };
@@ -621,7 +621,7 @@ struct ChangeLayoutCast : public mlir::OpRewritePattern<mlir::memref::CastOp> {
   mlir::LogicalResult
   matchAndRewrite(mlir::memref::CastOp op,
                   mlir::PatternRewriter &rewriter) const override {
-    auto cl = op.getSource().getDefiningOp<imex::util::ChangeLayoutOp>();
+    auto cl = op.getSource().getDefiningOp<numba::util::ChangeLayoutOp>();
     if (!cl)
       return mlir::failure();
 
@@ -644,18 +644,18 @@ struct ChangeLayoutCast : public mlir::OpRewritePattern<mlir::memref::CastOp> {
                               srcType.getLayout(), srcType.getMemorySpace());
     mlir::Value newCast =
         rewriter.create<mlir::memref::CastOp>(loc, newDstType, src);
-    rewriter.replaceOpWithNewOp<imex::util::ChangeLayoutOp>(op, dstType,
-                                                            newCast);
+    rewriter.replaceOpWithNewOp<numba::util::ChangeLayoutOp>(op, dstType,
+                                                             newCast);
     return mlir::success();
   }
 };
 
 struct ChangeLayoutFromCast
-    : public mlir::OpRewritePattern<imex::util::ChangeLayoutOp> {
+    : public mlir::OpRewritePattern<numba::util::ChangeLayoutOp> {
   using OpRewritePattern::OpRewritePattern;
 
   mlir::LogicalResult
-  matchAndRewrite(imex::util::ChangeLayoutOp op,
+  matchAndRewrite(numba::util::ChangeLayoutOp op,
                   mlir::PatternRewriter &rewriter) const override {
     auto cast = op.getSource().getDefiningOp<mlir::memref::CastOp>();
     if (!cast)
@@ -684,7 +684,7 @@ struct ChangeLayoutLoad : public mlir::OpRewritePattern<mlir::memref::LoadOp> {
   mlir::LogicalResult
   matchAndRewrite(mlir::memref::LoadOp op,
                   mlir::PatternRewriter &rewriter) const override {
-    auto cl = op.getMemref().getDefiningOp<imex::util::ChangeLayoutOp>();
+    auto cl = op.getMemref().getDefiningOp<numba::util::ChangeLayoutOp>();
     if (!cl)
       return mlir::failure();
 
@@ -701,7 +701,7 @@ struct ChangeLayoutStore
   mlir::LogicalResult
   matchAndRewrite(mlir::memref::StoreOp op,
                   mlir::PatternRewriter &rewriter) const override {
-    auto cl = op.getMemref().getDefiningOp<imex::util::ChangeLayoutOp>();
+    auto cl = op.getMemref().getDefiningOp<numba::util::ChangeLayoutOp>();
     if (!cl)
       return mlir::failure();
 
@@ -718,7 +718,7 @@ struct ChangeLayoutSubview
   mlir::LogicalResult
   matchAndRewrite(mlir::memref::SubViewOp op,
                   mlir::PatternRewriter &rewriter) const override {
-    auto cl = op.getSource().getDefiningOp<imex::util::ChangeLayoutOp>();
+    auto cl = op.getSource().getDefiningOp<numba::util::ChangeLayoutOp>();
     if (!cl)
       return mlir::failure();
 
@@ -746,7 +746,7 @@ struct ChangeLayoutSubview
     auto newSubview = rewriter.createOrFold<mlir::memref::SubViewOp>(
         loc, newDstType, src, offsets, sizes, strides);
     if (newDstType != dstType)
-      newSubview = rewriter.createOrFold<imex::util::ChangeLayoutOp>(
+      newSubview = rewriter.createOrFold<numba::util::ChangeLayoutOp>(
           loc, dstType, newSubview);
 
     rewriter.replaceOp(op, newSubview);
@@ -771,7 +771,7 @@ struct ChangeLayoutLinalgGeneric
       bool needUpdate = false;
       for (auto i : llvm::seq(0u, count)) {
         auto arg = args[i];
-        auto cl = arg.getDefiningOp<imex::util::ChangeLayoutOp>();
+        auto cl = arg.getDefiningOp<numba::util::ChangeLayoutOp>();
         if (cl) {
           assert(arg.getType().isa<mlir::MemRefType>());
           assert(cl.getSource().getType().isa<mlir::MemRefType>());
@@ -803,7 +803,7 @@ struct ChangeLayoutLinalgFill
   matchAndRewrite(mlir::linalg::FillOp op,
                   mlir::PatternRewriter &rewriter) const override {
     auto output = op.output();
-    auto clOutput = output.getDefiningOp<imex::util::ChangeLayoutOp>();
+    auto clOutput = output.getDefiningOp<numba::util::ChangeLayoutOp>();
     if (!clOutput)
       return mlir::failure();
 
@@ -846,7 +846,7 @@ struct ChangeLayoutIf : public mlir::OpRewritePattern<mlir::scf::YieldOp> {
         if (!arg.getType().isa<mlir::MemRefType>())
           continue;
 
-        auto cl = arg.getDefiningOp<imex::util::ChangeLayoutOp>();
+        auto cl = arg.getDefiningOp<numba::util::ChangeLayoutOp>();
         if (!cl)
           continue;
 
@@ -856,7 +856,7 @@ struct ChangeLayoutIf : public mlir::OpRewritePattern<mlir::scf::YieldOp> {
         auto otherArg = otherYield.getResults()[i];
 
         if (auto otherCl =
-                otherArg.getDefiningOp<imex::util::ChangeLayoutOp>()) {
+                otherArg.getDefiningOp<numba::util::ChangeLayoutOp>()) {
           auto otherSrc = otherCl.getSource();
           if (otherSrc.getType() == srcType) {
             rewriter.updateRootInPlace(
@@ -915,8 +915,8 @@ struct ChangeLayoutIf : public mlir::OpRewritePattern<mlir::scf::YieldOp> {
           auto newType = newResultTypes[i];
           if (origType != newType) {
             res.setType(newType);
-            auto cl =
-                rewriter.create<imex::util::ChangeLayoutOp>(loc, origType, res);
+            auto cl = rewriter.create<numba::util::ChangeLayoutOp>(
+                loc, origType, res);
             res.replaceAllUsesExcept(cl, cl);
           }
         }
@@ -994,7 +994,7 @@ struct ChangeLayout1DReshape
       view = rewriter.create<mlir::memref::SubViewOp>(
           loc, reducedType, view, newOfsets, sizes, newStrides);
     }
-    rewriter.replaceOpWithNewOp<imex::util::ChangeLayoutOp>(op, dstType, view);
+    rewriter.replaceOpWithNewOp<numba::util::ChangeLayoutOp>(op, dstType, view);
     return mlir::success();
   }
 };
@@ -1006,7 +1006,7 @@ struct ChangeLayoutSliceGetItem
   mlir::LogicalResult
   matchAndRewrite(plier::SliceGetItemOp op,
                   mlir::PatternRewriter &rewriter) const override {
-    auto cl = op.getArray().getDefiningOp<imex::util::ChangeLayoutOp>();
+    auto cl = op.getArray().getDefiningOp<numba::util::ChangeLayoutOp>();
     if (!cl)
       return mlir::failure();
 
@@ -1025,8 +1025,8 @@ struct ChangeLayoutCopy : public mlir::OpRewritePattern<mlir::memref::CopyOp> {
                   mlir::PatternRewriter &rewriter) const override {
     auto input = op.getSource();
     auto output = op.getTarget();
-    auto clInput = input.getDefiningOp<imex::util::ChangeLayoutOp>();
-    auto clOutput = output.getDefiningOp<imex::util::ChangeLayoutOp>();
+    auto clInput = input.getDefiningOp<numba::util::ChangeLayoutOp>();
+    auto clOutput = output.getDefiningOp<numba::util::ChangeLayoutOp>();
     if (!clInput && !clOutput)
       return mlir::failure();
 
@@ -1048,7 +1048,7 @@ struct ChangeLayoutExpandShape
   mlir::LogicalResult
   matchAndRewrite(mlir::memref::ExpandShapeOp op,
                   mlir::PatternRewriter &rewriter) const override {
-    auto cl = op.getSrc().getDefiningOp<imex::util::ChangeLayoutOp>();
+    auto cl = op.getSrc().getDefiningOp<numba::util::ChangeLayoutOp>();
     if (!cl)
       return mlir::failure();
 
@@ -1070,7 +1070,8 @@ struct ChangeLayoutExpandShape
     auto loc = op->getLoc();
     mlir::Value newOp = rewriter.create<mlir::memref::ExpandShapeOp>(
         loc, *newDstType, src, reassoc);
-    rewriter.replaceOpWithNewOp<imex::util::ChangeLayoutOp>(op, dstType, newOp);
+    rewriter.replaceOpWithNewOp<numba::util::ChangeLayoutOp>(op, dstType,
+                                                             newOp);
     return mlir::success();
   }
 };
@@ -1099,7 +1100,7 @@ struct ChangeLayoutSelect
     auto falseArg = op.getFalseValue();
     for (bool reverse : {false, true}) {
       auto arg = reverse ? falseArg : trueArg;
-      auto cl = arg.getDefiningOp<imex::util::ChangeLayoutOp>();
+      auto cl = arg.getDefiningOp<numba::util::ChangeLayoutOp>();
       if (!cl)
         continue;
 
@@ -1140,8 +1141,8 @@ struct ChangeLayoutSelect
       auto cond = op.getCondition();
       auto result =
           rewriter.create<mlir::arith::SelectOp>(loc, cond, trueArg, falseArg);
-      rewriter.replaceOpWithNewOp<imex::util::ChangeLayoutOp>(op, dstType,
-                                                              result);
+      rewriter.replaceOpWithNewOp<numba::util::ChangeLayoutOp>(op, dstType,
+                                                               result);
 
       return mlir::success();
     }
@@ -1151,18 +1152,18 @@ struct ChangeLayoutSelect
 };
 
 struct ChangeLayoutEnvRegion
-    : public mlir::OpRewritePattern<imex::util::EnvironmentRegionYieldOp> {
+    : public mlir::OpRewritePattern<numba::util::EnvironmentRegionYieldOp> {
   using OpRewritePattern::OpRewritePattern;
 
   mlir::LogicalResult
-  matchAndRewrite(imex::util::EnvironmentRegionYieldOp op,
+  matchAndRewrite(numba::util::EnvironmentRegionYieldOp op,
                   mlir::PatternRewriter &rewriter) const override {
     auto args = op.getResults();
     llvm::SmallVector<mlir::Value> updatedArgs(args.begin(), args.end());
 
     bool changed = false;
     for (auto [i, arg] : llvm::enumerate(args)) {
-      auto cl = arg.getDefiningOp<imex::util::ChangeLayoutOp>();
+      auto cl = arg.getDefiningOp<numba::util::ChangeLayoutOp>();
       if (!cl)
         continue;
 
@@ -1174,7 +1175,7 @@ struct ChangeLayoutEnvRegion
       return mlir::failure();
 
     auto region =
-        mlir::cast<imex::util::EnvironmentRegionOp>(op->getParentOp());
+        mlir::cast<numba::util::EnvironmentRegionOp>(op->getParentOp());
     rewriter.updateRootInPlace(
         op, [&]() { op.getResultsMutable().assign(updatedArgs); });
 
@@ -1189,7 +1190,7 @@ struct ChangeLayoutEnvRegion
           continue;
 
         auto cast =
-            rewriter.create<imex::util::ChangeLayoutOp>(loc, oldType, result);
+            rewriter.create<numba::util::ChangeLayoutOp>(loc, oldType, result);
         mlir::Value newResult = cast.getResult();
         for (auto &use : llvm::make_early_inc_range(result.getUses())) {
           auto owner = use.getOwner();
@@ -1257,7 +1258,7 @@ static mlir::Value foldPrevCast(mlir::Value val, mlir::Type thisType) {
 static mlir::Value propagateCasts(mlir::Value val, mlir::Type thisType) {
   using fptr = mlir::Value (*)(mlir::Value, mlir::Type);
   const fptr handlers[] = {
-      &foldPrevCast<imex::util::SignCastOp>,
+      &foldPrevCast<numba::util::SignCastOp>,
       &foldPrevCast<plier::CastOp>,
       &foldPrevCast<mlir::UnrealizedConversionCastOp>,
   };
@@ -1296,7 +1297,7 @@ struct SignCastDimPropagate : public mlir::OpRewritePattern<Op> {
   mlir::LogicalResult
   matchAndRewrite(Op op, mlir::PatternRewriter &rewriter) const override {
     auto castOp =
-        op.getSource().template getDefiningOp<imex::util::SignCastOp>();
+        op.getSource().template getDefiningOp<numba::util::SignCastOp>();
     if (!castOp)
       return mlir::failure();
 
@@ -1307,17 +1308,17 @@ struct SignCastDimPropagate : public mlir::OpRewritePattern<Op> {
 };
 
 struct SignCastUndefPropagate
-    : public mlir::OpRewritePattern<imex::util::SignCastOp> {
+    : public mlir::OpRewritePattern<numba::util::SignCastOp> {
   using OpRewritePattern::OpRewritePattern;
 
   mlir::LogicalResult
-  matchAndRewrite(imex::util::SignCastOp op,
+  matchAndRewrite(numba::util::SignCastOp op,
                   mlir::PatternRewriter &rewriter) const override {
-    auto undefOp = op.getSource().getDefiningOp<imex::util::UndefOp>();
+    auto undefOp = op.getSource().getDefiningOp<numba::util::UndefOp>();
     if (!undefOp)
       return mlir::failure();
 
-    rewriter.replaceOpWithNewOp<imex::util::UndefOp>(op, op.getType());
+    rewriter.replaceOpWithNewOp<numba::util::UndefOp>(op, op.getType());
     return mlir::success();
   }
 };
@@ -1329,7 +1330,7 @@ struct SignCastCastPropagate : public mlir::OpRewritePattern<CastOp> {
   mlir::LogicalResult
   matchAndRewrite(CastOp op, mlir::PatternRewriter &rewriter) const override {
     auto signCast =
-        op.getSource().template getDefiningOp<imex::util::SignCastOp>();
+        op.getSource().template getDefiningOp<numba::util::SignCastOp>();
     if (!signCast)
       return mlir::failure();
 
@@ -1349,7 +1350,7 @@ struct SignCastCastPropagate : public mlir::OpRewritePattern<CastOp> {
 
     auto loc = op.getLoc();
     mlir::Value cast = rewriter.create<CastOp>(loc, newDstType, src);
-    rewriter.replaceOpWithNewOp<imex::util::SignCastOp>(op, dstType, cast);
+    rewriter.replaceOpWithNewOp<numba::util::SignCastOp>(op, dstType, cast);
 
     return mlir::success();
   }
@@ -1362,7 +1363,7 @@ struct SignCastReinterpretPropagate
   mlir::LogicalResult
   matchAndRewrite(mlir::memref::ReinterpretCastOp op,
                   mlir::PatternRewriter &rewriter) const override {
-    auto signCast = op.getSource().getDefiningOp<imex::util::SignCastOp>();
+    auto signCast = op.getSource().getDefiningOp<numba::util::SignCastOp>();
     if (!signCast)
       return mlir::failure();
 
@@ -1384,7 +1385,7 @@ struct SignCastReinterpretPropagate
     auto strides = op.getMixedStrides();
     auto cast = rewriter.createOrFold<mlir::memref::ReinterpretCastOp>(
         loc, newDstType, src, offset, sizes, strides);
-    rewriter.replaceOpWithNewOp<imex::util::SignCastOp>(op, dstType, cast);
+    rewriter.replaceOpWithNewOp<numba::util::SignCastOp>(op, dstType, cast);
 
     return mlir::success();
   }
@@ -1397,7 +1398,7 @@ struct SignCastLoadPropagate
   mlir::LogicalResult
   matchAndRewrite(mlir::memref::LoadOp op,
                   mlir::PatternRewriter &rewriter) const override {
-    auto signCast = op.getMemref().getDefiningOp<imex::util::SignCastOp>();
+    auto signCast = op.getMemref().getDefiningOp<numba::util::SignCastOp>();
     if (!signCast)
       return mlir::failure();
 
@@ -1407,7 +1408,8 @@ struct SignCastLoadPropagate
         rewriter.createOrFold<mlir::memref::LoadOp>(loc, src, op.getIndices());
 
     if (newOp.getType() != op.getType())
-      newOp = rewriter.create<imex::util::SignCastOp>(loc, op.getType(), newOp);
+      newOp =
+          rewriter.create<numba::util::SignCastOp>(loc, op.getType(), newOp);
 
     rewriter.replaceOp(op, newOp);
     return mlir::success();
@@ -1421,7 +1423,7 @@ struct SignCastStorePropagate
   mlir::LogicalResult
   matchAndRewrite(mlir::memref::StoreOp op,
                   mlir::PatternRewriter &rewriter) const override {
-    auto signCast = op.getMemref().getDefiningOp<imex::util::SignCastOp>();
+    auto signCast = op.getMemref().getDefiningOp<numba::util::SignCastOp>();
     if (!signCast)
       return mlir::failure();
 
@@ -1429,8 +1431,8 @@ struct SignCastStorePropagate
     auto srcElemType = src.getType().cast<mlir::MemRefType>().getElementType();
     auto val = op.getValue();
     if (val.getType() != srcElemType)
-      val = rewriter.create<imex::util::SignCastOp>(op.getLoc(), srcElemType,
-                                                    val);
+      val = rewriter.create<numba::util::SignCastOp>(op.getLoc(), srcElemType,
+                                                     val);
 
     rewriter.replaceOpWithNewOp<mlir::memref::StoreOp>(op, val, src,
                                                        op.getIndices());
@@ -1440,11 +1442,11 @@ struct SignCastStorePropagate
 
 template <typename Op>
 struct SignCastAllocPropagate
-    : public mlir::OpRewritePattern<imex::util::SignCastOp> {
-  using mlir::OpRewritePattern<imex::util::SignCastOp>::OpRewritePattern;
+    : public mlir::OpRewritePattern<numba::util::SignCastOp> {
+  using mlir::OpRewritePattern<numba::util::SignCastOp>::OpRewritePattern;
 
   mlir::LogicalResult
-  matchAndRewrite(imex::util::SignCastOp op,
+  matchAndRewrite(numba::util::SignCastOp op,
                   mlir::PatternRewriter &rewriter) const override {
     auto alloc = op.getSource().getDefiningOp<Op>();
     if (!alloc || !alloc->hasOneUse())
@@ -1460,11 +1462,11 @@ struct SignCastAllocPropagate
 };
 
 struct SignCastTensorFromElementsPropagate
-    : public mlir::OpRewritePattern<imex::util::SignCastOp> {
+    : public mlir::OpRewritePattern<numba::util::SignCastOp> {
   using OpRewritePattern::OpRewritePattern;
 
   mlir::LogicalResult
-  matchAndRewrite(imex::util::SignCastOp op,
+  matchAndRewrite(numba::util::SignCastOp op,
                   mlir::PatternRewriter &rewriter) const override {
     auto fromElements =
         op.getSource().getDefiningOp<mlir::tensor::FromElementsOp>();
@@ -1479,7 +1481,7 @@ struct SignCastTensorFromElementsPropagate
     llvm::SmallVector<mlir::Value> castedVals(count);
     for (auto i : llvm::seq(0u, count))
       castedVals[i] =
-          rewriter.create<imex::util::SignCastOp>(loc, elemType, elements[i]);
+          rewriter.create<numba::util::SignCastOp>(loc, elemType, elements[i]);
 
     rewriter.replaceOpWithNewOp<mlir::tensor::FromElementsOp>(op, castedVals);
     return mlir::success();
@@ -1487,11 +1489,11 @@ struct SignCastTensorFromElementsPropagate
 };
 
 struct SignCastTensorCollapseShapePropagate
-    : public mlir::OpRewritePattern<imex::util::SignCastOp> {
+    : public mlir::OpRewritePattern<numba::util::SignCastOp> {
   using OpRewritePattern::OpRewritePattern;
 
   mlir::LogicalResult
-  matchAndRewrite(imex::util::SignCastOp op,
+  matchAndRewrite(numba::util::SignCastOp op,
                   mlir::PatternRewriter &rewriter) const override {
     auto prevOp = op.getSource().getDefiningOp<mlir::tensor::CollapseShapeOp>();
     if (!prevOp)
@@ -1505,7 +1507,8 @@ struct SignCastTensorCollapseShapePropagate
     auto newDstType = dstType.clone(dstType.getElementType());
 
     auto loc = prevOp->getLoc();
-    auto newSrc = rewriter.create<imex::util::SignCastOp>(loc, newSrcType, src);
+    auto newSrc =
+        rewriter.create<numba::util::SignCastOp>(loc, newSrcType, src);
     rewriter.replaceOpWithNewOp<mlir::tensor::CollapseShapeOp>(
         op, newDstType, newSrc, prevOp.getReassociation());
     return mlir::success();
@@ -1519,7 +1522,7 @@ struct SignCastBuferizationPropagate : public mlir::OpRewritePattern<BuffOp> {
   mlir::LogicalResult
   matchAndRewrite(BuffOp op, mlir::PatternRewriter &rewriter) const override {
     auto signCast =
-        op->getOperand(0).template getDefiningOp<imex::util::SignCastOp>();
+        op->getOperand(0).template getDefiningOp<numba::util::SignCastOp>();
     if (!signCast)
       return mlir::failure();
 
@@ -1530,7 +1533,7 @@ struct SignCastBuferizationPropagate : public mlir::OpRewritePattern<BuffOp> {
 
     auto loc = op.getLoc();
     auto res = rewriter.create<BuffOp>(loc, newDstType, src);
-    rewriter.replaceOpWithNewOp<imex::util::SignCastOp>(op, dstType, res);
+    rewriter.replaceOpWithNewOp<numba::util::SignCastOp>(op, dstType, res);
     return mlir::success();
   }
 };
@@ -1542,7 +1545,7 @@ struct SignCastSubviewPropagate : public mlir::OpRewritePattern<ViewOp> {
   mlir::LogicalResult
   matchAndRewrite(ViewOp op, mlir::PatternRewriter &rewriter) const override {
     auto signCast =
-        op.getSource().template getDefiningOp<imex::util::SignCastOp>();
+        op.getSource().template getDefiningOp<numba::util::SignCastOp>();
     if (!signCast)
       return mlir::failure();
 
@@ -1556,7 +1559,7 @@ struct SignCastSubviewPropagate : public mlir::OpRewritePattern<ViewOp> {
     auto res =
         rewriter.create<ViewOp>(loc, newDstType, src, op.getMixedOffsets(),
                                 op.getMixedSizes(), op.getMixedStrides());
-    rewriter.replaceOpWithNewOp<imex::util::SignCastOp>(op, dstType, res);
+    rewriter.replaceOpWithNewOp<numba::util::SignCastOp>(op, dstType, res);
     return mlir::success();
   }
 };
@@ -1581,11 +1584,11 @@ struct SignCastForPropagate : public mlir::OpRewritePattern<mlir::scf::ForOp> {
       auto initArg = initArgs[i];
       auto yieldArg = termResults[i];
       assert(initArg.getType() == yieldArg.getType());
-      auto yieldCast = yieldArg.getDefiningOp<imex::util::SignCastOp>();
+      auto yieldCast = yieldArg.getDefiningOp<numba::util::SignCastOp>();
       if (yieldCast) {
         auto newType = yieldCast.getSource().getType();
         newInitArgs[i] =
-            rewriter.create<imex::util::SignCastOp>(loc, newType, initArg);
+            rewriter.create<numba::util::SignCastOp>(loc, newType, initArg);
         needUpdate = true;
       } else {
         newInitArgs[i] = initArg;
@@ -1607,7 +1610,7 @@ struct SignCastForPropagate : public mlir::OpRewritePattern<mlir::scf::ForOp> {
         auto oldType = oldIterVal.getType();
         if (iterVal.getType() != oldType) {
           auto newIterVal =
-              builder.create<imex::util::SignCastOp>(loc, oldType, iterVal);
+              builder.create<numba::util::SignCastOp>(loc, oldType, iterVal);
           mapping.map(oldIterVal, newIterVal.getResult());
         } else {
           mapping.map(oldIterVal, iterVal);
@@ -1622,7 +1625,7 @@ struct SignCastForPropagate : public mlir::OpRewritePattern<mlir::scf::ForOp> {
         auto val = mapping.lookupOrDefault(termResults[i]);
         auto newType = newInitArgs[i].getType();
         if (val.getType() != newType)
-          val = val.getDefiningOp<imex::util::SignCastOp>().getSource();
+          val = val.getDefiningOp<numba::util::SignCastOp>().getSource();
 
         assert(val.getType() == newType);
         newYieldArgs[i] = val;
@@ -1640,8 +1643,8 @@ struct SignCastForPropagate : public mlir::OpRewritePattern<mlir::scf::ForOp> {
       auto oldRersultType = initArgs[i].getType();
       mlir::Value newResult = newResults[i];
       if (newResult.getType() != oldRersultType)
-        newResult = rewriter.create<imex::util::SignCastOp>(loc, oldRersultType,
-                                                            newResult);
+        newResult = rewriter.create<numba::util::SignCastOp>(
+            loc, oldRersultType, newResult);
 
       newInitArgs[i] = newResult;
     }
@@ -1666,12 +1669,12 @@ struct SignCastIfPropagate : public mlir::OpRewritePattern<mlir::scf::IfOp> {
 
     unsigned idx;
     CastOp castOp;
-    imex::util::UndefOp undefOp;
+    numba::util::UndefOp undefOp;
     for (auto [i, args] : llvm::enumerate(
              llvm::zip(thenYield.getResults(), elseYield.getResults()))) {
       auto [thenArg, elseArg] = args;
       auto cast = thenArg.template getDefiningOp<CastOp>();
-      auto undef = elseArg.template getDefiningOp<imex::util::UndefOp>();
+      auto undef = elseArg.template getDefiningOp<numba::util::UndefOp>();
       if (cast && undef) {
         idx = static_cast<unsigned>(i);
         castOp = cast;
@@ -1695,7 +1698,7 @@ struct SignCastIfPropagate : public mlir::OpRewritePattern<mlir::scf::IfOp> {
 
     rewriter.setInsertionPoint(elseYield);
     auto newUndef =
-        rewriter.create<imex::util::UndefOp>(undefOp->getLoc(), srcType);
+        rewriter.create<numba::util::UndefOp>(undefOp->getLoc(), srcType);
 
     rewriter.updateRootInPlace(
         elseYield, [&]() { elseYield->setOperand(idx, newUndef.getResult()); });
@@ -1729,7 +1732,7 @@ void SignCastOp::getCanonicalizationPatterns(::mlir::RewritePatternSet &results,
       SignCastDimPropagate<mlir::memref::DimOp>, SignCastUndefPropagate,
       SignCastCastPropagate<mlir::tensor::CastOp>,
       SignCastCastPropagate<mlir::memref::CastOp>,
-      SignCastCastPropagate<imex::util::ChangeLayoutOp>,
+      SignCastCastPropagate<numba::util::ChangeLayoutOp>,
       SignCastReinterpretPropagate, SignCastLoadPropagate,
       SignCastStorePropagate, SignCastAllocPropagate<mlir::memref::AllocOp>,
       SignCastAllocPropagate<mlir::memref::AllocaOp>,
@@ -1739,7 +1742,7 @@ void SignCastOp::getCanonicalizationPatterns(::mlir::RewritePatternSet &results,
       SignCastSubviewPropagate<mlir::tensor::ExtractSliceOp,
                                mlir::RankedTensorType>,
       SignCastSubviewPropagate<mlir::memref::SubViewOp, mlir::MemRefType>,
-      SignCastForPropagate, SignCastIfPropagate<imex::util::SignCastOp>,
+      SignCastForPropagate, SignCastIfPropagate<numba::util::SignCastOp>,
       SignCastIfPropagate<mlir::memref::CastOp>>(context);
 }
 
@@ -1748,7 +1751,7 @@ void TakeContextOp::build(mlir::OpBuilder &b, mlir::OperationState &result,
                           mlir::SymbolRefAttr releaseFunc,
                           mlir::TypeRange resultTypes) {
   llvm::SmallVector<mlir::Type> allTypes;
-  allTypes.emplace_back(imex::util::OpaqueType::get(b.getContext()));
+  allTypes.emplace_back(numba::util::OpaqueType::get(b.getContext()));
   allTypes.append(resultTypes.begin(), resultTypes.end());
   build(b, result, allTypes, initFunc, releaseFunc);
 }
@@ -2113,7 +2116,7 @@ MemrefBitcastOp::fold(llvm::ArrayRef<mlir::Attribute> /*operands*/) {
 }
 
 } // namespace util
-} // namespace imex
+} // namespace numba
 
 #include "imex/Dialect/imex_util/ImexUtilOpsDialect.cpp.inc"
 

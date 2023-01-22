@@ -67,14 +67,14 @@ struct MustAlias {
 };
 
 static mlir::LogicalResult
-optimizeUses(imex::MemorySSAAnalysis &memSSAAnalysis) {
+optimizeUses(numba::MemorySSAAnalysis &memSSAAnalysis) {
   return memSSAAnalysis.optimizeUses();
 }
 
-static mlir::LogicalResult foldLoads(imex::MemorySSAAnalysis &memSSAAnalysis) {
+static mlir::LogicalResult foldLoads(numba::MemorySSAAnalysis &memSSAAnalysis) {
   assert(memSSAAnalysis.memssa);
   auto &memSSA = *memSSAAnalysis.memssa;
-  using NodeType = imex::MemorySSA::NodeType;
+  using NodeType = numba::MemorySSA::NodeType;
   bool changed = false;
   for (auto &node : llvm::make_early_inc_range(memSSA.getNodes())) {
     if (NodeType::Use == memSSA.getNodeType(&node)) {
@@ -106,13 +106,13 @@ static mlir::LogicalResult foldLoads(imex::MemorySSAAnalysis &memSSAAnalysis) {
 }
 
 static mlir::LogicalResult
-deadStoreElemination(imex::MemorySSAAnalysis &memSSAAnalysis) {
+deadStoreElemination(numba::MemorySSAAnalysis &memSSAAnalysis) {
   assert(memSSAAnalysis.memssa);
   auto &memSSA = *memSSAAnalysis.memssa;
-  using NodeType = imex::MemorySSA::NodeType;
+  using NodeType = numba::MemorySSA::NodeType;
   auto getNextDef =
-      [&](imex::MemorySSA::Node *node) -> imex::MemorySSA::Node * {
-    imex::MemorySSA::Node *def = nullptr;
+      [&](numba::MemorySSA::Node *node) -> numba::MemorySSA::Node * {
+    numba::MemorySSA::Node *def = nullptr;
     for (auto user : memSSA.getUsers(node)) {
       auto type = memSSA.getNodeType(user);
       if (NodeType::Def == type) {
@@ -171,11 +171,11 @@ struct SimpleOperationInfo : public llvm::DenseMapInfo<mlir::Operation *> {
   }
 };
 
-static mlir::LogicalResult loadCSE(imex::MemorySSAAnalysis &memSSAAnalysis) {
+static mlir::LogicalResult loadCSE(numba::MemorySSAAnalysis &memSSAAnalysis) {
   mlir::DominanceInfo dom;
   assert(memSSAAnalysis.memssa);
   auto &memSSA = *memSSAAnalysis.memssa;
-  using NodeType = imex::MemorySSA::NodeType;
+  using NodeType = numba::MemorySSA::NodeType;
   bool changed = false;
   llvm::SmallDenseMap<mlir::Operation *, mlir::Operation *, 4,
                       SimpleOperationInfo>
@@ -226,7 +226,7 @@ static mlir::LogicalResult loadCSE(imex::MemorySSAAnalysis &memSSAAnalysis) {
 } // namespace
 
 llvm::Optional<mlir::LogicalResult>
-imex::optimizeMemoryOps(mlir::AnalysisManager &am) {
+numba::optimizeMemoryOps(mlir::AnalysisManager &am) {
   auto &memSSAAnalysis = am.getAnalysis<MemorySSAAnalysis>();
   if (!memSSAAnalysis.memssa)
     return {};
@@ -314,7 +314,7 @@ struct MemoryOptPass
     while (true) {
       (void)mlir::applyPatternsAndFoldGreedily(getOperation(), fPatterns);
       am.invalidate({});
-      auto res = imex::optimizeMemoryOps(am);
+      auto res = numba::optimizeMemoryOps(am);
       if (!res) {
         getOperation()->emitError("Failed to build memory SSA analysis");
         return signalPassFailure();
@@ -326,6 +326,6 @@ struct MemoryOptPass
 };
 } // namespace
 
-std::unique_ptr<mlir::Pass> imex::createMemoryOptPass() {
+std::unique_ptr<mlir::Pass> numba::createMemoryOptPass() {
   return std::make_unique<MemoryOptPass>();
 }

@@ -16,7 +16,7 @@ include "mlir/IR/OpBase.td"
 
 def ImexUtil_Dialect : Dialect {
   let name = "imex_util";
-  let cppNamespace = "::imex::util";
+  let cppNamespace = "::numba::util";
 
   let dependentDialects = ["::mlir::memref::MemRefDialect"];
 
@@ -83,7 +83,7 @@ def EnforceShapeOp : ImexUtil_Op<"enforce_shape"> {
 
 def ParallelOp : ImexUtil_Op<"parallel", [
   AttrSizedOperandSegments, DeclareOpInterfaceMethods<LoopLikeOpInterface>,
-  SingleBlockImplicitTerminator<"::imex::util::YieldOp">, RecursiveMemoryEffects
+  SingleBlockImplicitTerminator<"::numba::util::YieldOp">, RecursiveMemoryEffects
 ]> {
 
   let arguments = (ins Variadic<Index>:$lowerBounds,
@@ -126,7 +126,7 @@ def UndefOp : ImexUtil_Op<"undef", [Pure]> {
 }
 
 def YieldOp : ImexUtil_Op<"yield", [
-  Pure, ReturnLike, Terminator, ParentOneOf<["::imex::util::ParallelOp"]>
+  Pure, ReturnLike, Terminator, ParentOneOf<["::numba::util::ParallelOp"]>
 ]> {
   let arguments = (ins Variadic<AnyType> : $results);
   let builders = [OpBuilder<(ins), [{/* nothing to do */}]>];
@@ -231,7 +231,7 @@ def TupleExtractOp : ImexUtil_Op<"tuple_extract", [Pure]> {
 
 def EnvironmentRegionOp : ImexUtil_Op<"env_region", [
     DeclareOpInterfaceMethods<RegionBranchOpInterface>,
-    SingleBlockImplicitTerminator<"::imex::util::EnvironmentRegionYieldOp">,
+    SingleBlockImplicitTerminator<"::numba::util::EnvironmentRegionYieldOp">,
     RecursiveMemoryEffects]> {
   let summary = "Operation that executes its region with a specific environment";
   let description = [{
@@ -276,7 +276,7 @@ def EnvironmentRegionYieldOp : ImexUtil_Op<"env_region_yield", [
   Pure,
   ReturnLike,
   Terminator,
-  HasParent<"::imex::util::EnvironmentRegionOp">
+  HasParent<"::numba::util::EnvironmentRegionOp">
   ]> {
 
   let summary = "Environment region yield and termination operation";

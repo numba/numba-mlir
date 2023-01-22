@@ -70,19 +70,19 @@ populateToLLVMAdditionalTypeConversion(mlir::LLVMTypeConverter &converter) {
         return voidPtrType;
       });
   converter.addConversion(
-      [voidPtrType](imex::util::OpaqueType) -> llvm::Optional<mlir::Type> {
+      [voidPtrType](numba::util::OpaqueType) -> llvm::Optional<mlir::Type> {
         return voidPtrType;
       });
 }
 
 namespace {
 struct LowerMemrefBitcastOp
-    : public mlir::ConvertOpToLLVMPattern<imex::util::MemrefBitcastOp> {
+    : public mlir::ConvertOpToLLVMPattern<numba::util::MemrefBitcastOp> {
   using ConvertOpToLLVMPattern::ConvertOpToLLVMPattern;
 
   mlir::LogicalResult
-  matchAndRewrite(imex::util::MemrefBitcastOp op,
-                  imex::util::MemrefBitcastOp::Adaptor adaptor,
+  matchAndRewrite(numba::util::MemrefBitcastOp op,
+                  numba::util::MemrefBitcastOp::Adaptor adaptor,
                   mlir::ConversionPatternRewriter &rewriter) const override {
     auto arg = adaptor.getSource();
     if (!arg.getType().isa<mlir::LLVM::LLVMStructType>())
@@ -127,12 +127,12 @@ struct LowerMemrefBitcastOp
 };
 
 struct LowerBuildTuple
-    : public mlir::ConvertOpToLLVMPattern<imex::util::BuildTupleOp> {
+    : public mlir::ConvertOpToLLVMPattern<numba::util::BuildTupleOp> {
   using ConvertOpToLLVMPattern::ConvertOpToLLVMPattern;
 
   mlir::LogicalResult
-  matchAndRewrite(imex::util::BuildTupleOp op,
-                  imex::util::BuildTupleOp::Adaptor adaptor,
+  matchAndRewrite(numba::util::BuildTupleOp op,
+                  numba::util::BuildTupleOp::Adaptor adaptor,
                   mlir::ConversionPatternRewriter &rewriter) const override {
     auto converter = getTypeConverter();
     assert(converter && "Invalid type converter");
@@ -155,12 +155,12 @@ struct LowerBuildTuple
   }
 };
 
-struct LowerUndef : public mlir::ConvertOpToLLVMPattern<imex::util::UndefOp> {
+struct LowerUndef : public mlir::ConvertOpToLLVMPattern<numba::util::UndefOp> {
   using ConvertOpToLLVMPattern::ConvertOpToLLVMPattern;
 
   mlir::LogicalResult
-  matchAndRewrite(imex::util::UndefOp op,
-                  imex::util::UndefOp::Adaptor /*adaptor*/,
+  matchAndRewrite(numba::util::UndefOp op,
+                  numba::util::UndefOp::Adaptor /*adaptor*/,
                   mlir::ConversionPatternRewriter &rewriter) const override {
     auto converter = getTypeConverter();
     auto type = converter->convertType(op.getType());
@@ -204,12 +204,12 @@ static void addToGlobalDtors(mlir::ConversionPatternRewriter &rewriter,
 }
 
 struct LowerTakeContextOp
-    : public mlir::ConvertOpToLLVMPattern<imex::util::TakeContextOp> {
+    : public mlir::ConvertOpToLLVMPattern<numba::util::TakeContextOp> {
   using ConvertOpToLLVMPattern::ConvertOpToLLVMPattern;
 
   mlir::LogicalResult
-  matchAndRewrite(imex::util::TakeContextOp op,
-                  imex::util::TakeContextOp::Adaptor adaptor,
+  matchAndRewrite(numba::util::TakeContextOp op,
+                  numba::util::TakeContextOp::Adaptor adaptor,
                   mlir::ConversionPatternRewriter &rewriter) const override {
     auto converter = getTypeConverter();
     assert(converter);
@@ -390,7 +390,7 @@ struct LowerTakeContextOp
     auto ctxHandle = [&]() {
       mlir::OpBuilder::InsertionGuard g(rewriter);
       rewriter.setInsertionPointToStart(mod.getBody());
-      auto name = imex::getUniqueLLVMGlobalName(mod, "context_handle");
+      auto name = numba::getUniqueLLVMGlobalName(mod, "context_handle");
       auto handle = rewriter.create<mlir::LLVM::GlobalOp>(
           unknownLoc, ctxType, /*isConstant*/ false,
           mlir::LLVM::Linkage::Internal, name, mlir::Attribute());
@@ -454,12 +454,12 @@ struct LowerTakeContextOp
 };
 
 struct LowerReleaseContextOp
-    : public mlir::ConvertOpToLLVMPattern<imex::util::ReleaseContextOp> {
+    : public mlir::ConvertOpToLLVMPattern<numba::util::ReleaseContextOp> {
   using ConvertOpToLLVMPattern::ConvertOpToLLVMPattern;
 
   mlir::LogicalResult
-  matchAndRewrite(imex::util::ReleaseContextOp op,
-                  imex::util::ReleaseContextOp::Adaptor adaptor,
+  matchAndRewrite(numba::util::ReleaseContextOp op,
+                  numba::util::ReleaseContextOp::Adaptor adaptor,
                   mlir::ConversionPatternRewriter &rewriter) const override {
     auto mod = op->getParentOfType<mlir::ModuleOp>();
     assert(mod);
@@ -493,12 +493,12 @@ struct LowerReleaseContextOp
 };
 
 struct LowerApplyOffsetOp
-    : public mlir::ConvertOpToLLVMPattern<imex::util::MemrefApplyOffsetOp> {
+    : public mlir::ConvertOpToLLVMPattern<numba::util::MemrefApplyOffsetOp> {
   using ConvertOpToLLVMPattern::ConvertOpToLLVMPattern;
 
   mlir::LogicalResult
-  matchAndRewrite(imex::util::MemrefApplyOffsetOp op,
-                  imex::util::MemrefApplyOffsetOp::Adaptor adaptor,
+  matchAndRewrite(numba::util::MemrefApplyOffsetOp op,
+                  numba::util::MemrefApplyOffsetOp::Adaptor adaptor,
                   mlir::ConversionPatternRewriter &rewriter) const override {
     auto arg = adaptor.getSource();
     if (!arg.getType().isa<mlir::LLVM::LLVMStructType>())
@@ -578,8 +578,8 @@ struct ImexUtilToLLVMPass
     mlir::LLVMConversionTarget target(context);
     target.addLegalOp<mlir::func::FuncOp>();
     target.addLegalOp<mlir::func::CallOp>();
-    target.addLegalOp<imex::util::RetainOp>();
-    target.addIllegalDialect<imex::util::ImexUtilDialect>();
+    target.addLegalOp<numba::util::RetainOp>();
+    target.addIllegalDialect<numba::util::ImexUtilDialect>();
     if (failed(applyPartialConversion(op, target, std::move(patterns))))
       signalPassFailure();
   }
@@ -590,7 +590,7 @@ private:
 
 } // namespace
 
-std::unique_ptr<mlir::Pass> imex::createUtilToLLVMPass(
+std::unique_ptr<mlir::Pass> numba::createUtilToLLVMPass(
     std::function<mlir::LowerToLLVMOptions(mlir::MLIRContext &)> optsGetter) {
   assert(optsGetter && "invalid optsGetter");
   return std::make_unique<ImexUtilToLLVMPass>(std::move(optsGetter));

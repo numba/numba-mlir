@@ -134,6 +134,6 @@ struct CmpLoopBoundsSimplify
 };
 } // namespace
 
-void imex::populateLoopRewritesPatterns(mlir::RewritePatternSet &patterns) {
+void numba::populateLoopRewritesPatterns(mlir::RewritePatternSet &patterns) {
   patterns.insert<CmpLoopBoundsSimplify>(patterns.getContext());
 }

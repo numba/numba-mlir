@@ -79,7 +79,7 @@ template <typename SubOp, typename AddOp>
 static void subLower(mlir::OpBuilder &builder, mlir::Location loc,
                      mlir::Value val, mlir::Operation *origOp) {
   auto type = val.getType();
-  auto zeroAttr = imex::getConstAttr(type, 0.0);
+  auto zeroAttr = numba::getConstAttr(type, 0.0);
   auto zero = builder.create<mlir::arith::ConstantOp>(loc, zeroAttr, type);
   val = builder.create<SubOp>(loc, zero, val);
   auto bodyBuilder = [&](mlir::OpBuilder &b, mlir::Location l, mlir::Value lhs,
@@ -94,7 +94,7 @@ template <typename DivOp, typename MulOp>
 static void divLower(mlir::OpBuilder &builder, mlir::Location loc,
                      mlir::Value val, mlir::Operation *origOp) {
   auto type = val.getType();
-  auto oneAttr = imex::getConstAttr(type, 1.0);
+  auto oneAttr = numba::getConstAttr(type, 1.0);
   auto one = builder.create<mlir::arith::ConstantOp>(loc, oneAttr, type);
   val = builder.create<DivOp>(loc, one, val);
   auto bodyBuilder = [&](mlir::OpBuilder &b, mlir::Location l, mlir::Value lhs,
@@ -151,7 +151,7 @@ struct PromoteToParallel : public mlir::OpRewritePattern<mlir::scf::ForOp> {
   matchAndRewrite(mlir::scf::ForOp op,
                   mlir::PatternRewriter &rewriter) const override {
     auto hasParallelAttr =
-        op->hasAttr(imex::util::attributes::getParallelName());
+        op->hasAttr(numba::util::attributes::getParallelName());
     if (!canParallelizeLoop(op, hasParallelAttr))
       return mlir::failure();
 
@@ -207,7 +207,7 @@ struct PromoteToParallel : public mlir::OpRewritePattern<mlir::scf::ForOp> {
         op, op.getLowerBound(), op.getUpperBound(), op.getStep(),
         op.getInitArgs(), bodyBuilder);
     if (hasParallelAttr)
-      parallelOp->setAttr(imex::util::attributes::getParallelName(),
+      parallelOp->setAttr(numba::util::attributes::getParallelName(),
                           rewriter.getUnitAttr());
 
     return mlir::success();
@@ -252,7 +252,7 @@ struct MergeNestedForIntoParallel
       return mlir::failure();
 
     auto hasParallelAttr =
-        op->hasAttr(imex::util::attributes::getParallelName());
+        op->hasAttr(numba::util::attributes::getParallelName());
     if (!canParallelizeLoop(op, hasParallelAttr))
       return mlir::failure();
 
@@ -288,7 +288,7 @@ struct MergeNestedForIntoParallel
         parent, lowerBounds, upperBounds, steps, parent.getInitArgs(),
         bodyBuilder);
     if (hasParallelAttr)
-      newOp->setAttr(imex::util::attributes::getParallelName(),
+      newOp->setAttr(numba::util::attributes::getParallelName(),
                      rewriter.getUnitAttr());
 
     return mlir::success();
@@ -310,7 +310,7 @@ struct PromoteToParallelPass
     auto context = &getContext();
 
     mlir::RewritePatternSet patterns(context);
-    imex::populatePromoteToParallelPatterns(patterns);
+    numba::populatePromoteToParallelPatterns(patterns);
 
     if (mlir::failed(mlir::applyPatternsAndFoldGreedily(getOperation(),
                                                         std::move(patterns))))
@@ -319,12 +319,12 @@ struct PromoteToParallelPass
 };
 } // namespace
 
-void imex::populatePromoteToParallelPatterns(
+void numba::populatePromoteToParallelPatterns(
     mlir::RewritePatternSet &patterns) {
   patterns.insert<PromoteToParallel, MergeNestedForIntoParallel>(
       patterns.getContext());
 }
 
-std::unique_ptr<mlir::Pass> imex::createPromoteToParallelPass() {
+std::unique_ptr<mlir::Pass> numba::createPromoteToParallelPass() {
   return std::make_unique<PromoteToParallelPass>();
 }

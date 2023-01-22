@@ -22,19 +22,19 @@ namespace {
 /// artifact of Numba IR conversion and doesn't really have any functional
 /// meaning so we can get rid of it early.
 struct LowerArgOps
-    : public imex::RewriteWrapperPass<
-          LowerArgOps, void, imex::DependentDialectsList<plier::PlierDialect>,
-          imex::ArgOpLowering> {};
+    : public numba::RewriteWrapperPass<
+          LowerArgOps, void, numba::DependentDialectsList<plier::PlierDialect>,
+          numba::ArgOpLowering> {};
 
 static void populatePlierToScfPipeline(mlir::OpPassManager &pm) {
   pm.addNestedPass<mlir::func::FuncOp>(std::make_unique<LowerArgOps>());
   pm.addNestedPass<mlir::func::FuncOp>(mlir::createCanonicalizerPass());
-  pm.addNestedPass<mlir::func::FuncOp>(imex::createCFGToSCFPass());
+  pm.addNestedPass<mlir::func::FuncOp>(numba::createCFGToSCFPass());
   pm.addNestedPass<mlir::func::FuncOp>(mlir::createCanonicalizerPass());
 }
 } // namespace
 
-void registerPlierToScfPipeline(imex::PipelineRegistry &registry) {
+void registerPlierToScfPipeline(numba::PipelineRegistry &registry) {
   registry.registerPipeline([](auto sink) {
     auto stage = getHighLoweringStage();
     sink(plierToScfPipelineName(), {stage.begin}, {stage.end}, {},

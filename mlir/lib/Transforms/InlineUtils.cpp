@@ -16,7 +16,7 @@
 namespace {
 static bool mustInline(mlir::func::CallOp call, mlir::func::FuncOp func) {
   auto attr = mlir::StringAttr::get(
-      call.getContext(), imex::util::attributes::getForceInlineName());
+      call.getContext(), numba::util::attributes::getForceInlineName());
   return call->hasAttr(attr) || func->hasAttr(attr);
 }
 
@@ -102,6 +102,6 @@ private:
 };
 } // namespace
 
-std::unique_ptr<mlir::Pass> imex::createForceInlinePass() {
+std::unique_ptr<mlir::Pass> numba::createForceInlinePass() {
   return std::make_unique<ForceInlinePass>();
 }

@@ -14,7 +14,7 @@ namespace mlir {
 class TypeConverter;
 }
 
-namespace imex {
+namespace numba {
 struct CastOpLowering : public mlir::OpRewritePattern<plier::CastOp> {
   using cast_t = std::function<mlir::Value(
       mlir::PatternRewriter &, mlir::Location, mlir::Value, mlir::Type)>;
@@ -30,4 +30,4 @@ private:
   mlir::TypeConverter &converter;
   cast_t castFunc;
 };
-} // namespace imex
+} // namespace numba

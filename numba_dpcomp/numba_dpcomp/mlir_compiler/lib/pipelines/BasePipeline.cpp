@@ -16,7 +16,7 @@ static const constexpr llvm::StringLiteral passes[] = {
 void dummyPassFunc(mlir::OpPassManager &) {}
 } // namespace
 
-void registerBasePipeline(imex::PipelineRegistry &registry) {
+void registerBasePipeline(numba::PipelineRegistry &registry) {
   for (std::size_t i = 0; i < std::size(passes); ++i) {
     registry.registerPipeline([i](auto sink) {
       if (0 == i) {

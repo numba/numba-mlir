@@ -177,27 +177,28 @@ public:
   }
 };
 
-class ConvertRetainOp : public mlir::OpConversionPattern<imex::util::RetainOp> {
+class ConvertRetainOp
+    : public mlir::OpConversionPattern<numba::util::RetainOp> {
 public:
   using OpConversionPattern::OpConversionPattern;
 
   mlir::LogicalResult
-  matchAndRewrite(imex::util::RetainOp op,
-                  imex::util::RetainOp::Adaptor adaptor,
+  matchAndRewrite(numba::util::RetainOp op,
+                  numba::util::RetainOp::Adaptor adaptor,
                   mlir::ConversionPatternRewriter &rewriter) const override {
     auto *converter = getTypeConverter();
     auto resType = converter->convertType(op.getType())
                        .dyn_cast_or_null<mlir::MemRefType>();
     if (!resType)
       return mlir::failure();
-    rewriter.replaceOpWithNewOp<imex::util::RetainOp>(op, resType,
-                                                      adaptor.getSource());
+    rewriter.replaceOpWithNewOp<numba::util::RetainOp>(op, resType,
+                                                       adaptor.getSource());
     return mlir::success();
   }
 };
 } // namespace
 
-void imex::populatePromoteBoolMemrefConversionRewritesAndTarget(
+void numba::populatePromoteBoolMemrefConversionRewritesAndTarget(
     mlir::TypeConverter &typeConverter, mlir::RewritePatternSet &patterns,
     mlir::ConversionTarget &target) {
   auto context = patterns.getContext();
@@ -212,7 +213,7 @@ void imex::populatePromoteBoolMemrefConversionRewritesAndTarget(
       });
 
   target.addDynamicallyLegalDialect<mlir::memref::MemRefDialect>(&checkOp);
-  target.addDynamicallyLegalOp<imex::util::RetainOp>(&checkOp);
+  target.addDynamicallyLegalOp<numba::util::RetainOp>(&checkOp);
 
   patterns.insert<ConvertDimOp, ConvertLoadOp, ConvertStoreOp, ConvertAllocOp,
                   ConvertAllocaOp, ConvertDeallocOp, ConvertCastOp,
@@ -240,12 +241,12 @@ struct PromoteBoolMemrefPass
     mlir::RewritePatternSet patterns(&context);
     mlir::ConversionTarget target(context);
 
-    imex::populateTupleTypeConversionRewritesAndTarget(typeConverter, patterns,
-                                                       target);
-    imex::populateControlFlowTypeConversionRewritesAndTarget(typeConverter,
-                                                             patterns, target);
+    numba::populateTupleTypeConversionRewritesAndTarget(typeConverter, patterns,
+                                                        target);
+    numba::populateControlFlowTypeConversionRewritesAndTarget(typeConverter,
+                                                              patterns, target);
 
-    imex::populatePromoteBoolMemrefConversionRewritesAndTarget(
+    numba::populatePromoteBoolMemrefConversionRewritesAndTarget(
         typeConverter, patterns, target);
     if (mlir::failed(mlir::applyFullConversion(getOperation(), target,
                                                std::move(patterns))))
@@ -254,6 +255,6 @@ struct PromoteBoolMemrefPass
 };
 } // namespace
 
-std::unique_ptr<mlir::Pass> imex::createPromoteBoolMemrefPass() {
+std::unique_ptr<mlir::Pass> numba::createPromoteBoolMemrefPass() {
   return std::make_unique<PromoteBoolMemrefPass>();
 }

@@ -82,7 +82,7 @@ struct ConstOpLowering : public mlir::OpConversionPattern<plier::ConstOp> {
           auto constVal = rewriter.create<mlir::arith::ConstantIntOp>(
               loc, intVal, type.getWidth());
           mlir::Value res =
-              rewriter.create<imex::util::SignCastOp>(loc, type, constVal);
+              rewriter.create<numba::util::SignCastOp>(loc, type, constVal);
           if (res.getType() != expectedType)
             res = rewriter.create<plier::CastOp>(loc, expectedType, res);
 
@@ -113,7 +113,7 @@ struct ConstOpLowering : public mlir::OpConversionPattern<plier::ConstOp> {
     }
 
     if (expectedType.isa<mlir::NoneType>()) {
-      rewriter.replaceOpWithNewOp<imex::util::UndefOp>(op, expectedType);
+      rewriter.replaceOpWithNewOp<numba::util::UndefOp>(op, expectedType);
       return mlir::success();
     }
     return mlir::failure();
@@ -128,9 +128,9 @@ static mlir::Attribute makeSignlessAttr(mlir::Attribute val) {
   auto type = val.cast<mlir::TypedAttr>().getType();
   if (auto intType = type.dyn_cast<mlir::IntegerType>()) {
     if (!intType.isSignless()) {
-      auto newType = imex::makeSignlessType(intType);
+      auto newType = numba::makeSignlessType(intType);
       return mlir::IntegerAttr::get(
-          newType, imex::getIntAttrValue(val.cast<mlir::IntegerAttr>()));
+          newType, numba::getIntAttrValue(val.cast<mlir::IntegerAttr>()));
     }
   }
   return val;
@@ -150,13 +150,13 @@ struct LiteralLowering : public mlir::OpConversionPattern<Op> {
       return mlir::failure();
 
     if (convertedType.template isa<mlir::NoneType>()) {
-      rewriter.replaceOpWithNewOp<imex::util::UndefOp>(op, convertedType);
+      rewriter.replaceOpWithNewOp<numba::util::UndefOp>(op, convertedType);
       return mlir::success();
     }
 
     if (auto typevar =
-            convertedType.template dyn_cast<imex::util::TypeVarType>()) {
-      rewriter.replaceOpWithNewOp<imex::util::UndefOp>(op, typevar);
+            convertedType.template dyn_cast<numba::util::TypeVarType>()) {
+      rewriter.replaceOpWithNewOp<numba::util::UndefOp>(op, typevar);
       return mlir::success();
     }
 
@@ -192,7 +192,7 @@ struct OmittedLowering : public mlir::OpConversionPattern<plier::CastOp> {
       auto newVal =
           rewriter.create<mlir::arith::ConstantOp>(loc, val).getResult();
       if (dstType != val.cast<mlir::TypedAttr>().getType())
-        newVal = rewriter.create<imex::util::SignCastOp>(loc, dstType, newVal);
+        newVal = rewriter.create<numba::util::SignCastOp>(loc, dstType, newVal);
 
       rewriter.replaceOp(op, newVal);
       return mlir::success();
@@ -249,12 +249,13 @@ struct LowerGlobals : public mlir::OpConversionPattern<plier::GlobalOp> {
   }
 };
 
-struct UndefOpLowering : public mlir::OpConversionPattern<imex::util::UndefOp> {
+struct UndefOpLowering
+    : public mlir::OpConversionPattern<numba::util::UndefOp> {
   using OpConversionPattern::OpConversionPattern;
 
   mlir::LogicalResult
-  matchAndRewrite(imex::util::UndefOp op,
-                  imex::util::UndefOp::Adaptor /*adapator*/,
+  matchAndRewrite(numba::util::UndefOp op,
+                  numba::util::UndefOp::Adaptor /*adapator*/,
                   mlir::ConversionPatternRewriter &rewriter) const override {
     auto oldType = op.getType();
     auto &converter = *getTypeConverter();
@@ -262,7 +263,7 @@ struct UndefOpLowering : public mlir::OpConversionPattern<imex::util::UndefOp> {
     if (!type || oldType == type)
       return mlir::failure();
 
-    rewriter.replaceOpWithNewOp<imex::util::UndefOp>(op, type);
+    rewriter.replaceOpWithNewOp<numba::util::UndefOp>(op, type);
     return mlir::success();
   }
 };
@@ -321,30 +322,30 @@ template <typename T>
 static mlir::Value replaceOp(mlir::PatternRewriter &rewriter,
                              mlir::Location loc, mlir::ValueRange operands,
                              mlir::Type newType) {
-  auto signlessType = imex::makeSignlessType(newType);
+  auto signlessType = numba::makeSignlessType(newType);
   llvm::SmallVector<mlir::Value> newOperands(operands.size());
   for (auto [i, val] : llvm::enumerate(operands))
-    newOperands[i] = imex::doConvert(rewriter, loc, val, signlessType);
+    newOperands[i] = numba::doConvert(rewriter, loc, val, signlessType);
 
   auto res = rewriter.createOrFold<T>(loc, newOperands);
-  return imex::doConvert(rewriter, loc, res, newType);
+  return numba::doConvert(rewriter, loc, res, newType);
 }
 
 mlir::Value replaceIpowOp(mlir::PatternRewriter &rewriter, mlir::Location loc,
                           mlir::ValueRange operands, mlir::Type newType) {
   auto f64Type = rewriter.getF64Type();
-  auto a = imex::doConvert(rewriter, loc, operands[0], f64Type);
-  auto b = imex::doConvert(rewriter, loc, operands[1], f64Type);
+  auto a = numba::doConvert(rewriter, loc, operands[0], f64Type);
+  auto b = numba::doConvert(rewriter, loc, operands[1], f64Type);
   auto fres = rewriter.create<mlir::math::PowFOp>(loc, a, b).getResult();
-  return imex::doConvert(rewriter, loc, fres, newType);
+  return numba::doConvert(rewriter, loc, fres, newType);
 }
 
 mlir::Value replaceItruedivOp(mlir::PatternRewriter &rewriter,
                               mlir::Location loc, mlir::ValueRange operands,
                               mlir::Type newType) {
   assert(newType.isa<mlir::FloatType>());
-  auto lhs = imex::doConvert(rewriter, loc, operands[0], newType);
-  auto rhs = imex::doConvert(rewriter, loc, operands[1], newType);
+  auto lhs = numba::doConvert(rewriter, loc, operands[0], newType);
+  auto rhs = numba::doConvert(rewriter, loc, operands[1], newType);
   return rewriter.createOrFold<mlir::arith::DivFOp>(loc, lhs, rhs);
 }
 
@@ -352,37 +353,37 @@ mlir::Value replaceIfloordivOp(mlir::PatternRewriter &rewriter,
                                mlir::Location loc, mlir::ValueRange operands,
                                mlir::Type newType) {
   auto newIntType = newType.cast<mlir::IntegerType>();
-  auto signlessType = imex::makeSignlessType(newIntType);
-  auto lhs = imex::doConvert(rewriter, loc, operands[0], signlessType);
-  auto rhs = imex::doConvert(rewriter, loc, operands[1], signlessType);
+  auto signlessType = numba::makeSignlessType(newIntType);
+  auto lhs = numba::doConvert(rewriter, loc, operands[0], signlessType);
+  auto rhs = numba::doConvert(rewriter, loc, operands[1], signlessType);
   mlir::Value res;
   if (newIntType.isSigned()) {
     res = rewriter.createOrFold<mlir::arith::FloorDivSIOp>(loc, lhs, rhs);
   } else {
     res = rewriter.createOrFold<mlir::arith::DivUIOp>(loc, lhs, rhs);
   }
-  return imex::doConvert(rewriter, loc, res, newType);
+  return numba::doConvert(rewriter, loc, res, newType);
 }
 
 mlir::Value replaceFfloordivOp(mlir::PatternRewriter &rewriter,
                                mlir::Location loc, mlir::ValueRange operands,
                                mlir::Type newType) {
   assert(newType.isa<mlir::FloatType>());
-  auto lhs = imex::doConvert(rewriter, loc, operands[0], newType);
-  auto rhs = imex::doConvert(rewriter, loc, operands[1], newType);
+  auto lhs = numba::doConvert(rewriter, loc, operands[0], newType);
+  auto rhs = numba::doConvert(rewriter, loc, operands[1], newType);
   auto res = rewriter.createOrFold<mlir::arith::DivFOp>(loc, lhs, rhs);
   return rewriter.createOrFold<mlir::math::FloorOp>(loc, res);
 }
 
 mlir::Value replaceImodOp(mlir::PatternRewriter &rewriter, mlir::Location loc,
                           mlir::ValueRange operands, mlir::Type newType) {
-  auto signlessType = imex::makeSignlessType(operands[0].getType());
-  auto a = imex::doConvert(rewriter, loc, operands[0], signlessType);
-  auto b = imex::doConvert(rewriter, loc, operands[1], signlessType);
+  auto signlessType = numba::makeSignlessType(operands[0].getType());
+  auto a = numba::doConvert(rewriter, loc, operands[0], signlessType);
+  auto b = numba::doConvert(rewriter, loc, operands[1], signlessType);
   auto v1 = rewriter.create<mlir::arith::RemSIOp>(loc, a, b).getResult();
   auto v2 = rewriter.create<mlir::arith::AddIOp>(loc, v1, b).getResult();
   auto res = rewriter.create<mlir::arith::RemSIOp>(loc, v2, b).getResult();
-  return imex::doConvert(rewriter, loc, res, newType);
+  return numba::doConvert(rewriter, loc, res, newType);
 }
 
 mlir::Value replaceFmodOp(mlir::PatternRewriter &rewriter, mlir::Location loc,
@@ -401,9 +402,9 @@ mlir::Value replaceCmpiOp(mlir::PatternRewriter &rewriter, mlir::Location loc,
   assert(operands.size() == 2);
   assert(operands[0].getType() == operands[1].getType());
   auto type = operands[0].getType().cast<mlir::IntegerType>();
-  auto signlessType = imex::makeSignlessType(type);
-  auto a = imex::doConvert(rewriter, loc, operands[0], signlessType);
-  auto b = imex::doConvert(rewriter, loc, operands[1], signlessType);
+  auto signlessType = numba::makeSignlessType(type);
+  auto a = numba::doConvert(rewriter, loc, operands[0], signlessType);
+  auto b = numba::doConvert(rewriter, loc, operands[1], signlessType);
   if (SignedPred == UnsignedPred || type.isSigned()) {
     return rewriter.createOrFold<mlir::arith::CmpIOp>(loc, SignedPred, a, b);
   } else {
@@ -414,9 +415,9 @@ mlir::Value replaceCmpiOp(mlir::PatternRewriter &rewriter, mlir::Location loc,
 template <mlir::arith::CmpFPredicate Pred>
 mlir::Value replaceCmpfOp(mlir::PatternRewriter &rewriter, mlir::Location loc,
                           mlir::ValueRange operands, mlir::Type /*newType*/) {
-  auto signlessType = imex::makeSignlessType(operands[0].getType());
-  auto a = imex::doConvert(rewriter, loc, operands[0], signlessType);
-  auto b = imex::doConvert(rewriter, loc, operands[1], signlessType);
+  auto signlessType = numba::makeSignlessType(operands[0].getType());
+  auto a = numba::doConvert(rewriter, loc, operands[0], signlessType);
+  auto b = numba::doConvert(rewriter, loc, operands[1], signlessType);
   return rewriter.createOrFold<mlir::arith::CmpFOp>(loc, Pred, a, b);
 }
 
@@ -452,8 +453,8 @@ struct BinOpLowering : public mlir::OpConversionPattern<plier::BinOp> {
     if (type0 != type1) {
       finalType = coerce(type0, type1);
       convertedOperands = {
-          imex::doConvert(rewriter, loc, convertedOperands[0], finalType),
-          imex::doConvert(rewriter, loc, convertedOperands[1], finalType)};
+          numba::doConvert(rewriter, loc, convertedOperands[0], finalType),
+          numba::doConvert(rewriter, loc, convertedOperands[1], finalType)};
     } else {
       finalType = type0;
     }
@@ -522,8 +523,8 @@ struct BinOpLowering : public mlir::OpConversionPattern<plier::BinOp> {
         if (h.type == op.getOp()) {
           auto res = (h.*mem)(rewriter, loc, convertedOperands, resType);
           if (res.getType() != resType)
-            res = rewriter.createOrFold<imex::util::SignCastOp>(loc, resType,
-                                                                res);
+            res = rewriter.createOrFold<numba::util::SignCastOp>(loc, resType,
+                                                                 res);
           rewriter.replaceOp(op, res);
           return mlir::success();
         }
@@ -572,16 +573,16 @@ struct BinOpTupleLowering : public mlir::OpConversionPattern<plier::BinOp> {
           auto elemType = type.getType(i);
           auto ind = rewriter.create<mlir::arith::ConstantIndexOp>(
               loc, static_cast<int64_t>(i));
-          auto elem = rewriter.create<imex::util::TupleExtractOp>(loc, elemType,
-                                                                  arg, ind);
+          auto elem = rewriter.create<numba::util::TupleExtractOp>(
+              loc, elemType, arg, ind);
           newArgs.emplace_back(elem);
           newTypes.emplace_back(elemType);
         }
       }
 
       auto newTupleType = mlir::TupleType::get(getContext(), newTypes);
-      rewriter.replaceOpWithNewOp<imex::util::BuildTupleOp>(op, newTupleType,
-                                                            newArgs);
+      rewriter.replaceOpWithNewOp<numba::util::BuildTupleOp>(op, newTupleType,
+                                                             newArgs);
       return mlir::success();
     }
 
@@ -591,18 +592,18 @@ struct BinOpTupleLowering : public mlir::OpConversionPattern<plier::BinOp> {
 
 static mlir::Value negate(mlir::PatternRewriter &rewriter, mlir::Location loc,
                           mlir::Value val, mlir::Type resType) {
-  val = imex::doConvert(rewriter, loc, val, resType);
+  val = numba::doConvert(rewriter, loc, val, resType);
   if (auto itype = resType.dyn_cast<mlir::IntegerType>()) {
-    auto signless = imex::makeSignlessType(resType);
+    auto signless = numba::makeSignlessType(resType);
     if (signless != itype)
-      val = rewriter.create<imex::util::SignCastOp>(loc, signless, val);
+      val = rewriter.create<numba::util::SignCastOp>(loc, signless, val);
 
     // TODO: no int negation?
     auto zero = rewriter.create<mlir::arith::ConstantOp>(
         loc, mlir::IntegerAttr::get(signless, 0));
     auto res = rewriter.create<mlir::arith::SubIOp>(loc, zero, val).getResult();
     if (signless != itype)
-      res = rewriter.create<imex::util::SignCastOp>(loc, itype, res);
+      res = rewriter.create<numba::util::SignCastOp>(loc, itype, res);
 
     return res;
   }
@@ -619,7 +620,7 @@ static mlir::Value negate(mlir::PatternRewriter &rewriter, mlir::Location loc,
 static mlir::Value unaryPlus(mlir::PatternRewriter &rewriter,
                              mlir::Location loc, mlir::Value arg,
                              mlir::Type resType) {
-  return imex::doConvert(rewriter, loc, arg, resType);
+  return numba::doConvert(rewriter, loc, arg, resType);
 }
 
 static mlir::Value unaryMinus(mlir::PatternRewriter &rewriter,
@@ -631,7 +632,7 @@ static mlir::Value unaryMinus(mlir::PatternRewriter &rewriter,
 static mlir::Value unaryNot(mlir::PatternRewriter &rewriter, mlir::Location loc,
                             mlir::Value arg, mlir::Type resType) {
   auto i1 = rewriter.getIntegerType(1);
-  auto casted = imex::doConvert(rewriter, loc, arg, i1);
+  auto casted = numba::doConvert(rewriter, loc, arg, i1);
   auto one = rewriter.create<mlir::arith::ConstantIntOp>(loc, 1, i1);
   return rewriter.create<mlir::arith::SubIOp>(loc, one, casted);
 }
@@ -649,9 +650,9 @@ static mlir::Value unaryInvert(mlir::PatternRewriter &rewriter,
     signlessType = intType;
     arg = rewriter.create<mlir::arith::ExtUIOp>(loc, intType, arg);
   } else {
-    signlessType = imex::makeSignlessType(intType);
+    signlessType = numba::makeSignlessType(intType);
     if (intType != signlessType)
-      arg = rewriter.create<imex::util::SignCastOp>(loc, signlessType, arg);
+      arg = rewriter.create<numba::util::SignCastOp>(loc, signlessType, arg);
   }
 
   auto all = rewriter.create<mlir::arith::ConstantIntOp>(loc, -1, signlessType);
@@ -659,10 +660,10 @@ static mlir::Value unaryInvert(mlir::PatternRewriter &rewriter,
   arg = rewriter.create<mlir::arith::XOrIOp>(loc, all, arg);
 
   if (intType != signlessType)
-    arg = rewriter.create<imex::util::SignCastOp>(loc, intType, arg);
+    arg = rewriter.create<numba::util::SignCastOp>(loc, intType, arg);
 
   if (resType != arg.getType())
-    arg = imex::doConvert(rewriter, loc, arg, resType);
+    arg = numba::doConvert(rewriter, loc, arg, resType);
 
   return arg;
 }
@@ -730,7 +731,7 @@ struct LowerCasts : public mlir::OpConversionPattern<plier::CastOp> {
       return mlir::success();
     }
 
-    auto res = imex::doConvert(rewriter, op.getLoc(), src, dstType);
+    auto res = numba::doConvert(rewriter, op.getLoc(), src, dstType);
     if (!res)
       return mlir::failure();
 
@@ -746,7 +747,7 @@ static void rerunScfPipeline(mlir::Operation *op) {
       mlir::StringAttr::get(op->getContext(), plierToScfPipelineName());
   auto mod = op->getParentOfType<mlir::ModuleOp>();
   assert(nullptr != mod);
-  imex::addPipelineJumpMarker(mod, marker);
+  numba::addPipelineJumpMarker(mod, marker);
 }
 
 static mlir::LogicalResult
@@ -784,7 +785,7 @@ lowerRangeImpl(plier::PyCallOp op, mlir::ValueRange operands,
                llvm::ArrayRef<std::pair<llvm::StringRef, mlir::Value>> kwargs,
                mlir::PatternRewriter &rewriter) {
   auto parent = op->getParentOp();
-  auto res = imex::lowerRange(op, operands, kwargs, rewriter);
+  auto res = numba::lowerRange(op, operands, kwargs, rewriter);
   if (mlir::succeeded(res))
     rerunScfPipeline(parent);
 
@@ -801,7 +802,7 @@ static const std::pair<llvm::StringRef, func_t> builtinFuncsHandlers[] = {
     // clang-format on
 };
 
-struct BuiltinCallsLowering final : public imex::CallOpLowering {
+struct BuiltinCallsLowering final : public numba::CallOpLowering {
   BuiltinCallsLowering(mlir::MLIRContext *context)
       : CallOpLowering(context),
         resolver("numba_dpcomp.mlir.builtin.funcs", "registry") {}
@@ -836,7 +837,7 @@ private:
   PyLinalgResolver resolver;
 };
 
-struct ExternalCallsLowering final : public imex::CallOpLowering {
+struct ExternalCallsLowering final : public numba::CallOpLowering {
   using CallOpLowering::CallOpLowering;
 
 protected:
@@ -904,9 +905,9 @@ private:
 };
 
 struct BuiltinCallsLoweringPass
-    : public imex::RewriteWrapperPass<
+    : public numba::RewriteWrapperPass<
           BuiltinCallsLoweringPass, void, void, BuiltinCallsLowering,
-          imex::ExpandCallVarargs, ExternalCallsLowering> {};
+          numba::ExpandCallVarargs, ExternalCallsLowering> {};
 
 struct PlierToStdPass
     : public mlir::PassWrapper<PlierToStdPass,
@@ -915,7 +916,7 @@ struct PlierToStdPass
 
   virtual void
   getDependentDialects(mlir::DialectRegistry &registry) const override {
-    registry.insert<imex::util::ImexUtilDialect>();
+    registry.insert<numba::util::ImexUtilDialect>();
     registry.insert<mlir::complex::ComplexDialect>();
     registry.insert<mlir::func::FuncDialect>();
     registry.insert<mlir::math::MathDialect>();
@@ -939,8 +940,8 @@ struct BuildTupleConversionPattern
     if (!retType.isa_and_nonnull<mlir::TupleType>())
       return mlir::failure();
 
-    rewriter.replaceOpWithNewOp<imex::util::BuildTupleOp>(op, retType,
-                                                          adaptor.getArgs());
+    rewriter.replaceOpWithNewOp<numba::util::BuildTupleOp>(op, retType,
+                                                           adaptor.getArgs());
     return mlir::success();
   }
 };
@@ -963,10 +964,10 @@ struct GetItemTupleConversionPattern
     if (!retType)
       return mlir::failure();
 
-    auto index = imex::indexCast(rewriter, op->getLoc(), adaptor.getIndex());
+    auto index = numba::indexCast(rewriter, op->getLoc(), adaptor.getIndex());
 
-    rewriter.replaceOpWithNewOp<imex::util::TupleExtractOp>(op, retType,
-                                                            container, index);
+    rewriter.replaceOpWithNewOp<numba::util::TupleExtractOp>(op, retType,
+                                                             container, index);
     return mlir::success();
   }
 };
@@ -985,7 +986,7 @@ void PlierToStdPass::runOnOperation() {
 
         return std::nullopt;
       });
-  imex::populateTupleTypeConverter(typeConverter);
+  numba::populateTupleTypeConverter(typeConverter);
 
   auto materializeCast = [](mlir::OpBuilder &builder, mlir::Type type,
                             mlir::ValueRange inputs,
@@ -1050,13 +1051,13 @@ void PlierToStdPass::runOnOperation() {
         if (!type)
           return true;
 
-        if (type.isa<mlir::NoneType, imex::util::TypeVarType>())
+        if (type.isa<mlir::NoneType, numba::util::TypeVarType>())
           return false;
 
         return !isSupportedType(type);
       });
-  target.addDynamicallyLegalOp<imex::util::UndefOp>(
-      [&](imex::util::UndefOp op) {
+  target.addDynamicallyLegalOp<numba::util::UndefOp>(
+      [&](numba::util::UndefOp op) {
         auto srcType = op.getType();
         auto dstType = typeConverter.convertType(srcType);
         return srcType == dstType;
@@ -1071,7 +1072,7 @@ void PlierToStdPass::runOnOperation() {
         return std::nullopt;
       });
   target.addIllegalOp<plier::BuildTupleOp>();
-  target.addLegalOp<imex::util::BuildTupleOp, imex::util::TupleExtractOp>();
+  target.addLegalOp<numba::util::BuildTupleOp, numba::util::TupleExtractOp>();
   target.addLegalDialect<mlir::arith::ArithDialect>();
   target.addLegalDialect<mlir::complex::ComplexDialect>();
 
@@ -1092,10 +1093,10 @@ void PlierToStdPass::runOnOperation() {
       // clang-format on
       >(typeConverter, context);
 
-  imex::populateControlFlowTypeConversionRewritesAndTarget(typeConverter,
-                                                           patterns, target);
-  imex::populateTupleTypeConversionRewritesAndTarget(typeConverter, patterns,
-                                                     target);
+  numba::populateControlFlowTypeConversionRewritesAndTarget(typeConverter,
+                                                            patterns, target);
+  numba::populateTupleTypeConversionRewritesAndTarget(typeConverter, patterns,
+                                                      target);
 
   if (mlir::failed(mlir::applyPartialConversion(getOperation(), target,
                                                 std::move(patterns))))
@@ -1107,13 +1108,13 @@ static void populatePlierToStdPipeline(mlir::OpPassManager &pm) {
   pm.addPass(std::make_unique<PlierToStdPass>());
   pm.addPass(mlir::createCanonicalizerPass());
   pm.addPass(std::make_unique<BuiltinCallsLoweringPass>());
-  pm.addPass(imex::createForceInlinePass());
+  pm.addPass(numba::createForceInlinePass());
   pm.addPass(mlir::createSymbolDCEPass());
   pm.addPass(mlir::createCanonicalizerPass());
 }
 } // namespace
 
-void registerPlierToStdPipeline(imex::PipelineRegistry &registry) {
+void registerPlierToStdPipeline(numba::PipelineRegistry &registry) {
   registry.registerPipeline([](auto sink) {
     auto stage = getHighLoweringStage();
     sink(plierToStdPipelineName(), {plierToScfPipelineName()}, {stage.end},

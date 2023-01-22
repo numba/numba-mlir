@@ -158,8 +158,8 @@ struct PlierLowerer final {
   PlierLowerer(mlir::MLIRContext &context, PyTypeConverter &conv)
       : ctx(context), builder(&ctx), typeConverter(conv) {
     ctx.loadDialect<gpu_runtime::GpuRuntimeDialect>();
-    ctx.loadDialect<imex::ntensor::NTensorDialect>();
-    ctx.loadDialect<imex::util::ImexUtilDialect>();
+    ctx.loadDialect<numba::ntensor::NTensorDialect>();
+    ctx.loadDialect<numba::util::ImexUtilDialect>();
     ctx.loadDialect<mlir::func::FuncDialect>();
     ctx.loadDialect<plier::PlierDialect>();
   }
@@ -205,19 +205,19 @@ private:
                            compilationContext["restype"]);
     func = mlir::func::FuncOp::create(builder.getUnknownLoc(), name, typ);
     if (compilationContext["fastmath"]().cast<bool>())
-      func->setAttr(imex::util::attributes::getFastmathName(),
+      func->setAttr(numba::util::attributes::getFastmathName(),
                     builder.getUnitAttr());
 
     if (compilationContext["force_inline"]().cast<bool>())
-      func->setAttr(imex::util::attributes::getForceInlineName(),
+      func->setAttr(numba::util::attributes::getForceInlineName(),
                     builder.getUnitAttr());
 
-    func->setAttr(imex::util::attributes::getOptLevelName(),
+    func->setAttr(numba::util::attributes::getOptLevelName(),
                   builder.getI64IntegerAttr(
                       compilationContext["opt_level"]().cast<int64_t>()));
     auto maxConcurrency = compilationContext["max_concurrency"]().cast<int>();
     if (maxConcurrency > 0)
-      func->setAttr(imex::util::attributes::getMaxConcurrencyName(),
+      func->setAttr(numba::util::attributes::getMaxConcurrencyName(),
                     builder.getI64IntegerAttr(maxConcurrency));
 
     mod.push_back(func);
@@ -228,8 +228,8 @@ private:
     if (auto type = typeConverter.convertType(ctx, obj))
       return type;
 
-    imex::reportError(llvm::Twine("Unhandled type: ") +
-                      py::str(obj).cast<std::string>());
+    numba::reportError(llvm::Twine("Unhandled type: ") +
+                       py::str(obj).cast<std::string>());
   }
 
   mlir::Type getType(py::handle inst) const {
@@ -281,8 +281,8 @@ private:
     } else if (py::isinstance(inst, insts.Jump)) {
       jump(inst.attr("target"));
     } else {
-      imex::reportError(llvm::Twine("lower_inst not handled: \"") +
-                        py::str(inst.get_type()).cast<std::string>() + "\"");
+      numba::reportError(llvm::Twine("lower_inst not handled: \"") +
+                         py::str(inst.get_type()).cast<std::string>() + "\"");
     }
     currentInstr = nullptr;
   }
@@ -313,8 +313,8 @@ private:
       return builder.create<plier::GlobalOp>(getCurrentLoc(), name);
     }
 
-    imex::reportError(llvm::Twine("lower_assign not handled: \"") +
-                      py::str(value.get_type()).cast<std::string>() + "\"");
+    numba::reportError(llvm::Twine("lower_assign not handled: \"") +
+                       py::str(value.get_type()).cast<std::string>() + "\"");
   }
 
   mlir::Value lowerExpr(py::handle expr) {
@@ -341,7 +341,7 @@ private:
       if (h.first == op)
         return (this->*h.second)(expr);
 
-    imex::reportError(llvm::Twine("lower_expr not handled: \"") + op + "\"");
+    numba::reportError(llvm::Twine("lower_expr not handled: \"") + op + "\"");
   }
 
   template <typename T> mlir::Value lowerSimple(py::handle inst) {
@@ -364,7 +364,7 @@ private:
   mlir::Value lowerStaticIndex(mlir::Location loc, py::handle obj) {
     if (obj.is_none()) {
       auto type = mlir::NoneType::get(builder.getContext());
-      return builder.create<imex::util::UndefOp>(loc, type);
+      return builder.create<numba::util::UndefOp>(loc, type);
     }
     if (py::isinstance<py::int_>(obj)) {
       auto index = obj.cast<int64_t>();
@@ -389,8 +389,8 @@ private:
       auto tupleType = builder.getTupleType(types);
       return builder.create<plier::BuildTupleOp>(loc, tupleType, args);
     }
-    imex::reportError(llvm::Twine("Unhandled index type: ") +
-                      py::str(obj.get_type()).cast<std::string>());
+    numba::reportError(llvm::Twine("Unhandled index type: ") +
+                       py::str(obj.get_type()).cast<std::string>());
   }
 
   mlir::Value lowerStaticGetitem(py::handle inst) {
@@ -456,8 +456,8 @@ private:
 
     auto pyFuncName = funcNameResolver(typemap(pyPunc));
     if (pyFuncName.is_none())
-      imex::reportError(llvm::Twine("Can't resolve function: ") +
-                        py::str(typemap(pyPunc)).cast<std::string>());
+      numba::reportError(llvm::Twine("Can't resolve function: ") +
+                         py::str(typemap(pyPunc)).cast<std::string>());
 
     auto funcName = pyFuncName.cast<std::string>();
 
@@ -498,8 +498,8 @@ private:
       if (op.is(std::get<1>(elem)))
         return std::get<0>(elem).op;
 
-    imex::reportError(llvm::Twine("resolve_op not handled: \"") +
-                      py::str(op).cast<std::string>() + "\"");
+    numba::reportError(llvm::Twine("resolve_op not handled: \"") +
+                       py::str(op).cast<std::string>() + "\"");
   }
 
   mlir::Value lowerGetattr(py::handle inst) {
@@ -597,8 +597,8 @@ private:
   mlir::Value getConst(py::handle val) {
     auto ret = getConstOrNull(val);
     if (!ret)
-      imex::reportError(llvm::Twine("get_const unhandled type \"") +
-                        py::str(val.get_type()).cast<std::string>() + "\"");
+      numba::reportError(llvm::Twine("get_const unhandled type \"") +
+                         py::str(val.get_type()).cast<std::string>() + "\"");
     return ret;
   }
 
@@ -639,7 +639,7 @@ private:
         auto &info = it->second;
         auto term = bb->getTerminator();
         if (nullptr == term)
-          imex::reportError("broken ir: block without terminator");
+          numba::reportError("broken ir: block without terminator");
 
         builder.setInsertionPointToEnd(bb);
 
@@ -663,17 +663,17 @@ private:
                                                  trueDest, trueArgs, falseDest,
                                                  falseArgs);
         } else {
-          imex::reportError(llvm::Twine("Unhandled terminator: ") +
-                            term->getName().getStringRef());
+          numba::reportError(llvm::Twine("Unhandled terminator: ") +
+                             term->getName().getStringRef());
         }
       }
     }
   }
 };
 
-imex::CompilerContext::Settings getSettings(py::handle settings,
-                                            CallbackOstream &os) {
-  imex::CompilerContext::Settings ret;
+numba::CompilerContext::Settings getSettings(py::handle settings,
+                                             CallbackOstream &os) {
+  numba::CompilerContext::Settings ret;
   ret.verify = settings["verify"].cast<bool>();
   ret.passStatistics = settings["pass_statistics"].cast<bool>();
   ret.passTimings = settings["pass_timings"].cast<bool>();
@@ -694,7 +694,7 @@ imex::CompilerContext::Settings getSettings(py::handle settings,
     os.setCallback([callback](llvm::StringRef text) {
       callback(py::str(text.data(), text.size()));
     });
-    using S = imex::CompilerContext::Settings::IRPrintingSettings;
+    using S = numba::CompilerContext::Settings::IRPrintingSettings;
     ret.irPrinting = S{getList(printBefore), getList(printAfter), &os};
   }
   return ret;
@@ -704,7 +704,7 @@ struct ModuleSettings {
   bool enableGpuPipeline = false;
 };
 
-static void createPipeline(imex::PipelineRegistry &registry,
+static void createPipeline(numba::PipelineRegistry &registry,
                            PyTypeConverter &converter,
                            const ModuleSettings &settings) {
   converter.addConversion(
@@ -734,14 +734,14 @@ static void createPipeline(imex::PipelineRegistry &registry,
     registerLowerToGPUPipeline(registry);
     // TODO(nbpatel): Add Gpu->GpuRuntime & GpuRuntimetoLlvm Transformation
 #else
-    imex::reportError("DPCOMP was compiled without GPU support");
+    numba::reportError("DPCOMP was compiled without GPU support");
 #endif
   }
 }
 
 struct Module {
   mlir::MLIRContext context;
-  imex::PipelineRegistry registry;
+  numba::PipelineRegistry registry;
   mlir::ModuleOp module;
   PyTypeConverter typeConverter;
 
@@ -758,7 +758,7 @@ static void runCompiler(Module &mod, const py::object &compilationContext) {
   CallbackOstream printStream;
   auto settings =
       getSettings(compilationContext["compiler_settings"], printStream);
-  imex::CompilerContext compiler(context, settings, registry);
+  numba::CompilerContext compiler(context, settings, registry);
   compiler.run(module);
 }
 
@@ -786,15 +786,15 @@ struct GlobalCompilerContext {
 
   llvm::llvm_shutdown_obj s;
   llvm::SmallVector<std::pair<std::string, void *>, 0> symbolList;
-  imex::ExecutionEngine executionEngine;
+  numba::ExecutionEngine executionEngine;
 
 private:
-  imex::ExecutionEngineOptions getOpts(const py::dict &settings) const {
+  numba::ExecutionEngineOptions getOpts(const py::dict &settings) const {
     llvm::InitializeNativeTarget();
     llvm::InitializeNativeTargetAsmPrinter();
     llvm::InitializeNativeTargetAsmParser();
 
-    imex::ExecutionEngineOptions opts;
+    numba::ExecutionEngineOptions opts;
     opts.symbolMap =
         [this](llvm::orc::MangleAndInterner m) -> llvm::orc::SymbolMap {
       llvm::orc::SymbolMap ret;
@@ -890,8 +890,8 @@ py::capsule compileModule(const py::capsule &compiler,
   mlir::registerLLVMDialectTranslation(*mod->module->getContext());
   auto res = context->executionEngine.loadModule(mod->module);
   if (!res)
-    imex::reportError(llvm::Twine("Failed to load MLIR module:\n") +
-                      llvm::toString(res.takeError()));
+    numba::reportError(llvm::Twine("Failed to load MLIR module:\n") +
+                       llvm::toString(res.takeError()));
 
   return py::capsule(static_cast<void *>(res.get()));
 }
@@ -909,14 +909,14 @@ py::int_ getFunctionPointer(const py::capsule &compiler,
                             const py::capsule &module, py::str funcName) {
   auto context = static_cast<GlobalCompilerContext *>(compiler);
   assert(context);
-  auto handle = static_cast<imex::ExecutionEngine::ModuleHandle *>(module);
+  auto handle = static_cast<numba::ExecutionEngine::ModuleHandle *>(module);
   assert(handle);
 
   auto name = funcName.cast<std::string>();
   auto res = context->executionEngine.lookup(handle, name);
   if (!res)
-    imex::reportError(llvm::Twine("Failed to get function pointer:\n") +
-                      llvm::toString(res.takeError()));
+    numba::reportError(llvm::Twine("Failed to get function pointer:\n") +
+                       llvm::toString(res.takeError()));
 
   return py::int_(reinterpret_cast<intptr_t>(res.get()));
 }
@@ -924,7 +924,7 @@ py::int_ getFunctionPointer(const py::capsule &compiler,
 void releaseModule(const py::capsule &compiler, const py::capsule &module) {
   auto context = static_cast<GlobalCompilerContext *>(compiler);
   assert(context);
-  auto handle = static_cast<imex::ExecutionEngine::ModuleHandle *>(module);
+  auto handle = static_cast<numba::ExecutionEngine::ModuleHandle *>(module);
   assert(handle);
 
   context->executionEngine.releaseModule(handle);

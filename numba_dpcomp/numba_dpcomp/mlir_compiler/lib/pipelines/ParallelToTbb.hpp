@@ -4,7 +4,7 @@
 
 #pragma once
 
-namespace imex {
+namespace numba {
 class PipelineRegistry;
 }
 
@@ -12,6 +12,6 @@ namespace llvm {
 class StringRef;
 }
 
-void registerParallelToTBBPipeline(imex::PipelineRegistry &registry);
+void registerParallelToTBBPipeline(numba::PipelineRegistry &registry);
 
 llvm::StringRef parallelToTBBPipelineName();

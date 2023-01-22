@@ -59,7 +59,7 @@ static mlir::LowerToLLVMOptions getLLVMOptions(mlir::MLIRContext &context) {
     std::string errStr;
     auto target = llvm::TargetRegistry::lookupTarget(triple, errStr);
     if (nullptr == target)
-      imex::reportError(llvm::Twine("Unable to get target: ") + errStr);
+      numba::reportError(llvm::Twine("Unable to get target: ") + errStr);
 
     llvm::TargetOptions target_opts;
     std::unique_ptr<llvm::TargetMachine> machine(target->createTargetMachine(
@@ -140,11 +140,11 @@ populateToLLVMAdditionalTypeConversion(mlir::LLVMTypeConverter &converter) {
         return voidPtrType;
       });
   converter.addConversion(
-      [voidPtrType](imex::util::OpaqueType) -> llvm::Optional<mlir::Type> {
+      [voidPtrType](numba::util::OpaqueType) -> llvm::Optional<mlir::Type> {
         return voidPtrType;
       });
   converter.addConversion(
-      [voidPtrType](imex::util::TypeVarType) -> llvm::Optional<mlir::Type> {
+      [voidPtrType](numba::util::TypeVarType) -> llvm::Optional<mlir::Type> {
         return voidPtrType;
       });
 }
@@ -359,7 +359,7 @@ getToMemrefConversionFunc(mlir::ModuleOp module, mlir::OpBuilder &builder,
   auto funcType =
       mlir::FunctionType::get(builder.getContext(), srcType, dstType);
   auto loc = builder.getUnknownLoc();
-  auto newFunc = imex::addFunction(builder, module, funcName, funcType);
+  auto newFunc = numba::addFunction(builder, module, funcName, funcType);
   auto alwaysinline =
       mlir::StringAttr::get(builder.getContext(), "alwaysinline");
   newFunc->setAttr("passthrough",
@@ -418,7 +418,7 @@ getFromMemrefConversionFunc(mlir::ModuleOp module, mlir::OpBuilder &builder,
   auto funcType =
       mlir::FunctionType::get(builder.getContext(), srcType, dstType);
   auto loc = builder.getUnknownLoc();
-  auto newFunc = imex::addFunction(builder, module, funcName, funcType);
+  auto newFunc = numba::addFunction(builder, module, funcName, funcType);
   auto alwaysinline =
       mlir::StringAttr::get(builder.getContext(), "alwaysinline");
   newFunc->setAttr("passthrough",
@@ -483,7 +483,7 @@ static mlir::Attribute getFastmathAttrs(mlir::MLIRContext &ctx) {
       addPair("no-nans-fp-math", "true"),
       addPair("no-signed-zeros-fp-math", "true"),
       addPair("unsafe-fp-math", "true"),
-      addPair(imex::util::attributes::getFastmathName(), "1"),
+      addPair(numba::util::attributes::getFastmathName(), "1"),
   };
   return mlir::ArrayAttr::get(&ctx, attrs);
 }
@@ -517,7 +517,7 @@ static mlir::LogicalResult fixFuncSig(LLVMTypeHelper &typeHelper,
   if (func.isPrivate())
     return mlir::success();
 
-  if (func->getAttr(imex::util::attributes::getFastmathName()))
+  if (func->getAttr(numba::util::attributes::getFastmathName()))
     func->setAttr("passthrough", getFastmathAttrs(*func.getContext()));
 
   auto oldType = func.getFunctionType();
@@ -702,7 +702,7 @@ struct ApplyFastmathFlags : public mlir::OpRewritePattern<Op> {
 private:
   template <typename F>
   static void getFastmathFlags(mlir::LLVM::LLVMFuncOp func, F &&sink) {
-    if (func->hasAttr(imex::util::attributes::getFastmathName()))
+    if (func->hasAttr(numba::util::attributes::getFastmathName()))
       sink(mlir::LLVM::FastmathFlags::fast);
   }
 };
@@ -731,12 +731,12 @@ static mlir::Type getMeminfoType(mlir::LLVMTypeConverter &converter) {
 static const bool defineMeminfoFuncs = true;
 
 struct LowerRetainOp
-    : public mlir::ConvertOpToLLVMPattern<imex::util::RetainOp> {
+    : public mlir::ConvertOpToLLVMPattern<numba::util::RetainOp> {
   using ConvertOpToLLVMPattern::ConvertOpToLLVMPattern;
 
   mlir::LogicalResult
-  matchAndRewrite(imex::util::RetainOp op,
-                  imex::util::RetainOp::Adaptor adaptor,
+  matchAndRewrite(numba::util::RetainOp op,
+                  numba::util::RetainOp::Adaptor adaptor,
                   mlir::ConversionPatternRewriter &rewriter) const override {
     auto arg = adaptor.getSource();
     if (!arg.getType().isa<mlir::LLVM::LLVMStructType>())
@@ -1012,21 +1012,21 @@ public:
 
 static void copyAttrs(mlir::Operation *src, mlir::Operation *dst) {
   const mlir::StringRef attrs[] = {
-      imex::util::attributes::getFastmathName(),
-      imex::util::attributes::getParallelName(),
-      imex::util::attributes::getMaxConcurrencyName(),
+      numba::util::attributes::getFastmathName(),
+      numba::util::attributes::getParallelName(),
+      numba::util::attributes::getMaxConcurrencyName(),
   };
   for (auto name : attrs)
     if (auto attr = src->getAttr(name))
       dst->setAttr(name, attr);
 }
 
-struct LowerParallel : public mlir::OpRewritePattern<imex::util::ParallelOp> {
+struct LowerParallel : public mlir::OpRewritePattern<numba::util::ParallelOp> {
   LowerParallel(mlir::MLIRContext *context)
       : OpRewritePattern(context), converter(context) {}
 
   mlir::LogicalResult
-  matchAndRewrite(imex::util::ParallelOp op,
+  matchAndRewrite(numba::util::ParallelOp op,
                   mlir::PatternRewriter &rewriter) const override {
     auto numLoops = op.getNumLoops();
     llvm::SmallVector<mlir::Value> contextVars;
@@ -1088,7 +1088,7 @@ struct LowerParallel : public mlir::OpRewritePattern<imex::util::ParallelOp> {
       return mlir::failure();
     }
 
-    imex::AllocaInsertionPoint allocaInsertionPoint(op);
+    numba::AllocaInsertionPoint allocaInsertionPoint(op);
 
     auto contextPtrType = mlir::LLVM::LLVMPointerType::get(contextType);
 
@@ -1178,7 +1178,7 @@ struct LowerParallel : public mlir::OpRewritePattern<imex::util::ParallelOp> {
           }
         }();
 
-        auto func = imex::addFunction(rewriter, mod, funcName, funcType);
+        auto func = numba::addFunction(rewriter, mod, funcName, funcType);
         copyAttrs(parentFunc, func);
         return func;
       }();
@@ -1230,7 +1230,7 @@ struct LowerParallel : public mlir::OpRewritePattern<imex::util::ParallelOp> {
       rewriter.create<mlir::cf::BranchOp>(loc, &origEntry);
       for (auto &block : func.getBody()) {
         if (auto term =
-                mlir::dyn_cast<imex::util::YieldOp>(block.getTerminator())) {
+                mlir::dyn_cast<numba::util::YieldOp>(block.getTerminator())) {
           rewriter.eraseOp(term);
           rewriter.setInsertionPointToEnd(&block);
           rewriter.create<mlir::func::ReturnOp>(loc);
@@ -1252,7 +1252,7 @@ struct LowerParallel : public mlir::OpRewritePattern<imex::util::ParallelOp> {
       };
       auto parallelFuncType =
           mlir::FunctionType::get(op.getContext(), args, {});
-      return imex::addFunction(rewriter, mod, funcName, parallelFuncType);
+      return numba::addFunction(rewriter, mod, funcName, parallelFuncType);
     }();
     auto funcAddr = rewriter.create<mlir::func::ConstantOp>(
         loc, funcType, mlir::SymbolRefAttr::get(outlinedFunc));
@@ -1401,7 +1401,7 @@ struct FixLLVMStructABIPass
         }
 
         newArgs.clear();
-        imex::AllocaInsertionPoint allocaHelper(user);
+        numba::AllocaInsertionPoint allocaHelper(user);
         allocaHelper.insert(builder, [&] {
           for (auto [arg, newType] :
                llvm::zip(user->getOperands(), newFuncTypes)) {
@@ -1500,7 +1500,7 @@ struct LLVMLoweringPass
 
     LLVMConversionTarget target(context);
     target.addIllegalDialect<mlir::func::FuncDialect>();
-    target.addIllegalOp<imex::util::RetainOp>();
+    target.addIllegalOp<numba::util::RetainOp>();
 
     if (failed(applyPartialConversion(m, target, std::move(patterns))))
       signalPassFailure();
@@ -1526,7 +1526,7 @@ static void populateLowerToLlvmPipeline(mlir::OpPassManager &pm) {
   pm.addNestedPass<mlir::func::FuncOp>(mlir::arith::createArithExpandOpsPass());
   pm.addNestedPass<mlir::func::FuncOp>(mlir::createConvertMathToLLVMPass());
   pm.addPass(mlir::createConvertMathToLibmPass());
-  pm.addPass(imex::createUtilToLLVMPass(&getLLVMOptions));
+  pm.addPass(numba::createUtilToLLVMPass(&getLLVMOptions));
   pm.addPass(std::make_unique<LLVMLoweringPass>());
   pm.addPass(std::make_unique<FixLLVMStructABIPass>());
   pm.addNestedPass<mlir::LLVM::LLVMFuncOp>(
@@ -1536,7 +1536,7 @@ static void populateLowerToLlvmPipeline(mlir::OpPassManager &pm) {
 }
 } // namespace
 
-void registerLowerToLLVMPipeline(imex::PipelineRegistry &registry) {
+void registerLowerToLLVMPipeline(numba::PipelineRegistry &registry) {
   registry.registerPipeline([](auto sink) {
     auto stage = getLowerLoweringStage();
     sink(preLowerToLLVMPipelineName(), {stage.begin},

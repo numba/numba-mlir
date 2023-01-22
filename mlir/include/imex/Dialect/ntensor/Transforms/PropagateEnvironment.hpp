@@ -10,10 +10,10 @@ namespace mlir {
 class Pass;
 } // namespace mlir
 
-namespace imex {
+namespace numba {
 namespace ntensor {
 /// Propagate enviroment attribute through the ntensor ops using dataflow
 /// analysis.
 std::unique_ptr<mlir::Pass> createPropagateEnvironmentPass();
 } // namespace ntensor
-} // namespace imex
+} // namespace numba

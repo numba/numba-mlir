@@ -18,20 +18,21 @@
 #include <mlir/Transforms/DialectConversion.h>
 
 namespace {
-struct DimOpLowering : public mlir::OpConversionPattern<imex::ntensor::DimOp> {
+struct DimOpLowering : public mlir::OpConversionPattern<numba::ntensor::DimOp> {
   using OpConversionPattern::OpConversionPattern;
 
   mlir::LogicalResult
-  matchAndRewrite(imex::ntensor::DimOp op,
-                  imex::ntensor::DimOp::Adaptor adaptor,
+  matchAndRewrite(numba::ntensor::DimOp op,
+                  numba::ntensor::DimOp::Adaptor adaptor,
                   mlir::ConversionPatternRewriter &rewriter) const override {
-    auto origType = op.getSource().getType().cast<imex::ntensor::NTensorType>();
+    auto origType =
+        op.getSource().getType().cast<numba::ntensor::NTensorType>();
     auto src = adaptor.getSource();
     if (!src.getType().isa<mlir::MemRefType>())
       return mlir::failure();
 
     auto indexType = rewriter.getIndexType();
-    auto results = imex::util::wrapEnvRegion(
+    auto results = numba::util::wrapEnvRegion(
         rewriter, op->getLoc(), origType.getEnvironment(), indexType,
         [&](mlir::OpBuilder &builder, mlir::Location loc) {
           return builder
@@ -45,14 +46,14 @@ struct DimOpLowering : public mlir::OpConversionPattern<imex::ntensor::DimOp> {
 };
 
 struct CreateOpLowering
-    : public mlir::OpConversionPattern<imex::ntensor::CreateArrayOp> {
+    : public mlir::OpConversionPattern<numba::ntensor::CreateArrayOp> {
   using OpConversionPattern::OpConversionPattern;
 
   mlir::LogicalResult
-  matchAndRewrite(imex::ntensor::CreateArrayOp op,
-                  imex::ntensor::CreateArrayOp::Adaptor adaptor,
+  matchAndRewrite(numba::ntensor::CreateArrayOp op,
+                  numba::ntensor::CreateArrayOp::Adaptor adaptor,
                   mlir::ConversionPatternRewriter &rewriter) const override {
-    auto srcType = op.getType().dyn_cast<imex::ntensor::NTensorType>();
+    auto srcType = op.getType().dyn_cast<numba::ntensor::NTensorType>();
     if (!srcType)
       return mlir::failure();
 
@@ -69,7 +70,7 @@ struct CreateOpLowering
     if (initValue && initValue.getType() != elemType)
       return mlir::failure();
 
-    auto results = imex::util::wrapEnvRegion(
+    auto results = numba::util::wrapEnvRegion(
         rewriter, op->getLoc(), srcType.getEnvironment(), dstType,
         [&](mlir::OpBuilder &builder, mlir::Location loc) {
           mlir::Value result = builder.create<mlir::memref::AllocOp>(
@@ -85,14 +86,15 @@ struct CreateOpLowering
 };
 
 struct SubviewOpLowering
-    : public mlir::OpConversionPattern<imex::ntensor::SubviewOp> {
+    : public mlir::OpConversionPattern<numba::ntensor::SubviewOp> {
   using OpConversionPattern::OpConversionPattern;
 
   mlir::LogicalResult
-  matchAndRewrite(imex::ntensor::SubviewOp op,
-                  imex::ntensor::SubviewOp::Adaptor adaptor,
+  matchAndRewrite(numba::ntensor::SubviewOp op,
+                  numba::ntensor::SubviewOp::Adaptor adaptor,
                   mlir::ConversionPatternRewriter &rewriter) const override {
-    auto origType = op.getSource().getType().cast<imex::ntensor::NTensorType>();
+    auto origType =
+        op.getSource().getType().cast<numba::ntensor::NTensorType>();
     auto src = adaptor.getSource();
     auto srcType = src.getType().dyn_cast<mlir::MemRefType>();
     if (!srcType)
@@ -106,7 +108,7 @@ struct SubviewOpLowering
     if (!dstType)
       return mlir::failure();
 
-    auto results = imex::util::wrapEnvRegion(
+    auto results = numba::util::wrapEnvRegion(
         rewriter, op->getLoc(), origType.getEnvironment(), dstType,
         [&](mlir::OpBuilder &builder, mlir::Location loc) {
           auto offsets = mlir::getMixedValues(adaptor.getStaticOffsets(),
@@ -125,7 +127,8 @@ struct SubviewOpLowering
               loc, resType, src, offsets, sizes, strides);
 
           if (resType != dstType)
-            res = builder.create<imex::util::ChangeLayoutOp>(loc, dstType, res);
+            res =
+                builder.create<numba::util::ChangeLayoutOp>(loc, dstType, res);
 
           return res;
         });
@@ -136,14 +139,14 @@ struct SubviewOpLowering
 };
 
 struct LoadOpLowering
-    : public mlir::OpConversionPattern<imex::ntensor::LoadOp> {
+    : public mlir::OpConversionPattern<numba::ntensor::LoadOp> {
   using OpConversionPattern::OpConversionPattern;
 
   mlir::LogicalResult
-  matchAndRewrite(imex::ntensor::LoadOp op,
-                  imex::ntensor::LoadOp::Adaptor adaptor,
+  matchAndRewrite(numba::ntensor::LoadOp op,
+                  numba::ntensor::LoadOp::Adaptor adaptor,
                   mlir::ConversionPatternRewriter &rewriter) const override {
-    auto origType = op.getArray().getType().cast<imex::ntensor::NTensorType>();
+    auto origType = op.getArray().getType().cast<numba::ntensor::NTensorType>();
     auto src = adaptor.getArray();
     if (!src.getType().isa<mlir::MemRefType>())
       return mlir::failure();
@@ -155,7 +158,7 @@ struct LoadOpLowering
     if (!dstType || dstType != origType.getElementType())
       return mlir::failure();
 
-    auto results = imex::util::wrapEnvRegion(
+    auto results = numba::util::wrapEnvRegion(
         rewriter, op->getLoc(), origType.getEnvironment(), dstType,
         [&](mlir::OpBuilder &builder, mlir::Location loc) {
           return builder
@@ -169,19 +172,19 @@ struct LoadOpLowering
 };
 
 struct StoreOpLowering
-    : public mlir::OpConversionPattern<imex::ntensor::StoreOp> {
+    : public mlir::OpConversionPattern<numba::ntensor::StoreOp> {
   using OpConversionPattern::OpConversionPattern;
 
   mlir::LogicalResult
-  matchAndRewrite(imex::ntensor::StoreOp op,
-                  imex::ntensor::StoreOp::Adaptor adaptor,
+  matchAndRewrite(numba::ntensor::StoreOp op,
+                  numba::ntensor::StoreOp::Adaptor adaptor,
                   mlir::ConversionPatternRewriter &rewriter) const override {
-    auto origType = op.getArray().getType().cast<imex::ntensor::NTensorType>();
+    auto origType = op.getArray().getType().cast<numba::ntensor::NTensorType>();
     auto src = adaptor.getArray();
     if (!src.getType().isa<mlir::MemRefType>())
       return mlir::failure();
 
-    auto results = imex::util::wrapEnvRegion(
+    auto results = numba::util::wrapEnvRegion(
         rewriter, op->getLoc(), origType.getEnvironment(), std::nullopt,
         [&](mlir::OpBuilder &builder, mlir::Location loc) {
           auto val = adaptor.getValue();
@@ -196,12 +199,12 @@ struct StoreOpLowering
 };
 
 struct ToTensorOpLowering
-    : public mlir::OpConversionPattern<imex::ntensor::ToTensorOp> {
+    : public mlir::OpConversionPattern<numba::ntensor::ToTensorOp> {
   using OpConversionPattern::OpConversionPattern;
 
   mlir::LogicalResult
-  matchAndRewrite(imex::ntensor::ToTensorOp op,
-                  imex::ntensor::ToTensorOp::Adaptor adaptor,
+  matchAndRewrite(numba::ntensor::ToTensorOp op,
+                  numba::ntensor::ToTensorOp::Adaptor adaptor,
                   mlir::ConversionPatternRewriter &rewriter) const override {
     auto array = adaptor.getArray();
     if (!array.getType().isa<mlir::MemRefType>())
@@ -215,8 +218,8 @@ struct ToTensorOpLowering
     if (!retType)
       return mlir::failure();
 
-    auto origType = op.getArray().getType().cast<imex::ntensor::NTensorType>();
-    auto results = imex::util::wrapEnvRegion(
+    auto origType = op.getArray().getType().cast<numba::ntensor::NTensorType>();
+    auto results = numba::util::wrapEnvRegion(
         rewriter, op->getLoc(), origType.getEnvironment(), retType,
         [&](mlir::OpBuilder &builder, mlir::Location loc) {
           return builder
@@ -230,12 +233,12 @@ struct ToTensorOpLowering
 };
 
 struct FromTensorOpLowering
-    : public mlir::OpConversionPattern<imex::ntensor::FromTensorOp> {
+    : public mlir::OpConversionPattern<numba::ntensor::FromTensorOp> {
   using OpConversionPattern::OpConversionPattern;
 
   mlir::LogicalResult
-  matchAndRewrite(imex::ntensor::FromTensorOp op,
-                  imex::ntensor::FromTensorOp::Adaptor adaptor,
+  matchAndRewrite(numba::ntensor::FromTensorOp op,
+                  numba::ntensor::FromTensorOp::Adaptor adaptor,
                   mlir::ConversionPatternRewriter &rewriter) const override {
     auto tensor = adaptor.getTensor();
     if (!tensor.getType().isa<mlir::RankedTensorType>())
@@ -244,13 +247,13 @@ struct FromTensorOpLowering
     auto *converter = getTypeConverter();
     assert(converter && "Type converter is not set");
 
-    auto origType = op.getType().cast<imex::ntensor::NTensorType>();
+    auto origType = op.getType().cast<numba::ntensor::NTensorType>();
     auto retType =
         converter->convertType(origType).dyn_cast_or_null<mlir::MemRefType>();
     if (!retType)
       return mlir::failure();
 
-    auto results = imex::util::wrapEnvRegion(
+    auto results = numba::util::wrapEnvRegion(
         rewriter, op->getLoc(), origType.getEnvironment(), retType,
         [&](mlir::OpBuilder &builder, mlir::Location loc) {
           return builder
@@ -264,12 +267,12 @@ struct FromTensorOpLowering
 };
 
 struct ToMemrefOpLowering
-    : public mlir::OpConversionPattern<imex::ntensor::ToMemrefOp> {
+    : public mlir::OpConversionPattern<numba::ntensor::ToMemrefOp> {
   using OpConversionPattern::OpConversionPattern;
 
   mlir::LogicalResult
-  matchAndRewrite(imex::ntensor::ToMemrefOp op,
-                  imex::ntensor::ToMemrefOp::Adaptor adaptor,
+  matchAndRewrite(numba::ntensor::ToMemrefOp op,
+                  numba::ntensor::ToMemrefOp::Adaptor adaptor,
                   mlir::ConversionPatternRewriter &rewriter) const override {
     auto src = adaptor.getArray();
     auto srcType = src.getType().dyn_cast<mlir::MemRefType>();
@@ -293,12 +296,12 @@ struct ToMemrefOpLowering
 };
 
 struct FromMemrefOpLowering
-    : public mlir::OpConversionPattern<imex::ntensor::FromMemrefOp> {
+    : public mlir::OpConversionPattern<numba::ntensor::FromMemrefOp> {
   using OpConversionPattern::OpConversionPattern;
 
   mlir::LogicalResult
-  matchAndRewrite(imex::ntensor::FromMemrefOp op,
-                  imex::ntensor::FromMemrefOp::Adaptor adaptor,
+  matchAndRewrite(numba::ntensor::FromMemrefOp op,
+                  numba::ntensor::FromMemrefOp::Adaptor adaptor,
                   mlir::ConversionPatternRewriter &rewriter) const override {
     auto src = adaptor.getMemref();
     auto srcType = src.getType().dyn_cast<mlir::MemRefType>();
@@ -322,12 +325,12 @@ struct FromMemrefOpLowering
 };
 
 struct CastOpLowering
-    : public mlir::OpConversionPattern<imex::ntensor::CastOp> {
+    : public mlir::OpConversionPattern<numba::ntensor::CastOp> {
   using OpConversionPattern::OpConversionPattern;
 
   mlir::LogicalResult
-  matchAndRewrite(imex::ntensor::CastOp op,
-                  imex::ntensor::CastOp::Adaptor adaptor,
+  matchAndRewrite(numba::ntensor::CastOp op,
+                  numba::ntensor::CastOp::Adaptor adaptor,
                   mlir::ConversionPatternRewriter &rewriter) const override {
     auto src = adaptor.getSource();
     auto srcType = src.getType().dyn_cast<mlir::MemRefType>();
@@ -335,11 +338,11 @@ struct CastOpLowering
       return mlir::failure();
 
     auto origSrcType =
-        op.getSource().getType().dyn_cast<imex::ntensor::NTensorType>();
+        op.getSource().getType().dyn_cast<numba::ntensor::NTensorType>();
     if (!origSrcType)
       return mlir::failure();
 
-    auto origDstType = op.getType().dyn_cast<imex::ntensor::NTensorType>();
+    auto origDstType = op.getType().dyn_cast<numba::ntensor::NTensorType>();
     if (!origDstType)
       return mlir::failure();
 
@@ -363,7 +366,7 @@ struct CastOpLowering
     if (!mlir::memref::CastOp::areCastCompatible(srcType, retType))
       return mlir::failure();
 
-    auto results = imex::util::wrapEnvRegion(
+    auto results = numba::util::wrapEnvRegion(
         rewriter, op->getLoc(), origSrcType.getEnvironment(), retType,
         [&](mlir::OpBuilder &builder, mlir::Location loc) {
           return builder.create<mlir::memref::CastOp>(loc, retType, src)
@@ -376,12 +379,12 @@ struct CastOpLowering
 };
 
 struct CopyOpLowering
-    : public mlir::OpConversionPattern<imex::ntensor::CopyOp> {
+    : public mlir::OpConversionPattern<numba::ntensor::CopyOp> {
   using OpConversionPattern::OpConversionPattern;
 
   mlir::LogicalResult
-  matchAndRewrite(imex::ntensor::CopyOp op,
-                  imex::ntensor::CopyOp::Adaptor adaptor,
+  matchAndRewrite(numba::ntensor::CopyOp op,
+                  numba::ntensor::CopyOp::Adaptor adaptor,
                   mlir::ConversionPatternRewriter &rewriter) const override {
     auto src = adaptor.getSource();
     if (!src.getType().isa<mlir::MemRefType>())
@@ -392,19 +395,19 @@ struct CopyOpLowering
       return mlir::failure();
 
     auto origSrcType =
-        op.getSource().getType().dyn_cast<imex::ntensor::NTensorType>();
+        op.getSource().getType().dyn_cast<numba::ntensor::NTensorType>();
     if (!origSrcType)
       return mlir::failure();
 
     auto origDstType =
-        op.getTarget().getType().dyn_cast<imex::ntensor::NTensorType>();
+        op.getTarget().getType().dyn_cast<numba::ntensor::NTensorType>();
     if (!origDstType)
       return mlir::failure();
 
     if (origSrcType.getEnvironment() != origDstType.getEnvironment())
       return mlir::failure();
 
-    imex::util::wrapEnvRegion(
+    numba::util::wrapEnvRegion(
         rewriter, op->getLoc(), origSrcType.getEnvironment(), std::nullopt,
         [&](mlir::ConversionPatternRewriter &builder, mlir::Location /*loc*/) {
           builder.replaceOpWithNewOp<mlir::memref::CopyOp>(op, src, dst);
@@ -415,11 +418,11 @@ struct CopyOpLowering
 };
 } // namespace
 
-void imex::populateNtensorToMemrefRewritesAndTarget(
+void numba::populateNtensorToMemrefRewritesAndTarget(
     mlir::TypeConverter &converter, mlir::RewritePatternSet &patterns,
     mlir::ConversionTarget &target) {
   converter.addConversion(
-      [](imex::ntensor::NTensorType type) -> llvm::Optional<mlir::Type> {
+      [](numba::ntensor::NTensorType type) -> llvm::Optional<mlir::Type> {
         auto elemType = type.getElementType();
         if (mlir::MemRefType::isValidElementType(elemType))
           return mlir::MemRefType::get(type.getShape(), elemType);
@@ -433,12 +436,12 @@ void imex::populateNtensorToMemrefRewritesAndTarget(
                   FromMemrefOpLowering, CastOpLowering, CopyOpLowering>(
       converter, patterns.getContext());
 
-  target.addIllegalOp<imex::ntensor::DimOp, imex::ntensor::CreateArrayOp,
-                      imex::ntensor::SubviewOp, imex::ntensor::LoadOp,
-                      imex::ntensor::StoreOp, imex::ntensor::ToTensorOp,
-                      imex::ntensor::FromTensorOp, imex::ntensor::ToMemrefOp,
-                      imex::ntensor::FromMemrefOp, imex::ntensor::CastOp,
-                      imex::ntensor::CopyOp>();
+  target.addIllegalOp<numba::ntensor::DimOp, numba::ntensor::CreateArrayOp,
+                      numba::ntensor::SubviewOp, numba::ntensor::LoadOp,
+                      numba::ntensor::StoreOp, numba::ntensor::ToTensorOp,
+                      numba::ntensor::FromTensorOp, numba::ntensor::ToMemrefOp,
+                      numba::ntensor::FromMemrefOp, numba::ntensor::CastOp,
+                      numba::ntensor::CopyOp>();
 }
 
 namespace {
@@ -448,7 +451,7 @@ struct NtensorToMemrefPass
 
   virtual void
   getDependentDialects(mlir::DialectRegistry &registry) const override {
-    registry.insert<imex::util::ImexUtilDialect>();
+    registry.insert<numba::util::ImexUtilDialect>();
     registry.insert<mlir::arith::ArithDialect>();
     registry.insert<mlir::bufferization::BufferizationDialect>();
     registry.insert<mlir::linalg::LinalgDialect>();
@@ -464,7 +467,7 @@ struct NtensorToMemrefPass
     // Convert unknown types to itself
     converter.addConversion([](mlir::Type type) { return type; });
 
-    imex::populateTupleTypeConverter(converter);
+    numba::populateTupleTypeConverter(converter);
 
     auto addUnrealizedCast = [](mlir::OpBuilder &builder, mlir::Type type,
                                 mlir::ValueRange inputs, mlir::Location loc) {
@@ -476,12 +479,13 @@ struct NtensorToMemrefPass
     converter.addSourceMaterialization(addUnrealizedCast);
     converter.addTargetMaterialization(addUnrealizedCast);
 
-    imex::populateTupleTypeConversionRewritesAndTarget(converter, patterns,
-                                                       target);
-    imex::populateControlFlowTypeConversionRewritesAndTarget(converter,
-                                                             patterns, target);
-    imex::populateNtensorToMemrefRewritesAndTarget(converter, patterns, target);
-    imex::populateUtilConversionPatterns(converter, patterns, target);
+    numba::populateTupleTypeConversionRewritesAndTarget(converter, patterns,
+                                                        target);
+    numba::populateControlFlowTypeConversionRewritesAndTarget(converter,
+                                                              patterns, target);
+    numba::populateNtensorToMemrefRewritesAndTarget(converter, patterns,
+                                                    target);
+    numba::populateUtilConversionPatterns(converter, patterns, target);
 
     auto op = getOperation();
     if (mlir::failed(
@@ -491,6 +495,6 @@ struct NtensorToMemrefPass
 };
 } // namespace
 
-std::unique_ptr<mlir::Pass> imex::createNtensorToMemrefPass() {
+std::unique_ptr<mlir::Pass> numba::createNtensorToMemrefPass() {
   return std::make_unique<NtensorToMemrefPass>();
 }

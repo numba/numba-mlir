@@ -13,10 +13,10 @@ class OpPassManager;
 class Pass;
 } // namespace mlir
 
-namespace imex {
+namespace numba {
 /// Create composite pass, which runs selected set of passes until fixed point
 /// or maximum number of iterations reached.
 std::unique_ptr<mlir::Pass>
 createCompositePass(std::string name,
                     std::function<void(mlir::OpPassManager &)> populateFunc);
-} // namespace imex
+} // namespace numba

@@ -4,7 +4,7 @@
 
 #pragma once
 
-namespace imex {
+namespace numba {
 class PipelineRegistry;
 }
 
@@ -17,7 +17,7 @@ class MLIRContext;
 class TypeConverter;
 } // namespace mlir
 
-void registerPreLowSimpleficationsPipeline(imex::PipelineRegistry &registry);
+void registerPreLowSimpleficationsPipeline(numba::PipelineRegistry &registry);
 
 llvm::StringRef untuplePipelineName();
 llvm::StringRef removeSignPipelineName();

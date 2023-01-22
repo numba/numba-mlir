@@ -10,8 +10,8 @@ namespace mlir {
 class Pass;
 }
 
-namespace imex {
+namespace numba {
 /// Propagate integer range info through the IR and optimize ops based on this
 /// info.
 std::unique_ptr<mlir::Pass> createShapeIntegerRangePropagationPass();
-} // namespace imex
+} // namespace numba

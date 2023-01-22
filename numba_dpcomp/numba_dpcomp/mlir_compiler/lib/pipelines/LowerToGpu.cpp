@@ -94,7 +94,7 @@ static void moveOpsIntoParallel(mlir::scf::ParallelOp outer, int depth = 0) {
   moveOpsIntoParallel(parallelOp, depth);
 }
 
-static bool isGpuRegion(imex::util::EnvironmentRegionOp op) {
+static bool isGpuRegion(numba::util::EnvironmentRegionOp op) {
   return op.getEnvironment().isa<gpu_runtime::GPURegionDescAttr>();
 }
 
@@ -106,12 +106,12 @@ struct PrepareForGPUPass
   virtual void
   getDependentDialects(mlir::DialectRegistry &registry) const override {
     registry.insert<gpu_runtime::GpuRuntimeDialect>();
-    registry.insert<imex::util::ImexUtilDialect>();
+    registry.insert<numba::util::ImexUtilDialect>();
     registry.insert<mlir::scf::SCFDialect>();
   }
 
   void runOnOperation() override {
-    getOperation()->walk([](imex::util::EnvironmentRegionOp envOp) {
+    getOperation()->walk([](numba::util::EnvironmentRegionOp envOp) {
       if (!isGpuRegion(envOp))
         return;
 
@@ -189,27 +189,27 @@ struct RemoveNestedParallel
 
 // TODO: fix ParallelLoopToGpuPass
 struct RemoveNestedParallelPass
-    : public imex::RewriteWrapperPass<RemoveNestedParallelPass, void, void,
-                                      RemoveNestedParallel> {};
+    : public numba::RewriteWrapperPass<RemoveNestedParallelPass, void, void,
+                                       RemoveNestedParallel> {};
 
 struct RemoveGpuRegion
-    : public mlir::OpRewritePattern<imex::util::EnvironmentRegionOp> {
+    : public mlir::OpRewritePattern<numba::util::EnvironmentRegionOp> {
   using OpRewritePattern::OpRewritePattern;
 
   mlir::LogicalResult
-  matchAndRewrite(imex::util::EnvironmentRegionOp op,
+  matchAndRewrite(numba::util::EnvironmentRegionOp op,
                   mlir::PatternRewriter &rewriter) const override {
     if (!isGpuRegion(op))
       return mlir::failure();
 
-    imex::util::EnvironmentRegionOp::inlineIntoParent(rewriter, op);
+    numba::util::EnvironmentRegionOp::inlineIntoParent(rewriter, op);
     return mlir::success();
   }
 };
 
 struct RemoveGpuRegionPass
-    : public imex::RewriteWrapperPass<RemoveGpuRegionPass, void, void,
-                                      RemoveGpuRegion> {};
+    : public numba::RewriteWrapperPass<RemoveGpuRegionPass, void, void,
+                                       RemoveGpuRegion> {};
 
 struct KernelMemrefOpsMovementPass
     : public mlir::PassWrapper<KernelMemrefOpsMovementPass,
@@ -304,7 +304,7 @@ struct GPULowerDefaultLocalSize
   virtual void
   getDependentDialects(mlir::DialectRegistry &registry) const override {
     registry.insert<mlir::func::FuncDialect>();
-    registry.insert<imex::util::ImexUtilDialect>();
+    registry.insert<numba::util::ImexUtilDialect>();
   }
 
   void runOnOperation() override {
@@ -347,7 +347,7 @@ struct GPULowerDefaultLocalSize
         auto count = static_cast<unsigned>(operands.size());
         llvm::SmallVector<mlir::Value, 3> globalSize(count);
         for (auto i : llvm::seq(0u, count))
-          globalSize[i] = imex::indexCast(builder, loc, operands[i]);
+          globalSize[i] = numba::indexCast(builder, loc, operands[i]);
 
         auto res = builder
                        .create<gpu_runtime::GPUSuggestBlockSizeOp>(
@@ -355,8 +355,8 @@ struct GPULowerDefaultLocalSize
                        .getResults();
 
         for (auto i : llvm::seq(0u, count)) {
-          auto castedRes = imex::indexCast(builder, loc, res[i],
-                                           call.getResult(i).getType());
+          auto castedRes = numba::indexCast(builder, loc, res[i],
+                                            call.getResult(i).getType());
           call.getResult(i).replaceAllUsesWith(castedRes);
         }
       }
@@ -424,8 +424,8 @@ struct FlattenScfIf : public mlir::OpRewritePattern<mlir::scf::IfOp> {
   }
 };
 
-struct FlattenScfPass : public imex::RewriteWrapperPass<FlattenScfPass, void,
-                                                        void, FlattenScfIf> {};
+struct FlattenScfPass : public numba::RewriteWrapperPass<FlattenScfPass, void,
+                                                         void, FlattenScfIf> {};
 
 static mlir::LogicalResult processAllocUser(mlir::Operation *user,
                                             mlir::Operation *allocParent,
@@ -698,7 +698,7 @@ struct GenerateOutlineContextPass
     mlir::SymbolRefAttr deinitSym = (deinit ? deinit.getCalleeAttr() : nullptr);
 
     builder.setInsertionPoint(init);
-    auto takeCtx = builder.create<imex::util::TakeContextOp>(
+    auto takeCtx = builder.create<numba::util::TakeContextOp>(
         init->getLoc(), initSym, deinitSym, init.getResultTypes());
     auto ctx = takeCtx.getContext();
     auto resValues = takeCtx.getResults();
@@ -707,12 +707,12 @@ struct GenerateOutlineContextPass
 
     if (deinit) {
       builder.setInsertionPoint(deinit);
-      builder.create<imex::util::ReleaseContextOp>(deinit->getLoc(), ctx);
+      builder.create<numba::util::ReleaseContextOp>(deinit->getLoc(), ctx);
       deinit->erase();
     } else {
       builder.setInsertionPoint(body.front().getTerminator());
-      builder.create<imex::util::ReleaseContextOp>(builder.getUnknownLoc(),
-                                                   ctx);
+      builder.create<numba::util::ReleaseContextOp>(builder.getUnknownLoc(),
+                                                    ctx);
     }
   }
 };
@@ -723,14 +723,14 @@ static void rerunStdPipeline(mlir::Operation *op) {
       mlir::StringAttr::get(op->getContext(), plierToStdPipelineName());
   auto mod = op->getParentOfType<mlir::ModuleOp>();
   assert(nullptr != mod);
-  imex::addPipelineJumpMarker(mod, marker);
+  numba::addPipelineJumpMarker(mod, marker);
 }
 
 static mlir::FailureOr<mlir::StringAttr>
 getDeviceDescFromFunc(mlir::MLIRContext *context, mlir::TypeRange argTypes) {
   mlir::StringAttr res;
   for (auto arg : argTypes) {
-    auto tensor = arg.dyn_cast<imex::ntensor::NTensorType>();
+    auto tensor = arg.dyn_cast<numba::ntensor::NTensorType>();
     if (!tensor)
       continue;
 
@@ -756,7 +756,7 @@ getDeviceDescFromFunc(mlir::MLIRContext *context, mlir::TypeRange argTypes) {
   return res;
 }
 
-struct LowerGpuRange final : public imex::CallOpLowering {
+struct LowerGpuRange final : public numba::CallOpLowering {
   using CallOpLowering::CallOpLowering;
 
 protected:
@@ -780,10 +780,10 @@ protected:
     llvm::SmallVector<mlir::scf::ForOp> newOps;
     auto setAttr = [&](mlir::scf::ForOp op) {
       auto unitAttr = mlir::UnitAttr::get(op->getContext());
-      op->setAttr(imex::util::attributes::getParallelName(), unitAttr);
+      op->setAttr(numba::util::attributes::getParallelName(), unitAttr);
       newOps.emplace_back(op);
     };
-    if (mlir::failed(imex::lowerRange(op, args, kwargs, rewriter, setAttr)))
+    if (mlir::failed(numba::lowerRange(op, args, kwargs, rewriter, setAttr)))
       return mlir::failure();
 
     mlir::OpBuilder::InsertionGuard g(rewriter);
@@ -791,12 +791,12 @@ protected:
     for (auto op : newOps) {
       auto bodyBuilder = [&](mlir::OpBuilder &builder, mlir::Location loc) {
         auto newOp = builder.clone(*op);
-        builder.create<imex::util::EnvironmentRegionYieldOp>(
+        builder.create<numba::util::EnvironmentRegionYieldOp>(
             loc, newOp->getResults());
       };
       auto opResults = op.getResults();
       rewriter.setInsertionPoint(op);
-      auto newOp = rewriter.create<imex::util::EnvironmentRegionOp>(
+      auto newOp = rewriter.create<numba::util::EnvironmentRegionOp>(
           op->getLoc(), envAttr, /*args*/ std::nullopt, opResults.getTypes(),
           bodyBuilder);
       rewriter.replaceOp(op, newOp->getResults());
@@ -808,7 +808,7 @@ protected:
 };
 
 static bool isGpuArray(mlir::Type type) {
-  auto tensor = type.dyn_cast<imex::ntensor::NTensorType>();
+  auto tensor = type.dyn_cast<numba::ntensor::NTensorType>();
   if (!tensor)
     return false;
 
@@ -827,7 +827,7 @@ struct MarkGpuArraysInputs
   virtual void
   getDependentDialects(mlir::DialectRegistry &registry) const override {
     registry.insert<gpu_runtime::GpuRuntimeDialect>();
-    registry.insert<imex::ntensor::NTensorDialect>();
+    registry.insert<numba::ntensor::NTensorDialect>();
     registry.insert<mlir::func::FuncDialect>();
   }
 
@@ -887,15 +887,15 @@ struct LowerGpuRangePass
 
     patterns.insert<LowerGpuRange>(context);
 
-    imex::util::EnvironmentRegionOp::getCanonicalizationPatterns(patterns,
-                                                                 context);
+    numba::util::EnvironmentRegionOp::getCanonicalizationPatterns(patterns,
+                                                                  context);
 
     auto op = getOperation();
     (void)mlir::applyPatternsAndFoldGreedily(op, std::move(patterns));
   }
 };
 
-struct LowerPlierCalls final : public imex::CallOpLowering {
+struct LowerPlierCalls final : public numba::CallOpLowering {
   LowerPlierCalls(mlir::MLIRContext *context)
       : CallOpLowering(context),
         resolver("numba_dpcomp.mlir.kernel_impl", "registry") {}
@@ -1091,8 +1091,8 @@ struct LowerBuiltinCalls : public mlir::OpRewritePattern<mlir::func::CallOp> {
 };
 
 struct LowerGpuBuiltinsPass
-    : public imex::RewriteWrapperPass<LowerGpuBuiltinsPass, void, void,
-                                      LowerPlierCalls> {};
+    : public numba::RewriteWrapperPass<LowerGpuBuiltinsPass, void, void,
+                                       LowerPlierCalls> {};
 
 static llvm::Optional<gpu_runtime::FenceFlags>
 getFenceFlags(mlir::OpFoldResult arg) {
@@ -1119,7 +1119,7 @@ static void genBarrierOp(mlir::Operation *srcOp,
   // TODO: remove
   assert(srcOp->getNumResults() == 1);
   auto retType = srcOp->getResult(0).getType();
-  rewriter.replaceOpWithNewOp<imex::util::UndefOp>(srcOp, retType);
+  rewriter.replaceOpWithNewOp<numba::util::UndefOp>(srcOp, retType);
 }
 
 class ConvertBarrierOps : public mlir::OpRewritePattern<mlir::func::CallOp> {
@@ -1372,7 +1372,7 @@ public:
 };
 
 struct LowerGpuBuiltins2Pass
-    : public imex::RewriteWrapperPass<
+    : public numba::RewriteWrapperPass<
           LowerGpuBuiltins2Pass, void, void, ConvertBarrierOps, ConvertGroupOps,
           ConvertGroupOpsToSubgroup, LowerBuiltinCalls> {};
 
@@ -1456,7 +1456,7 @@ public:
     mlir::Value newArray =
         rewriter.create<mlir::memref::GetGlobalOp>(loc, typeLocal, global);
 
-    newArray = rewriter.create<imex::util::SignCastOp>(loc, type, newArray);
+    newArray = rewriter.create<numba::util::SignCastOp>(loc, type, newArray);
 
     if (type != oldType)
       newArray = rewriter.create<mlir::memref::CastOp>(loc, oldType, newArray);
@@ -1520,7 +1520,7 @@ public:
     mlir::Value newArray =
         rewriter.create<mlir::memref::AllocaOp>(loc, typeLocal);
 
-    newArray = rewriter.create<imex::util::SignCastOp>(loc, type, newArray);
+    newArray = rewriter.create<numba::util::SignCastOp>(loc, type, newArray);
 
     if (type != oldType)
       newArray = rewriter.create<mlir::memref::CastOp>(loc, oldType, newArray);
@@ -1531,9 +1531,9 @@ public:
 };
 
 struct LowerGpuBuiltins3Pass
-    : public imex::RewriteWrapperPass<LowerGpuBuiltins3Pass, void, void,
-                                      ConvertLocalArrayAllocOps,
-                                      ConvertPrivateArrayAllocOps> {};
+    : public numba::RewriteWrapperPass<LowerGpuBuiltins3Pass, void, void,
+                                       ConvertLocalArrayAllocOps,
+                                       ConvertPrivateArrayAllocOps> {};
 
 class GpuLaunchSinkOpsPass
     : public mlir::PassWrapper<GpuLaunchSinkOpsPass,
@@ -1549,7 +1549,8 @@ public:
             auto isSinkingBeneficiary = [](mlir::Operation *op) -> bool {
               return isa<arith::ConstantOp, func::ConstantOp, arith::SelectOp,
                          arith::CmpIOp, arith::IndexCastOp, arith::MulIOp,
-                         arith::SubIOp, arith::AddIOp, imex::util::UndefOp>(op);
+                         arith::SubIOp, arith::AddIOp, numba::util::UndefOp>(
+                  op);
             };
 
             // Pull in instructions that can be sunk
@@ -1575,7 +1576,7 @@ public:
   void runOnOperation() override {
     auto mod = getOperation();
     mod->walk([&](mlir::gpu::LaunchFuncOp launch) {
-      auto env = launch->getParentOfType<imex::util::EnvironmentRegionOp>();
+      auto env = launch->getParentOfType<numba::util::EnvironmentRegionOp>();
       if (!env)
         return;
 
@@ -1671,8 +1672,8 @@ struct SinkGpuDims : public mlir::OpRewritePattern<mlir::gpu::LaunchOp> {
   }
 };
 
-struct SinkGpuDimsPass : public imex::RewriteWrapperPass<SinkGpuDimsPass, void,
-                                                         void, SinkGpuDims> {};
+struct SinkGpuDimsPass : public numba::RewriteWrapperPass<SinkGpuDimsPass, void,
+                                                          void, SinkGpuDims> {};
 
 struct GPUToLLVMPass
     : public mlir::PassWrapper<GPUToLLVMPass,
@@ -1690,12 +1691,12 @@ struct GPUToLLVMPass
     mlir::populateGpuToLLVMConversionPatterns(
         converter, patterns, mlir::gpu::getDefaultGpuBinaryAnnotation());
 
-    imex::populateControlFlowTypeConversionRewritesAndTarget(converter,
-                                                             patterns, target);
+    numba::populateControlFlowTypeConversionRewritesAndTarget(converter,
+                                                              patterns, target);
 
     gpu_runtime::populateGpuToLLVMPatternsAndLegality(converter, patterns,
                                                       target);
-    imex::populateUtilConversionPatterns(converter, patterns, target);
+    numba::populateUtilConversionPatterns(converter, patterns, target);
 
     // TODO: There were some issues with structural conversion, investigate.
     target.addLegalOp<mlir::arith::SelectOp>();
@@ -1789,9 +1790,9 @@ static mlir::spirv::TargetEnvAttr deviceCapsMapper(mlir::gpu::GPUModuleOp op) {
 }
 
 static void commonOptPasses(mlir::OpPassManager &pm) {
-  pm.addPass(imex::createCommonOptsPass());
+  pm.addPass(numba::createCommonOptsPass());
   pm.addPass(mlir::createCSEPass());
-  pm.addPass(imex::createCommonOptsPass());
+  pm.addPass(numba::createCommonOptsPass());
 }
 
 static void populateLowerToGPUPipelineHigh(mlir::OpPassManager &pm) {
@@ -1873,7 +1874,7 @@ static void populateLowerToGPUPipelineLow(mlir::OpPassManager &pm) {
 }
 } // namespace
 
-void registerLowerToGPUPipeline(imex::PipelineRegistry &registry) {
+void registerLowerToGPUPipeline(numba::PipelineRegistry &registry) {
   registry.registerPipeline([](auto sink) {
     auto highStage = getHighLoweringStage();
     sink(lowerToGPUPipelineNameHigh(),

@@ -8,6 +8,6 @@
 
 #include "llvm/ADT/Twine.h"
 
-void imex::reportError(const llvm::Twine &msg) {
+void numba::reportError(const llvm::Twine &msg) {
   throw std::runtime_error(msg.str());
 }

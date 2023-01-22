@@ -27,17 +27,17 @@ SmallVector<Range, 8> getOrCreateRanges(OffsetSizeAndStrideOpInterface op,
 
 } // namespace mlir
 
-namespace imex {
+namespace numba {
 namespace ntensor {
 class NTensorType;
 class SliceType;
 } // namespace ntensor
-} // namespace imex
+} // namespace numba
 
 #include "imex/Dialect/ntensor/IR/NTensorOpsDialect.h.inc"
 #include "imex/Dialect/ntensor/IR/NTensorOpsEnums.h.inc"
 
-namespace imex {
+namespace numba {
 namespace ntensor {
 class NTensorBase : public mlir::Type,
                     public mlir::ShapedType::Trait<NTensorBase> {
@@ -69,7 +69,7 @@ public:
 };
 
 } // namespace ntensor
-} // namespace imex
+} // namespace numba
 
 #define GET_TYPEDEF_CLASSES
 #include "imex/Dialect/ntensor/IR/NTensorOpsTypes.h.inc"

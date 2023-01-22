@@ -14,16 +14,16 @@
 #include <mlir/Transforms/Passes.h>
 
 static void populateUntuplePipeline(mlir::OpPassManager &pm) {
-  pm.addPass(imex::createExpandTuplePass());
+  pm.addPass(numba::createExpandTuplePass());
   pm.addPass(mlir::createCanonicalizerPass());
 }
 
 static void populateRemoveSignPipeline(mlir::OpPassManager &pm) {
-  pm.addPass(imex::createMakeSignlessPass());
+  pm.addPass(numba::createMakeSignlessPass());
   pm.addPass(mlir::createCanonicalizerPass());
 }
 
-void registerPreLowSimpleficationsPipeline(imex::PipelineRegistry &registry) {
+void registerPreLowSimpleficationsPipeline(numba::PipelineRegistry &registry) {
   registry.registerPipeline([](auto sink) {
     auto stage = getHighLoweringStage();
     sink(untuplePipelineName(), {stage.begin}, {stage.end}, {},

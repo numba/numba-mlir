@@ -16,8 +16,8 @@ int main(int argc, char **argv) {
   mlir::DialectRegistry registry;
   mlir::registerAllDialects(registry);
   registry.insert<gpu_runtime::GpuRuntimeDialect>();
-  registry.insert<imex::ntensor::NTensorDialect>();
-  registry.insert<imex::util::ImexUtilDialect>();
+  registry.insert<numba::ntensor::NTensorDialect>();
+  registry.insert<numba::util::ImexUtilDialect>();
   return mlir::failed(MlirOptMain(argc, argv, "imex modular optimizer driver\n",
                                   registry,
                                   /*preloadDialectsInContext=*/false));

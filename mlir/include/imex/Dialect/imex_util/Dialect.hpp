@@ -26,7 +26,7 @@
 #define GET_OP_CLASSES
 #include "imex/Dialect/imex_util/ImexUtilOps.h.inc"
 
-namespace imex {
+namespace numba {
 namespace util {
 namespace attributes {
 llvm::StringRef getFastmathName();
@@ -38,4 +38,4 @@ llvm::StringRef getOptLevelName();
 llvm::StringRef getShapeRangeName();
 } // namespace attributes
 } // namespace util
-} // namespace imex
+} // namespace numba

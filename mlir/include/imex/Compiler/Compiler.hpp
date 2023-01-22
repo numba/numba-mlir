@@ -21,7 +21,7 @@ class MLIRContext;
 class ModuleOp;
 } // namespace mlir
 
-namespace imex {
+namespace numba {
 class PipelineRegistry;
 
 class CompilerContext {
@@ -55,4 +55,4 @@ public:
 private:
   std::unique_ptr<CompilerContextImpl> impl;
 };
-} // namespace imex
+} // namespace numba

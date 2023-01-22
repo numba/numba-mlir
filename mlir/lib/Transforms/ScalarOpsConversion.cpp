@@ -168,7 +168,7 @@ struct ConvertConstantOp
 };
 } // namespace
 
-void imex::populateArithConversionRewritesAndTarget(
+void numba::populateArithConversionRewritesAndTarget(
     mlir::TypeConverter &converter, mlir::RewritePatternSet &patterns,
     mlir::ConversionTarget &target) {
   target.addDynamicallyLegalDialect<mlir::arith::ArithDialect>(
@@ -234,7 +234,7 @@ void imex::populateArithConversionRewritesAndTarget(
       >(converter, patterns.getContext());
 }
 
-void imex::populateMathConversionRewritesAndTarget(
+void numba::populateMathConversionRewritesAndTarget(
     mlir::TypeConverter &converter, mlir::RewritePatternSet &patterns,
     mlir::ConversionTarget &target) {
   target.addDynamicallyLegalDialect<mlir::math::MathDialect>(

@@ -10,9 +10,9 @@ namespace mlir {
 class Pass;
 } // namespace mlir
 
-namespace imex {
+namespace numba {
 namespace ntensor {
 /// This pass tries to remove redundant `ntensor.copy` ops.
 std::unique_ptr<mlir::Pass> createCopyRemovalPass();
 } // namespace ntensor
-} // namespace imex
+} // namespace numba

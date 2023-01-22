@@ -14,7 +14,7 @@
 #include <unordered_map>
 #include <utility>
 
-void imex::PipelineRegistry::registerPipeline(
+void numba::PipelineRegistry::registerPipeline(
     PipelineRegistry::registry_entry_t func) {
   assert(nullptr != func);
   pipelines.push_back(std::move(func));
@@ -34,7 +34,7 @@ static void topoVisit(T &elem, IterF &&iterFunc, VisitF &&func) {
 }
 } // namespace
 
-void imex::PipelineRegistry::populatePassManager(
+void numba::PipelineRegistry::populatePassManager(
     populate_pass_manager_t resultSink) const {
   llvm::BumpPtrAllocator allocator;
   llvm::UniqueStringSaver stringSet(allocator);

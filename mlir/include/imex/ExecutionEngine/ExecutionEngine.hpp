@@ -26,7 +26,7 @@ class MangleAndInterner;
 } // namespace orc
 } // namespace llvm
 
-namespace imex {
+namespace numba {
 struct ExecutionEngineOptions {
   /// `jitCodeGenOptLevel`, when provided, is used as the optimization level for
   /// target code generation.
@@ -113,4 +113,4 @@ private:
   /// Id for unique module name generation.
   int uniqueNameCounter = 0;
 };
-} // namespace imex
+} // namespace numba

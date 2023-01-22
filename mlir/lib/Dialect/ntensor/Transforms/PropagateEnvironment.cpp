@@ -21,7 +21,7 @@
 namespace {
 static bool needUpdate(mlir::Operation *op) {
   assert(op && "Invalid op");
-  return mlir::isa<imex::ntensor::NTensorDialect>(op->getDialect());
+  return mlir::isa<numba::ntensor::NTensorDialect>(op->getDialect());
 }
 
 static bool needPropagation(mlir::Operation *op) {
@@ -30,7 +30,7 @@ static bool needPropagation(mlir::Operation *op) {
 }
 
 static llvm::Optional<mlir::Attribute> getTensorEnv(mlir::Value val) {
-  if (auto tensor = val.getType().dyn_cast<imex::ntensor::NTensorType>())
+  if (auto tensor = val.getType().dyn_cast<numba::ntensor::NTensorType>())
     return tensor.getEnvironment();
 
   return std::nullopt;
@@ -180,7 +180,7 @@ struct PropagateEnvironmentPass
 
   virtual void
   getDependentDialects(mlir::DialectRegistry &registry) const override {
-    registry.insert<imex::ntensor::NTensorDialect>();
+    registry.insert<numba::ntensor::NTensorDialect>();
   }
 
   void runOnOperation() override {
@@ -244,42 +244,42 @@ struct PropagateEnvironmentPass
     mlir::OpBuilder builder(&getContext());
     for (auto [op, env] : opsToProcess) {
       assert(op);
-      if (mlir::isa<imex::ntensor::CastOp>(op))
+      if (mlir::isa<numba::ntensor::CastOp>(op))
         continue;
 
       auto loc = op->getLoc();
       builder.setInsertionPoint(op);
       for (auto &operand : op->getOpOperands()) {
         auto arg = operand.get();
-        auto tensor = arg.getType().dyn_cast<imex::ntensor::NTensorType>();
+        auto tensor = arg.getType().dyn_cast<numba::ntensor::NTensorType>();
         if (!tensor)
           continue;
 
         if (tensor.getEnvironment() == env)
           continue;
 
-        auto newType = imex::ntensor::NTensorType::get(tensor.getShape(),
-                                                       tensor.getElementType(),
-                                                       env, tensor.getLayout());
+        auto newType = numba::ntensor::NTensorType::get(
+            tensor.getShape(), tensor.getElementType(), env,
+            tensor.getLayout());
         mlir::Value newVal =
-            builder.createOrFold<imex::ntensor::CastOp>(loc, newType, arg);
+            builder.createOrFold<numba::ntensor::CastOp>(loc, newType, arg);
         operand.set(newVal);
       }
 
       builder.setInsertionPointAfter(op);
       for (auto res : op->getResults()) {
-        auto tensor = res.getType().dyn_cast<imex::ntensor::NTensorType>();
+        auto tensor = res.getType().dyn_cast<numba::ntensor::NTensorType>();
         if (!tensor)
           continue;
 
         if (tensor.getEnvironment() == env)
           continue;
 
-        auto newType = imex::ntensor::NTensorType::get(tensor.getShape(),
-                                                       tensor.getElementType(),
-                                                       env, tensor.getLayout());
+        auto newType = numba::ntensor::NTensorType::get(
+            tensor.getShape(), tensor.getElementType(), env,
+            tensor.getLayout());
         res.setType(newType);
-        auto newRes = builder.create<imex::ntensor::CastOp>(loc, tensor, res);
+        auto newRes = builder.create<numba::ntensor::CastOp>(loc, tensor, res);
         res.replaceAllUsesExcept(newRes.getResult(), newRes);
       }
     }
@@ -299,7 +299,7 @@ struct PropagateEnvironmentPass
       bool changed = false;
       builder.setInsertionPointToStart(&entryBlock);
       for (auto [i, arg] : llvm::enumerate(entryBlock.getArguments())) {
-        auto oldType = arg.getType().dyn_cast<imex::ntensor::NTensorType>();
+        auto oldType = arg.getType().dyn_cast<numba::ntensor::NTensorType>();
         if (!oldType)
           continue;
 
@@ -320,12 +320,12 @@ struct PropagateEnvironmentPass
         if (newEnv == getTensorEnv(arg))
           continue;
 
-        auto newType = imex::ntensor::NTensorType::get(
+        auto newType = numba::ntensor::NTensorType::get(
             oldType.getShape(), oldType.getElementType(), newEnv,
             oldType.getLayout());
 
         auto cast =
-            builder.create<imex::ntensor::CastOp>(arg.getLoc(), oldType, arg);
+            builder.create<numba::ntensor::CastOp>(arg.getLoc(), oldType, arg);
         arg.replaceAllUsesExcept(cast.getResult(), cast);
         arg.setType(newType);
         newArgsTypes[i] = newType;
@@ -360,7 +360,7 @@ struct PropagateEnvironmentPass
           if (oldType == newType)
             continue;
 
-          auto cast = builder.create<imex::ntensor::CastOp>(loc, newType, arg);
+          auto cast = builder.create<numba::ntensor::CastOp>(loc, newType, arg);
           callOp->setOperand(i, cast.getResult());
         }
       }
@@ -371,12 +371,13 @@ struct PropagateEnvironmentPass
 
     // Run some cleanup
     mlir::RewritePatternSet patterns(&getContext());
-    imex::ntensor::CastOp::getCanonicalizationPatterns(patterns, &getContext());
+    numba::ntensor::CastOp::getCanonicalizationPatterns(patterns,
+                                                        &getContext());
     (void)mlir::applyPatternsAndFoldGreedily(root, std::move(patterns));
   }
 };
 } // namespace
 
-std::unique_ptr<mlir::Pass> imex::ntensor::createPropagateEnvironmentPass() {
+std::unique_ptr<mlir::Pass> numba::ntensor::createPropagateEnvironmentPass() {
   return std::make_unique<PropagateEnvironmentPass>();
 }

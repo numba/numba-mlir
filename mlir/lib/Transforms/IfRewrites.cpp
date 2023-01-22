@@ -68,6 +68,6 @@ IfOpConstCond::matchAndRewrite(mlir::scf::IfOp op,
   return mlir::success();
 }
 
-void imex::populateIfRewritesPatterns(mlir::RewritePatternSet &patterns) {
+void numba::populateIfRewritesPatterns(mlir::RewritePatternSet &patterns) {
   patterns.insert<IfOpConstCond>(patterns.getContext());
 }

@@ -36,7 +36,7 @@ struct Conversion {
       if (!type)
         return std::nullopt;
 
-      return imex::util::TypeVarType::get(type);
+      return numba::util::TypeVarType::get(type);
     }
 
     if (py::isinstance(obj, fixedArray)) {
@@ -61,8 +61,8 @@ struct Conversion {
         }
       }
 
-      return imex::ntensor::NTensorType::get(shape, elemType, /*env*/ {},
-                                             llvm::StringRef(layout));
+      return numba::ntensor::NTensorType::get(shape, elemType, /*env*/ {},
+                                              llvm::StringRef(layout));
     }
 
     if (py::isinstance(obj, array)) {
@@ -75,8 +75,8 @@ struct Conversion {
       auto ndim = obj.attr("ndim").cast<size_t>();
       llvm::SmallVector<int64_t> shape(ndim, mlir::ShapedType::kDynamic);
 
-      return imex::ntensor::NTensorType::get(shape, elemType, /*env*/ {},
-                                             llvm::StringRef(layout));
+      return numba::ntensor::NTensorType::get(shape, elemType, /*env*/ {},
+                                              llvm::StringRef(layout));
     }
 
     return std::nullopt;

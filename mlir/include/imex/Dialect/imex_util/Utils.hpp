@@ -6,7 +6,7 @@
 
 #include "imex/Dialect/imex_util/Dialect.hpp"
 
-namespace imex {
+namespace numba {
 namespace util {
 template <typename Builder, typename F>
 static llvm::SmallVector<mlir::Value>
@@ -23,14 +23,14 @@ wrapEnvRegion(Builder &builder, mlir::Location loc, mlir::Attribute env,
     auto res = func(static_cast<Builder &>(b), l);
     mlir::ValueRange range(res);
     assert(range.getTypes() == results && "Invalid result types");
-    b.create<imex::util::EnvironmentRegionYieldOp>(l, range);
+    b.create<numba::util::EnvironmentRegionYieldOp>(l, range);
   };
 
   auto res = builder
-                 .template create<imex::util::EnvironmentRegionOp>(
+                 .template create<numba::util::EnvironmentRegionOp>(
                      loc, env, /*args*/ std::nullopt, results, bodyBuilder)
                  .getResults();
   return {res.begin(), res.end()};
 }
 } // namespace util
-} // namespace imex
+} // namespace numba

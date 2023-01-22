@@ -15,7 +15,7 @@
 namespace {
 struct CanonicalizeReduction : public mlir::OpRewritePattern<mlir::scf::ForOp> {
   CanonicalizeReduction(mlir::MLIRContext *context,
-                        imex::LocalAliasAnalysis &analysis)
+                        numba::LocalAliasAnalysis &analysis)
       : mlir::OpRewritePattern<mlir::scf::ForOp>(context),
         aliasAnalysis(analysis) {}
 
@@ -202,7 +202,7 @@ struct CanonicalizeReduction : public mlir::OpRewritePattern<mlir::scf::ForOp> {
   }
 
 private:
-  imex::LocalAliasAnalysis &aliasAnalysis;
+  numba::LocalAliasAnalysis &aliasAnalysis;
 };
 
 struct CanonicalizeReductionsPass
@@ -219,7 +219,7 @@ struct CanonicalizeReductionsPass
   void runOnOperation() override {
     auto context = &getContext();
 
-    auto &aliasAnalysis = getAnalysis<imex::LocalAliasAnalysis>();
+    auto &aliasAnalysis = getAnalysis<numba::LocalAliasAnalysis>();
 
     mlir::RewritePatternSet patterns(context);
     patterns.insert<CanonicalizeReduction>(context, aliasAnalysis);
@@ -229,6 +229,6 @@ struct CanonicalizeReductionsPass
 };
 } // namespace
 
-std::unique_ptr<mlir::Pass> imex::createCanonicalizeReductionsPass() {
+std::unique_ptr<mlir::Pass> numba::createCanonicalizeReductionsPass() {
   return std::make_unique<CanonicalizeReductionsPass>();
 }

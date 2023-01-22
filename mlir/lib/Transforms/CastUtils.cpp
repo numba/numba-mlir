@@ -19,8 +19,8 @@ mlir::Type makeSignless(mlir::Type type) {
 }
 } // namespace
 
-mlir::Value imex::indexCast(mlir::OpBuilder &builder, mlir::Location loc,
-                            mlir::Value val, mlir::Type dstType) {
+mlir::Value numba::indexCast(mlir::OpBuilder &builder, mlir::Location loc,
+                             mlir::Value val, mlir::Type dstType) {
   auto srcType = val.getType();
   assert(srcType.isa<mlir::IndexType>() || dstType.isa<mlir::IndexType>());
   if (srcType == dstType)
@@ -28,30 +28,30 @@ mlir::Value imex::indexCast(mlir::OpBuilder &builder, mlir::Location loc,
 
   auto newSrcType = makeSignless(srcType);
   if (newSrcType != srcType)
-    val = builder.createOrFold<imex::util::SignCastOp>(loc, newSrcType, val);
+    val = builder.createOrFold<numba::util::SignCastOp>(loc, newSrcType, val);
 
   auto newDstType = makeSignless(dstType);
   val = builder.createOrFold<mlir::arith::IndexCastOp>(loc, newDstType, val);
   if (newDstType != dstType)
-    val = builder.createOrFold<imex::util::SignCastOp>(loc, dstType, val);
+    val = builder.createOrFold<numba::util::SignCastOp>(loc, dstType, val);
 
   return val;
 }
 
-mlir::Value imex::indexCast(mlir::OpBuilder &builder, mlir::Location loc,
-                            mlir::Value src) {
+mlir::Value numba::indexCast(mlir::OpBuilder &builder, mlir::Location loc,
+                             mlir::Value src) {
   return indexCast(builder, loc, src,
                    mlir::IndexType::get(builder.getContext()));
 }
 
-mlir::Type imex::makeSignlessType(mlir::Type type) {
+mlir::Type numba::makeSignlessType(mlir::Type type) {
   if (auto intType = type.dyn_cast<mlir::IntegerType>())
     return makeSignlessType(intType);
 
   return type;
 }
 
-mlir::IntegerType imex::makeSignlessType(mlir::IntegerType type) {
+mlir::IntegerType numba::makeSignlessType(mlir::IntegerType type) {
   if (!type.isSignless())
     return mlir::IntegerType::get(type.getContext(), type.getWidth());
 
@@ -83,13 +83,13 @@ static mlir::Value intCast(mlir::OpBuilder &rewriter, mlir::Location loc,
                            mlir::Value val, mlir::Type dstType) {
   auto srcIntType = val.getType().cast<mlir::IntegerType>();
   auto dstIntType = dstType.cast<mlir::IntegerType>();
-  auto srcSignless = imex::makeSignlessType(srcIntType);
-  auto dstSignless = imex::makeSignlessType(dstIntType);
+  auto srcSignless = numba::makeSignlessType(srcIntType);
+  auto dstSignless = numba::makeSignlessType(dstIntType);
   auto srcBits = srcIntType.getWidth();
   auto dstBits = dstIntType.getWidth();
 
   if (srcIntType != srcSignless)
-    val = rewriter.createOrFold<imex::util::SignCastOp>(loc, srcSignless, val);
+    val = rewriter.createOrFold<numba::util::SignCastOp>(loc, srcSignless, val);
 
   if (dstBits > srcBits) {
     if (srcIntType.isSigned()) {
@@ -113,7 +113,7 @@ static mlir::Value intCast(mlir::OpBuilder &rewriter, mlir::Location loc,
   }
 
   if (dstIntType != dstSignless)
-    val = rewriter.createOrFold<imex::util::SignCastOp>(loc, dstIntType, val);
+    val = rewriter.createOrFold<numba::util::SignCastOp>(loc, dstIntType, val);
 
   return val;
 }
@@ -121,9 +121,10 @@ static mlir::Value intCast(mlir::OpBuilder &rewriter, mlir::Location loc,
 static mlir::Value intFloatCast(mlir::OpBuilder &rewriter, mlir::Location loc,
                                 mlir::Value val, mlir::Type dstType) {
   auto srcIntType = val.getType().cast<mlir::IntegerType>();
-  auto signlessType = imex::makeSignlessType(srcIntType);
+  auto signlessType = numba::makeSignlessType(srcIntType);
   if (val.getType() != signlessType)
-    val = rewriter.createOrFold<imex::util::SignCastOp>(loc, signlessType, val);
+    val =
+        rewriter.createOrFold<numba::util::SignCastOp>(loc, signlessType, val);
 
   if (srcIntType.isSigned()) {
     return rewriter.createOrFold<mlir::arith::SIToFPOp>(loc, dstType, val);
@@ -136,7 +137,7 @@ static mlir::Value floatIntCast(mlir::OpBuilder &rewriter, mlir::Location loc,
                                 mlir::Value val, mlir::Type dstType) {
   auto dstIntType = dstType.cast<mlir::IntegerType>();
   mlir::Value res;
-  auto dstSignlessType = imex::makeSignlessType(dstIntType);
+  auto dstSignlessType = numba::makeSignlessType(dstIntType);
   if (dstIntType.getWidth() == 1) {
     // Special handling for bool
     auto floatType = val.getType().cast<mlir::FloatType>();
@@ -161,7 +162,7 @@ static mlir::Value floatIntCast(mlir::OpBuilder &rewriter, mlir::Location loc,
     res = rewriter.create<mlir::arith::FPToUIOp>(loc, dstSignlessType, val);
   }
   if (dstSignlessType != dstIntType) {
-    return rewriter.createOrFold<imex::util::SignCastOp>(loc, dstIntType, res);
+    return rewriter.createOrFold<numba::util::SignCastOp>(loc, dstIntType, res);
   }
   return res;
 }
@@ -174,10 +175,10 @@ static mlir::Value indexCastImpl(mlir::OpBuilder &rewriter, mlir::Location loc,
   }
   if (dstType.isa<mlir::FloatType>()) {
     auto intType = rewriter.getI64Type();
-    val = imex::indexCast(rewriter, loc, val, intType);
+    val = numba::indexCast(rewriter, loc, val, intType);
     return rewriter.createOrFold<mlir::arith::SIToFPOp>(loc, dstType, val);
   }
-  return imex::indexCast(rewriter, loc, val, dstType);
+  return numba::indexCast(rewriter, loc, val, dstType);
 }
 
 static mlir::Value floatCastImpl(mlir::OpBuilder &rewriter, mlir::Location loc,
@@ -250,7 +251,7 @@ static const CastHandler castHandlers[] = {
     // clang-format on
 };
 
-bool imex::canConvert(mlir::Type srcType, mlir::Type dstType) {
+bool numba::canConvert(mlir::Type srcType, mlir::Type dstType) {
   if (srcType == dstType)
     return true;
 
@@ -261,8 +262,8 @@ bool imex::canConvert(mlir::Type srcType, mlir::Type dstType) {
   return false;
 }
 
-mlir::Value imex::doConvert(mlir::OpBuilder &rewriter, mlir::Location loc,
-                            mlir::Value val, mlir::Type dstType) {
+mlir::Value numba::doConvert(mlir::OpBuilder &rewriter, mlir::Location loc,
+                             mlir::Value val, mlir::Type dstType) {
   assert(dstType);
   auto srcType = val.getType();
   if (srcType == dstType)

@@ -48,7 +48,7 @@ public:
   ShapeValue(mlir::ArrayAttr attr) : shapeRanges(std::in_place) {
     shapeRanges->reserve(attr.size());
     for (auto elem : attr) {
-      auto range = elem.cast<imex::util::IndexRangeAttr>();
+      auto range = elem.cast<numba::util::IndexRangeAttr>();
       shapeRanges->emplace_back(getIndexRange(range.getMin(), range.getMax()));
     }
   }
@@ -188,8 +188,8 @@ struct ShapeValueLattice : public mlir::dataflow::Lattice<ShapeValue> {
 };
 
 static bool isShapedCast(mlir::Operation *op) {
-  if (mlir::isa<imex::ntensor::FromTensorOp, imex::ntensor::ToTensorOp,
-                imex::ntensor::FromMemrefOp, imex::ntensor::ToMemrefOp>(op))
+  if (mlir::isa<numba::ntensor::FromTensorOp, numba::ntensor::ToTensorOp,
+                numba::ntensor::FromMemrefOp, numba::ntensor::ToMemrefOp>(op))
     return true;
 
   return mlir::isa<mlir::CastOpInterface>(op) && op->getNumOperands() == 1 &&
@@ -291,7 +291,7 @@ public:
       return;
     }
 
-    if (auto enforceShape = mlir::dyn_cast<imex::util::EnforceShapeOp>(op)) {
+    if (auto enforceShape = mlir::dyn_cast<numba::util::EnforceShapeOp>(op)) {
       auto srcShaped =
           enforceShape.getValue().getType().dyn_cast<mlir::ShapedType>();
       if (!srcShaped)
@@ -477,7 +477,7 @@ public:
       return mlir::failure();
 
     auto attrName = mlir::StringAttr::get(
-        top->getContext(), imex::util::attributes::getShapeRangeName());
+        top->getContext(), numba::util::attributes::getShapeRangeName());
     top->walk([&](mlir::FunctionOpInterface func) {
       if (func.isExternal())
         return;
@@ -596,8 +596,8 @@ struct ShapeIntegerRangePropagationPass
 
   virtual void
   getDependentDialects(mlir::DialectRegistry &registry) const override {
-    registry.insert<imex::util::ImexUtilDialect>();
-    registry.insert<imex::ntensor::NTensorDialect>();
+    registry.insert<numba::util::ImexUtilDialect>();
+    registry.insert<numba::ntensor::NTensorDialect>();
     registry.insert<mlir::arith::ArithDialect>();
     registry.insert<mlir::tensor::TensorDialect>();
     registry.insert<mlir::linalg::LinalgDialect>();
@@ -624,6 +624,6 @@ struct ShapeIntegerRangePropagationPass
 };
 } // namespace
 
-std::unique_ptr<mlir::Pass> imex::createShapeIntegerRangePropagationPass() {
+std::unique_ptr<mlir::Pass> numba::createShapeIntegerRangePropagationPass() {
   return std::make_unique<ShapeIntegerRangePropagationPass>();
 }

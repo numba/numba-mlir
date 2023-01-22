@@ -25,7 +25,7 @@ namespace plier {
 class GetiterOp;
 }
 
-namespace imex {
+namespace numba {
 bool canLowerWhileToFor(mlir::scf::WhileOp whileOp);
 llvm::SmallVector<mlir::scf::ForOp, 2> lowerWhileToFor(
     mlir::scf::WhileOp whileOp, mlir::PatternRewriter &builder,
@@ -47,4 +47,4 @@ mlir::LogicalResult lowerWhileToFor(
 
 mlir::LogicalResult naivelyFuseParallelOps(mlir::Region &region);
 mlir::LogicalResult prepareForFusion(mlir::Region &region);
-} // namespace imex
+} // namespace numba

@@ -10,7 +10,7 @@ namespace mlir {
 class Pass;
 }
 
-namespace imex {
+namespace numba {
 /// Converts function body from CFG form to SCF dialect ops.
 std::unique_ptr<mlir::Pass> createCFGToSCFPass();
-} // namespace imex
+} // namespace numba

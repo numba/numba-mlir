@@ -6,11 +6,11 @@
 
 #include <llvm/ADT/StringRef.h>
 
-namespace imex {
+namespace numba {
 class PipelineRegistry;
 }
 
-void registerBasePipeline(imex::PipelineRegistry &registry);
+void registerBasePipeline(numba::PipelineRegistry &registry);
 
 struct PipelineStage {
   llvm::StringRef begin;

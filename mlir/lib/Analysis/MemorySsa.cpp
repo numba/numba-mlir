@@ -10,8 +10,8 @@
 #include <mlir/Interfaces/LoopLikeInterface.h>
 #include <mlir/Interfaces/SideEffectInterfaces.h>
 
-struct imex::MemorySSA::Node : public llvm::ilist_node<Node> {
-  using Type = imex::MemorySSA::NodeType;
+struct numba::MemorySSA::Node : public llvm::ilist_node<Node> {
+  using Type = numba::MemorySSA::NodeType;
 
   mlir::Operation *getOperation() const { return operation; }
 
@@ -142,9 +142,9 @@ private:
   Arg args[1]; // Variadic size
 };
 
-imex::MemorySSA::Node *
-imex::MemorySSA::createNode(mlir::Operation *op, NodeType type,
-                            llvm::ArrayRef<imex::MemorySSA::Node *> args) {
+numba::MemorySSA::Node *
+numba::MemorySSA::createNode(mlir::Operation *op, NodeType type,
+                             llvm::ArrayRef<numba::MemorySSA::Node *> args) {
   auto ptr = allocator.Allocate(Node::computeSize(args.size()),
                                 std::alignment_of<Node>::value);
   auto node = new (ptr) Node(op, type, args);
@@ -153,23 +153,23 @@ imex::MemorySSA::createNode(mlir::Operation *op, NodeType type,
   return node;
 }
 
-imex::MemorySSA::Node *imex::MemorySSA::createDef(mlir::Operation *op,
-                                                  imex::MemorySSA::Node *arg) {
+numba::MemorySSA::Node *
+numba::MemorySSA::createDef(mlir::Operation *op, numba::MemorySSA::Node *arg) {
   return createNode(op, NodeType::Def, arg);
 }
 
-imex::MemorySSA::Node *imex::MemorySSA::createUse(mlir::Operation *op,
-                                                  imex::MemorySSA::Node *arg) {
+numba::MemorySSA::Node *
+numba::MemorySSA::createUse(mlir::Operation *op, numba::MemorySSA::Node *arg) {
   return createNode(op, NodeType::Use, arg);
 }
 
-imex::MemorySSA::Node *
-imex::MemorySSA::createPhi(mlir::Operation *op,
-                           llvm::ArrayRef<imex::MemorySSA::Node *> args) {
+numba::MemorySSA::Node *
+numba::MemorySSA::createPhi(mlir::Operation *op,
+                            llvm::ArrayRef<numba::MemorySSA::Node *> args) {
   return createNode(op, NodeType::Phi, args);
 }
 
-void imex::MemorySSA::eraseNode(imex::MemorySSA::Node *node) {
+void numba::MemorySSA::eraseNode(numba::MemorySSA::Node *node) {
   assert(nullptr != node);
   if (NodeType::Def == node->getType()) {
     assert(node->getNumArguments() == 1);
@@ -195,20 +195,20 @@ void imex::MemorySSA::eraseNode(imex::MemorySSA::Node *node) {
   node->~Node();
 }
 
-imex::MemorySSA::NodeType
-imex::MemorySSA::getNodeType(imex::MemorySSA::Node *node) const {
+numba::MemorySSA::NodeType
+numba::MemorySSA::getNodeType(numba::MemorySSA::Node *node) const {
   assert(nullptr != node);
   return node->getType();
 }
 
 mlir::Operation *
-imex::MemorySSA::getNodeOperation(imex::MemorySSA::Node *node) const {
+numba::MemorySSA::getNodeOperation(numba::MemorySSA::Node *node) const {
   assert(nullptr != node);
   return node->getOperation();
 }
 
-imex::MemorySSA::Node *
-imex::MemorySSA::getNodeDef(imex::MemorySSA::Node *node) const {
+numba::MemorySSA::Node *
+numba::MemorySSA::getNodeDef(numba::MemorySSA::Node *node) const {
   node->getIterator();
   assert(nullptr != node);
   assert(NodeType::Use == node->getType());
@@ -216,14 +216,14 @@ imex::MemorySSA::getNodeDef(imex::MemorySSA::Node *node) const {
   return node->getArgument(0);
 }
 
-llvm::SmallVector<imex::MemorySSA::Node *>
-imex::MemorySSA::getUsers(imex::MemorySSA::Node *node) {
+llvm::SmallVector<numba::MemorySSA::Node *>
+numba::MemorySSA::getUsers(numba::MemorySSA::Node *node) {
   assert(nullptr != node);
   auto users = node->getUsers();
   return {users.begin(), users.end()};
 }
 
-imex::MemorySSA::Node *imex::MemorySSA::getRoot() {
+numba::MemorySSA::Node *numba::MemorySSA::getRoot() {
   if (nullptr == root) {
     root = new (allocator.Allocate(Node::computeSize(0),
                                    std::alignment_of<Node>::value)) Node();
@@ -232,7 +232,7 @@ imex::MemorySSA::Node *imex::MemorySSA::getRoot() {
   return root;
 }
 
-imex::MemorySSA::Node *imex::MemorySSA::getTerm() {
+numba::MemorySSA::Node *numba::MemorySSA::getTerm() {
   if (nullptr == term) {
     Node *temp = nullptr;
     term = new (allocator.Allocate(Node::computeSize(1),
@@ -243,18 +243,18 @@ imex::MemorySSA::Node *imex::MemorySSA::getTerm() {
   return term;
 }
 
-imex::MemorySSA::Node *imex::MemorySSA::getNode(mlir::Operation *op) const {
+numba::MemorySSA::Node *numba::MemorySSA::getNode(mlir::Operation *op) const {
   assert(nullptr != op);
   auto it = nodesMap.find(op);
   return it != nodesMap.end() ? it->second : nullptr;
 }
 
-llvm::iterator_range<imex::MemorySSA::NodesIterator>
-imex::MemorySSA::getNodes() {
+llvm::iterator_range<numba::MemorySSA::NodesIterator>
+numba::MemorySSA::getNodes() {
   return llvm::make_range(nodes.begin(), nodes.end());
 }
 
-void imex::MemorySSA::print(llvm::raw_ostream &os) {
+void numba::MemorySSA::print(llvm::raw_ostream &os) {
   for (auto &node : getNodes()) {
     os << "\n";
     print(&node, os);
@@ -265,8 +265,8 @@ void imex::MemorySSA::print(llvm::raw_ostream &os) {
   }
 }
 
-void imex::MemorySSA::print(
-    imex::MemorySSA::Node *node,
+void numba::MemorySSA::print(
+    numba::MemorySSA::Node *node,
     llvm::raw_ostream &os) /*const*/ // TODO: identifyObject const
 {
   const llvm::StringRef types[] = {
@@ -306,13 +306,13 @@ void imex::MemorySSA::print(
 
 namespace {
 template <typename C, typename F>
-bool checkPhisAlias(C &phiCache, imex::MemorySSA::Node *phi,
-                    imex::MemorySSA::Node *stop, mlir::Operation *useOp,
+bool checkPhisAlias(C &phiCache, numba::MemorySSA::Node *phi,
+                    numba::MemorySSA::Node *stop, mlir::Operation *useOp,
                     F &&mayAlias) {
   assert(nullptr != phi);
   assert(nullptr != stop);
   assert(nullptr != useOp);
-  using NodeType = imex::MemorySSA::Node::Type;
+  using NodeType = numba::MemorySSA::Node::Type;
   assert(phi->getType() == NodeType::Phi);
   if (phiCache.count(phi) == 0) {
     phiCache.insert(phi);
@@ -341,8 +341,8 @@ bool checkPhisAlias(C &phiCache, imex::MemorySSA::Node *phi,
 }
 
 template <typename F>
-imex::MemorySSA::Node *getDef(imex::MemorySSA::Node *def,
-                              mlir::Operation *useOp, F &&mayAlias) {
+numba::MemorySSA::Node *getDef(numba::MemorySSA::Node *def,
+                               mlir::Operation *useOp, F &&mayAlias) {
   while (true) {
     assert(nullptr != def);
     auto dom = def->getDominator();
@@ -350,11 +350,11 @@ imex::MemorySSA::Node *getDef(imex::MemorySSA::Node *def,
       return def;
 
     auto type = def->getType();
-    if (type == imex::MemorySSA::Node::Type::Phi) {
-      llvm::SmallDenseSet<imex::MemorySSA::Node *> phiCache;
+    if (type == numba::MemorySSA::Node::Type::Phi) {
+      llvm::SmallDenseSet<numba::MemorySSA::Node *> phiCache;
       if (!checkPhisAlias(phiCache, def, dom, useOp, std::forward<F>(mayAlias)))
         return def;
-    } else if (type == imex::MemorySSA::Node::Type::Def) {
+    } else if (type == numba::MemorySSA::Node::Type::Def) {
       assert(nullptr != def->getOperation());
       if (mayAlias(def->getOperation(), useOp))
         return def;
@@ -366,7 +366,7 @@ imex::MemorySSA::Node *getDef(imex::MemorySSA::Node *def,
 }
 } // namespace
 
-mlir::LogicalResult imex::MemorySSA::optimizeUses(
+mlir::LogicalResult numba::MemorySSA::optimizeUses(
     llvm::function_ref<bool(mlir::Operation *, mlir::Operation *)> mayAlias) {
   assert(mayAlias);
   bool changed = false;
@@ -416,20 +416,21 @@ auto hasMemEffect(mlir::Operation &op) {
   return ret;
 }
 
-imex::MemorySSA::Node *memSSAProcessRegion(mlir::Region &region,
-                                           imex::MemorySSA::Node *entryNode,
-                                           imex::MemorySSA &memSSA) {
+numba::MemorySSA::Node *memSSAProcessRegion(mlir::Region &region,
+                                            numba::MemorySSA::Node *entryNode,
+                                            numba::MemorySSA &memSSA) {
   assert(nullptr != entryNode);
   // Only structured control flow is supported for now
   if (!llvm::hasSingleElement(region))
     return nullptr;
 
   auto &block = region.front();
-  imex::MemorySSA::Node *currentNode = entryNode;
+  numba::MemorySSA::Node *currentNode = entryNode;
   for (auto &op : block) {
     if (!op.getRegions().empty()) {
       if (auto loop = mlir::dyn_cast<mlir::LoopLikeOpInterface>(op)) {
-        std::array<imex::MemorySSA::Node *, 2> phiArgs = {nullptr, currentNode};
+        std::array<numba::MemorySSA::Node *, 2> phiArgs = {nullptr,
+                                                           currentNode};
         auto phi = memSSA.createPhi(&op, phiArgs);
         auto result = memSSAProcessRegion(loop.getLoopBody(), phi, memSSA);
         if (nullptr == result)
@@ -493,7 +494,7 @@ imex::MemorySSA::Node *memSSAProcessRegion(mlir::Region &region,
           }
         }
 
-        llvm::SmallVector<imex::MemorySSA::Node *> regResults(numRegions);
+        llvm::SmallVector<numba::MemorySSA::Node *> regResults(numRegions);
 
         struct RegionVisitor {
           decltype(branchReg) _op;
@@ -502,7 +503,7 @@ imex::MemorySSA::Node *memSSAProcessRegion(mlir::Region &region,
           decltype(memSSA) &_memSSA;
           decltype(predecessors) &_predecessors;
 
-          imex::MemorySSA::Node *visit(llvm::Optional<unsigned> ii) {
+          numba::MemorySSA::Node *visit(llvm::Optional<unsigned> ii) {
             if (!ii)
               return _currentNode;
 
@@ -528,8 +529,8 @@ imex::MemorySSA::Node *memSSAProcessRegion(mlir::Region &region,
               _regResults[i] = res;
               return res;
             } else {
-              llvm::SmallVector<imex::MemorySSA::Node *> prevNodes(pred.size(),
-                                                                   nullptr);
+              llvm::SmallVector<numba::MemorySSA::Node *> prevNodes(pred.size(),
+                                                                    nullptr);
               auto phi = _memSSA.createPhi(_op, prevNodes);
               phi->setDominator(_currentNode); // TODO: not very robust
               _currentNode->setPostDominator(phi);
@@ -560,7 +561,7 @@ imex::MemorySSA::Node *memSSAProcessRegion(mlir::Region &region,
           if (currentNode == nullptr)
             return nullptr;
         } else {
-          llvm::SmallVector<imex::MemorySSA::Node *> prevNodes(
+          llvm::SmallVector<numba::MemorySSA::Node *> prevNodes(
               parentPredecessors.size());
           for (auto [i, val] : llvm::enumerate(parentPredecessors)) {
             auto prev = visitor.visit(val);
@@ -603,8 +604,8 @@ imex::MemorySSA::Node *memSSAProcessRegion(mlir::Region &region,
 }
 } // namespace
 
-llvm::Optional<imex::MemorySSA> imex::buildMemorySSA(mlir::Region &region) {
-  imex::MemorySSA ret;
+llvm::Optional<numba::MemorySSA> numba::buildMemorySSA(mlir::Region &region) {
+  numba::MemorySSA ret;
   if (auto last = memSSAProcessRegion(region, ret.getRoot(), ret)) {
     ret.getTerm()->setArgument(0, last);
   } else {
@@ -613,38 +614,40 @@ llvm::Optional<imex::MemorySSA> imex::buildMemorySSA(mlir::Region &region) {
   return std::move(ret);
 }
 
-imex::MemorySSA::NodesIterator::NodesIterator(
-    imex::MemorySSA::NodesIterator::internal_iterator iter)
+numba::MemorySSA::NodesIterator::NodesIterator(
+    numba::MemorySSA::NodesIterator::internal_iterator iter)
     : iterator(iter) {}
 
-imex::MemorySSA::NodesIterator &imex::MemorySSA::NodesIterator::operator++() {
+numba::MemorySSA::NodesIterator &numba::MemorySSA::NodesIterator::operator++() {
   ++iterator;
   return *this;
 }
 
-imex::MemorySSA::NodesIterator imex::MemorySSA::NodesIterator::operator++(int) {
+numba::MemorySSA::NodesIterator
+numba::MemorySSA::NodesIterator::operator++(int) {
   auto tmp = *this;
   ++iterator;
   return tmp;
 }
 
-imex::MemorySSA::NodesIterator &imex::MemorySSA::NodesIterator::operator--() {
+numba::MemorySSA::NodesIterator &numba::MemorySSA::NodesIterator::operator--() {
   --iterator;
   return *this;
 }
 
-imex::MemorySSA::NodesIterator imex::MemorySSA::NodesIterator::operator--(int) {
+numba::MemorySSA::NodesIterator
+numba::MemorySSA::NodesIterator::operator--(int) {
   auto tmp = *this;
   --iterator;
   return tmp;
 }
 
-imex::MemorySSA::NodesIterator::reference
-imex::MemorySSA::NodesIterator::operator*() {
+numba::MemorySSA::NodesIterator::reference
+numba::MemorySSA::NodesIterator::operator*() {
   return *iterator;
 }
 
-imex::MemorySSA::NodesIterator::pointer
-imex::MemorySSA::NodesIterator::operator->() {
+numba::MemorySSA::NodesIterator::pointer
+numba::MemorySSA::NodesIterator::operator->() {
   return iterator.operator->();
 }

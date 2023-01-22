@@ -10,7 +10,7 @@ namespace mlir {
 class Pass;
 }
 
-namespace imex {
+namespace numba {
 /// Expand tuple into individual elements.
 std::unique_ptr<mlir::Pass> createExpandTuplePass();
-} // namespace imex
+} // namespace numba

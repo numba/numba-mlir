@@ -10,7 +10,7 @@
 #include <mlir/Pass/Pass.h>
 #include <mlir/Transforms/GreedyPatternRewriteDriver.h>
 
-namespace imex {
+namespace numba {
 
 template <typename... Dialects> struct DependentDialectsList {
   void operator()(mlir::DialectRegistry &registry) const {
@@ -55,4 +55,4 @@ public:
 private:
   mlir::FrozenRewritePatternSet patterns;
 };
-} // namespace imex
+} // namespace numba

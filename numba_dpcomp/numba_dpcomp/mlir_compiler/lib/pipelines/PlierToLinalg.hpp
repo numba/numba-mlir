@@ -4,7 +4,7 @@
 
 #pragma once
 
-namespace imex {
+namespace numba {
 class PipelineRegistry;
 }
 
@@ -12,7 +12,7 @@ namespace llvm {
 class StringRef;
 }
 
-void registerPlierToLinalgPipeline(imex::PipelineRegistry &registry);
+void registerPlierToLinalgPipeline(numba::PipelineRegistry &registry);
 
 llvm::StringRef plierToLinalgGenPipelineName();
 llvm::StringRef plierToLinalgOptPipelineName();
