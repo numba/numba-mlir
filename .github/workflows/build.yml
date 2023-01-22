@@ -180,26 +180,31 @@ jobs:
         run: |
           external_lit=`which lit`
           echo ${external_lit}
-          # make the llvm-mlir working dir
-          mkdir -p /home/runner/work/tmpdir
+          mkdir -p _build
+          cd _build
           export TBB_PATH=/home/runner/work/tbb/oneapi-tbb-${TBB_VER}
           export LEVEL_ZERO_DIR=/home/runner/work/level-zero/level-zero/level_zero_install
           export LEVEL_ZERO_VERSION_CHECK_OFF=1
-          python scripts/build_locally.py                                      \
-            --working-dir /home/runner/work/tmpdir                             \
-            --llvm-install /home/runner/work/llvm-mlir/_mlir_install           \
-            --imex-enable-igpu                                                 \
-            --imex-enable-tests                                                \
-            --imex-tbb-dir /${TBB_PATH}/lib/cmake/tbb                          \
-            --external-lit ${external_lit}
-
+          export LLVM_DIR=/home/runner/work/llvm-mlir/_mlir_install
+          cmake ${GITHUB_WORKSPACE}                                             \
+            -GNinja                                                             \
+            -DCMAKE_BUILD_TYPE=Release                                          \
+            -DLLVM_DIR=${LLVM_DIR}/lib/cmake/llvm                               \
+            -DMLIR_DIR=${LLVM_DIR}/lib/cmake/mlir                               \
+            -DIMEX_ENABLE_IGPU_DIALECT=ON                                       \
+            -DIMEX_ENABLE_TESTS=ON                                              \
+            -DIMEX_ENABLE_TBB_SUPPORT=ON                                        \
+            -DTBB_DIR=${TBB_PATH}/lib/cmake/tbb                                 \
+            -DLLVM_EXTERNAL_LIT=${external_lit}                                 \
+             || exit 1
+          ninja all || exit 1
 
       - name: Run IMEX core test cases
         shell: bash -l {0}
 
         run: |
           cd _build || exit 1
-          cmake --build . --target check-imex || exit 1
+          ninja check-imex || exit 1
 
       - name: Build Python frontend
         shell: bash -l {0}
