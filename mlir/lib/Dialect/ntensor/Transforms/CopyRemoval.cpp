@@ -2,10 +2,10 @@
 //
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "imex/Dialect/ntensor/Transforms/CopyRemoval.hpp"
+#include "numba/Dialect/ntensor/Transforms/CopyRemoval.hpp"
 
-#include "imex/Analysis/AliasAnalysis.hpp"
-#include "imex/Dialect/ntensor/IR/NTensorOps.hpp"
+#include "numba/Analysis/AliasAnalysis.hpp"
+#include "numba/Dialect/ntensor/IR/NTensorOps.hpp"
 
 #include <mlir/IR/Dominance.h>
 #include <mlir/IR/FunctionInterfaces.h>

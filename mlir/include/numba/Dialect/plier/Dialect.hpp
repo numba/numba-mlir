@@ -14,13 +14,13 @@
 #include <mlir/Interfaces/SideEffectInterfaces.h>
 #include <mlir/Interfaces/ViewLikeInterface.h>
 
-#include "imex/Dialect/plier/PlierOpsDialect.h.inc"
+#include "numba/Dialect/plier/PlierOpsDialect.h.inc"
 
 #define GET_TYPEDEF_CLASSES
-#include "imex/Dialect/plier/PlierOpsTypes.h.inc"
+#include "numba/Dialect/plier/PlierOpsTypes.h.inc"
 
 #define GET_OP_CLASSES
-#include "imex/Dialect/plier/PlierOps.h.inc"
+#include "numba/Dialect/plier/PlierOps.h.inc"
 
 namespace plier {
 namespace detail {

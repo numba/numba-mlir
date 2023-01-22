@@ -8,11 +8,11 @@
 #include <mlir/Pass/PassManager.h>
 #include <mlir/Transforms/Passes.h>
 
-#include "imex/Compiler/PipelineRegistry.hpp"
-#include "imex/Conversion/CfgToScf.hpp"
-#include "imex/Dialect/plier/Dialect.hpp"
-#include "imex/Transforms/ArgLowering.hpp"
-#include "imex/Transforms/RewriteWrapper.hpp"
+#include "numba/Compiler/PipelineRegistry.hpp"
+#include "numba/Conversion/CfgToScf.hpp"
+#include "numba/Dialect/plier/Dialect.hpp"
+#include "numba/Transforms/ArgLowering.hpp"
+#include "numba/Transforms/RewriteWrapper.hpp"
 
 #include "BasePipeline.hpp"
 

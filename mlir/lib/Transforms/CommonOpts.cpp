@@ -2,11 +2,11 @@
 //
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "imex/Transforms/CommonOpts.hpp"
+#include "numba/Transforms/CommonOpts.hpp"
 
-#include "imex/Transforms/IfRewrites.hpp"
-#include "imex/Transforms/IndexTypePropagation.hpp"
-#include "imex/Transforms/LoopRewrites.hpp"
+#include "numba/Transforms/IfRewrites.hpp"
+#include "numba/Transforms/IndexTypePropagation.hpp"
+#include "numba/Transforms/LoopRewrites.hpp"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 

@@ -2,9 +2,9 @@
 //
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "imex/Transforms/InlineUtils.hpp"
+#include "numba/Transforms/InlineUtils.hpp"
 
-#include "imex/Dialect/imex_util/Dialect.hpp"
+#include "numba/Dialect/imex_util/Dialect.hpp"
 
 #include <mlir/Dialect/Func/IR/FuncOps.h>
 #include <mlir/Dialect/SCF/IR/SCF.h>

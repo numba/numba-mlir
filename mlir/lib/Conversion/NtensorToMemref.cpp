@@ -2,13 +2,13 @@
 //
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "imex/Conversion/NtensorToMemref.hpp"
+#include "numba/Conversion/NtensorToMemref.hpp"
 
-#include "imex/Conversion/UtilConversion.hpp"
-#include "imex/Dialect/imex_util/Dialect.hpp"
-#include "imex/Dialect/imex_util/Utils.hpp"
-#include "imex/Dialect/ntensor/IR/NTensorOps.hpp"
-#include "imex/Transforms/TypeConversion.hpp"
+#include "numba/Conversion/UtilConversion.hpp"
+#include "numba/Dialect/imex_util/Dialect.hpp"
+#include "numba/Dialect/imex_util/Utils.hpp"
+#include "numba/Dialect/ntensor/IR/NTensorOps.hpp"
+#include "numba/Transforms/TypeConversion.hpp"
 
 #include <mlir/Dialect/Arith/IR/Arith.h>
 #include <mlir/Dialect/Bufferization/IR/Bufferization.h>

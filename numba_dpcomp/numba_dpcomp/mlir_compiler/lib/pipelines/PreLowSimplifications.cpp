@@ -6,9 +6,9 @@
 
 #include "pipelines/BasePipeline.hpp"
 
-#include "imex/Compiler/PipelineRegistry.hpp"
-#include "imex/Transforms/ExpandTuple.hpp"
-#include "imex/Transforms/MakeSignless.hpp"
+#include "numba/Compiler/PipelineRegistry.hpp"
+#include "numba/Transforms/ExpandTuple.hpp"
+#include "numba/Transforms/MakeSignless.hpp"
 
 #include <mlir/Pass/PassManager.h>
 #include <mlir/Transforms/Passes.h>

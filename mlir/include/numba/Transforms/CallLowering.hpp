@@ -4,7 +4,7 @@
 
 #pragma once
 
-#include "imex/Dialect/plier/Dialect.hpp"
+#include "numba/Dialect/plier/Dialect.hpp"
 
 #include <mlir/IR/PatternMatch.h>
 

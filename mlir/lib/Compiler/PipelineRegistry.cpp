@@ -2,9 +2,9 @@
 //
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "imex/Compiler/PipelineRegistry.hpp"
+#include "numba/Compiler/PipelineRegistry.hpp"
 
-#include "imex/Utils.hpp"
+#include "numba/Utils.hpp"
 
 #include <llvm/ADT/STLExtras.h>
 #include <llvm/Support/Allocator.h>

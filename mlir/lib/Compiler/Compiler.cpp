@@ -2,11 +2,11 @@
 //
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "imex/Compiler/Compiler.hpp"
+#include "numba/Compiler/Compiler.hpp"
 
-#include "imex/Compiler/PipelineRegistry.hpp"
-#include "imex/Transforms/PipelineUtils.hpp"
-#include "imex/Utils.hpp"
+#include "numba/Compiler/PipelineRegistry.hpp"
+#include "numba/Transforms/PipelineUtils.hpp"
+#include "numba/Utils.hpp"
 
 #include <mlir/IR/BuiltinOps.h>
 #include <mlir/IR/Diagnostics.h>

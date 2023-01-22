@@ -2,11 +2,11 @@
 //
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "imex/Transforms/ArgLowering.hpp"
+#include "numba/Transforms/ArgLowering.hpp"
 
 #include <mlir/Dialect/Func/IR/FuncOps.h>
 
-#include "imex/Dialect/plier/Dialect.hpp"
+#include "numba/Dialect/plier/Dialect.hpp"
 
 numba::ArgOpLowering::ArgOpLowering(mlir::MLIRContext *context)
     : OpRewritePattern(context) {}

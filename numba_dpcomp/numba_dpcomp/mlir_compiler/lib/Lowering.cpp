@@ -29,15 +29,15 @@
 #include <llvm/Support/ManagedStatic.h>
 #include <llvm/Support/TargetSelect.h>
 
-#include "imex/Dialect/gpu_runtime/IR/GpuRuntimeOps.hpp"
-#include "imex/Dialect/imex_util/Dialect.hpp"
-#include "imex/Dialect/ntensor/IR/NTensorOps.hpp"
-#include "imex/Dialect/plier/Dialect.hpp"
+#include "numba/Dialect/gpu_runtime/IR/GpuRuntimeOps.hpp"
+#include "numba/Dialect/imex_util/Dialect.hpp"
+#include "numba/Dialect/ntensor/IR/NTensorOps.hpp"
+#include "numba/Dialect/plier/Dialect.hpp"
 
-#include "imex/Compiler/Compiler.hpp"
-#include "imex/Compiler/PipelineRegistry.hpp"
-#include "imex/ExecutionEngine/ExecutionEngine.hpp"
-#include "imex/Utils.hpp"
+#include "numba/Compiler/Compiler.hpp"
+#include "numba/Compiler/PipelineRegistry.hpp"
+#include "numba/ExecutionEngine/ExecutionEngine.hpp"
+#include "numba/Utils.hpp"
 
 #include "PyTypeConverter.hpp"
 #include "pipelines/BasePipeline.hpp"

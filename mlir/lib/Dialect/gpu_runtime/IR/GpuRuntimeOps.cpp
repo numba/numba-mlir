@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "imex/Dialect/gpu_runtime/IR/GpuRuntimeOps.hpp"
+#include "numba/Dialect/gpu_runtime/IR/GpuRuntimeOps.hpp"
 
 #include <mlir/IR/Builders.h>
 #include <mlir/IR/BuiltinOps.h>
@@ -41,17 +41,17 @@ namespace gpu_runtime {
 void GpuRuntimeDialect::initialize() {
   addOperations<
 #define GET_OP_LIST
-#include "imex/Dialect/gpu_runtime/IR/GpuRuntimeOps.cpp.inc"
+#include "numba/Dialect/gpu_runtime/IR/GpuRuntimeOps.cpp.inc"
       >();
 
   addTypes<
 #define GET_TYPEDEF_LIST
-#include "imex/Dialect/gpu_runtime/IR/GpuRuntimeOpsTypes.cpp.inc"
+#include "numba/Dialect/gpu_runtime/IR/GpuRuntimeOpsTypes.cpp.inc"
       >();
 
   addAttributes<
 #define GET_ATTRDEF_LIST
-#include "imex/Dialect/gpu_runtime/IR/GpuRuntimeOpsAttributes.cpp.inc"
+#include "numba/Dialect/gpu_runtime/IR/GpuRuntimeOpsAttributes.cpp.inc"
       >();
 
   addInterfaces<GpuRuntimeInlinerInterface>();
@@ -251,15 +251,15 @@ static void printAsyncDependencies(mlir::OpAsmPrinter &printer,
   printer << ']';
 }
 
-#include "imex/Dialect/gpu_runtime/IR/GpuRuntimeOpsDialect.cpp.inc"
+#include "numba/Dialect/gpu_runtime/IR/GpuRuntimeOpsDialect.cpp.inc"
 
 #define GET_ATTRDEF_CLASSES
-#include "imex/Dialect/gpu_runtime/IR/GpuRuntimeOpsAttributes.cpp.inc"
+#include "numba/Dialect/gpu_runtime/IR/GpuRuntimeOpsAttributes.cpp.inc"
 
 #define GET_OP_CLASSES
-#include "imex/Dialect/gpu_runtime/IR/GpuRuntimeOps.cpp.inc"
+#include "numba/Dialect/gpu_runtime/IR/GpuRuntimeOps.cpp.inc"
 
 #define GET_TYPEDEF_CLASSES
-#include "imex/Dialect/gpu_runtime/IR/GpuRuntimeOpsTypes.cpp.inc"
+#include "numba/Dialect/gpu_runtime/IR/GpuRuntimeOpsTypes.cpp.inc"
 
-#include "imex/Dialect/gpu_runtime/IR/GpuRuntimeOpsEnums.cpp.inc"
+#include "numba/Dialect/gpu_runtime/IR/GpuRuntimeOpsEnums.cpp.inc"

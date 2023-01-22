@@ -2,10 +2,10 @@
 //
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "imex/Transforms/PromoteBoolMemref.hpp"
+#include "numba/Transforms/PromoteBoolMemref.hpp"
 
-#include "imex/Dialect/imex_util/Dialect.hpp"
-#include "imex/Transforms/TypeConversion.hpp"
+#include "numba/Dialect/imex_util/Dialect.hpp"
+#include "numba/Transforms/TypeConversion.hpp"
 
 #include <mlir/Dialect/Arith/IR/Arith.h>
 #include <mlir/Dialect/MemRef/IR/MemRef.h>

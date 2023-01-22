@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "imex/Utils.hpp"
+#include "numba/Utils.hpp"
 
 #include <stdexcept>
 

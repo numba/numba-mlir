@@ -34,8 +34,8 @@ class SliceType;
 } // namespace ntensor
 } // namespace numba
 
-#include "imex/Dialect/ntensor/IR/NTensorOpsDialect.h.inc"
-#include "imex/Dialect/ntensor/IR/NTensorOpsEnums.h.inc"
+#include "numba/Dialect/ntensor/IR/NTensorOpsDialect.h.inc"
+#include "numba/Dialect/ntensor/IR/NTensorOpsEnums.h.inc"
 
 namespace numba {
 namespace ntensor {
@@ -72,10 +72,10 @@ public:
 } // namespace numba
 
 #define GET_TYPEDEF_CLASSES
-#include "imex/Dialect/ntensor/IR/NTensorOpsTypes.h.inc"
+#include "numba/Dialect/ntensor/IR/NTensorOpsTypes.h.inc"
 
 #define GET_ATTRDEF_CLASSES
-#include "imex/Dialect/ntensor/IR/NTensorOpsAttributes.h.inc"
+#include "numba/Dialect/ntensor/IR/NTensorOpsAttributes.h.inc"
 
 #define GET_OP_CLASSES
-#include "imex/Dialect/ntensor/IR/NTensorOps.h.inc"
+#include "numba/Dialect/ntensor/IR/NTensorOps.h.inc"

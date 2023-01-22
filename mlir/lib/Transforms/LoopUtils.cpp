@@ -2,13 +2,13 @@
 //
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "imex/Transforms/LoopUtils.hpp"
+#include "numba/Transforms/LoopUtils.hpp"
 
-#include "imex/Analysis/AliasAnalysis.hpp"
-#include "imex/Dialect/imex_util/Dialect.hpp"
-#include "imex/Dialect/plier/Dialect.hpp"
-#include "imex/Transforms/CastUtils.hpp"
-#include "imex/Transforms/ConstUtils.hpp"
+#include "numba/Analysis/AliasAnalysis.hpp"
+#include "numba/Dialect/imex_util/Dialect.hpp"
+#include "numba/Dialect/plier/Dialect.hpp"
+#include "numba/Transforms/CastUtils.hpp"
+#include "numba/Transforms/ConstUtils.hpp"
 
 #include <llvm/ADT/SmallVector.h>
 

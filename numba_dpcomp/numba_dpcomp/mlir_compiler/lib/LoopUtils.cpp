@@ -7,8 +7,8 @@
 #include <mlir/Dialect/Arith/IR/Arith.h>
 #include <mlir/IR/PatternMatch.h>
 
-#include "imex/Dialect/plier/Dialect.hpp"
-#include "imex/Transforms/LoopUtils.hpp"
+#include "numba/Dialect/plier/Dialect.hpp"
+#include "numba/Transforms/LoopUtils.hpp"
 
 mlir::LogicalResult numba::lowerRange(
     plier::PyCallOp op, mlir::ValueRange operands,

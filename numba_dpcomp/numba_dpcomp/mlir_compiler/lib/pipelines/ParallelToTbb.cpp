@@ -18,11 +18,11 @@
 #include "pipelines/BasePipeline.hpp"
 #include "pipelines/LowerToLlvm.hpp"
 
-#include "imex/Compiler/PipelineRegistry.hpp"
-#include "imex/Dialect/imex_util/Dialect.hpp"
-#include "imex/Transforms/ConstUtils.hpp"
-#include "imex/Transforms/FuncUtils.hpp"
-#include "imex/Transforms/RewriteWrapper.hpp"
+#include "numba/Compiler/PipelineRegistry.hpp"
+#include "numba/Dialect/imex_util/Dialect.hpp"
+#include "numba/Transforms/ConstUtils.hpp"
+#include "numba/Transforms/FuncUtils.hpp"
+#include "numba/Transforms/RewriteWrapper.hpp"
 
 namespace {
 static mlir::MemRefType getReduceType(mlir::Type type, int64_t count) {

@@ -6,8 +6,8 @@
 
 #include "PyTypeConverter.hpp"
 
-#include "imex/Dialect/imex_util/Dialect.hpp"
-#include "imex/Dialect/plier/Dialect.hpp"
+#include "numba/Dialect/imex_util/Dialect.hpp"
+#include "numba/Dialect/plier/Dialect.hpp"
 
 #include <pybind11/pybind11.h>
 

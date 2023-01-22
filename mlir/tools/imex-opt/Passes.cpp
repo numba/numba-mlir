@@ -12,22 +12,22 @@
 #include <mlir/Dialect/GPU/IR/GPUDialect.h>
 #include <mlir/Dialect/SCF/IR/SCF.h>
 
-#include "imex/Conversion/CfgToScf.hpp"
-#include "imex/Conversion/GpuRuntimeToLlvm.hpp"
-#include "imex/Conversion/GpuToGpuRuntime.hpp"
-#include "imex/Conversion/NtensorToLinalg.hpp"
-#include "imex/Conversion/NtensorToMemref.hpp"
-#include "imex/Conversion/SCFToAffine/SCFToAffine.h"
-#include "imex/Dialect/gpu_runtime/Transforms/MakeBarriersUniform.hpp"
-#include "imex/Dialect/ntensor/Transforms/CopyRemoval.hpp"
-#include "imex/Dialect/ntensor/Transforms/PropagateEnvironment.hpp"
-#include "imex/Dialect/ntensor/Transforms/ResolveArrayOps.hpp"
-#include "imex/Transforms/CanonicalizeReductions.hpp"
-#include "imex/Transforms/ExpandTuple.hpp"
-#include "imex/Transforms/MakeSignless.hpp"
-#include "imex/Transforms/MemoryRewrites.hpp"
-#include "imex/Transforms/PromoteToParallel.hpp"
-#include "imex/Transforms/ShapeIntegerRangePropagation.hpp"
+#include "numba/Conversion/CfgToScf.hpp"
+#include "numba/Conversion/GpuRuntimeToLlvm.hpp"
+#include "numba/Conversion/GpuToGpuRuntime.hpp"
+#include "numba/Conversion/NtensorToLinalg.hpp"
+#include "numba/Conversion/NtensorToMemref.hpp"
+#include "numba/Conversion/SCFToAffine/SCFToAffine.h"
+#include "numba/Dialect/gpu_runtime/Transforms/MakeBarriersUniform.hpp"
+#include "numba/Dialect/ntensor/Transforms/CopyRemoval.hpp"
+#include "numba/Dialect/ntensor/Transforms/PropagateEnvironment.hpp"
+#include "numba/Dialect/ntensor/Transforms/ResolveArrayOps.hpp"
+#include "numba/Transforms/CanonicalizeReductions.hpp"
+#include "numba/Transforms/ExpandTuple.hpp"
+#include "numba/Transforms/MakeSignless.hpp"
+#include "numba/Transforms/MemoryRewrites.hpp"
+#include "numba/Transforms/PromoteToParallel.hpp"
+#include "numba/Transforms/ShapeIntegerRangePropagation.hpp"
 
 // Passes registration.
 

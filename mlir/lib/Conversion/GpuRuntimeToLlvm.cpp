@@ -2,11 +2,11 @@
 //
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "imex/Conversion/GpuRuntimeToLlvm.hpp"
+#include "numba/Conversion/GpuRuntimeToLlvm.hpp"
 
-#include "imex/Dialect/gpu_runtime/IR/GpuRuntimeOps.hpp"
-#include "imex/Transforms/FuncUtils.hpp"
-#include "imex/Transforms/TypeConversion.hpp"
+#include "numba/Dialect/gpu_runtime/IR/GpuRuntimeOps.hpp"
+#include "numba/Transforms/FuncUtils.hpp"
+#include "numba/Transforms/TypeConversion.hpp"
 
 #include <mlir/Conversion/AsyncToLLVM/AsyncToLLVM.h>
 #include <mlir/Conversion/GPUCommon/GPUCommonPass.h>
