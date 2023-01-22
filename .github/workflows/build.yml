@@ -185,10 +185,11 @@ jobs:
           export TBB_PATH=/home/runner/work/tbb/oneapi-tbb-${TBB_VER}
           export LEVEL_ZERO_DIR=/home/runner/work/level-zero/level-zero/level_zero_install
           export LEVEL_ZERO_VERSION_CHECK_OFF=1
+          export LLVM_DIR=/home/runner/work/llvm-mlir/_mlir_install
           cmake ../llvm                                                         \
             -GNinja                                                             \
             -DCMAKE_BUILD_TYPE=Release                                          \
-            -DLLVM_DIR=/home/runner/work/llvm-mlir/_mlir_install/lib/cmake/llvm \
+            -DLLVM_DIR=${LLVM_DIR}/lib/cmake/llvm                               \
             -DIMEX_ENABLE_IGPU_DIALECT=ON                                       \
             -DIMEX_ENABLE_TESTS=ON                                              \
             -DIMEX_ENABLE_TBB_SUPPORT=ON                                        \
