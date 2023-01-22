@@ -197,6 +197,7 @@ jobs:
             -DTBB_DIR=${TBB_PATH}/lib/cmake/tbb                                 \
             -DLLVM_EXTERNAL_LIT=${external_lit}                                 \
              || exit 1
+          ninja all || exit 1
 
       - name: Run IMEX core test cases
         shell: bash -l {0}
