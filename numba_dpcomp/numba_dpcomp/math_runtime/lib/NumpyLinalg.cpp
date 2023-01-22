@@ -7,11 +7,11 @@
 
 #include "Common.hpp"
 
-#ifdef IMEX_USE_DPNP
+#ifdef NUMBA_MLIR_USE_DPNP
 #include <dpnp_iface.hpp>
 #endif
 
-#ifdef IMEX_USE_MKL
+#ifdef NUMBA_MLIR_USE_MKL
 #include "mkl.h"
 #endif
 
@@ -40,7 +40,7 @@ namespace {
 template <typename T>
 void eigImpl(Memref<2, const T> *input, Memref<1, T> *vals,
              Memref<2, T> *vecs) {
-#ifdef IMEX_USE_DPNP
+#ifdef NUMBA_MLIR_USE_DPNP
   dpnp_eig_c<T, T>(input->data, vals->data, vecs->data, input->dims[0]);
 #else
   (void)input;
@@ -53,7 +53,7 @@ void eigImpl(Memref<2, const T> *input, Memref<1, T> *vals,
 #endif
 }
 
-#ifdef IMEX_USE_MKL
+#ifdef NUMBA_MLIR_USE_MKL
 template <typename T>
 using GemmFunc = void(const CBLAS_LAYOUT, const CBLAS_TRANSPOSE,
                       const CBLAS_TRANSPOSE, const MKL_INT, const MKL_INT,
@@ -136,7 +136,7 @@ EIG_VARIANT(double, float64)
 
 #undef EIG_VARIANT
 
-#ifdef IMEX_USE_MKL
+#ifdef NUMBA_MLIR_USE_MKL
 #define MKL_CALL(f, ...) f(__VA_ARGS__)
 #define MKL_GEMM(Prefix) cblas_##Prefix##gemm
 #else

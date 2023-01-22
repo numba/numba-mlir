@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#ifdef IMEX_ENABLE_TBB_SUPPORT
+#ifdef NUMBA_MLIR_ENABLE_TBB_SUPPORT
 
 #include <array>
 #include <cassert>
@@ -252,4 +252,4 @@ DPCOMP_RUNTIME_EXPORT void dpcompParallelFinalize() {
   globalContext.reset();
 }
 }
-#endif // IMEX_ENABLE_TBB_SUPPORT
+#endif // NUMBA_MLIR_ENABLE_TBB_SUPPORT

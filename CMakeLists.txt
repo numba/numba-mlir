@@ -60,39 +60,39 @@ if (CMAKE_SYSTEM_NAME STREQUAL Darwin)
     # add_compile_options(-mcet) # v8.0 and newer # unrecognized command line option '-mcet', only recommended
 endif()
 
-option(IMEX_USE_DPNP
+option(NUMBA_MLIR_USE_DPNP
     "Use the dpnp Python NumPy-like library for some math functions"
     OFF
 )
 
-option(IMEX_USE_MKL
+option(NUMBA_MLIR_USE_MKL
     "Enable mkl support"
     ON
 )
 
-option(IMEX_ENABLE_IGPU_DIALECT
+option(NUMBA_MLIR_ENABLE_IGPU_DIALECT
     "Enable GPU codegen"
     OFF
 )
-option(IMEX_ENABLE_NUMBA_FE
+option(NUMBA_MLIR_ENABLE_NUMBA_FE
     "Enable numba-based python frontend"
     OFF
 )
-option(IMEX_ENABLE_TBB_SUPPORT
+option(NUMBA_MLIR_ENABLE_TBB_SUPPORT
     "Enable TBB"
     OFF
 )
-option(IMEX_ENABLE_TESTS
+option(NUMBA_MLIR_ENABLE_TESTS
     "Enable CTests"
     OFF
 )
 
-message(STATUS "IMEX_USE_DPNP ${IMEX_USE_DPNP}")
-message(STATUS "IMEX_USE_MKL ${IMEX_USE_MKL}")
-message(STATUS "IMEX_ENABLE_IGPU_DIALECT ${IMEX_ENABLE_IGPU_DIALECT}")
-message(STATUS "IMEX_ENABLE_TESTS ${IMEX_ENABLE_TESTS}")
-message(STATUS "IMEX_ENABLE_NUMBA_FE ${IMEX_ENABLE_NUMBA_FE}")
-message(STATUS "IMEX_ENABLE_TBB_SUPPORT ${IMEX_ENABLE_TBB_SUPPORT}")
+message(STATUS "NUMBA_MLIR_USE_DPNP ${NUMBA_MLIR_USE_DPNP}")
+message(STATUS "NUMBA_MLIR_USE_MKL ${NUMBA_MLIR_USE_MKL}")
+message(STATUS "NUMBA_MLIR_ENABLE_IGPU_DIALECT ${NUMBA_MLIR_ENABLE_IGPU_DIALECT}")
+message(STATUS "NUMBA_MLIR_ENABLE_TESTS ${NUMBA_MLIR_ENABLE_TESTS}")
+message(STATUS "NUMBA_MLIR_ENABLE_NUMBA_FE ${NUMBA_MLIR_ENABLE_NUMBA_FE}")
+message(STATUS "NUMBA_MLIR_ENABLE_TBB_SUPPORT ${NUMBA_MLIR_ENABLE_TBB_SUPPORT}")
 
 macro(apply_llvm_compile_flags target)
     if (MSVC)
@@ -101,7 +101,7 @@ macro(apply_llvm_compile_flags target)
     target_compile_definitions(${target} PRIVATE ${LLVM_DEFINITIONS})
 endmacro()
 
-if(IMEX_ENABLE_IGPU_DIALECT)
+if(NUMBA_MLIR_ENABLE_IGPU_DIALECT)
     if(DEFINED ENV{LEVEL_ZERO_VERSION_CHECK_OFF})
         find_package(LevelZero REQUIRED)
     else()
@@ -113,6 +113,6 @@ endif()
 add_subdirectory(mlir)
 add_subdirectory(dpcomp_runtime)
 
-if(IMEX_ENABLE_NUMBA_FE)
+if(NUMBA_MLIR_ENABLE_NUMBA_FE)
     add_subdirectory(numba_dpcomp)
 endif()

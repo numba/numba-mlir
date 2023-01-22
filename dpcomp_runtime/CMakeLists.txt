@@ -6,7 +6,7 @@ project(dpcomp-runtime LANGUAGES CXX C)
 
 include(GenerateExportHeader)
 
-if(IMEX_ENABLE_TBB_SUPPORT)
+if(NUMBA_MLIR_ENABLE_TBB_SUPPORT)
     find_package(TBB REQUIRED)
 endif()
 
@@ -29,7 +29,7 @@ target_include_directories(${PROJECT_NAME} SYSTEM PRIVATE
     ${PROJECT_BINARY_DIR}
     )
 
-if(IMEX_ENABLE_TBB_SUPPORT)
-    target_compile_definitions(${PROJECT_NAME} PRIVATE IMEX_ENABLE_TBB_SUPPORT=1)
+if(NUMBA_MLIR_ENABLE_TBB_SUPPORT)
+    target_compile_definitions(${PROJECT_NAME} PRIVATE NUMBA_MLIR_ENABLE_TBB_SUPPORT=1)
     target_link_libraries(${PROJECT_NAME} TBB::tbb)
 endif()

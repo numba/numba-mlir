@@ -12,7 +12,7 @@ configure_lit_site_cfg(
         ${CMAKE_CURRENT_SOURCE_DIR}/lit.cfg.py
 )
 
-set(IMEX_TEST_DEPENDS
+set(NUMBA_MLIR_TEST_DEPENDS
         FileCheck
         numba-mlir-opt
         level_zero_runner
@@ -22,8 +22,8 @@ set(IMEX_TEST_DEPENDS
 
 add_lit_testsuite(check-imex "Running the imex regression tests"
         ${CMAKE_CURRENT_BINARY_DIR}
-        DEPENDS ${IMEX_TEST_DEPENDS}
+        DEPENDS ${NUMBA_MLIR_TEST_DEPENDS}
         )
 set_target_properties(check-imex PROPERTIES FOLDER "Tests")
 
-add_lit_testsuites(imex-tests ${CMAKE_CURRENT_SOURCE_DIR} DEPENDS ${IMEX_TEST_DEPENDS})
+add_lit_testsuites(imex-tests ${CMAKE_CURRENT_SOURCE_DIR} DEPENDS ${NUMBA_MLIR_TEST_DEPENDS})

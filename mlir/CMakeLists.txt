@@ -173,6 +173,6 @@ target_include_directories(${MLIR_EXTENSIONS_LIB} PUBLIC
 add_dependencies(${MLIR_EXTENSIONS_LIB} MLIRPlierOpsIncGen MLIRNumbaUtilOpsIncGen MLIRGpuRuntimeOpsIncGen MLIRNTensorOpsIncGen)
 
 add_subdirectory(tools)
-if(IMEX_ENABLE_TESTS)
+if(NUMBA_MLIR_ENABLE_TESTS)
     add_subdirectory(test)
 endif()

@@ -22,7 +22,7 @@ target_include_directories(${PROJECT_NAME} PRIVATE
 
 target_link_libraries(${PROJECT_NAME})
 
-if(IMEX_USE_MKL)
+if(NUMBA_MLIR_USE_MKL)
     if (NOT DEFINED(MKL_THREADING))
         set(MKL_THREADING tbb_thread)
     endif()
@@ -39,10 +39,10 @@ if(IMEX_USE_MKL)
         $<TARGET_PROPERTY:MKL::MKL,INTERFACE_INCLUDE_DIRECTORIES>)
 
     target_link_libraries(${PROJECT_NAME} PUBLIC $<LINK_ONLY:MKL::MKL>)
-    target_compile_definitions(${PROJECT_NAME} PRIVATE IMEX_USE_MKL=1)
+    target_compile_definitions(${PROJECT_NAME} PRIVATE NUMBA_MLIR_USE_MKL=1)
 endif()
 
-if(IMEX_USE_DPNP)
+if(NUMBA_MLIR_USE_DPNP)
     target_include_directories(${PROJECT_NAME} PRIVATE
         ${DPNP_INCLUDE_DIR}
         )
@@ -56,5 +56,5 @@ if(IMEX_USE_DPNP)
         INSTALL_RPATH "${DPNP_RPATH}"
     )
 
-    target_compile_definitions(${PROJECT_NAME} PRIVATE IMEX_USE_DPNP=1)
+    target_compile_definitions(${PROJECT_NAME} PRIVATE NUMBA_MLIR_USE_DPNP=1)
 endif()
