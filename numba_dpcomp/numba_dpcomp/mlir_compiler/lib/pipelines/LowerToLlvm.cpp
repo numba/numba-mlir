@@ -45,11 +45,11 @@
 
 #include "BasePipeline.hpp"
 
-#include "imex/Compiler/PipelineRegistry.hpp"
-#include "imex/Conversion/UtilToLlvm.hpp"
-#include "imex/Dialect/imex_util/Dialect.hpp"
-#include "imex/Transforms/FuncUtils.hpp"
-#include "imex/Utils.hpp"
+#include "numba/Compiler/PipelineRegistry.hpp"
+#include "numba/Conversion/UtilToLlvm.hpp"
+#include "numba/Dialect/imex_util/Dialect.hpp"
+#include "numba/Transforms/FuncUtils.hpp"
+#include "numba/Utils.hpp"
 
 namespace {
 static mlir::LowerToLLVMOptions getLLVMOptions(mlir::MLIRContext &context) {

@@ -2,10 +2,10 @@
 //
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "imex/Transforms/MakeSignless.hpp"
+#include "numba/Transforms/MakeSignless.hpp"
 
-#include "imex/Dialect/imex_util/Dialect.hpp"
-#include "imex/Transforms/TypeConversion.hpp"
+#include "numba/Dialect/imex_util/Dialect.hpp"
+#include "numba/Transforms/TypeConversion.hpp"
 
 #include <mlir/Dialect/Bufferization/IR/Bufferization.h>
 #include <mlir/Dialect/Linalg/IR/Linalg.h>

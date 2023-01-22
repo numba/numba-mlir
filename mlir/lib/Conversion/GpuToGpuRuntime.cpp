@@ -2,14 +2,14 @@
 //
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "imex/Conversion/GpuToGpuRuntime.hpp"
+#include "numba/Conversion/GpuToGpuRuntime.hpp"
 
-#include "imex/Dialect/gpu_runtime/IR/GpuRuntimeOps.hpp"
-#include "imex/Dialect/imex_util/Dialect.hpp"
-#include "imex/Dialect/imex_util/Utils.hpp"
-#include "imex/Transforms/FuncUtils.hpp"
-#include "imex/Transforms/ScalarOpsConversion.hpp"
-#include "imex/Transforms/TypeConversion.hpp"
+#include "numba/Dialect/gpu_runtime/IR/GpuRuntimeOps.hpp"
+#include "numba/Dialect/imex_util/Dialect.hpp"
+#include "numba/Dialect/imex_util/Utils.hpp"
+#include "numba/Transforms/FuncUtils.hpp"
+#include "numba/Transforms/ScalarOpsConversion.hpp"
+#include "numba/Transforms/TypeConversion.hpp"
 
 #include <mlir/Conversion/ArithToSPIRV/ArithToSPIRV.h>
 #include <mlir/Conversion/ControlFlowToSPIRV/ControlFlowToSPIRV.h>

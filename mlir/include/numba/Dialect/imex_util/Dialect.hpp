@@ -14,17 +14,17 @@
 #include <mlir/Interfaces/SideEffectInterfaces.h>
 #include <mlir/Interfaces/ViewLikeInterface.h>
 
-#include "imex/Dialect/imex_util/ImexUtilOpsDialect.h.inc"
-#include "imex/Dialect/imex_util/ImexUtilOpsEnums.h.inc"
+#include "numba/Dialect/imex_util/ImexUtilOpsDialect.h.inc"
+#include "numba/Dialect/imex_util/ImexUtilOpsEnums.h.inc"
 
 #define GET_TYPEDEF_CLASSES
-#include "imex/Dialect/imex_util/ImexUtilOpsTypes.h.inc"
+#include "numba/Dialect/imex_util/ImexUtilOpsTypes.h.inc"
 
 #define GET_ATTRDEF_CLASSES
-#include "imex/Dialect/imex_util/ImexUtilOpsAttributes.h.inc"
+#include "numba/Dialect/imex_util/ImexUtilOpsAttributes.h.inc"
 
 #define GET_OP_CLASSES
-#include "imex/Dialect/imex_util/ImexUtilOps.h.inc"
+#include "numba/Dialect/imex_util/ImexUtilOps.h.inc"
 
 namespace numba {
 namespace util {

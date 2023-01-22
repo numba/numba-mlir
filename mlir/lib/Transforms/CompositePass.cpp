@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "imex/Transforms/CompositePass.hpp"
+#include "numba/Transforms/CompositePass.hpp"
 
 #include "mlir/Pass/PassManager.h"
 #include <mlir/Pass/Pass.h>

@@ -2,9 +2,9 @@
 //
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "imex/Transforms/CanonicalizeReductions.hpp"
+#include "numba/Transforms/CanonicalizeReductions.hpp"
 
-#include "imex/Analysis/AliasAnalysis.hpp"
+#include "numba/Analysis/AliasAnalysis.hpp"
 
 #include <mlir/Dialect/MemRef/IR/MemRef.h>
 #include <mlir/Dialect/SCF/IR/SCF.h>

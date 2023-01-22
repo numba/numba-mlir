@@ -2,9 +2,9 @@
 //
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "imex/Transforms/UpliftMath.hpp"
+#include "numba/Transforms/UpliftMath.hpp"
 
-#include "imex/Dialect/imex_util/Dialect.hpp"
+#include "numba/Dialect/imex_util/Dialect.hpp"
 
 #include <mlir/Dialect/Arith/IR/Arith.h>
 #include <mlir/Dialect/Complex/IR/Complex.h>

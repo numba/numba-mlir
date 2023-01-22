@@ -16,18 +16,18 @@
 
 #include <mlir/Dialect/GPU/IR/GPUDialect.h>
 
-#include "imex/Dialect/gpu_runtime/IR/GpuRuntimeOpsDialect.h.inc"
+#include "numba/Dialect/gpu_runtime/IR/GpuRuntimeOpsDialect.h.inc"
 
-#include "imex/Dialect/gpu_runtime/IR/GpuRuntimeOpsEnums.h.inc"
+#include "numba/Dialect/gpu_runtime/IR/GpuRuntimeOpsEnums.h.inc"
 
 #define GET_TYPEDEF_CLASSES
-#include "imex/Dialect/gpu_runtime/IR/GpuRuntimeOpsTypes.h.inc"
+#include "numba/Dialect/gpu_runtime/IR/GpuRuntimeOpsTypes.h.inc"
 
 #define GET_ATTRDEF_CLASSES
-#include "imex/Dialect/gpu_runtime/IR/GpuRuntimeOpsAttributes.h.inc"
+#include "numba/Dialect/gpu_runtime/IR/GpuRuntimeOpsAttributes.h.inc"
 
 #define GET_OP_CLASSES
-#include "imex/Dialect/gpu_runtime/IR/GpuRuntimeOps.h.inc"
+#include "numba/Dialect/gpu_runtime/IR/GpuRuntimeOps.h.inc"
 
 namespace gpu_runtime {
 mlir::StringRef getGpuAccessibleAttrName();

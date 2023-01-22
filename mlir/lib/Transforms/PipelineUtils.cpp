@@ -2,12 +2,12 @@
 //
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "imex/Transforms/PipelineUtils.hpp"
+#include "numba/Transforms/PipelineUtils.hpp"
 
 #include <mlir/IR/Attributes.h>
 #include <mlir/IR/BuiltinOps.h>
 
-#include "imex/Dialect/imex_util/Dialect.hpp"
+#include "numba/Dialect/imex_util/Dialect.hpp"
 
 mlir::ArrayAttr numba::getPipelineJumpMarkers(mlir::ModuleOp module) {
   return module->getAttrOfType<mlir::ArrayAttr>(

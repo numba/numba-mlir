@@ -2,8 +2,8 @@
 //
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "imex/Transforms/CallLowering.hpp"
-#include "imex/Dialect/imex_util/Dialect.hpp"
+#include "numba/Transforms/CallLowering.hpp"
+#include "numba/Dialect/imex_util/Dialect.hpp"
 
 #include <mlir/Dialect/Arith/IR/Arith.h>
 

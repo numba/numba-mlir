@@ -21,12 +21,12 @@
 #include <mlir/IR/BuiltinTypes.h>
 #include <mlir/Parser/Parser.h>
 
-#include "imex/Dialect/imex_util/Dialect.hpp"
-#include "imex/Dialect/ntensor/IR/NTensorOps.hpp"
-#include "imex/Transforms/CastUtils.hpp"
-#include "imex/Transforms/ConstUtils.hpp"
-#include "imex/Transforms/FuncUtils.hpp"
-#include "imex/Utils.hpp"
+#include "numba/Dialect/imex_util/Dialect.hpp"
+#include "numba/Dialect/ntensor/IR/NTensorOps.hpp"
+#include "numba/Transforms/CastUtils.hpp"
+#include "numba/Transforms/ConstUtils.hpp"
+#include "numba/Transforms/FuncUtils.hpp"
+#include "numba/Utils.hpp"
 
 #include "PyMapTypes.hpp"
 

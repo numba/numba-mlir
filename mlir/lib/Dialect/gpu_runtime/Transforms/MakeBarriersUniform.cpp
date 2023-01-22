@@ -2,10 +2,10 @@
 //
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "imex/Dialect/gpu_runtime/Transforms/MakeBarriersUniform.hpp"
+#include "numba/Dialect/gpu_runtime/Transforms/MakeBarriersUniform.hpp"
 
-#include "imex/Dialect/gpu_runtime/IR/GpuRuntimeOps.hpp"
-#include "imex/Dialect/imex_util/Dialect.hpp"
+#include "numba/Dialect/gpu_runtime/IR/GpuRuntimeOps.hpp"
+#include "numba/Dialect/imex_util/Dialect.hpp"
 
 #include <mlir/Dialect/GPU/IR/GPUDialect.h>
 #include <mlir/Dialect/SCF/IR/SCF.h>

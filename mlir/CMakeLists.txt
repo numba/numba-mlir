@@ -24,10 +24,10 @@ if (NOT EXPECTED_LLVM_SHA STREQUAL LLVM_SHA)
     message(FATAL_ERROR "Invalid llvm version")
 endif()
 
-add_subdirectory(include/imex/Dialect/plier)
-add_subdirectory(include/imex/Dialect/imex_util)
-add_subdirectory(include/imex/Dialect/gpu_runtime/IR)
-add_subdirectory(include/imex/Dialect/ntensor/IR)
+add_subdirectory(include/numba/Dialect/plier)
+add_subdirectory(include/numba/Dialect/imex_util)
+add_subdirectory(include/numba/Dialect/gpu_runtime/IR)
+add_subdirectory(include/numba/Dialect/ntensor/IR)
 
 set(SOURCES_LIST
     lib/Analysis/AliasAnalysis.cpp
@@ -79,55 +79,55 @@ set(SOURCES_LIST
     lib/Utils.cpp
     )
 set(HEADERS_LIST
-    include/imex/Analysis/AliasAnalysis.hpp
-    include/imex/Analysis/MemorySsa.hpp
-    include/imex/Analysis/MemorySsaAnalysis.hpp
-    include/imex/Compiler/Compiler.hpp
-    include/imex/Compiler/PipelineRegistry.hpp
-    include/imex/Conversion/CfgToScf.hpp
-    include/imex/Conversion/GpuRuntimeToLlvm.hpp
-    include/imex/Conversion/GpuToGpuRuntime.hpp
-    include/imex/Conversion/NtensorToLinalg.hpp
-    include/imex/Conversion/NtensorToMemref.hpp
-    include/imex/Conversion/SCFToAffine/SCFToAffine.h
-    include/imex/Conversion/UtilConversion.hpp
-    include/imex/Conversion/UtilToLlvm.hpp
-    include/imex/Dialect/gpu_runtime/IR/GpuRuntimeOps.hpp
-    include/imex/Dialect/gpu_runtime/Transforms/MakeBarriersUniform.hpp
-    include/imex/Dialect/imex_util/Dialect.hpp
-    include/imex/Dialect/imex_util/Utils.hpp
-    include/imex/Dialect/ntensor/IR/NTensorOps.hpp
-    include/imex/Dialect/ntensor/Transforms/CopyRemoval.hpp
-    include/imex/Dialect/ntensor/Transforms/PropagateEnvironment.hpp
-    include/imex/Dialect/ntensor/Transforms/ResolveArrayOps.hpp
-    include/imex/Dialect/plier/Dialect.hpp
-    include/imex/ExecutionEngine/ExecutionEngine.hpp
-    include/imex/Transforms/ArgLowering.hpp
-    include/imex/Transforms/CallLowering.hpp
-    include/imex/Transforms/CanonicalizeReductions.hpp
-    include/imex/Transforms/CastLowering.hpp
-    include/imex/Transforms/CastUtils.hpp
-    include/imex/Transforms/CommonOpts.hpp
-    include/imex/Transforms/CompositePass.hpp
-    include/imex/Transforms/ConstUtils.hpp
-    include/imex/Transforms/ExpandTuple.hpp
-    include/imex/Transforms/FuncUtils.hpp
-    include/imex/Transforms/IfRewrites.hpp
-    include/imex/Transforms/IndexTypePropagation.hpp
-    include/imex/Transforms/InlineUtils.hpp
-    include/imex/Transforms/LoopRewrites.hpp
-    include/imex/Transforms/LoopUtils.hpp
-    include/imex/Transforms/MakeSignless.hpp
-    include/imex/Transforms/MemoryRewrites.hpp
-    include/imex/Transforms/PipelineUtils.hpp
-    include/imex/Transforms/PromoteBoolMemref.hpp
-    include/imex/Transforms/PromoteToParallel.hpp
-    include/imex/Transforms/RewriteWrapper.hpp
-    include/imex/Transforms/ScalarOpsConversion.hpp
-    include/imex/Transforms/ShapeIntegerRangePropagation.hpp
-    include/imex/Transforms/TypeConversion.hpp
-    include/imex/Transforms/UpliftMath.hpp
-    include/imex/Utils.hpp
+    include/numba/Analysis/AliasAnalysis.hpp
+    include/numba/Analysis/MemorySsa.hpp
+    include/numba/Analysis/MemorySsaAnalysis.hpp
+    include/numba/Compiler/Compiler.hpp
+    include/numba/Compiler/PipelineRegistry.hpp
+    include/numba/Conversion/CfgToScf.hpp
+    include/numba/Conversion/GpuRuntimeToLlvm.hpp
+    include/numba/Conversion/GpuToGpuRuntime.hpp
+    include/numba/Conversion/NtensorToLinalg.hpp
+    include/numba/Conversion/NtensorToMemref.hpp
+    include/numba/Conversion/SCFToAffine/SCFToAffine.h
+    include/numba/Conversion/UtilConversion.hpp
+    include/numba/Conversion/UtilToLlvm.hpp
+    include/numba/Dialect/gpu_runtime/IR/GpuRuntimeOps.hpp
+    include/numba/Dialect/gpu_runtime/Transforms/MakeBarriersUniform.hpp
+    include/numba/Dialect/imex_util/Dialect.hpp
+    include/numba/Dialect/imex_util/Utils.hpp
+    include/numba/Dialect/ntensor/IR/NTensorOps.hpp
+    include/numba/Dialect/ntensor/Transforms/CopyRemoval.hpp
+    include/numba/Dialect/ntensor/Transforms/PropagateEnvironment.hpp
+    include/numba/Dialect/ntensor/Transforms/ResolveArrayOps.hpp
+    include/numba/Dialect/plier/Dialect.hpp
+    include/numba/ExecutionEngine/ExecutionEngine.hpp
+    include/numba/Transforms/ArgLowering.hpp
+    include/numba/Transforms/CallLowering.hpp
+    include/numba/Transforms/CanonicalizeReductions.hpp
+    include/numba/Transforms/CastLowering.hpp
+    include/numba/Transforms/CastUtils.hpp
+    include/numba/Transforms/CommonOpts.hpp
+    include/numba/Transforms/CompositePass.hpp
+    include/numba/Transforms/ConstUtils.hpp
+    include/numba/Transforms/ExpandTuple.hpp
+    include/numba/Transforms/FuncUtils.hpp
+    include/numba/Transforms/IfRewrites.hpp
+    include/numba/Transforms/IndexTypePropagation.hpp
+    include/numba/Transforms/InlineUtils.hpp
+    include/numba/Transforms/LoopRewrites.hpp
+    include/numba/Transforms/LoopUtils.hpp
+    include/numba/Transforms/MakeSignless.hpp
+    include/numba/Transforms/MemoryRewrites.hpp
+    include/numba/Transforms/PipelineUtils.hpp
+    include/numba/Transforms/PromoteBoolMemref.hpp
+    include/numba/Transforms/PromoteToParallel.hpp
+    include/numba/Transforms/RewriteWrapper.hpp
+    include/numba/Transforms/ScalarOpsConversion.hpp
+    include/numba/Transforms/ShapeIntegerRangePropagation.hpp
+    include/numba/Transforms/TypeConversion.hpp
+    include/numba/Transforms/UpliftMath.hpp
+    include/numba/Utils.hpp
     )
 
 set(MLIR_EXTENSIONS_LIB "mlir-extensions")
@@ -167,7 +167,7 @@ target_include_directories(${MLIR_EXTENSIONS_LIB} SYSTEM PRIVATE
 target_include_directories(${MLIR_EXTENSIONS_LIB} PUBLIC
     ./include
     ${PROJECT_BINARY_DIR}/mlir/include
-    ${PROJECT_BINARY_DIR}/imex/include
+    ${PROJECT_BINARY_DIR}/numba/include
     )
 
 add_dependencies(${MLIR_EXTENSIONS_LIB} MLIRPlierOpsIncGen MLIRImexUtilOpsIncGen MLIRGpuRuntimeOpsIncGen MLIRNTensorOpsIncGen)

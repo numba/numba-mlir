@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "imex/Dialect/ntensor/IR/NTensorOps.hpp"
+#include "numba/Dialect/ntensor/IR/NTensorOps.hpp"
 
 #include <mlir/Dialect/Arith/IR/Arith.h>
 #include <mlir/Dialect/Linalg/IR/Linalg.h>
@@ -34,19 +34,19 @@ struct NTensorInlinerInterface : public mlir::DialectInlinerInterface {
 void numba::ntensor::NTensorDialect::initialize() {
   addOperations<
 #define GET_OP_LIST
-#include "imex/Dialect/ntensor/IR/NTensorOps.cpp.inc"
+#include "numba/Dialect/ntensor/IR/NTensorOps.cpp.inc"
       >();
 
   addInterfaces<NTensorInlinerInterface>();
 
   addTypes<
 #define GET_TYPEDEF_LIST
-#include "imex/Dialect/ntensor/IR/NTensorOpsTypes.cpp.inc"
+#include "numba/Dialect/ntensor/IR/NTensorOpsTypes.cpp.inc"
       >();
 
   addAttributes<
 #define GET_ATTRDEF_LIST
-#include "imex/Dialect/ntensor/IR/NTensorOpsAttributes.cpp.inc"
+#include "numba/Dialect/ntensor/IR/NTensorOpsAttributes.cpp.inc"
       >();
 }
 
@@ -982,15 +982,15 @@ static void printArgList(mlir::OpAsmPrinter &printer,
   printer << ')';
 }
 
-#include "imex/Dialect/ntensor/IR/NTensorOpsDialect.cpp.inc"
+#include "numba/Dialect/ntensor/IR/NTensorOpsDialect.cpp.inc"
 
 #define GET_OP_CLASSES
-#include "imex/Dialect/ntensor/IR/NTensorOps.cpp.inc"
+#include "numba/Dialect/ntensor/IR/NTensorOps.cpp.inc"
 
 #define GET_ATTRDEF_CLASSES
-#include "imex/Dialect/ntensor/IR/NTensorOpsAttributes.cpp.inc"
+#include "numba/Dialect/ntensor/IR/NTensorOpsAttributes.cpp.inc"
 
 #define GET_TYPEDEF_CLASSES
-#include "imex/Dialect/ntensor/IR/NTensorOpsTypes.cpp.inc"
+#include "numba/Dialect/ntensor/IR/NTensorOpsTypes.cpp.inc"
 
-#include "imex/Dialect/ntensor/IR/NTensorOpsEnums.cpp.inc"
+#include "numba/Dialect/ntensor/IR/NTensorOpsEnums.cpp.inc"

@@ -2,9 +2,9 @@
 //
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "imex/Dialect/ntensor/Transforms/PropagateEnvironment.hpp"
+#include "numba/Dialect/ntensor/Transforms/PropagateEnvironment.hpp"
 
-#include "imex/Dialect/ntensor/IR/NTensorOps.hpp"
+#include "numba/Dialect/ntensor/IR/NTensorOps.hpp"
 
 #include <llvm/Support/Debug.h>
 #include <mlir/Analysis/DataFlow/ConstantPropagationAnalysis.h>

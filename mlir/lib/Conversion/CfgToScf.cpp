@@ -2,8 +2,8 @@
 //
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "imex/Conversion/CfgToScf.hpp"
-#include "imex/Dialect/imex_util/Dialect.hpp"
+#include "numba/Conversion/CfgToScf.hpp"
+#include "numba/Dialect/imex_util/Dialect.hpp"
 
 #include <mlir/Dialect/Arith/IR/Arith.h>
 #include <mlir/Dialect/ControlFlow/IR/ControlFlowOps.h>

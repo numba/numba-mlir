@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "imex/Analysis/AliasAnalysis.hpp"
+#include "numba/Analysis/AliasAnalysis.hpp"
 
 #include <mlir/IR/FunctionInterfaces.h>
 

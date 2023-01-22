@@ -4,7 +4,7 @@
 
 #include "pipelines/BasePipeline.hpp"
 
-#include "imex/Compiler/PipelineRegistry.hpp"
+#include "numba/Compiler/PipelineRegistry.hpp"
 
 namespace {
 static const constexpr llvm::StringLiteral passes[] = {

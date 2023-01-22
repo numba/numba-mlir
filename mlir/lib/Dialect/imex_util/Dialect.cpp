@@ -2,8 +2,8 @@
 //
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "imex/Dialect/plier/Dialect.hpp"
-#include "imex/Dialect/imex_util/Dialect.hpp"
+#include "numba/Dialect/plier/Dialect.hpp"
+#include "numba/Dialect/imex_util/Dialect.hpp"
 
 #include <mlir/IR/Builders.h>
 #include <mlir/IR/BuiltinOps.h>
@@ -72,19 +72,19 @@ namespace util {
 void ImexUtilDialect::initialize() {
   addOperations<
 #define GET_OP_LIST
-#include "imex/Dialect/imex_util/ImexUtilOps.cpp.inc"
+#include "numba/Dialect/imex_util/ImexUtilOps.cpp.inc"
       >();
 
   addInterfaces<ImexUtilInlinerInterface>();
 
   addTypes<
 #define GET_TYPEDEF_LIST
-#include "imex/Dialect/imex_util/ImexUtilOpsTypes.cpp.inc"
+#include "numba/Dialect/imex_util/ImexUtilOpsTypes.cpp.inc"
       >();
 
   addAttributes<
 #define GET_ATTRDEF_LIST
-#include "imex/Dialect/imex_util/ImexUtilOpsAttributes.cpp.inc"
+#include "numba/Dialect/imex_util/ImexUtilOpsAttributes.cpp.inc"
       >();
 }
 
@@ -2118,15 +2118,15 @@ MemrefBitcastOp::fold(llvm::ArrayRef<mlir::Attribute> /*operands*/) {
 } // namespace util
 } // namespace numba
 
-#include "imex/Dialect/imex_util/ImexUtilOpsDialect.cpp.inc"
+#include "numba/Dialect/imex_util/ImexUtilOpsDialect.cpp.inc"
 
 #define GET_OP_CLASSES
-#include "imex/Dialect/imex_util/ImexUtilOps.cpp.inc"
+#include "numba/Dialect/imex_util/ImexUtilOps.cpp.inc"
 
 #define GET_ATTRDEF_CLASSES
-#include "imex/Dialect/imex_util/ImexUtilOpsAttributes.cpp.inc"
+#include "numba/Dialect/imex_util/ImexUtilOpsAttributes.cpp.inc"
 
 #define GET_TYPEDEF_CLASSES
-#include "imex/Dialect/imex_util/ImexUtilOpsTypes.cpp.inc"
+#include "numba/Dialect/imex_util/ImexUtilOpsTypes.cpp.inc"
 
-#include "imex/Dialect/imex_util/ImexUtilOpsEnums.cpp.inc"
+#include "numba/Dialect/imex_util/ImexUtilOpsEnums.cpp.inc"

@@ -2,8 +2,8 @@
 //
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "imex/Dialect/plier/Dialect.hpp"
-#include "imex/Dialect/imex_util/Dialect.hpp"
+#include "numba/Dialect/plier/Dialect.hpp"
+#include "numba/Dialect/imex_util/Dialect.hpp"
 
 #include <mlir/IR/Builders.h>
 #include <mlir/IR/BuiltinOps.h>
@@ -40,12 +40,12 @@ mlir::ArrayRef<detail::OperatorNamePair> getOperators() {
 void PlierDialect::initialize() {
   addOperations<
 #define GET_OP_LIST
-#include "imex/Dialect/plier/PlierOps.cpp.inc"
+#include "numba/Dialect/plier/PlierOps.cpp.inc"
       >();
 
   addTypes<
 #define GET_TYPEDEF_LIST
-#include "imex/Dialect/plier/PlierOpsTypes.cpp.inc"
+#include "numba/Dialect/plier/PlierOpsTypes.cpp.inc"
       >();
 
   addInterfaces<PlierInlinerInterface>();
@@ -297,12 +297,12 @@ void BuildSliceOp::build(mlir::OpBuilder &builder, mlir::OperationState &state,
 }
 } // namespace plier
 
-#include "imex/Dialect/plier/PlierOpsDialect.cpp.inc"
+#include "numba/Dialect/plier/PlierOpsDialect.cpp.inc"
 
 #define GET_OP_CLASSES
-#include "imex/Dialect/plier/PlierOps.cpp.inc"
+#include "numba/Dialect/plier/PlierOps.cpp.inc"
 
 #define GET_TYPEDEF_CLASSES
-#include "imex/Dialect/plier/PlierOpsTypes.cpp.inc"
+#include "numba/Dialect/plier/PlierOpsTypes.cpp.inc"
 
-//#include "imex/Dialect/plier/PlierOpsEnums.cpp.inc"
+//#include "numba/Dialect/plier/PlierOpsEnums.cpp.inc"

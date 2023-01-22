@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "imex/Analysis/MemorySsa.hpp"
+#include "numba/Analysis/MemorySsa.hpp"
 
 #include <mlir/IR/BuiltinTypes.h>
 #include <mlir/Interfaces/CallInterfaces.h>

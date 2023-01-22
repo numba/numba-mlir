@@ -21,17 +21,17 @@
 #include <mlir/Transforms/GreedyPatternRewriteDriver.h>
 #include <mlir/Transforms/Passes.h>
 
-#include "imex/Dialect/imex_util/Dialect.hpp"
-#include "imex/Dialect/plier/Dialect.hpp"
+#include "numba/Dialect/imex_util/Dialect.hpp"
+#include "numba/Dialect/plier/Dialect.hpp"
 
-#include "imex/Compiler/PipelineRegistry.hpp"
-#include "imex/Transforms/CallLowering.hpp"
-#include "imex/Transforms/CastUtils.hpp"
-#include "imex/Transforms/ConstUtils.hpp"
-#include "imex/Transforms/InlineUtils.hpp"
-#include "imex/Transforms/PipelineUtils.hpp"
-#include "imex/Transforms/RewriteWrapper.hpp"
-#include "imex/Transforms/TypeConversion.hpp"
+#include "numba/Compiler/PipelineRegistry.hpp"
+#include "numba/Transforms/CallLowering.hpp"
+#include "numba/Transforms/CastUtils.hpp"
+#include "numba/Transforms/ConstUtils.hpp"
+#include "numba/Transforms/InlineUtils.hpp"
+#include "numba/Transforms/PipelineUtils.hpp"
+#include "numba/Transforms/RewriteWrapper.hpp"
+#include "numba/Transforms/TypeConversion.hpp"
 
 #include "BasePipeline.hpp"
 #include "LoopUtils.hpp"

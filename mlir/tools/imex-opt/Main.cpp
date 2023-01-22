@@ -7,9 +7,9 @@
 #include <mlir/InitAllPasses.h>
 #include <mlir/Tools/mlir-opt/MlirOptMain.h>
 
-#include "imex/Dialect/gpu_runtime/IR/GpuRuntimeOps.hpp"
-#include "imex/Dialect/imex_util/Dialect.hpp"
-#include "imex/Dialect/ntensor/IR/NTensorOps.hpp"
+#include "numba/Dialect/gpu_runtime/IR/GpuRuntimeOps.hpp"
+#include "numba/Dialect/imex_util/Dialect.hpp"
+#include "numba/Dialect/ntensor/IR/NTensorOps.hpp"
 
 int main(int argc, char **argv) {
   mlir::registerAllPasses();

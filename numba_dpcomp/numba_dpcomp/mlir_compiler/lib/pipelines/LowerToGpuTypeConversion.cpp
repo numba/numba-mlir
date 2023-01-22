@@ -6,8 +6,8 @@
 
 #include "PyTypeConverter.hpp"
 
-#include "imex/Dialect/gpu_runtime/IR/GpuRuntimeOps.hpp"
-#include "imex/Dialect/ntensor/IR/NTensorOps.hpp"
+#include "numba/Dialect/gpu_runtime/IR/GpuRuntimeOps.hpp"
+#include "numba/Dialect/ntensor/IR/NTensorOps.hpp"
 
 #include <pybind11/pybind11.h>
 

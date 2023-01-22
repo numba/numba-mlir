@@ -23,9 +23,9 @@
 #include <mlir/Pass/PassManager.h>
 #include <mlir/Target/LLVMIR/Dialect/LLVMIR/LLVMToLLVMIRTranslation.h>
 
-#include "imex/Conversion/GpuRuntimeToLlvm.hpp"
-#include "imex/Conversion/GpuToGpuRuntime.hpp"
-#include "imex/Conversion/UtilToLlvm.hpp"
+#include "numba/Conversion/GpuRuntimeToLlvm.hpp"
+#include "numba/Conversion/GpuToGpuRuntime.hpp"
+#include "numba/Conversion/UtilToLlvm.hpp"
 
 using namespace mlir;
 

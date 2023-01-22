@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "imex/ExecutionEngine/ExecutionEngine.hpp"
+#include "numba/ExecutionEngine/ExecutionEngine.hpp"
 
 #include <llvm/ExecutionEngine/JITEventListener.h>
 #include <llvm/ExecutionEngine/ObjectCache.h>
