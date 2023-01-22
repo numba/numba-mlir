@@ -1,4 +1,4 @@
-// RUN: imex-opt %s -allow-unregistered-dialect -canonicalize --split-input-file | FileCheck %s
+// RUN: numba-mlir-opt %s -allow-unregistered-dialect -canonicalize --split-input-file | FileCheck %s
 
 func.func @resolve_slice_propagate() -> (index, index, index, index) {
   %0 = arith.constant 50 : index

@@ -1,4 +1,4 @@
-// RUN: imex-opt -allow-unregistered-dialect --cfg-to-scf -split-input-file %s | FileCheck %s
+// RUN: numba-mlir-opt -allow-unregistered-dialect --cfg-to-scf -split-input-file %s | FileCheck %s
 
 func.func @if_test1() {
   %cond = "test.test1"() : () -> i1

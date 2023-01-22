@@ -1,4 +1,4 @@
-// RUN: imex-opt --insert-gpu-alloc %s | FileCheck %s
+// RUN: numba-mlir-opt --insert-gpu-alloc %s | FileCheck %s
 
 #map0 = affine_map<(d0)[s0, s1] -> ((d0 - s0) ceildiv s1)>
 #map1 = affine_map<(d0)[s0, s1] -> (d0 * s0 + s1)>

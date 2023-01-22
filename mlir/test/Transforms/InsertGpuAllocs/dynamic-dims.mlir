@@ -1,4 +1,4 @@
-// RUN: imex-opt --insert-gpu-alloc %s | FileCheck %s
+// RUN: numba-mlir-opt --insert-gpu-alloc %s | FileCheck %s
 
 func.func @addt(%arg0: memref<2x5xf32>, %arg1: memref<?x?xf32>) -> memref<2x5xf32> {
   %c0 = arith.constant 0 : index

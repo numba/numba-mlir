@@ -1,4 +1,4 @@
-// RUN: imex-opt --gpu-to-gpux --split-input-file %s | FileCheck %s
+// RUN: numba-mlir-opt --gpu-to-gpux --split-input-file %s | FileCheck %s
 
 func.func @alloc() {
   // CHECK-LABEL: func @alloc()

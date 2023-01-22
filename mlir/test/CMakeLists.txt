@@ -14,7 +14,7 @@ configure_lit_site_cfg(
 
 set(IMEX_TEST_DEPENDS
         FileCheck
-        imex-opt
+        numba-mlir-opt
         level_zero_runner
         dpcomp-runtime
         dpcomp-gpu-runtime

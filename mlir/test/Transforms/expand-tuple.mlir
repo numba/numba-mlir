@@ -1,4 +1,4 @@
-// RUN: imex-opt -allow-unregistered-dialect --expand-tuple --canonicalize --split-input-file %s | FileCheck %s
+// RUN: numba-mlir-opt -allow-unregistered-dialect --expand-tuple --canonicalize --split-input-file %s | FileCheck %s
 
 func.func @test(%arg1: tuple<index, i64>) -> tuple<index, i64> {
   return %arg1 : tuple<index, i64>

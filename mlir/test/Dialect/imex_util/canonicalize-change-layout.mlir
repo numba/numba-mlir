@@ -1,4 +1,4 @@
-// RUN: imex-opt %s -allow-unregistered-dialect -canonicalize --split-input-file | FileCheck %s
+// RUN: numba-mlir-opt %s -allow-unregistered-dialect -canonicalize --split-input-file | FileCheck %s
 
 
 // CHECK-LABEL: func @test_change_layout

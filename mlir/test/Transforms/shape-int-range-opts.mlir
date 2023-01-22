@@ -1,4 +1,4 @@
-// RUN: imex-opt --imex-shape-int-range-opts --allow-unregistered-dialect --split-input-file %s | FileCheck %s
+// RUN: numba-mlir-opt --numba-shape-int-range-opts --allow-unregistered-dialect --split-input-file %s | FileCheck %s
 
 // CHECK-LABEL: func @test
 //       CHECK:   %[[C:.*]] = arith.constant false

@@ -1,4 +1,4 @@
-// RUN: imex-opt -allow-unregistered-dialect --gpux-insert-global-reduce --split-input-file %s | FileCheck %s
+// RUN: numba-mlir-opt -allow-unregistered-dialect --gpux-insert-global-reduce --split-input-file %s | FileCheck %s
 
 
 func.func @test(%lb: index, %ub: index, %s: index) {

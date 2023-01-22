@@ -1,4 +1,4 @@
-// RUN: imex-opt %s -lower-affine -split-input-file| FileCheck %s
+// RUN: numba-mlir-opt %s -lower-affine -split-input-file| FileCheck %s
 
 // CHECK-LABLEL: copy_affine
 // CHECK: scf.parallel

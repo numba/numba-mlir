@@ -1,6 +1,6 @@
-// RUN: imex-opt %s -split-input-file | FileCheck %s
+// RUN: numba-mlir-opt %s -split-input-file | FileCheck %s
 // Verify the printed output can be parsed.
-// RUN: imex-opt %s -split-input-file | imex-opt | FileCheck %s
+// RUN: numba-mlir-opt %s -split-input-file | numba-mlir-opt | FileCheck %s
 
 func.func @test() -> tuple<> {
   %0 = numba_util.build_tuple tuple<>

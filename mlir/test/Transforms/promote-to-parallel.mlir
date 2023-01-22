@@ -1,4 +1,4 @@
-// RUN: imex-opt -allow-unregistered-dialect --imex-promote-to-parallel --split-input-file %s | FileCheck %s
+// RUN: numba-mlir-opt -allow-unregistered-dialect --numba-promote-to-parallel --split-input-file %s | FileCheck %s
 
 // CHECK-LABEL: func @test
 //  CHECK-SAME:  (%[[INIT:.*]]: index)
