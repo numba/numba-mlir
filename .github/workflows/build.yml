@@ -194,7 +194,7 @@ jobs:
             -DIMEX_ENABLE_IGPU_DIALECT=ON                                       \
             -DIMEX_ENABLE_TESTS=ON                                              \
             -DIMEX_ENABLE_TBB_SUPPORT=ON                                        \
-            -DTBB_DIR=${TBB_PATH}                                               \
+            -DTBB_DIR=${TBB_PATH}/lib/cmake/tbb                                 \
             -DLLVM_EXTERNAL_LIT=${external_lit}                                 \
              || exit 1
             popd
