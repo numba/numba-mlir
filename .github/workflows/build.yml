@@ -180,8 +180,8 @@ jobs:
         run: |
           external_lit=`which lit`
           echo ${external_lit}
-          mkdir -p /home/runner/work/tmpdir
-          pushd /home/runner/work/tmpdir
+          mkdir -p _build
+          cd _build
           export TBB_PATH=/home/runner/work/tbb/oneapi-tbb-${TBB_VER}
           export LEVEL_ZERO_DIR=/home/runner/work/level-zero/level-zero/level_zero_install
           export LEVEL_ZERO_VERSION_CHECK_OFF=1
@@ -197,16 +197,13 @@ jobs:
             -DTBB_DIR=${TBB_PATH}/lib/cmake/tbb                                 \
             -DLLVM_EXTERNAL_LIT=${external_lit}                                 \
              || exit 1
-            popd
 
       - name: Run IMEX core test cases
         shell: bash -l {0}
 
         run: |
           cd _build || exit 1
-          pushd /home/runner/work/tmpdir
           ninja chek-imex || exit 1
-          popd
 
       - name: Build Python frontend
         shell: bash -l {0}
