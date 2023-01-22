@@ -89,9 +89,9 @@ void NumbaUtilDialect::initialize() {
 }
 
 mlir::Operation *NumbaUtilDialect::materializeConstant(mlir::OpBuilder &builder,
-                                                      mlir::Attribute value,
-                                                      mlir::Type type,
-                                                      mlir::Location loc) {
+                                                       mlir::Attribute value,
+                                                       mlir::Type type,
+                                                       mlir::Location loc) {
   if (mlir::arith::ConstantOp::isBuildableWith(value, type))
     return builder.create<mlir::arith::ConstantOp>(loc, type, value);
 

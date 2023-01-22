@@ -8,8 +8,8 @@
 #include <mlir/Tools/mlir-opt/MlirOptMain.h>
 
 #include "numba/Dialect/gpu_runtime/IR/GpuRuntimeOps.hpp"
-#include "numba/Dialect/numba_util/Dialect.hpp"
 #include "numba/Dialect/ntensor/IR/NTensorOps.hpp"
+#include "numba/Dialect/numba_util/Dialect.hpp"
 
 int main(int argc, char **argv) {
   mlir::registerAllPasses();

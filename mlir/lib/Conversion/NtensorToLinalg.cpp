@@ -4,9 +4,9 @@
 
 #include "numba/Conversion/NtensorToLinalg.hpp"
 
+#include "numba/Dialect/ntensor/IR/NTensorOps.hpp"
 #include "numba/Dialect/numba_util/Dialect.hpp"
 #include "numba/Dialect/numba_util/Utils.hpp"
-#include "numba/Dialect/ntensor/IR/NTensorOps.hpp"
 
 #include <mlir/Analysis/AliasAnalysis.h>
 #include <mlir/Dialect/Arith/IR/Arith.h>

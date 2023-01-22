@@ -4,8 +4,8 @@
 
 #include "numba/Transforms/ShapeIntegerRangePropagation.hpp"
 
-#include "numba/Dialect/numba_util/Dialect.hpp"
 #include "numba/Dialect/ntensor/IR/NTensorOps.hpp"
+#include "numba/Dialect/numba_util/Dialect.hpp"
 
 #include <llvm/Support/Debug.h>
 #include <mlir/Analysis/DataFlow/DeadCodeAnalysis.h>

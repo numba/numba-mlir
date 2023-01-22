@@ -5,9 +5,9 @@
 #include "numba/Conversion/NtensorToMemref.hpp"
 
 #include "numba/Conversion/UtilConversion.hpp"
+#include "numba/Dialect/ntensor/IR/NTensorOps.hpp"
 #include "numba/Dialect/numba_util/Dialect.hpp"
 #include "numba/Dialect/numba_util/Utils.hpp"
-#include "numba/Dialect/ntensor/IR/NTensorOps.hpp"
 #include "numba/Transforms/TypeConversion.hpp"
 
 #include <mlir/Dialect/Arith/IR/Arith.h>

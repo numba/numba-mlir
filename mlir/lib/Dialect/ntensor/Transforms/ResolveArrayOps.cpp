@@ -4,8 +4,8 @@
 
 #include "numba/Dialect/ntensor/Transforms/ResolveArrayOps.hpp"
 
-#include "numba/Dialect/numba_util/Dialect.hpp"
 #include "numba/Dialect/ntensor/IR/NTensorOps.hpp"
+#include "numba/Dialect/numba_util/Dialect.hpp"
 #include "numba/Transforms/CastUtils.hpp"
 
 #include <mlir/Dialect/Arith/IR/Arith.h>

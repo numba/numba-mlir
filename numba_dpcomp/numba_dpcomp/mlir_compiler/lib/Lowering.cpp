@@ -30,8 +30,8 @@
 #include <llvm/Support/TargetSelect.h>
 
 #include "numba/Dialect/gpu_runtime/IR/GpuRuntimeOps.hpp"
-#include "numba/Dialect/numba_util/Dialect.hpp"
 #include "numba/Dialect/ntensor/IR/NTensorOps.hpp"
+#include "numba/Dialect/numba_util/Dialect.hpp"
 #include "numba/Dialect/plier/Dialect.hpp"
 
 #include "numba/Compiler/Compiler.hpp"
