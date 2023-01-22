@@ -5,7 +5,7 @@
 // CHECK: %[[C1:.*]] = arith.constant 1 : index
 // CHECK: %[[C0:.*]] = arith.constant 0 : index
 // CHECK: %[[DIM1:.*]] = memref.dim %[[MEM1]], %[[C0]] : memref<?xf64>
-// CHECK: imex_util.env_region #gpu_runtime.region_desc<device = "test">
+// CHECK: numba_util.env_region #gpu_runtime.region_desc<device = "test">
 // CHECK: %[[B:.*]]:3 = gpu_runtime.suggest_block_size, %[[DIM1]], %[[C1]], %[[C1]] -> index, index, index
 // CHECK: %[[G1:.*]] = arith.ceildivui %[[DIM1]], %[[B]]#0 : index
 // CHECK: scf.parallel
@@ -26,7 +26,7 @@ func.func @check1D(%arg0: memref<?xf64>, %arg1: memref<?xf64>) {
   %c1 = arith.constant 1 : index
   %c0 = arith.constant 0 : index
   %0 = memref.dim %arg0, %c0 : memref<?xf64>
-  imex_util.env_region #gpu_runtime.region_desc<device = "test"> {
+  numba_util.env_region #gpu_runtime.region_desc<device = "test"> {
     scf.parallel (%arg4) = (%c0) to (%0) step (%c1) {
       %2 = memref.load %arg0[%arg4] : memref<?xf64>
       memref.store %2, %arg1[%arg4] : memref<?xf64>
@@ -46,7 +46,7 @@ func.func @check1D(%arg0: memref<?xf64>, %arg1: memref<?xf64>) {
 // CHECK: %[[DIM1:.*]] = memref.dim %[[MEM1]], %[[C0]] : memref<?x?x?xf64>
 // CHECK: %[[DIM2:.*]] = memref.dim %[[MEM1]], %[[C1]] : memref<?x?x?xf64>
 // CHECK: %[[DIM3:.*]] = memref.dim %[[MEM1]], %[[C2]] : memref<?x?x?xf64>
-// CHECK: imex_util.env_region #gpu_runtime.region_desc<device = "test">
+// CHECK: numba_util.env_region #gpu_runtime.region_desc<device = "test">
 // CHECK: %[[B:.*]]:3 = gpu_runtime.suggest_block_size, %[[DIM1]], %[[DIM2]], %[[DIM3]] -> index, index, index
 // CHECK: %[[G1:.*]] = arith.ceildivui %[[DIM1]], %[[B]]#0 : index
 // CHECK: %[[G2:.*]] = arith.ceildivui %[[DIM2]], %[[B]]#1 : index
@@ -80,7 +80,7 @@ func.func @check3D(%arg0: memref<?x?x?xf64>, %arg1: memref<?x?x?xf64>) {
   %0 = memref.dim %arg0, %c0 : memref<?x?x?xf64>
   %1 = memref.dim %arg0, %c1 : memref<?x?x?xf64>
   %2 = memref.dim %arg0, %c2 : memref<?x?x?xf64>
-  imex_util.env_region #gpu_runtime.region_desc<device = "test"> {
+  numba_util.env_region #gpu_runtime.region_desc<device = "test"> {
     scf.parallel (%arg4, %arg5, %arg6) = (%c0, %c0, %c0) to (%0, %1, %2) step (%c1, %c1, %c1) {
       %3 = memref.load %arg0[%arg4, %arg5, %arg6] : memref<?x?x?xf64>
       memref.store %3, %arg1[%arg4, %arg5, %arg6] : memref<?x?x?xf64>
@@ -102,7 +102,7 @@ func.func @check3D(%arg0: memref<?x?x?xf64>, %arg1: memref<?x?x?xf64>) {
 // CHECK: %[[DIM2:.*]] = memref.dim %[[MEM1]], %[[C1]] : memref<?x?x?x?xf64>
 // CHECK: %[[DIM3:.*]] = memref.dim %[[MEM1]], %[[C2]] : memref<?x?x?x?xf64>
 // CHECK: %[[DIM4:.*]] = memref.dim %[[MEM1]], %[[C3]] : memref<?x?x?x?xf64>
-// CHECK: imex_util.env_region #gpu_runtime.region_desc<device = "test">
+// CHECK: numba_util.env_region #gpu_runtime.region_desc<device = "test">
 // CHECK: %[[B:.*]]:3 = gpu_runtime.suggest_block_size, %[[DIM1]], %[[DIM2]], %[[DIM3]] -> index, index, index
 // CHECK: %[[G1:.*]] = arith.ceildivui %[[DIM1]], %[[B]]#0 : index
 // CHECK: %[[G2:.*]] = arith.ceildivui %[[DIM2]], %[[B]]#1 : index
@@ -138,7 +138,7 @@ func.func @check4D(%arg0: memref<?x?x?x?xf64>, %arg1: memref<?x?x?x?xf64>) {
   %1 = memref.dim %arg0, %c1 : memref<?x?x?x?xf64>
   %2 = memref.dim %arg0, %c2 : memref<?x?x?x?xf64>
   %3 = memref.dim %arg0, %c3 : memref<?x?x?x?xf64>
-  imex_util.env_region #gpu_runtime.region_desc<device = "test"> {
+  numba_util.env_region #gpu_runtime.region_desc<device = "test"> {
     scf.parallel (%arg4, %arg5, %arg6, %arg7) = (%c0, %c0, %c0, %c0) to (%0, %1, %2, %3) step (%c1, %c1, %c1, %c1) {
       %4 = memref.load %arg0[%arg4, %arg5, %arg6, %arg7] : memref<?x?x?x?xf64>
       memref.store %4, %arg1[%arg4, %arg5, %arg6, %arg7] : memref<?x?x?x?xf64>
@@ -156,7 +156,7 @@ func.func @check4D(%arg0: memref<?x?x?x?xf64>, %arg1: memref<?x?x?x?xf64>) {
 // CHECK: %[[C1:.*]] = arith.constant 1 : index
 // CHECK: %[[C0:.*]] = arith.constant 0 : index
 // CHECK: %[[DIM1:.*]] = memref.dim %[[MEM1]], %[[C0]] : memref<?xf64>
-// CHECK: %[[RES1:.*]] = imex_util.env_region #gpu_runtime.region_desc<device = "test"> -> f64
+// CHECK: %[[RES1:.*]] = numba_util.env_region #gpu_runtime.region_desc<device = "test"> -> f64
 // CHECK: %[[B:.*]]:3 = gpu_runtime.suggest_block_size, %[[DIM1]], %[[C1]], %[[C1]] -> index, index, index
 // CHECK: %[[G1:.*]] = arith.ceildivui %[[DIM1]], %[[B]]#0 : index
 // CHECK: %[[RES2:.*]] = scf.parallel
@@ -187,7 +187,7 @@ func.func @check1DReduction(%arg0: memref<?xf64>, %arg1: memref<?xf64>, %arg2: f
   %c1 = arith.constant 1 : index
   %c0 = arith.constant 0 : index
   %0 = memref.dim %arg0, %c0 : memref<?xf64>
-  %1 = imex_util.env_region #gpu_runtime.region_desc<device = "test"> -> f64 {
+  %1 = numba_util.env_region #gpu_runtime.region_desc<device = "test"> -> f64 {
     %2 = scf.parallel (%arg4) = (%c0) to (%0) step (%c1) init(%arg2) -> f64 {
       %3 = memref.load %arg0[%arg4] : memref<?xf64>
       memref.store %3, %arg1[%arg4] : memref<?xf64>
@@ -198,7 +198,7 @@ func.func @check1DReduction(%arg0: memref<?xf64>, %arg1: memref<?xf64>, %arg2: f
       }
       scf.yield
     }
-    imex_util.env_region_yield %2: f64
+    numba_util.env_region_yield %2: f64
   }
   return %1 : f64
 }

@@ -545,7 +545,7 @@ struct LowerApplyOffsetOp
   }
 };
 
-/// Convert operations from the imex_util dialect to the LLVM dialect.
+/// Convert operations from the numba_util dialect to the LLVM dialect.
 struct ImexUtilToLLVMPass
     : public mlir::PassWrapper<ImexUtilToLLVMPass,
                                mlir::OperationPass<mlir::ModuleOp>> {

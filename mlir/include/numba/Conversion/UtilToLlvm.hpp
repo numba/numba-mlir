@@ -15,7 +15,7 @@ class Pass;
 
 namespace numba {
 
-/// Convert operations from the imex_util dialect to the LLVM dialect.
+/// Convert operations from the numba_util dialect to the LLVM dialect.
 ///
 /// TODO: We cannot pass LowerToLLVMOptions directly to the pass as it requires
 /// mlir context which is not yet available at this point, pass creation

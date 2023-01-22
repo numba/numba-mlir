@@ -26,7 +26,7 @@ func.func @test() {
 //  CHECK-NEXT: %[[V1:.*]] = "test.test3"() : () -> i32
 //  CHECK-NEXT: scf.yield %[[V1]] : i32
 //  CHECK-NEXT: } else {
-//  CHECK-NEXT: %[[V2:.*]] = imex_util.undef : i32
+//  CHECK-NEXT: %[[V2:.*]] = numba_util.undef : i32
 //  CHECK-NEXT: scf.yield %[[V2]] : i32
 //  CHECK-NEXT: }
 //  CHECK-NEXT: gpu_runtime.barrier  local
@@ -72,8 +72,8 @@ func.func @test() {
 //  CHECK-NEXT: %[[V2:.*]] = "test.test4"() : () -> i64
 //  CHECK-NEXT: scf.yield %[[V1]], %[[V2]] : i32, i64
 //  CHECK-NEXT: } else {
-//  CHECK-NEXT: %[[V3:.*]] = imex_util.undef : i32
-//  CHECK-NEXT: %[[V4:.*]] = imex_util.undef : i64
+//  CHECK-NEXT: %[[V3:.*]] = numba_util.undef : i32
+//  CHECK-NEXT: %[[V4:.*]] = numba_util.undef : i64
 //  CHECK-NEXT: scf.yield %[[V3]], %[[V4]] : i32, i64
 //  CHECK-NEXT: }
 //  CHECK-NEXT: gpu_runtime.barrier  local
@@ -83,7 +83,7 @@ func.func @test() {
 //  CHECK-NEXT: %[[V5:.*]] = "test.test7"() : () -> index
 //  CHECK-NEXT: scf.yield %[[V5]] : index
 //  CHECK-NEXT: } else {
-//  CHECK-NEXT: %[[V6:.*]] = imex_util.undef : index
+//  CHECK-NEXT: %[[V6:.*]] = numba_util.undef : index
 //  CHECK-NEXT: scf.yield %[[V6]] : index
 //  CHECK-NEXT: }
 //  CHECK-NEXT: gpu_runtime.barrier global
