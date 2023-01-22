@@ -152,7 +152,7 @@ static mlir::PassPipelineRegistration<>
                     });
 
 static mlir::PassPipelineRegistration<> makeSignless(
-    "imex-make-signless",
+    "numba-make-signless",
     "Convert types of various signedness to corresponding signless type",
     [](mlir::OpPassManager &pm) {
       pm.addPass(numba::createMakeSignlessPass());
@@ -172,11 +172,11 @@ static mlir::PassPipelineRegistration<> tileParallelLoopsGPU(
     });
 
 static mlir::PassPipelineRegistration<> memoryOpts(
-    "imex-memory-opts", "Apply memory optimizations",
+    "numba-memory-opts", "Apply memory optimizations",
     [](mlir::OpPassManager &pm) { pm.addPass(numba::createMemoryOptPass()); });
 
 static mlir::PassPipelineRegistration<> canonicalizeReductions(
-    "imex-canonicalize-reductions",
+    "numba-canonicalize-reductions",
     "Tries to promote loads/stores in scf.for to loop-carried variables",
     [](mlir::OpPassManager &pm) {
       pm.addPass(numba::createCanonicalizeReductionsPass());
@@ -191,14 +191,14 @@ static mlir::PassPipelineRegistration<> insertGPUGlobalReduce(
     });
 
 static mlir::PassPipelineRegistration<>
-    promoteToParallel("imex-promote-to-parallel",
+    promoteToParallel("numba-promote-to-parallel",
                       "Promotes scf.for to scf.parallel",
                       [](mlir::OpPassManager &pm) {
                         pm.addPass(numba::createPromoteToParallelPass());
                       });
 
 static mlir::PassPipelineRegistration<> shapeIntegerRangePropagation(
-    "imex-shape-int-range-opts", "Shape integer range optimizations",
+    "numba-shape-int-range-opts", "Shape integer range optimizations",
     [](mlir::OpPassManager &pm) {
       pm.addPass(numba::createShapeIntegerRangePropagationPass());
     });
