@@ -204,7 +204,9 @@ jobs:
 
         run: |
           cd _build || exit 1
+          pushd /home/runner/work/tmpdir
           ninja chek-imex || exit 1
+          popd
 
       - name: Build Python frontend
         shell: bash -l {0}
