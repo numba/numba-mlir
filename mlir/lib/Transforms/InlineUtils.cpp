@@ -4,7 +4,7 @@
 
 #include "numba/Transforms/InlineUtils.hpp"
 
-#include "numba/Dialect/imex_util/Dialect.hpp"
+#include "numba/Dialect/numba_util/Dialect.hpp"
 
 #include <mlir/Dialect/Func/IR/FuncOps.h>
 #include <mlir/Dialect/SCF/IR/SCF.h>

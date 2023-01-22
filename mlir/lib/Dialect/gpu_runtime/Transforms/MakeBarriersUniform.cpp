@@ -5,7 +5,7 @@
 #include "numba/Dialect/gpu_runtime/Transforms/MakeBarriersUniform.hpp"
 
 #include "numba/Dialect/gpu_runtime/IR/GpuRuntimeOps.hpp"
-#include "numba/Dialect/imex_util/Dialect.hpp"
+#include "numba/Dialect/numba_util/Dialect.hpp"
 
 #include <mlir/Dialect/GPU/IR/GPUDialect.h>
 #include <mlir/Dialect/SCF/IR/SCF.h>
@@ -141,9 +141,9 @@ struct MakeBarriersUniformPass
   virtual void
   getDependentDialects(mlir::DialectRegistry &registry) const override {
     registry.insert<gpu_runtime::GpuRuntimeDialect>();
-    registry.insert<numba::util::ImexUtilDialect>();
     registry.insert<mlir::gpu::GPUDialect>();
     registry.insert<mlir::scf::SCFDialect>();
+    registry.insert<numba::util::NumbaUtilDialect>();
   }
 
   void runOnOperation() override {

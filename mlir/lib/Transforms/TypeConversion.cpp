@@ -4,7 +4,7 @@
 
 #include "numba/Transforms/TypeConversion.hpp"
 
-#include "numba/Dialect/imex_util/Dialect.hpp"
+#include "numba/Dialect/numba_util/Dialect.hpp"
 
 #include <mlir/Dialect/Arith/IR/Arith.h>
 #include <mlir/Dialect/Func/Transforms/FuncConversions.h>

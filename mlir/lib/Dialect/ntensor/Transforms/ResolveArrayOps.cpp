@@ -4,8 +4,8 @@
 
 #include "numba/Dialect/ntensor/Transforms/ResolveArrayOps.hpp"
 
-#include "numba/Dialect/imex_util/Dialect.hpp"
 #include "numba/Dialect/ntensor/IR/NTensorOps.hpp"
+#include "numba/Dialect/numba_util/Dialect.hpp"
 #include "numba/Transforms/CastUtils.hpp"
 
 #include <mlir/Dialect/Arith/IR/Arith.h>
@@ -467,7 +467,7 @@ struct ResolveArrayOpsPass
   getDependentDialects(mlir::DialectRegistry &registry) const override {
     registry.insert<mlir::arith::ArithDialect>();
     registry.insert<numba::ntensor::NTensorDialect>();
-    registry.insert<numba::util::ImexUtilDialect>();
+    registry.insert<numba::util::NumbaUtilDialect>();
   }
 
   void runOnOperation() override {

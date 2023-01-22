@@ -39,11 +39,11 @@
 #include "numba/Compiler/PipelineRegistry.hpp"
 #include "numba/Conversion/NtensorToLinalg.hpp"
 #include "numba/Conversion/NtensorToMemref.hpp"
-#include "numba/Dialect/imex_util/Dialect.hpp"
 #include "numba/Dialect/ntensor/IR/NTensorOps.hpp"
 #include "numba/Dialect/ntensor/Transforms/CopyRemoval.hpp"
 #include "numba/Dialect/ntensor/Transforms/PropagateEnvironment.hpp"
 #include "numba/Dialect/ntensor/Transforms/ResolveArrayOps.hpp"
+#include "numba/Dialect/numba_util/Dialect.hpp"
 #include "numba/Dialect/plier/Dialect.hpp"
 #include "numba/Transforms/CanonicalizeReductions.hpp"
 #include "numba/Transforms/CastUtils.hpp"
@@ -1287,9 +1287,9 @@ struct PlierToNtensorPass
 
   virtual void
   getDependentDialects(mlir::DialectRegistry &registry) const override {
-    registry.insert<numba::ntensor::NTensorDialect>();
-    registry.insert<numba::util::ImexUtilDialect>();
     registry.insert<mlir::func::FuncDialect>();
+    registry.insert<numba::ntensor::NTensorDialect>();
+    registry.insert<numba::util::NumbaUtilDialect>();
     registry.insert<plier::PlierDialect>();
   }
 
@@ -1813,12 +1813,12 @@ struct ResolveNtensorPass
 
   virtual void
   getDependentDialects(mlir::DialectRegistry &registry) const override {
-    registry.insert<numba::ntensor::NTensorDialect>();
-    registry.insert<numba::util::ImexUtilDialect>();
+    registry.insert<mlir::bufferization::BufferizationDialect>();
     registry.insert<mlir::linalg::LinalgDialect>();
     registry.insert<mlir::memref::MemRefDialect>();
     registry.insert<mlir::tensor::TensorDialect>();
-    registry.insert<mlir::bufferization::BufferizationDialect>();
+    registry.insert<numba::ntensor::NTensorDialect>();
+    registry.insert<numba::util::NumbaUtilDialect>();
   }
 
   void runOnOperation() override {
@@ -1841,9 +1841,9 @@ struct WrapParforRegionsPass
 
   virtual void
   getDependentDialects(mlir::DialectRegistry &registry) const override {
-    registry.insert<numba::ntensor::NTensorDialect>();
-    registry.insert<numba::util::ImexUtilDialect>();
     registry.insert<mlir::scf::SCFDialect>();
+    registry.insert<numba::ntensor::NTensorDialect>();
+    registry.insert<numba::util::NumbaUtilDialect>();
   }
 
   void runOnOperation() override {
@@ -1921,7 +1921,7 @@ struct MarkInputShapesRanges
 
   virtual void
   getDependentDialects(mlir::DialectRegistry &registry) const override {
-    registry.insert<numba::util::ImexUtilDialect>();
+    registry.insert<numba::util::NumbaUtilDialect>();
   }
 
   void runOnOperation() override {
@@ -1983,9 +1983,9 @@ struct ResolveNumpyFuncsPass
 
   virtual void
   getDependentDialects(mlir::DialectRegistry &registry) const override {
-    registry.insert<numba::ntensor::NTensorDialect>();
-    registry.insert<numba::util::ImexUtilDialect>();
     registry.insert<mlir::arith::ArithDialect>();
+    registry.insert<numba::ntensor::NTensorDialect>();
+    registry.insert<numba::util::NumbaUtilDialect>();
   }
 
   void runOnOperation() override {
@@ -2776,7 +2776,7 @@ struct AdditionalBufferize
 
   virtual void
   getDependentDialects(mlir::DialectRegistry &registry) const override {
-    registry.insert<numba::util::ImexUtilDialect>();
+    registry.insert<numba::util::NumbaUtilDialect>();
   }
 
   void runOnOperation() override {
@@ -2852,7 +2852,7 @@ struct CloneArgsPass
 
   virtual void
   getDependentDialects(mlir::DialectRegistry &registry) const override {
-    registry.insert<numba::util::ImexUtilDialect>();
+    registry.insert<numba::util::NumbaUtilDialect>();
   }
 
   void runOnOperation() override;
@@ -2963,9 +2963,9 @@ struct MoveArithIntoRegionPass
 
   virtual void
   getDependentDialects(mlir::DialectRegistry &registry) const override {
-    registry.insert<numba::util::ImexUtilDialect>();
     registry.insert<mlir::arith::ArithDialect>();
     registry.insert<mlir::math::MathDialect>();
+    registry.insert<numba::util::NumbaUtilDialect>();
   }
 
   void runOnOperation() override {

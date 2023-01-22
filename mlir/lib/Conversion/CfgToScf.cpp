@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "numba/Conversion/CfgToScf.hpp"
-#include "numba/Dialect/imex_util/Dialect.hpp"
+#include "numba/Dialect/numba_util/Dialect.hpp"
 
 #include <mlir/Dialect/Arith/IR/Arith.h>
 #include <mlir/Dialect/ControlFlow/IR/ControlFlowOps.h>
@@ -709,7 +709,7 @@ struct CFGToSCFPass
   virtual void
   getDependentDialects(mlir::DialectRegistry &registry) const override {
     registry.insert<mlir::scf::SCFDialect>();
-    registry.insert<numba::util::ImexUtilDialect>();
+    registry.insert<numba::util::NumbaUtilDialect>();
   }
 
   void runOnOperation() override {

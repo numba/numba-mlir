@@ -4,7 +4,7 @@
 
 #include "numba/Conversion/UtilConversion.hpp"
 
-#include "numba/Dialect/imex_util/Dialect.hpp"
+#include "numba/Dialect/numba_util/Dialect.hpp"
 
 #include <mlir/Conversion/Passes.h>
 

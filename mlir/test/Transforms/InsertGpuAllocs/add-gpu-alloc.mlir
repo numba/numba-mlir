@@ -86,26 +86,26 @@ func.func @addt(%arg0: memref<2x5xf32>, %arg1: memref<2x5xf32>) -> memref<2x5xf3
   %c2 = arith.constant 2 : index
   %c1 = arith.constant 1 : index
   %c5 = arith.constant 5 : index
-  // CHECK: %[[RES0:.*]] = imex_util.env_region #gpu_runtime.region_desc<device = "test"> -> memref<2x5xf32>
+  // CHECK: %[[RES0:.*]] = numba_util.env_region #gpu_runtime.region_desc<device = "test"> -> memref<2x5xf32>
   // CHECK: %[[MEMREF0:.*]] = gpu.alloc host_shared () : memref<2x5xf32>
   // CHECK: memref.copy %[[ARG2]], %[[MEMREF0]] : memref<2x5xf32> to memref<2x5xf32>
-  // CHECK: imex_util.env_region_yield %[[MEMREF0]] : memref<2x5xf32>
+  // CHECK: numba_util.env_region_yield %[[MEMREF0]] : memref<2x5xf32>
 
-  // CHECK: %[[RES1:.*]] = imex_util.env_region #gpu_runtime.region_desc<device = "test"> -> memref<2x5xf32>
+  // CHECK: %[[RES1:.*]] = numba_util.env_region #gpu_runtime.region_desc<device = "test"> -> memref<2x5xf32>
   // CHECK: %[[MEMREF1:.*]] = gpu.alloc host_shared () : memref<2x5xf32>
   // CHECK: memref.copy %[[ARG1]], %[[MEMREF1]] : memref<2x5xf32> to memref<2x5xf32>
-  // CHECK: imex_util.env_region_yield %[[MEMREF1]] : memref<2x5xf32>
+  // CHECK: numba_util.env_region_yield %[[MEMREF1]] : memref<2x5xf32>
 
   %0 = memref.alloc() {alignment = 128 : i64} : memref<2x5xf32>
-  // CHECK: %[[RES2:.*]] = imex_util.env_region #gpu_runtime.region_desc<device = "test"> -> memref<2x5xf32>
+  // CHECK: %[[RES2:.*]] = numba_util.env_region #gpu_runtime.region_desc<device = "test"> -> memref<2x5xf32>
   // CHECK:  %[[MEMREF2:.*]] = gpu.alloc host_shared () : memref<2x5xf32>
-  // CHECK: imex_util.env_region_yield %[[MEMREF2]] : memref<2x5xf32>
+  // CHECK: numba_util.env_region_yield %[[MEMREF2]] : memref<2x5xf32>
 
   %c1_0 = arith.constant 1 : index
   %1 = affine.apply affine_map<(d0)[s0, s1] -> ((d0 - s0) ceildiv s1)>(%c2)[%c0, %c1]
   %2 = affine.apply affine_map<(d0)[s0, s1] -> ((d0 - s0) ceildiv s1)>(%c5)[%c0, %c1]
 
-  imex_util.env_region #gpu_runtime.region_desc<device = "test"> {
+  numba_util.env_region #gpu_runtime.region_desc<device = "test"> {
     gpu.launch blocks(%arg2, %arg3, %arg4) in (%arg8 = %1, %arg9 = %2, %arg10 = %c1_0) threads(%arg5, %arg6, %arg7) in (%arg11 = %c1_0, %arg12 = %c1_0, %arg13 = %c1_0) {
       // CHECK: %[[IDX1:.*]] = affine.apply #map1(%{{.*}})[%{{.*}}, %{{.*}}]
       %3 = affine.apply affine_map<(d0)[s0, s1] -> (d0 * s0 + s1)>(%arg2)[%c1, %c0]

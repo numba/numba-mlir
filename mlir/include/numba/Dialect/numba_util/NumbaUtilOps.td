@@ -14,8 +14,8 @@ include "mlir/Interfaces/ViewLikeInterface.td"
 include "mlir/IR/EnumAttr.td"
 include "mlir/IR/OpBase.td"
 
-def ImexUtil_Dialect : Dialect {
-  let name = "imex_util";
+def NumbaUtil_Dialect : Dialect {
+  let name = "numba_util";
   let cppNamespace = "::numba::util";
 
   let dependentDialects = ["::mlir::memref::MemRefDialect"];
@@ -26,23 +26,23 @@ def ImexUtil_Dialect : Dialect {
   let useDefaultTypePrinterParser = 1;
 }
 
-class ImexUtil_Type<string name, string typeMnemonic, list<Trait> traits = [],
+class NumbaUtil_Type<string name, string typeMnemonic, list<Trait> traits = [],
                    string baseCppClass = "::mlir::Type">
-    : TypeDef<ImexUtil_Dialect, name, traits, baseCppClass> {
+    : TypeDef<NumbaUtil_Dialect, name, traits, baseCppClass> {
   let mnemonic = typeMnemonic;
 }
 
-class ImexUtil_Attr<string attrName, string attrMnemonic, list<Trait> traits = []>
-    : AttrDef<ImexUtil_Dialect, attrName, traits> {
+class NumbaUtil_Attr<string attrName, string attrMnemonic, list<Trait> traits = []>
+    : AttrDef<NumbaUtil_Dialect, attrName, traits> {
   let mnemonic = attrMnemonic;
 }
 
-class ImexUtil_Op<string mnemonic, list<Trait> traits = []>
-    : Op<ImexUtil_Dialect, mnemonic, traits>;
+class NumbaUtil_Op<string mnemonic, list<Trait> traits = []>
+    : Op<NumbaUtil_Dialect, mnemonic, traits>;
 
-def ImexUtil_OpaqueType : ImexUtil_Type<"Opaque", "opaque", [], "::mlir::Type">;
+def NumbaUtil_OpaqueType : NumbaUtil_Type<"Opaque", "opaque", [], "::mlir::Type">;
 
-def ImexUtil_TypeVar : ImexUtil_Type<"TypeVar", "typevar", [], "::mlir::Type"> {
+def NumbaUtil_TypeVar : NumbaUtil_Type<"TypeVar", "typevar", [], "::mlir::Type"> {
   let parameters = (ins
     "::mlir::Type":$type
   );
@@ -57,7 +57,7 @@ def ImexUtil_TypeVar : ImexUtil_Type<"TypeVar", "typevar", [], "::mlir::Type"> {
 }
 
 def IndexRangeAttr
-    : ImexUtil_Attr<"IndexRange", "index_range"> {
+    : NumbaUtil_Attr<"IndexRange", "index_range"> {
   let parameters = (ins
     "int64_t":$min,
     "int64_t":$max
@@ -65,7 +65,7 @@ def IndexRangeAttr
   let assemblyFormat = "`<` `[` $min `,` $max `]` `>`";
 }
 
-def EnforceShapeOp : ImexUtil_Op<"enforce_shape"> {
+def EnforceShapeOp : NumbaUtil_Op<"enforce_shape"> {
 
   let arguments = (ins AnyShaped:$value, Variadic<Index>:$sizes);
   let results = (outs AnyShaped:$result);
@@ -81,7 +81,7 @@ def EnforceShapeOp : ImexUtil_Op<"enforce_shape"> {
   let assemblyFormat = "attr-dict $value `:` type($value) `(` $sizes `)` `->` type($result)";
 }
 
-def ParallelOp : ImexUtil_Op<"parallel", [
+def ParallelOp : NumbaUtil_Op<"parallel", [
   AttrSizedOperandSegments, DeclareOpInterfaceMethods<LoopLikeOpInterface>,
   SingleBlockImplicitTerminator<"::numba::util::YieldOp">, RecursiveMemoryEffects
 ]> {
@@ -119,13 +119,13 @@ def ParallelOp : ImexUtil_Op<"parallel", [
     }];
 }
 
-def UndefOp : ImexUtil_Op<"undef", [Pure]> {
+def UndefOp : NumbaUtil_Op<"undef", [Pure]> {
   let results = (outs AnyType:$result);
 
   let assemblyFormat = "attr-dict `:` type($result)";
 }
 
-def YieldOp : ImexUtil_Op<"yield", [
+def YieldOp : NumbaUtil_Op<"yield", [
   Pure, ReturnLike, Terminator, ParentOneOf<["::numba::util::ParallelOp"]>
 ]> {
   let arguments = (ins Variadic<AnyType> : $results);
@@ -135,7 +135,7 @@ def YieldOp : ImexUtil_Op<"yield", [
   let hasVerifier = 0;
 }
 
-def RetainOp : ImexUtil_Op<"retain", [ViewLikeOpInterface]> {
+def RetainOp : NumbaUtil_Op<"retain", [ViewLikeOpInterface]> {
   let arguments = (ins AnyMemRef : $source);
 
   let results = (outs AnyMemRef);
@@ -147,7 +147,7 @@ def RetainOp : ImexUtil_Op<"retain", [ViewLikeOpInterface]> {
   }];
 }
 
-def ChangeLayoutOp : ImexUtil_Op<"change_layout", [
+def ChangeLayoutOp : NumbaUtil_Op<"change_layout", [
   DeclareOpInterfaceMethods<CastOpInterface>,
   ViewLikeOpInterface,
   Pure]> {
@@ -164,7 +164,7 @@ def ChangeLayoutOp : ImexUtil_Op<"change_layout", [
   }];
 }
 
-def SignCastOp : ImexUtil_Op<"sign_cast", [Pure]> {
+def SignCastOp : NumbaUtil_Op<"sign_cast", [Pure]> {
   let arguments = (ins AnyType:$source);
 
   let results = (outs AnyType:$dest);
@@ -174,11 +174,11 @@ def SignCastOp : ImexUtil_Op<"sign_cast", [Pure]> {
   let assemblyFormat = "$source attr-dict `:` type($source) `to` type($dest)";
 }
 
-def TakeContextOp : ImexUtil_Op<"take_context"> {
+def TakeContextOp : NumbaUtil_Op<"take_context"> {
   let arguments = (ins OptionalAttr<SymbolRefAttr>:$initFunc,
                        OptionalAttr<SymbolRefAttr>:$releaseFunc);
 
-  let results = (outs ImexUtil_OpaqueType:$context,
+  let results = (outs NumbaUtil_OpaqueType:$context,
                       Variadic<AnyType>:$results);
 
     let builders = [
@@ -188,11 +188,11 @@ def TakeContextOp : ImexUtil_Op<"take_context"> {
    ];
 }
 
-def ReleaseContextOp : ImexUtil_Op<"release_context"> {
-  let arguments = (ins ImexUtil_OpaqueType:$context);
+def ReleaseContextOp : NumbaUtil_Op<"release_context"> {
+  let arguments = (ins NumbaUtil_OpaqueType:$context);
 }
 
-def BuildTupleOp : ImexUtil_Op<"build_tuple", [Pure]> {
+def BuildTupleOp : NumbaUtil_Op<"build_tuple", [Pure]> {
   let summary = "Constructs tuple from provided values";
   let description = [{
     "build_tuple" takes multiple SSA values and constructs tuple from them.
@@ -206,7 +206,7 @@ def BuildTupleOp : ImexUtil_Op<"build_tuple", [Pure]> {
   let assemblyFormat = "attr-dict ($args^ `:` type($args) `->`)? type($result)";
 }
 
-def TupleExtractOp : ImexUtil_Op<"tuple_extract", [Pure]> {
+def TupleExtractOp : NumbaUtil_Op<"tuple_extract", [Pure]> {
   let summary = "Extracts value from tuple";
   let description = [{
     "tuple_extract" extracts element with specific index from tuple.
@@ -229,7 +229,7 @@ def TupleExtractOp : ImexUtil_Op<"tuple_extract", [Pure]> {
   let hasFolder = 1;
 }
 
-def EnvironmentRegionOp : ImexUtil_Op<"env_region", [
+def EnvironmentRegionOp : NumbaUtil_Op<"env_region", [
     DeclareOpInterfaceMethods<RegionBranchOpInterface>,
     SingleBlockImplicitTerminator<"::numba::util::EnvironmentRegionYieldOp">,
     RecursiveMemoryEffects]> {
@@ -272,7 +272,7 @@ def EnvironmentRegionOp : ImexUtil_Op<"env_region", [
   let hasCanonicalizer = 1;
 }
 
-def EnvironmentRegionYieldOp : ImexUtil_Op<"env_region_yield", [
+def EnvironmentRegionYieldOp : NumbaUtil_Op<"env_region_yield", [
   Pure,
   ReturnLike,
   Terminator,
@@ -294,7 +294,7 @@ def EnvironmentRegionYieldOp : ImexUtil_Op<"env_region_yield", [
   let assemblyFormat = "attr-dict ($results^ `:` type($results))?";
 }
 
-def MemrefApplyOffsetOp : ImexUtil_Op<"memref_apply_offset", [
+def MemrefApplyOffsetOp : NumbaUtil_Op<"memref_apply_offset", [
     Pure, ViewLikeOpInterface
   ]> {
 
@@ -316,7 +316,7 @@ def MemrefApplyOffsetOp : ImexUtil_Op<"memref_apply_offset", [
 
 // TODO: Upstream arith.bitcast doesnt suuport casting between vectors and
 // non-vectors
-def BitcastOp : ImexUtil_Op<"bitcast", [Pure]> {
+def BitcastOp : NumbaUtil_Op<"bitcast", [Pure]> {
 
   let arguments = (ins AnyType:$source);
   let results = (outs AnyType:$result);
@@ -328,7 +328,7 @@ def BitcastOp : ImexUtil_Op<"bitcast", [Pure]> {
 }
 
 // TODO: Upstream
-def MemrefBitcastOp : ImexUtil_Op<"memref_bitcast", [
+def MemrefBitcastOp : NumbaUtil_Op<"memref_bitcast", [
     Pure, ViewLikeOpInterface, SameOperandsElementType, SameOperandsShape
   ]> {
 

@@ -6,8 +6,8 @@
 
 #include "PyTypeConverter.hpp"
 
-#include "numba/Dialect/imex_util/Dialect.hpp"
 #include "numba/Dialect/ntensor/IR/NTensorOps.hpp"
+#include "numba/Dialect/numba_util/Dialect.hpp"
 
 #include <pybind11/pybind11.h>
 

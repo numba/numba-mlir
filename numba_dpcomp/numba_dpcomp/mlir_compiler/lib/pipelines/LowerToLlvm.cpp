@@ -47,7 +47,7 @@
 
 #include "numba/Compiler/PipelineRegistry.hpp"
 #include "numba/Conversion/UtilToLlvm.hpp"
-#include "numba/Dialect/imex_util/Dialect.hpp"
+#include "numba/Dialect/numba_util/Dialect.hpp"
 #include "numba/Transforms/FuncUtils.hpp"
 #include "numba/Utils.hpp"
 

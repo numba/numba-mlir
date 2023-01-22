@@ -977,7 +977,7 @@ def test_dpctl_simple1():
         ir = get_print_buffer()
         assert (
             ir.count(
-                f'imex_util.env_region #gpu_runtime.region_desc<device = "{filter_string}">'
+                f'numba_util.env_region #gpu_runtime.region_desc<device = "{filter_string}">'
             )
             > 0
         ), ir
@@ -1014,7 +1014,7 @@ def test_parfor_simple1():
         ir = get_print_buffer()
         assert (
             ir.count(
-                f'imex_util.env_region #gpu_runtime.region_desc<device = "{filter_string}">'
+                f'numba_util.env_region #gpu_runtime.region_desc<device = "{filter_string}">'
             )
             > 0
         ), ir
@@ -1048,7 +1048,7 @@ def test_cfd_simple1():
         ir = get_print_buffer()
         assert (
             ir.count(
-                f'imex_util.env_region #gpu_runtime.region_desc<device = "{filter_string}">'
+                f'numba_util.env_region #gpu_runtime.region_desc<device = "{filter_string}">'
             )
             > 0
         ), ir
@@ -1084,7 +1084,7 @@ def test_cfd_simple2():
         ir = get_print_buffer()
         assert (
             ir.count(
-                f'imex_util.env_region #gpu_runtime.region_desc<device = "{filter_string}">'
+                f'numba_util.env_region #gpu_runtime.region_desc<device = "{filter_string}">'
             )
             > 0
         ), ir
@@ -1122,7 +1122,7 @@ def test_cfd_indirect():
         ir = get_print_buffer()
         assert (
             ir.count(
-                f'imex_util.env_region #gpu_runtime.region_desc<device = "{filter_string}">'
+                f'numba_util.env_region #gpu_runtime.region_desc<device = "{filter_string}">'
             )
             > 0
         ), ir
@@ -1161,7 +1161,7 @@ def test_cfd_reshape():
         ir = get_print_buffer()
         assert (
             ir.count(
-                f'imex_util.env_region #gpu_runtime.region_desc<device = "{filter_string}">'
+                f'numba_util.env_region #gpu_runtime.region_desc<device = "{filter_string}">'
             )
             > 0
         ), ir
@@ -1191,7 +1191,7 @@ def test_cfd_reduce1(size):
         ir = get_print_buffer()
         assert (
             ir.count(
-                f'imex_util.env_region #gpu_runtime.region_desc<device = "{filter_string}">'
+                f'numba_util.env_region #gpu_runtime.region_desc<device = "{filter_string}">'
             )
             > 0
         ), ir
@@ -1261,7 +1261,7 @@ def test_cfd_dot(a, b, py_func):
         ir = get_print_buffer()
         assert (
             ir.count(
-                f'imex_util.env_region #gpu_runtime.region_desc<device = "{filter_string}">'
+                f'numba_util.env_region #gpu_runtime.region_desc<device = "{filter_string}">'
             )
             > 0
         ), ir

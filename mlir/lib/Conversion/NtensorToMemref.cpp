@@ -5,9 +5,9 @@
 #include "numba/Conversion/NtensorToMemref.hpp"
 
 #include "numba/Conversion/UtilConversion.hpp"
-#include "numba/Dialect/imex_util/Dialect.hpp"
-#include "numba/Dialect/imex_util/Utils.hpp"
 #include "numba/Dialect/ntensor/IR/NTensorOps.hpp"
+#include "numba/Dialect/numba_util/Dialect.hpp"
+#include "numba/Dialect/numba_util/Utils.hpp"
 #include "numba/Transforms/TypeConversion.hpp"
 
 #include <mlir/Dialect/Arith/IR/Arith.h>
@@ -451,11 +451,11 @@ struct NtensorToMemrefPass
 
   virtual void
   getDependentDialects(mlir::DialectRegistry &registry) const override {
-    registry.insert<numba::util::ImexUtilDialect>();
     registry.insert<mlir::arith::ArithDialect>();
     registry.insert<mlir::bufferization::BufferizationDialect>();
     registry.insert<mlir::linalg::LinalgDialect>();
     registry.insert<mlir::memref::MemRefDialect>();
+    registry.insert<numba::util::NumbaUtilDialect>();
   }
 
   void runOnOperation() override {

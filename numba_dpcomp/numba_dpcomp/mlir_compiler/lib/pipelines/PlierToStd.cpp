@@ -21,7 +21,7 @@
 #include <mlir/Transforms/GreedyPatternRewriteDriver.h>
 #include <mlir/Transforms/Passes.h>
 
-#include "numba/Dialect/imex_util/Dialect.hpp"
+#include "numba/Dialect/numba_util/Dialect.hpp"
 #include "numba/Dialect/plier/Dialect.hpp"
 
 #include "numba/Compiler/PipelineRegistry.hpp"
@@ -916,11 +916,11 @@ struct PlierToStdPass
 
   virtual void
   getDependentDialects(mlir::DialectRegistry &registry) const override {
-    registry.insert<numba::util::ImexUtilDialect>();
     registry.insert<mlir::complex::ComplexDialect>();
     registry.insert<mlir::func::FuncDialect>();
     registry.insert<mlir::math::MathDialect>();
     registry.insert<mlir::scf::SCFDialect>();
+    registry.insert<numba::util::NumbaUtilDialect>();
     registry.insert<plier::PlierDialect>();
   }
 

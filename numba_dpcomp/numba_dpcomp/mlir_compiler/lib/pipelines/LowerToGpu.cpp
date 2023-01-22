@@ -43,8 +43,8 @@
 #include "numba/Conversion/UtilConversion.hpp"
 #include "numba/Dialect/gpu_runtime/IR/GpuRuntimeOps.hpp"
 #include "numba/Dialect/gpu_runtime/Transforms/MakeBarriersUniform.hpp"
-#include "numba/Dialect/imex_util/Dialect.hpp"
 #include "numba/Dialect/ntensor/IR/NTensorOps.hpp"
+#include "numba/Dialect/numba_util/Dialect.hpp"
 #include "numba/Transforms/CallLowering.hpp"
 #include "numba/Transforms/CastUtils.hpp"
 #include "numba/Transforms/CommonOpts.hpp"
@@ -106,8 +106,8 @@ struct PrepareForGPUPass
   virtual void
   getDependentDialects(mlir::DialectRegistry &registry) const override {
     registry.insert<gpu_runtime::GpuRuntimeDialect>();
-    registry.insert<numba::util::ImexUtilDialect>();
     registry.insert<mlir::scf::SCFDialect>();
+    registry.insert<numba::util::NumbaUtilDialect>();
   }
 
   void runOnOperation() override {
@@ -304,7 +304,7 @@ struct GPULowerDefaultLocalSize
   virtual void
   getDependentDialects(mlir::DialectRegistry &registry) const override {
     registry.insert<mlir::func::FuncDialect>();
-    registry.insert<numba::util::ImexUtilDialect>();
+    registry.insert<numba::util::NumbaUtilDialect>();
   }
 
   void runOnOperation() override {

@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "numba/Dialect/plier/Dialect.hpp"
-#include "numba/Dialect/imex_util/Dialect.hpp"
+#include "numba/Dialect/numba_util/Dialect.hpp"
 
 #include <mlir/IR/Builders.h>
 #include <mlir/IR/BuiltinOps.h>

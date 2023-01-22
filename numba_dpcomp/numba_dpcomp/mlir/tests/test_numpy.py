@@ -485,7 +485,7 @@ def test_prange_lowering():
         arr = np.arange(10000, dtype=np.float32)
         assert_equal(py_func(arr), jit_func(arr))
         ir = get_print_buffer()
-        assert ir.count("imex_util.parallel") == 1, ir
+        assert ir.count("numba_util.parallel") == 1, ir
 
 
 @pytest.mark.skip()
@@ -508,13 +508,13 @@ def test_prange_lowering_indirect():
         arr = np.arange(10000, dtype=np.float32)
         assert_equal(py_func1(arr), jit_func1(arr))
         ir = get_print_buffer()
-        assert ir.count("imex_util.parallel") == 1, ir
+        assert ir.count("numba_util.parallel") == 1, ir
 
     with print_pass_ir([], ["ParallelToTbbPass"]):
         arr = np.arange(10000, dtype=np.float32)
         assert_equal(py_func2(arr), jit_func2(arr))
         ir = get_print_buffer()
-        assert ir.count("imex_util.parallel") == 1, ir
+        assert ir.count("numba_util.parallel") == 1, ir
 
 
 def test_loop_fusion1():

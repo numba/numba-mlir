@@ -3,8 +3,8 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 include_directories(${MLIR_INCLUDE_DIRS})
-set(dialect ImexUtilOps)
-set(dialect_namespace imex_util)
+set(dialect NumbaUtilOps)
+set(dialect_namespace numba_util)
 set(LLVM_TARGET_DEFINITIONS ${dialect}.td)
 mlir_tablegen(${dialect}Enums.h.inc -gen-enum-decls)
 mlir_tablegen(${dialect}Enums.cpp.inc -gen-enum-defs)

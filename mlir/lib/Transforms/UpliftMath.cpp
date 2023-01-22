@@ -4,7 +4,7 @@
 
 #include "numba/Transforms/UpliftMath.hpp"
 
-#include "numba/Dialect/imex_util/Dialect.hpp"
+#include "numba/Dialect/numba_util/Dialect.hpp"
 
 #include <mlir/Dialect/Arith/IR/Arith.h>
 #include <mlir/Dialect/Complex/IR/Complex.h>

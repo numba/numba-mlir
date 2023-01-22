@@ -108,10 +108,10 @@ func.func @test(%arg0: tensor<2x3xsi32>, %arg1 : tensor<2x3xsi32>) -> tensor<2x3
       ins(%arg0, %arg1 : tensor<2x3xsi32>, tensor<2x3xsi32>)
       outs(%0 : tensor<2x3xsi32>) {
     ^bb0(%arg3: si32, %arg4: si32, %arg5: si32):
-      %2 = imex_util.sign_cast %arg3 : si32 to i32
-      %3 = imex_util.sign_cast %arg4 : si32 to i32
+      %2 = numba_util.sign_cast %arg3 : si32 to i32
+      %3 = numba_util.sign_cast %arg4 : si32 to i32
       %4 = arith.addi %2, %3 : i32
-      %5 = imex_util.sign_cast %4 : i32 to si32
+      %5 = numba_util.sign_cast %4 : i32 to si32
       linalg.yield %5 : si32
   } -> tensor<2x3xsi32>
   return %1 : tensor<2x3xsi32>

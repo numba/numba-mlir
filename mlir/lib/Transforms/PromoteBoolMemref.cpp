@@ -4,7 +4,7 @@
 
 #include "numba/Transforms/PromoteBoolMemref.hpp"
 
-#include "numba/Dialect/imex_util/Dialect.hpp"
+#include "numba/Dialect/numba_util/Dialect.hpp"
 #include "numba/Transforms/TypeConversion.hpp"
 
 #include <mlir/Dialect/Arith/IR/Arith.h>
