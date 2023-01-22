@@ -9,7 +9,7 @@
 #include "Lowering.hpp"
 
 static bool is_dpnp_supported() {
-#ifdef IMEX_USE_DPNP
+#ifdef NUMBA_MLIR_USE_DPNP
   return true;
 #else
   return false;
@@ -17,7 +17,7 @@ static bool is_dpnp_supported() {
 }
 
 static bool is_mkl_supported() {
-#ifdef IMEX_USE_MKL
+#ifdef NUMBA_MLIR_USE_MKL
   return true;
 #else
   return false;

@@ -31,7 +31,7 @@ if int(os.environ.get("DPCOMP_SETUP_RUN_CMAKE", 1)):
     LLVM_DIR = os.path.join(LLVM_PATH, "lib", "cmake", "llvm")
     MLIR_DIR = os.path.join(LLVM_PATH, "lib", "cmake", "mlir")
     TBB_DIR = os.path.join(os.environ["TBB_PATH"], "lib", "cmake", "tbb")
-    IMEX_USE_MKL = os.environ.get("IMEX_USE_MKL")
+    NUMBA_MLIR_USE_MKL = os.environ.get("NUMBA_MLIR_USE_MKL")
     CMAKE_INSTALL_PREFIX = os.path.join(root_dir, "..")
 
     cmake_build_dir = os.path.join(CMAKE_INSTALL_PREFIX, "dpcomp_cmake_build")
@@ -53,13 +53,13 @@ if int(os.environ.get("DPCOMP_SETUP_RUN_CMAKE", 1)):
         "-DCMAKE_INSTALL_PREFIX=" + CMAKE_INSTALL_PREFIX,
         "-DPython3_NumPy_INCLUDE_DIRS=" + NUMPY_INCLUDE_DIR,
         "-DPython3_FIND_STRATEGY=LOCATION",
-        "-DIMEX_ENABLE_NUMBA_FE=ON",
-        "-DIMEX_ENABLE_TBB_SUPPORT=ON",
+        "-DNUMBA_MLIR_ENABLE_NUMBA_FE=ON",
+        "-DNUMBA_MLIR_ENABLE_TBB_SUPPORT=ON",
         "-DLLVM_ENABLE_ZSTD=OFF",
     ]
 
-    if IMEX_USE_MKL is not None:
-        cmake_cmd += ["-DIMEX_USE_MKL=" + IMEX_USE_MKL]
+    if NUMBA_MLIR_USE_MKL is not None:
+        cmake_cmd += ["-DNUMBA_MLIR_USE_MKL=" + NUMBA_MLIR_USE_MKL]
 
     # DPNP
     try:
@@ -70,7 +70,7 @@ if int(os.environ.get("DPCOMP_SETUP_RUN_CMAKE", 1)):
         cmake_cmd += [
             "-DDPNP_LIBRARY_DIR=" + DPNP_LIBRARY_DIR,
             "-DDPNP_INCLUDE_DIR=" + DPNP_INCLUDE_DIR,
-            "-DIMEX_USE_DPNP=ON",
+            "-DNUMBA_MLIR_USE_DPNP=ON",
         ]
         print("Found DPNP at", DPNP_LIBRARY_DIR)
     except ImportError:
@@ -83,7 +83,7 @@ if int(os.environ.get("DPCOMP_SETUP_RUN_CMAKE", 1)):
     else:
         print("LEVEL_ZERO_DIR is", LEVEL_ZERO_DIR)
         cmake_cmd += [
-            "-DIMEX_ENABLE_IGPU_DIALECT=ON",
+            "-DNUMBA_MLIR_ENABLE_IGPU_DIALECT=ON",
         ]
 
     try:

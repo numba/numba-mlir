@@ -729,7 +729,7 @@ static void createPipeline(numba::PipelineRegistry &registry,
   registerParallelToTBBPipeline(registry);
 
   if (settings.enableGpuPipeline) {
-#ifdef IMEX_ENABLE_IGPU_DIALECT
+#ifdef NUMBA_MLIR_ENABLE_IGPU_DIALECT
     populateGpuTypeConverter(converter);
     registerLowerToGPUPipeline(registry);
     // TODO(nbpatel): Add Gpu->GpuRuntime & GpuRuntimetoLlvm Transformation

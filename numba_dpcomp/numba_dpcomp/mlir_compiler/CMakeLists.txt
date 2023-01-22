@@ -108,23 +108,23 @@ target_include_directories(${PROJECT_NAME} SYSTEM PRIVATE
     PRIVATE
     ./lib)
 
-if(IMEX_USE_DPNP)
-    target_compile_definitions(${PROJECT_NAME} PRIVATE IMEX_USE_DPNP=1)
+if(NUMBA_MLIR_USE_DPNP)
+    target_compile_definitions(${PROJECT_NAME} PRIVATE NUMBA_MLIR_USE_DPNP=1)
 endif()
 
-if(IMEX_USE_MKL)
-    target_compile_definitions(${PROJECT_NAME} PRIVATE IMEX_USE_MKL=1)
+if(NUMBA_MLIR_USE_MKL)
+    target_compile_definitions(${PROJECT_NAME} PRIVATE NUMBA_MLIR_USE_MKL=1)
 endif()
 
-if(IMEX_ENABLE_IGPU_DIALECT)
-    target_compile_definitions(${PROJECT_NAME} PRIVATE IMEX_ENABLE_IGPU_DIALECT=1)
+if(NUMBA_MLIR_ENABLE_IGPU_DIALECT)
+    target_compile_definitions(${PROJECT_NAME} PRIVATE NUMBA_MLIR_ENABLE_IGPU_DIALECT=1)
 endif()
 
 install(TARGETS dpcomp-runtime dpcomp-math-runtime dpcomp-python-runtime mlir_compiler
         DESTINATION "${CMAKE_INSTALL_PREFIX}/numba_dpcomp/numba_dpcomp"
         )
 
-if(IMEX_ENABLE_IGPU_DIALECT)
+if(NUMBA_MLIR_ENABLE_IGPU_DIALECT)
     install(TARGETS dpcomp-gpu-runtime
             DESTINATION "${CMAKE_INSTALL_PREFIX}/numba_dpcomp/numba_dpcomp"
             )
