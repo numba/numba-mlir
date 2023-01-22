@@ -4,7 +4,7 @@
 
 #include "numba/Conversion/UtilToLlvm.hpp"
 
-#include "numba/Dialect/imex_util/Dialect.hpp"
+#include "numba/Dialect/numba_util/Dialect.hpp"
 #include "numba/Transforms/FuncUtils.hpp"
 
 #include <mlir/Conversion/LLVMCommon/ConversionTarget.h>
@@ -579,7 +579,7 @@ struct ImexUtilToLLVMPass
     target.addLegalOp<mlir::func::FuncOp>();
     target.addLegalOp<mlir::func::CallOp>();
     target.addLegalOp<numba::util::RetainOp>();
-    target.addIllegalDialect<numba::util::ImexUtilDialect>();
+    target.addIllegalDialect<numba::util::NumbaUtilDialect>();
     if (failed(applyPartialConversion(op, target, std::move(patterns))))
       signalPassFailure();
   }

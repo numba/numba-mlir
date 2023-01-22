@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "numba/Dialect/plier/Dialect.hpp"
-#include "numba/Dialect/imex_util/Dialect.hpp"
+#include "numba/Dialect/numba_util/Dialect.hpp"
 
 #include <mlir/IR/Builders.h>
 #include <mlir/IR/BuiltinOps.h>
@@ -69,26 +69,26 @@ llvm::StringRef numba::util::attributes::getShapeRangeName() {
 namespace numba {
 namespace util {
 
-void ImexUtilDialect::initialize() {
+void NumbaUtilDialect::initialize() {
   addOperations<
 #define GET_OP_LIST
-#include "numba/Dialect/imex_util/ImexUtilOps.cpp.inc"
+#include "numba/Dialect/numba_util/NumbaUtilOps.cpp.inc"
       >();
 
   addInterfaces<ImexUtilInlinerInterface>();
 
   addTypes<
 #define GET_TYPEDEF_LIST
-#include "numba/Dialect/imex_util/ImexUtilOpsTypes.cpp.inc"
+#include "numba/Dialect/numba_util/NumbaUtilOpsTypes.cpp.inc"
       >();
 
   addAttributes<
 #define GET_ATTRDEF_LIST
-#include "numba/Dialect/imex_util/ImexUtilOpsAttributes.cpp.inc"
+#include "numba/Dialect/numba_util/NumbaUtilOpsAttributes.cpp.inc"
       >();
 }
 
-mlir::Operation *ImexUtilDialect::materializeConstant(mlir::OpBuilder &builder,
+mlir::Operation *NumbaUtilDialect::materializeConstant(mlir::OpBuilder &builder,
                                                       mlir::Attribute value,
                                                       mlir::Type type,
                                                       mlir::Location loc) {
@@ -316,7 +316,7 @@ struct ReshapeAlloca : public mlir::OpRewritePattern<mlir::memref::ReshapeOp> {
 };
 } // namespace
 
-void ImexUtilDialect::getCanonicalizationPatterns(
+void NumbaUtilDialect::getCanonicalizationPatterns(
     mlir::RewritePatternSet &results) const {
   results.add<DimExpandShape<mlir::tensor::DimOp, mlir::tensor::ExpandShapeOp>,
               DimExpandShape<mlir::memref::DimOp, mlir::memref::ExpandShapeOp>,
@@ -2118,15 +2118,15 @@ MemrefBitcastOp::fold(llvm::ArrayRef<mlir::Attribute> /*operands*/) {
 } // namespace util
 } // namespace numba
 
-#include "numba/Dialect/imex_util/ImexUtilOpsDialect.cpp.inc"
+#include "numba/Dialect/numba_util/NumbaUtilOpsDialect.cpp.inc"
 
 #define GET_OP_CLASSES
-#include "numba/Dialect/imex_util/ImexUtilOps.cpp.inc"
+#include "numba/Dialect/numba_util/NumbaUtilOps.cpp.inc"
 
 #define GET_ATTRDEF_CLASSES
-#include "numba/Dialect/imex_util/ImexUtilOpsAttributes.cpp.inc"
+#include "numba/Dialect/numba_util/NumbaUtilOpsAttributes.cpp.inc"
 
 #define GET_TYPEDEF_CLASSES
-#include "numba/Dialect/imex_util/ImexUtilOpsTypes.cpp.inc"
+#include "numba/Dialect/numba_util/NumbaUtilOpsTypes.cpp.inc"
 
-#include "numba/Dialect/imex_util/ImexUtilOpsEnums.cpp.inc"
+#include "numba/Dialect/numba_util/NumbaUtilOpsEnums.cpp.inc"

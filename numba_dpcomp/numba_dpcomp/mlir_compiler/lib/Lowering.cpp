@@ -30,7 +30,7 @@
 #include <llvm/Support/TargetSelect.h>
 
 #include "numba/Dialect/gpu_runtime/IR/GpuRuntimeOps.hpp"
-#include "numba/Dialect/imex_util/Dialect.hpp"
+#include "numba/Dialect/numba_util/Dialect.hpp"
 #include "numba/Dialect/ntensor/IR/NTensorOps.hpp"
 #include "numba/Dialect/plier/Dialect.hpp"
 
@@ -158,9 +158,9 @@ struct PlierLowerer final {
   PlierLowerer(mlir::MLIRContext &context, PyTypeConverter &conv)
       : ctx(context), builder(&ctx), typeConverter(conv) {
     ctx.loadDialect<gpu_runtime::GpuRuntimeDialect>();
-    ctx.loadDialect<numba::ntensor::NTensorDialect>();
-    ctx.loadDialect<numba::util::ImexUtilDialect>();
     ctx.loadDialect<mlir::func::FuncDialect>();
+    ctx.loadDialect<numba::ntensor::NTensorDialect>();
+    ctx.loadDialect<numba::util::NumbaUtilDialect>();
     ctx.loadDialect<plier::PlierDialect>();
   }
 

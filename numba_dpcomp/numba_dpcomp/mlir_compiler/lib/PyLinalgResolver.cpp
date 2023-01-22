@@ -21,7 +21,7 @@
 #include <mlir/IR/BuiltinTypes.h>
 #include <mlir/Parser/Parser.h>
 
-#include "numba/Dialect/imex_util/Dialect.hpp"
+#include "numba/Dialect/numba_util/Dialect.hpp"
 #include "numba/Dialect/ntensor/IR/NTensorOps.hpp"
 #include "numba/Transforms/CastUtils.hpp"
 #include "numba/Transforms/ConstUtils.hpp"

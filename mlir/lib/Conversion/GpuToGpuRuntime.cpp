@@ -5,8 +5,8 @@
 #include "numba/Conversion/GpuToGpuRuntime.hpp"
 
 #include "numba/Dialect/gpu_runtime/IR/GpuRuntimeOps.hpp"
-#include "numba/Dialect/imex_util/Dialect.hpp"
-#include "numba/Dialect/imex_util/Utils.hpp"
+#include "numba/Dialect/numba_util/Dialect.hpp"
+#include "numba/Dialect/numba_util/Utils.hpp"
 #include "numba/Transforms/FuncUtils.hpp"
 #include "numba/Transforms/ScalarOpsConversion.hpp"
 #include "numba/Transforms/TypeConversion.hpp"
@@ -642,9 +642,9 @@ struct UnstrideMemrefsPass
 
   virtual void
   getDependentDialects(mlir::DialectRegistry &registry) const override {
-    registry.insert<mlir::memref::MemRefDialect>();
     registry.insert<mlir::gpu::GPUDialect>();
-    registry.insert<numba::util::ImexUtilDialect>();
+    registry.insert<mlir::memref::MemRefDialect>();
+    registry.insert<numba::util::NumbaUtilDialect>();
   }
 
   void runOnOperation() override {
@@ -1876,10 +1876,10 @@ struct TileParallelLoopsForGPUPass
   virtual void
   getDependentDialects(mlir::DialectRegistry &registry) const override {
     registry.insert<gpu_runtime::GpuRuntimeDialect>();
-    registry.insert<numba::util::ImexUtilDialect>();
     registry.insert<mlir::arith::ArithDialect>();
     registry.insert<mlir::gpu::GPUDialect>();
     registry.insert<mlir::scf::SCFDialect>();
+    registry.insert<numba::util::NumbaUtilDialect>();
   }
 
   void runOnOperation() override {

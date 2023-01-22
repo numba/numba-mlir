@@ -19,7 +19,7 @@
 #include "pipelines/LowerToLlvm.hpp"
 
 #include "numba/Compiler/PipelineRegistry.hpp"
-#include "numba/Dialect/imex_util/Dialect.hpp"
+#include "numba/Dialect/numba_util/Dialect.hpp"
 #include "numba/Transforms/ConstUtils.hpp"
 #include "numba/Transforms/FuncUtils.hpp"
 #include "numba/Transforms/RewriteWrapper.hpp"
@@ -367,7 +367,7 @@ struct HoistBufferAllocs
 struct ParallelToTbbPass
     : public numba::RewriteWrapperPass<
           ParallelToTbbPass, mlir::func::FuncOp,
-          numba::DependentDialectsList<numba::util::ImexUtilDialect,
+          numba::DependentDialectsList<numba::util::NumbaUtilDialect,
                                        mlir::arith::ArithDialect,
                                        mlir::scf::SCFDialect>,
           ParallelToTbb> {};
@@ -375,7 +375,7 @@ struct ParallelToTbbPass
 struct HoistBufferAllocsPass
     : public numba::RewriteWrapperPass<
           HoistBufferAllocsPass, mlir::func::FuncOp,
-          numba::DependentDialectsList<numba::util::ImexUtilDialect,
+          numba::DependentDialectsList<numba::util::NumbaUtilDialect,
                                        mlir::scf::SCFDialect,
                                        mlir::memref::MemRefDialect>,
           HoistBufferAllocs> {};

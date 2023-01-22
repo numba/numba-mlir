@@ -25,7 +25,7 @@ if (NOT EXPECTED_LLVM_SHA STREQUAL LLVM_SHA)
 endif()
 
 add_subdirectory(include/numba/Dialect/plier)
-add_subdirectory(include/numba/Dialect/imex_util)
+add_subdirectory(include/numba/Dialect/numba_util)
 add_subdirectory(include/numba/Dialect/gpu_runtime/IR)
 add_subdirectory(include/numba/Dialect/ntensor/IR)
 
@@ -45,7 +45,7 @@ set(SOURCES_LIST
     lib/Conversion/UtilToLlvm.cpp
     lib/Dialect/gpu_runtime/IR/GpuRuntimeOps.cpp
     lib/Dialect/gpu_runtime/Transforms/MakeBarriersUniform.cpp
-    lib/Dialect/imex_util/Dialect.cpp
+    lib/Dialect/numba_util/Dialect.cpp
     lib/Dialect/ntensor/IR/NTensorOps.cpp
     lib/Dialect/ntensor/Transforms/CopyRemoval.cpp
     lib/Dialect/ntensor/Transforms/PropagateEnvironment.cpp
@@ -94,12 +94,12 @@ set(HEADERS_LIST
     include/numba/Conversion/UtilToLlvm.hpp
     include/numba/Dialect/gpu_runtime/IR/GpuRuntimeOps.hpp
     include/numba/Dialect/gpu_runtime/Transforms/MakeBarriersUniform.hpp
-    include/numba/Dialect/imex_util/Dialect.hpp
-    include/numba/Dialect/imex_util/Utils.hpp
     include/numba/Dialect/ntensor/IR/NTensorOps.hpp
     include/numba/Dialect/ntensor/Transforms/CopyRemoval.hpp
     include/numba/Dialect/ntensor/Transforms/PropagateEnvironment.hpp
     include/numba/Dialect/ntensor/Transforms/ResolveArrayOps.hpp
+    include/numba/Dialect/numba_util/Dialect.hpp
+    include/numba/Dialect/numba_util/Utils.hpp
     include/numba/Dialect/plier/Dialect.hpp
     include/numba/ExecutionEngine/ExecutionEngine.hpp
     include/numba/Transforms/ArgLowering.hpp
@@ -170,7 +170,7 @@ target_include_directories(${MLIR_EXTENSIONS_LIB} PUBLIC
     ${PROJECT_BINARY_DIR}/numba/include
     )
 
-add_dependencies(${MLIR_EXTENSIONS_LIB} MLIRPlierOpsIncGen MLIRImexUtilOpsIncGen MLIRGpuRuntimeOpsIncGen MLIRNTensorOpsIncGen)
+add_dependencies(${MLIR_EXTENSIONS_LIB} MLIRPlierOpsIncGen MLIRNumbaUtilOpsIncGen MLIRGpuRuntimeOpsIncGen MLIRNTensorOpsIncGen)
 
 add_subdirectory(tools)
 if(IMEX_ENABLE_TESTS)

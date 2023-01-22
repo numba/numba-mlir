@@ -8,7 +8,7 @@
 #include <mlir/Tools/mlir-opt/MlirOptMain.h>
 
 #include "numba/Dialect/gpu_runtime/IR/GpuRuntimeOps.hpp"
-#include "numba/Dialect/imex_util/Dialect.hpp"
+#include "numba/Dialect/numba_util/Dialect.hpp"
 #include "numba/Dialect/ntensor/IR/NTensorOps.hpp"
 
 int main(int argc, char **argv) {
@@ -17,7 +17,7 @@ int main(int argc, char **argv) {
   mlir::registerAllDialects(registry);
   registry.insert<gpu_runtime::GpuRuntimeDialect>();
   registry.insert<numba::ntensor::NTensorDialect>();
-  registry.insert<numba::util::ImexUtilDialect>();
+  registry.insert<numba::util::NumbaUtilDialect>();
   return mlir::failed(MlirOptMain(argc, argv, "imex modular optimizer driver\n",
                                   registry,
                                   /*preloadDialectsInContext=*/false));

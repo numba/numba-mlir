@@ -4,7 +4,7 @@
 
 #pragma once
 
-#include "numba/Dialect/imex_util/Dialect.hpp"
+#include "numba/Dialect/numba_util/Dialect.hpp"
 
 namespace numba {
 namespace util {

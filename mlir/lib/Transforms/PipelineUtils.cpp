@@ -7,7 +7,7 @@
 #include <mlir/IR/Attributes.h>
 #include <mlir/IR/BuiltinOps.h>
 
-#include "numba/Dialect/imex_util/Dialect.hpp"
+#include "numba/Dialect/numba_util/Dialect.hpp"
 
 mlir::ArrayAttr numba::getPipelineJumpMarkers(mlir::ModuleOp module) {
   return module->getAttrOfType<mlir::ArrayAttr>(

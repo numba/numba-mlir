@@ -4,8 +4,8 @@
 
 #include "numba/Conversion/NtensorToLinalg.hpp"
 
-#include "numba/Dialect/imex_util/Dialect.hpp"
-#include "numba/Dialect/imex_util/Utils.hpp"
+#include "numba/Dialect/numba_util/Dialect.hpp"
+#include "numba/Dialect/numba_util/Utils.hpp"
 #include "numba/Dialect/ntensor/IR/NTensorOps.hpp"
 
 #include <mlir/Analysis/AliasAnalysis.h>
@@ -734,12 +734,12 @@ struct NtensorToLinalgPass
 
   virtual void
   getDependentDialects(mlir::DialectRegistry &registry) const override {
-    registry.insert<numba::ntensor::NTensorDialect>();
-    registry.insert<numba::util::ImexUtilDialect>();
     registry.insert<mlir::arith::ArithDialect>();
     registry.insert<mlir::linalg::LinalgDialect>();
     registry.insert<mlir::scf::SCFDialect>();
     registry.insert<mlir::tensor::TensorDialect>();
+    registry.insert<numba::ntensor::NTensorDialect>();
+    registry.insert<numba::util::NumbaUtilDialect>();
   }
 
   void runOnOperation() override {
