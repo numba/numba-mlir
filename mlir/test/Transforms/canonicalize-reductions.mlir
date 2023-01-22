@@ -1,4 +1,4 @@
-// RUN: imex-opt -allow-unregistered-dialect --imex-canonicalize-reductions --split-input-file %s | FileCheck %s
+// RUN: numba-mlir-opt -allow-unregistered-dialect --imex-canonicalize-reductions --split-input-file %s | FileCheck %s
 
 // CHECK-LABEL: func @test
 //  CHECK-SAME:  (%[[C:.*]]: f32)

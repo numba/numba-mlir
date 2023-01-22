@@ -1,4 +1,4 @@
-// RUN: imex-opt -pass-pipeline='builtin.module(func.func(ntensor-copy-removal))' --split-input-file %s | FileCheck %s
+// RUN: numba-mlir-opt -pass-pipeline='builtin.module(func.func(ntensor-copy-removal))' --split-input-file %s | FileCheck %s
 
 // CHECK-LABEL: func @test
 //  CHECK-SAME: (%[[ARG1:.*]]: !ntensor.ntensor<?xf32>, %[[ARG2:.*]]: !ntensor.ntensor<?xf32>)

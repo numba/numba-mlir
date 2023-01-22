@@ -1,4 +1,4 @@
-// RUN: imex-opt --insert-gpu-alloc -split-input-file %s | FileCheck %s
+// RUN: numba-mlir-opt --insert-gpu-alloc -split-input-file %s | FileCheck %s
 
 // CHECK-LABEL: func @addt
 // CHECK-SAME: (%[[ARG1:.*]]: memref<2x5xf32>, %[[ARG2:.*]]: memref<2x5xf32>)

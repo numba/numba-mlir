@@ -1,4 +1,4 @@
-// RUN: imex-opt --gpux-tile-parallel-loops --split-input-file %s | FileCheck %s
+// RUN: numba-mlir-opt --gpux-tile-parallel-loops --split-input-file %s | FileCheck %s
 
 // CHECK-LABEL: check1D
 // CHECK-SAME: (%[[MEM1:.*]]: memref<?xf64>, %[[MEM2:.*]]: memref<?xf64>)

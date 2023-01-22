@@ -1,4 +1,4 @@
-// RUN: imex-opt --set-spirv-capablilities %s | FileCheck %s
+// RUN: numba-mlir-opt --set-spirv-capablilities %s | FileCheck %s
 
 module attributes {gpu.container_module} {
 

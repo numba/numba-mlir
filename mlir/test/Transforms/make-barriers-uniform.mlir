@@ -1,4 +1,4 @@
-// RUN: imex-opt -allow-unregistered-dialect --gpux-make-barriers-uniform --split-input-file %s | FileCheck %s
+// RUN: numba-mlir-opt -allow-unregistered-dialect --gpux-make-barriers-uniform --split-input-file %s | FileCheck %s
 
 func.func @test() {
   %c0 = arith.constant 0 : index

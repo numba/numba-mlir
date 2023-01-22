@@ -1,4 +1,4 @@
-// RUN: imex-opt %s -allow-unregistered-dialect -canonicalize --split-input-file | FileCheck %s
+// RUN: numba-mlir-opt %s -allow-unregistered-dialect -canonicalize --split-input-file | FileCheck %s
 
 func.func @test(%arg1: index, %arg2: i64) -> i64 {
   %0 = numba_util.build_tuple %arg1, %arg2: index, i64 -> tuple<index, i64>

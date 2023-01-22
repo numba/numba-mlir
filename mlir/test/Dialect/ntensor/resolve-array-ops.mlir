@@ -1,4 +1,4 @@
-// RUN: imex-opt --ntensor-resolve-array-ops --split-input-file %s | FileCheck %s
+// RUN: numba-mlir-opt --ntensor-resolve-array-ops --split-input-file %s | FileCheck %s
 
 func.func @test(%arg1: !ntensor.ntensor<?xf32>, %arg2: index) -> f32 {
   %0 = ntensor.getitem(%arg1 : !ntensor.ntensor<?xf32>) [%arg2 : index] -> f32

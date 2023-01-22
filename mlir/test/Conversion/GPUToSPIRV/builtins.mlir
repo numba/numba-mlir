@@ -1,4 +1,4 @@
-// RUN: imex-opt -allow-unregistered-dialect --gpux-to-spirv -split-input-file %s | FileCheck %s
+// RUN: numba-mlir-opt -allow-unregistered-dialect --gpux-to-spirv -split-input-file %s | FileCheck %s
 
 module attributes {gpu.container_module, spirv.target_env = #spirv.target_env<#spirv.vce<v1.0, [Addresses, Int64, Kernel], []>, #spirv.resource_limits<>>} {
   func.func @builtin() {

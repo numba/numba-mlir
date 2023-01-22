@@ -1,4 +1,4 @@
-// RUN: imex-opt --ntensor-propagate-env --split-input-file %s | FileCheck %s
+// RUN: numba-mlir-opt --ntensor-propagate-env --split-input-file %s | FileCheck %s
 
 // CHECK-LABEL: func @test
 //  CHECK-SAME: (%[[ARG:.*]]: !ntensor.ntensor<?xf32>)

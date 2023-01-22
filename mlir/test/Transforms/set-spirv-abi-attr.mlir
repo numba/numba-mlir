@@ -1,4 +1,4 @@
-// RUN: imex-opt --set-spirv-abi-attrs %s | FileCheck %s
+// RUN: numba-mlir-opt --set-spirv-abi-attrs %s | FileCheck %s
 
 gpu.module @main_kernel {
   gpu.func @main_kernel(%arg0: memref<8xf32>, %arg1: memref<8xf32>, %arg2: memref<8xf32>) kernel {

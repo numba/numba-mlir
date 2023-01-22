@@ -1,4 +1,4 @@
-// RUN: imex-opt --imex-make-signless --canonicalize --split-input-file %s | FileCheck %s
+// RUN: numba-mlir-opt --imex-make-signless --canonicalize --split-input-file %s | FileCheck %s
 
 func.func @test(%arg: si32) -> si32 {
   return %arg : si32

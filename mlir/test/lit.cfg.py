@@ -62,6 +62,6 @@ config.numba_opt_dir = os.path.join(
 llvm_config.with_environment("PATH", config.llvm_tools_dir, append_path=True)
 
 tool_dirs = [config.numba_tools_dir, config.llvm_tools_dir, config.numba_opt_dir]
-tools = ["level_zero_runner", "imex-opt"]
+tools = ["level_zero_runner", "numba-mlir-opt"]
 
 llvm_config.add_tool_substitutions(tools, tool_dirs)
