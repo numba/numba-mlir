@@ -186,7 +186,7 @@ jobs:
           export LEVEL_ZERO_DIR=/home/runner/work/level-zero/level-zero/level_zero_install
           export LEVEL_ZERO_VERSION_CHECK_OFF=1
           export LLVM_DIR=/home/runner/work/llvm-mlir/_mlir_install
-          cmake ../llvm                                                         \
+          cmake ${GITHUB_WORKSPACE}                                             \
             -GNinja                                                             \
             -DCMAKE_BUILD_TYPE=Release                                          \
             -DLLVM_DIR=${LLVM_DIR}/lib/cmake/llvm                               \
@@ -195,7 +195,7 @@ jobs:
             -DIMEX_ENABLE_TBB_SUPPORT=ON                                        \
             -DTBB_DIR=${TBB_PATH}                                               \
             -DLLVM_EXTERNAL_LIT=${external_lit}                                 \
-            .. || exit 1
+             || exit 1
             popd
 
       - name: Run IMEX core test cases
