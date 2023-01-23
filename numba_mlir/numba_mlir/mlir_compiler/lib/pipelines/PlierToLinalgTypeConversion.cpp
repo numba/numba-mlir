@@ -25,7 +25,7 @@ struct Conversion {
     array = mod.attr("Array");
 
     py::object dpcompArrayMod =
-        py::module::import("numba_dpcomp.mlir.array_type");
+        py::module::import("numba_mlir.mlir.array_type");
     fixedArray = dpcompArrayMod.attr("FixedArray");
   }
 

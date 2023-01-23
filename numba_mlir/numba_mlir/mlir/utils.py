@@ -6,14 +6,14 @@ import ctypes
 import os
 import atexit
 import sys
-import numba_dpcomp
+import numba_mlir
 import llvmlite.binding as ll
 from .compiler_context import global_compiler_context
 from .. import mlir_compiler
 
 
 def load_lib(name):
-    runtime_search_paths = [os.path.dirname(numba_dpcomp.__file__)]
+    runtime_search_paths = [os.path.dirname(numba_mlir.__file__)]
 
     try:
         runtime_search_paths += os.environ["PYTHONPATH"].split(os.pathsep)

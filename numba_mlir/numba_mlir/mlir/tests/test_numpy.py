@@ -4,9 +4,9 @@
 
 import numba
 
-# from numba_dpcomp import njit
-from numba_dpcomp import vectorize
-from numba_dpcomp.mlir.passes import print_pass_ir, get_print_buffer
+# from numba_mlir import njit
+from numba_mlir import vectorize
+from numba_mlir.mlir.passes import print_pass_ir, get_print_buffer
 from numpy.testing import assert_equal, assert_allclose  # for nans comparison
 import numpy as np
 import itertools

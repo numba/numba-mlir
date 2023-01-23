@@ -14,7 +14,7 @@ from numba.core.compiler_machinery import PassManager
 from numba.core.registry import cpu_target
 from numba.core import typing, cpu
 
-from numba_dpcomp.mlir.passes import MlirBackendInner, get_mlir_func
+from numba_mlir.mlir.passes import MlirBackendInner, get_mlir_func
 
 
 class MlirTempCompiler(CompilerBase):  # custom compiler extends from CompilerBase

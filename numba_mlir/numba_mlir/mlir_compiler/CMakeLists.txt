@@ -121,12 +121,12 @@ if(NUMBA_MLIR_ENABLE_IGPU_DIALECT)
 endif()
 
 install(TARGETS dpcomp-runtime dpcomp-math-runtime dpcomp-python-runtime mlir_compiler
-        DESTINATION "${CMAKE_INSTALL_PREFIX}/numba_dpcomp/numba_dpcomp"
+        DESTINATION "${CMAKE_INSTALL_PREFIX}/numba_mlir/numba_mlir"
         )
 
 if(NUMBA_MLIR_ENABLE_IGPU_DIALECT)
     install(TARGETS dpcomp-gpu-runtime
-            DESTINATION "${CMAKE_INSTALL_PREFIX}/numba_dpcomp/numba_dpcomp"
+            DESTINATION "${CMAKE_INSTALL_PREFIX}/numba_mlir/numba_mlir"
             )
 endif()
 
@@ -138,7 +138,7 @@ if (NOT ${_result})
     message(STATUS "Copy python files")
     install(
         DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/../../
-        DESTINATION ./numba_dpcomp
+        DESTINATION ./numba_mlir
         FILES_MATCHING
         PATTERN "__pycache__" EXCLUDE
         PATTERN "*.py"

@@ -19,7 +19,7 @@ namespace py = pybind11;
 namespace {
 struct Conversion {
   Conversion(PyTypeConverter &conv) : converter(conv) {
-    py::object mod = py::module::import("numba_dpcomp.mlir.dpctl_interop");
+    py::object mod = py::module::import("numba_mlir.mlir.dpctl_interop");
     usmArrayType = mod.attr("USMNdArrayType");
   }
 

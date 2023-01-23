@@ -2,7 +2,7 @@
 #
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-from numba_dpcomp import njit
+from numba_mlir import njit
 import inspect
 import pytest
 

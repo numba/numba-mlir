@@ -898,7 +898,7 @@ struct LowerGpuRangePass
 struct LowerPlierCalls final : public numba::CallOpLowering {
   LowerPlierCalls(mlir::MLIRContext *context)
       : CallOpLowering(context),
-        resolver("numba_dpcomp.mlir.kernel_impl", "registry") {}
+        resolver("numba_mlir.mlir.kernel_impl", "registry") {}
 
 protected:
   virtual mlir::LogicalResult
