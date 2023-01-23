@@ -546,12 +546,12 @@ struct LowerApplyOffsetOp
 };
 
 /// Convert operations from the numba_util dialect to the LLVM dialect.
-struct ImexUtilToLLVMPass
-    : public mlir::PassWrapper<ImexUtilToLLVMPass,
+struct NumbaUtilToLLVMPass
+    : public mlir::PassWrapper<NumbaUtilToLLVMPass,
                                mlir::OperationPass<mlir::ModuleOp>> {
-  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(ImexUtilToLLVMPass)
+  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(NumbaUtilToLLVMPass)
 
-  ImexUtilToLLVMPass(
+  NumbaUtilToLLVMPass(
       std::function<mlir::LowerToLLVMOptions(mlir::MLIRContext &)> &&getter)
       : optsGetter(std::move(getter)) {}
 
@@ -593,5 +593,5 @@ private:
 std::unique_ptr<mlir::Pass> numba::createUtilToLLVMPass(
     std::function<mlir::LowerToLLVMOptions(mlir::MLIRContext &)> optsGetter) {
   assert(optsGetter && "invalid optsGetter");
-  return std::make_unique<ImexUtilToLLVMPass>(std::move(optsGetter));
+  return std::make_unique<NumbaUtilToLLVMPass>(std::move(optsGetter));
 }

@@ -20,7 +20,7 @@
 #include <mlir/Pass/Pass.h>
 #include <mlir/Transforms/GreedyPatternRewriteDriver.h>
 
-#define DEBUG_TYPE "imex-shape-range-propagation"
+#define DEBUG_TYPE "numba-shape-range-propagation"
 
 namespace {
 static auto getIndexRange(int64_t smin, int64_t smax) {

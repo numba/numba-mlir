@@ -25,7 +25,7 @@
 #include <llvm/ADT/TypeSwitch.h>
 
 namespace {
-struct ImexUtilInlinerInterface : public mlir::DialectInlinerInterface {
+struct NumbaUtilInlinerInterface : public mlir::DialectInlinerInterface {
   using mlir::DialectInlinerInterface::DialectInlinerInterface;
   bool isLegalToInline(mlir::Region *, mlir::Region *, bool,
                        mlir::BlockAndValueMapping &) const final override {
@@ -39,31 +39,31 @@ struct ImexUtilInlinerInterface : public mlir::DialectInlinerInterface {
 } // namespace
 
 llvm::StringRef numba::util::attributes::getFastmathName() {
-  return "imex.fastmath";
+  return "numba.fastmath";
 }
 
 llvm::StringRef numba::util::attributes::getJumpMarkersName() {
-  return "imex.pipeline_jump_markers";
+  return "numba.pipeline_jump_markers";
 }
 
 llvm::StringRef numba::util::attributes::getParallelName() {
-  return "imex.parallel";
+  return "numba.parallel";
 }
 
 llvm::StringRef numba::util::attributes::getMaxConcurrencyName() {
-  return "imex.max_concurrency";
+  return "numba.max_concurrency";
 }
 
 llvm::StringRef numba::util::attributes::getForceInlineName() {
-  return "imex.force_inline";
+  return "numba.force_inline";
 }
 
 llvm::StringRef numba::util::attributes::getOptLevelName() {
-  return "imex.opt_level";
+  return "numba.opt_level";
 }
 
 llvm::StringRef numba::util::attributes::getShapeRangeName() {
-  return "imex.shape_range";
+  return "numba.shape_range";
 }
 
 namespace numba {
@@ -75,7 +75,7 @@ void NumbaUtilDialect::initialize() {
 #include "numba/Dialect/numba_util/NumbaUtilOps.cpp.inc"
       >();
 
-  addInterfaces<ImexUtilInlinerInterface>();
+  addInterfaces<NumbaUtilInlinerInterface>();
 
   addTypes<
 #define GET_TYPEDEF_LIST
