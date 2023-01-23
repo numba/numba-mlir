@@ -20,10 +20,10 @@ set(NUMBA_MLIR_TEST_DEPENDS
         dpcomp-gpu-runtime
         )
 
-add_lit_testsuite(check-imex "Running the imex regression tests"
+add_lit_testsuite(check-numba-mlir "Running the numba mlir regression tests"
         ${CMAKE_CURRENT_BINARY_DIR}
         DEPENDS ${NUMBA_MLIR_TEST_DEPENDS}
         )
-set_target_properties(check-imex PROPERTIES FOLDER "Tests")
+set_target_properties(check-numba-mlir PROPERTIES FOLDER "Tests")
 
-add_lit_testsuites(imex-tests ${CMAKE_CURRENT_SOURCE_DIR} DEPENDS ${NUMBA_MLIR_TEST_DEPENDS})
+add_lit_testsuites(numba-mlir-tests ${CMAKE_CURRENT_SOURCE_DIR} DEPENDS ${NUMBA_MLIR_TEST_DEPENDS})
