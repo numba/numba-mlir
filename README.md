@@ -14,7 +14,7 @@ Python frontend provides set of decorators similar to Numba decorators to compil
 
 Example:
 ```Python
-from numba_dpcomp import njit
+from numba_mlir import njit
 import numpy as np
 
 @njit
@@ -63,7 +63,7 @@ ninja install
 
 Building and testing Python package
 ```Bash
-cd numba_dpcomp
+cd numba_mlir
 conda create -n test-env python=3.9 numba=0.56 numpy=1.22 "setuptools<65.6" scikit-learn pytest-xdist ninja scipy pybind11 pytest lit tbb=2021.6.0 cmake "mkl-devel-dpcpp>=2022.2" -c conda-forge -c intel
 conda activate test-env
 export TBB_PATH=<...>/tbb

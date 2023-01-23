@@ -1826,7 +1826,7 @@ PyLinalgResolver::PyLinalgResolver(const char *modName, const char *regName)
     : context(std::make_unique<Context>()) {
   assert(modName != nullptr);
   assert(regName != nullptr);
-  auto builderMod = py::module::import("numba_dpcomp.mlir.linalg_builder");
+  auto builderMod = py::module::import("numba_mlir.mlir.linalg_builder");
   auto registryMod = py::module::import(modName);
   auto registry = registryMod.attr(regName);
 

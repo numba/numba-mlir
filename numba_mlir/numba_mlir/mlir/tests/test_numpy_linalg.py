@@ -4,8 +4,8 @@
 
 import pytest
 import numpy
-from numba_dpcomp import njit
-from numba_dpcomp.mlir.settings import _readenv
+from numba_mlir import njit
+from numba_mlir.mlir.settings import _readenv
 
 DPNP_TESTS_ENABLED = _readenv("DPCOMP_ENABLE_DPNP_TESTS", int, 0)
 

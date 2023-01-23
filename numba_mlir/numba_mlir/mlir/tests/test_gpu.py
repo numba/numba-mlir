@@ -10,8 +10,8 @@ import math
 import numba
 import itertools
 
-from numba_dpcomp.mlir.settings import _readenv
-from numba_dpcomp.mlir.kernel_impl import (
+from numba_mlir.mlir.settings import _readenv
+from numba_mlir.mlir.kernel_impl import (
     kernel,
     get_global_id,
     get_local_id,
@@ -29,8 +29,8 @@ from numba_dpcomp.mlir.kernel_impl import (
     private,
     group,
 )
-from numba_dpcomp.mlir.kernel_sim import kernel as kernel_sim
-from numba_dpcomp.mlir.passes import (
+from numba_mlir.mlir.kernel_sim import kernel as kernel_sim
+from numba_mlir.mlir.passes import (
     print_pass_ir,
     get_print_buffer,
     is_print_buffer_empty,

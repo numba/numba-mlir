@@ -171,7 +171,7 @@ class group_proxy:
 
 
 def _setup_execution_state(global_size, local_size):
-    import numba_dpcomp.mlir.kernel_impl
+    import numba_mlir.mlir.kernel_impl
 
     global _execution_state
     assert _execution_state is None

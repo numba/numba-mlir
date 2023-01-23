@@ -4,10 +4,10 @@
 
 import numba
 
-# from numba_dpcomp import njit
+# from numba_mlir import njit
 import math
 from numpy.testing import assert_equal  # for nans comparison
-from numba_dpcomp.mlir.passes import print_pass_ir, get_print_buffer
+from numba_mlir.mlir.passes import print_pass_ir, get_print_buffer
 
 import pytest
 import itertools

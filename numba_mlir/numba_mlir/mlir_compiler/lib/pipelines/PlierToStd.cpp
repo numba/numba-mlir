@@ -805,7 +805,7 @@ static const std::pair<llvm::StringRef, func_t> builtinFuncsHandlers[] = {
 struct BuiltinCallsLowering final : public numba::CallOpLowering {
   BuiltinCallsLowering(mlir::MLIRContext *context)
       : CallOpLowering(context),
-        resolver("numba_dpcomp.mlir.builtin.funcs", "registry") {}
+        resolver("numba_mlir.mlir.builtin.funcs", "registry") {}
 
 protected:
   virtual mlir::LogicalResult

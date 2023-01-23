@@ -114,5 +114,5 @@ add_subdirectory(mlir)
 add_subdirectory(dpcomp_runtime)
 
 if(NUMBA_MLIR_ENABLE_NUMBA_FE)
-    add_subdirectory(numba_dpcomp)
+    add_subdirectory(numba_mlir)
 endif()

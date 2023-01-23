@@ -9,11 +9,11 @@ import pytest
 import numpy as np
 import types as pytypes
 
-from numba_dpcomp.mlir.settings import _readenv
-from numba_dpcomp import njit, jit, vectorize
+from numba_mlir.mlir.settings import _readenv
+from numba_mlir import njit, jit, vectorize
 
 from numba.core.registry import CPUDispatcher
-from numba_dpcomp.mlir.passes import (
+from numba_mlir.mlir.passes import (
     print_pass_ir,
     get_print_buffer,
     is_print_buffer_empty,

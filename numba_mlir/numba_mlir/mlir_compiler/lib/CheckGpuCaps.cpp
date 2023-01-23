@@ -12,7 +12,7 @@ using ResolveFptr = bool (*)(OffloadDeviceCapabilities *, const char *);
 
 static ResolveFptr getResolver() {
   static ResolveFptr resolver = []() {
-    py::object mod = py::module::import("numba_dpcomp.mlir.gpu_runtime");
+    py::object mod = py::module::import("numba_mlir.mlir.gpu_runtime");
     py::object attr = mod.attr("get_device_caps_addr");
     return reinterpret_cast<ResolveFptr>(attr.cast<uintptr_t>());
   }();
@@ -36,7 +36,7 @@ getOffloadDeviceCapabilities(const std::string &name) {
 }
 
 llvm::Optional<std::string> getDefaultDevice() {
-  py::object mod = py::module::import("numba_dpcomp.mlir.dpctl_interop");
+  py::object mod = py::module::import("numba_mlir.mlir.dpctl_interop");
   py::object res = mod.attr("get_default_device_name")();
   if (res.is_none())
     return std::nullopt;

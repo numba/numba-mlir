@@ -1,0 +1,15 @@
+# SPDX-FileCopyrightText: 2022 Intel Corporation
+#
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+include MANIFEST.in
+
+include setup.py
+include versioneer.py
+include numba_mlir/_version.py
+
+recursive-include numba_mlir *.ini
+recursive-include numba_mlir *.pyd
+recursive-include numba_mlir *.dll
+recursive-include numba_mlir *.so
+recursive-include numba_mlir *.dylib
