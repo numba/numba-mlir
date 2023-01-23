@@ -30,7 +30,7 @@
 #include <llvm/Passes/PassBuilder.h>
 #include <llvm/Passes/StandardInstrumentations.h>
 
-#define DEBUG_TYPE "imex-execution-engine"
+#define DEBUG_TYPE "numba-execution-engine"
 
 static llvm::OptimizationLevel mapToLevel(llvm::CodeGenOpt::Level level) {
   unsigned optimizeSize = 0; // TODO: unhardcode

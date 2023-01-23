@@ -25,7 +25,7 @@
 #include <llvm/ADT/TypeSwitch.h>
 
 namespace {
-struct ImexUtilInlinerInterface : public mlir::DialectInlinerInterface {
+struct NumbaUtilInlinerInterface : public mlir::DialectInlinerInterface {
   using mlir::DialectInlinerInterface::DialectInlinerInterface;
   bool isLegalToInline(mlir::Region *, mlir::Region *, bool,
                        mlir::BlockAndValueMapping &) const final override {
@@ -75,7 +75,7 @@ void NumbaUtilDialect::initialize() {
 #include "numba/Dialect/numba_util/NumbaUtilOps.cpp.inc"
       >();
 
-  addInterfaces<ImexUtilInlinerInterface>();
+  addInterfaces<NumbaUtilInlinerInterface>();
 
   addTypes<
 #define GET_TYPEDEF_LIST

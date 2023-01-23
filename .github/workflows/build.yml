@@ -2,7 +2,7 @@
 #
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-name: Cross-compile IMEX on CPUs
+name: Cross-compile Numba-MLIR on CPUs
 
 on:
   push:
@@ -12,7 +12,7 @@ on:
 
 jobs:
   build_linux:
-    name: Builds IMEX on Linux
+    name: Builds Numba-MLIR on Linux
     runs-on: ubuntu-latest
     timeout-minutes: 450
 
@@ -174,7 +174,7 @@ jobs:
           cp bin/not /home/runner/work/llvm-mlir/_mlir_install/bin/
           popd
 
-      - name: Build IMEX
+      - name: Build Numba-MLIR
         shell: bash -l {0}
 
         run: |
@@ -199,7 +199,7 @@ jobs:
              || exit 1
           ninja all || exit 1
 
-      - name: Run IMEX core test cases
+      - name: Run Numba-MLIR core test cases
         shell: bash -l {0}
 
         run: |
