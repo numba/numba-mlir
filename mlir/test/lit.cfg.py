@@ -20,7 +20,7 @@ from lit.llvm.subst import FindTool
 # Configuration file for the 'lit' test runner.
 
 # name: The name of this test suite.
-config.name = "imex-tests"
+config.name = "numba-mlir-tests"
 
 config.test_format = lit.formats.ShTest(not llvm_config.use_lit_shell)
 
@@ -31,14 +31,14 @@ config.suffixes = [".mlir"]
 config.test_source_root = os.path.dirname(__file__)
 
 # test_exec_root: The root path where tests should be run.
-config.test_exec_root = os.path.join(config.imex_obj_root, "test")
+config.test_exec_root = os.path.join(config.numba_obj_root, "test")
 
 config.substitutions.append(("%PATH%", config.environment["PATH"]))
 config.substitutions.append(("%shlibext", config.llvm_shlib_ext))
-config.substitutions.append(("%shlibprefix", config.imex_shlib_prefix))
+config.substitutions.append(("%shlibprefix", config.numba_shlib_prefix))
 config.substitutions.append(("%mlir_wrappers_dir", config.mlir_wrappers_dir))
-config.substitutions.append(("%imex_runtime_dir", config.imex_runtime_dir))
-config.substitutions.append(("%imex_igpu_runtime_dir", config.imex_igpu_runtime_dir))
+config.substitutions.append(("%numba_runtime_dir", config.numba_runtime_dir))
+config.substitutions.append(("%numba_igpu_runtime_dir", config.numba_igpu_runtime_dir))
 
 llvm_config.with_system_environment(["HOME", "INCLUDE", "LIB", "TMP", "TEMP"])
 
@@ -50,12 +50,12 @@ llvm_config.use_default_substitutions()
 config.excludes = ["Inputs", "Examples", "CMakeLists.txt", "README.txt", "LICENSE.txt"]
 
 # test_exec_root: The root path where tests should be run.
-config.test_exec_root = os.path.join(config.imex_obj_root, "mlir", "test")
+config.test_exec_root = os.path.join(config.numba_obj_root, "mlir", "test")
 config.numba_tools_dir = os.path.join(
-    config.imex_obj_root, "mlir", "tools", "level_zero_runner"
+    config.numba_obj_root, "mlir", "tools", "level_zero_runner"
 )
 config.numba_opt_dir = os.path.join(
-    config.imex_obj_root, "mlir", "tools", "numba-mlir-opt"
+    config.numba_obj_root, "mlir", "tools", "numba-mlir-opt"
 )
 
 # Tweak the PATH to include the tools dir.

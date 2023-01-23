@@ -204,7 +204,7 @@ jobs:
 
         run: |
           cd _build || exit 1
-          ninja check-imex || exit 1
+          ninja check-numba-mlir || exit 1
 
       - name: Build Python frontend
         shell: bash -l {0}
