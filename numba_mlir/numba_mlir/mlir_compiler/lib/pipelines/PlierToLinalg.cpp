@@ -1282,8 +1282,8 @@ struct PlierToNtensorPass
   MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(PlierToNtensorPass)
 
   PlierToNtensorPass()
-      : resolver(std::make_shared<NumpyResolver>(
-            "numba_mlir.mlir.numpy.funcs", "_get_func")) {}
+      : resolver(std::make_shared<NumpyResolver>("numba_mlir.mlir.numpy.funcs",
+                                                 "_get_func")) {}
 
   virtual void
   getDependentDialects(mlir::DialectRegistry &registry) const override {
@@ -1978,8 +1978,8 @@ struct ResolveNumpyFuncsPass
   MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(ResolveNumpyFuncsPass)
 
   ResolveNumpyFuncsPass()
-      : resolver(std::make_shared<NumpyResolver>(
-            "numba_mlir.mlir.numpy.funcs", "_get_func")) {}
+      : resolver(std::make_shared<NumpyResolver>("numba_mlir.mlir.numpy.funcs",
+                                                 "_get_func")) {}
 
   virtual void
   getDependentDialects(mlir::DialectRegistry &registry) const override {
