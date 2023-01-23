@@ -81,7 +81,7 @@ func.func @test(%arg1: tensor<?xf32>) -> i1 {
 // CHECK-LABEL: func @test
 //       CHECK:   %[[C:.*]] = arith.constant false
 //       CHECK:   return %[[C]]
-func.func @test(%arg1: tensor<?xf32> {imex.shape_range = [#numba_util.index_range<[1,10]>]}) -> i1 {
+func.func @test(%arg1: tensor<?xf32> {numba.shape_range = [#numba_util.index_range<[1,10]>]}) -> i1 {
   %cst = arith.constant 0 : index
   %0 = tensor.dim %arg1, %cst : tensor<?xf32>
   %1 = arith.cmpi eq, %0, %cst : index
@@ -93,8 +93,8 @@ func.func @test(%arg1: tensor<?xf32> {imex.shape_range = [#numba_util.index_rang
 // CHECK-LABEL: func @test
 //       CHECK:   %[[C:.*]] = arith.constant false
 //       CHECK:   return %[[C]]
-func.func @test(%arg1: tensor<?xf32> {imex.shape_range = [#numba_util.index_range<[1,7]>]},
-                %arg2: tensor<?xf32> {imex.shape_range = [#numba_util.index_range<[2,10]>]},
+func.func @test(%arg1: tensor<?xf32> {numba.shape_range = [#numba_util.index_range<[1,7]>]},
+                %arg2: tensor<?xf32> {numba.shape_range = [#numba_util.index_range<[2,10]>]},
                 %cond: i1) -> i1 {
   %cst = arith.constant 0 : index
   %0 = arith.select %cond, %arg1, %arg2 : tensor<?xf32>
@@ -138,7 +138,7 @@ func.func @test(%arg1: tensor<?xf32>) -> i1 {
 // CHECK-LABEL: func @test
 //       CHECK:   %[[C:.*]] = arith.constant false
 //       CHECK:   return %[[C]]
-func.func @test(%arg1: tensor<?xf32>, %arg2: tensor<?xf32> {imex.shape_range = [#numba_util.index_range<[2,10]>]}) -> i1 {
+func.func @test(%arg1: tensor<?xf32>, %arg2: tensor<?xf32> {numba.shape_range = [#numba_util.index_range<[2,10]>]}) -> i1 {
   %cst0 = arith.constant 0 : index
   %cst1 = arith.constant 1 : index
   %0 = tensor.dim %arg2, %cst0 : tensor<?xf32>
@@ -153,7 +153,7 @@ func.func @test(%arg1: tensor<?xf32>, %arg2: tensor<?xf32> {imex.shape_range = [
 // CHECK-LABEL: func @test
 //       CHECK:   %[[C:.*]] = arith.constant false
 //       CHECK:   return %[[C]]
-func.func @test(%arg1: tensor<?xf32>, %arg2: tensor<?xf32> {imex.shape_range = [#numba_util.index_range<[2,10]>]}) -> i1 {
+func.func @test(%arg1: tensor<?xf32>, %arg2: tensor<?xf32> {numba.shape_range = [#numba_util.index_range<[2,10]>]}) -> i1 {
   %cst0 = arith.constant 0 : index
   %cst1 = arith.constant 1 : index
   %0 = tensor.dim %arg2, %cst0 : tensor<?xf32>
@@ -168,7 +168,7 @@ func.func @test(%arg1: tensor<?xf32>, %arg2: tensor<?xf32> {imex.shape_range = [
 // CHECK-LABEL: func @test
 //       CHECK:   %[[C:.*]] = arith.constant false
 //       CHECK:   return %[[C]]
-func.func @test(%arg1: tensor<?xf32> {imex.shape_range = [#numba_util.index_range<[2,10]>]}) -> i1 {
+func.func @test(%arg1: tensor<?xf32> {numba.shape_range = [#numba_util.index_range<[2,10]>]}) -> i1 {
   %cst0 = arith.constant 0 : index
   %cst1 = arith.constant 1 : index
   %0 = tensor.dim %arg1, %cst0 : tensor<?xf32>
@@ -191,7 +191,7 @@ func.func private @test_nested(%arg1: tensor<?xf32>) -> i1 {
   return %1: i1
 }
 
-func.func @test(%arg1: tensor<?xf32> {imex.shape_range = [#numba_util.index_range<[2,10]>]}) -> i1 {
+func.func @test(%arg1: tensor<?xf32> {numba.shape_range = [#numba_util.index_range<[2,10]>]}) -> i1 {
   %0 = func.call @test_nested(%arg1) : (tensor<?xf32>) -> i1
   return %0: i1
 }
@@ -201,7 +201,7 @@ func.func @test(%arg1: tensor<?xf32> {imex.shape_range = [#numba_util.index_rang
 // CHECK-LABEL: func @test
 //       CHECK:   %[[C:.*]] = arith.constant false
 //       CHECK:   "test.test"(%[[C]]) : (i1) -> ()
-func.func @test(%arg1: tensor<?xf32> {imex.shape_range = [#numba_util.index_range<[1,10]>]}, %arg2: i1) {
+func.func @test(%arg1: tensor<?xf32> {numba.shape_range = [#numba_util.index_range<[1,10]>]}, %arg2: i1) {
   %cst = arith.constant 0 : index
   scf.if %arg2 {
     %0 = tensor.dim %arg1, %cst : tensor<?xf32>
@@ -227,7 +227,7 @@ func.func private @test_nested(%arg1: tensor<?xf32>, %arg2: i1) {
   return
 }
 
-func.func @test(%arg1: tensor<?xf32> {imex.shape_range = [#numba_util.index_range<[2,10]>]}, %arg2: i1) {
+func.func @test(%arg1: tensor<?xf32> {numba.shape_range = [#numba_util.index_range<[2,10]>]}, %arg2: i1) {
   func.call @test_nested(%arg1, %arg2) : (tensor<?xf32>, i1) -> ()
   return
 }
@@ -237,7 +237,7 @@ func.func @test(%arg1: tensor<?xf32> {imex.shape_range = [#numba_util.index_rang
 // CHECK-LABEL: func @test
 //       CHECK:   %[[C:.*]] = arith.constant false
 //       CHECK:   "test.test"(%[[C]]) : (i1) -> ()
-func.func @test(%arg1: tensor<?xf32> {imex.shape_range = [#numba_util.index_range<[1,10]>]}, %arg2: f32) {
+func.func @test(%arg1: tensor<?xf32> {numba.shape_range = [#numba_util.index_range<[1,10]>]}, %arg2: f32) {
   %cst = arith.constant 0 : index
   %cst1 = arith.constant 0 : i32
   %1 = llvm.fptosi %arg2 : f32 to i32
@@ -258,7 +258,7 @@ func.func @test(%arg1: tensor<?xf32> {imex.shape_range = [#numba_util.index_rang
 //   CHECK-NOT:   return %[[C]]
 
 #map0 = affine_map<(d0) -> (d0)>
-func.func @test(%arg1: tensor<?xf32>, %arg2: tensor<?xf32> {imex.shape_range = [#numba_util.index_range<[2,10]>]}) -> i1 {
+func.func @test(%arg1: tensor<?xf32>, %arg2: tensor<?xf32> {numba.shape_range = [#numba_util.index_range<[2,10]>]}) -> i1 {
   %cst0 = arith.constant 0 : index
   %cst1 = arith.constant 1 : index
   %1 = linalg.generic {

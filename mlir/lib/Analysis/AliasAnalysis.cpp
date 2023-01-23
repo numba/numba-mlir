@@ -39,4 +39,4 @@ mlir::AliasResult numba::LocalAliasAnalysis::aliasImpl(mlir::Value lhs,
   return mlir::LocalAliasAnalysis::aliasImpl(lhs, rhs);
 }
 
-llvm::StringRef numba::getRestrictArgName() { return "imex.restrict"; }
+llvm::StringRef numba::getRestrictArgName() { return "numba.restrict"; }
