@@ -568,8 +568,8 @@ struct OffloadDeviceCapabilities {
 
 // TODO: device name
 extern "C" NUMBA_MLIR_GPU_RUNTIME_EXPORT bool
-dpcompGetDeviceCapabilities(OffloadDeviceCapabilities *ret,
-                            const char *deviceName) {
+gpuxGetDeviceCapabilities(OffloadDeviceCapabilities *ret,
+                          const char *deviceName) {
   LOG_FUNC();
   assert(ret);
   assert(deviceName);
