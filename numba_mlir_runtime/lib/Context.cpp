@@ -6,7 +6,7 @@
 #include <cstddef>
 #include <type_traits>
 
-#include "dpcomp-runtime_export.h"
+#include "numba-mlir-runtime_export.h"
 
 using init_func_t = void (*)(void *);
 using release_func_t = void (*)(void *);
@@ -22,7 +22,7 @@ static void *toData(void *ptr) {
   return &(reinterpret_cast<Context *>(ptr)->data);
 }
 
-extern "C" DPCOMP_RUNTIME_EXPORT void *
+extern "C" NUMBA_MLIR_RUNTIME_EXPORT void *
 dpcompTakeContext(void **ctxHandle, size_t contextSize, init_func_t init,
                   release_func_t release) {
   assert(ctxHandle);
@@ -41,11 +41,11 @@ dpcompTakeContext(void **ctxHandle, size_t contextSize, init_func_t init,
   return toData(*ctxHandle);
 }
 
-extern "C" DPCOMP_RUNTIME_EXPORT void dpcompReleaseContext(void * /*context*/) {
+extern "C" NUMBA_MLIR_RUNTIME_EXPORT void dpcompReleaseContext(void * /*context*/) {
   // Nothing For now
 }
 
-extern "C" DPCOMP_RUNTIME_EXPORT void dpcompPurgeContext(void **ctxHandle) {
+extern "C" NUMBA_MLIR_RUNTIME_EXPORT void dpcompPurgeContext(void **ctxHandle) {
   assert(ctxHandle);
   if (*ctxHandle) {
     auto &context = *reinterpret_cast<Context *>(*ctxHandle);

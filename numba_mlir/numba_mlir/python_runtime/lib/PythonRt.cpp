@@ -21,12 +21,12 @@ using AllocFuncT = void *(*)(size_t);
 // TODO: expose NRT_MemInfo_new from numba runtime
 static AllocFuncT AllocFunc = nullptr;
 
-extern "C" DPCOMP_PYTHON_RUNTIME_EXPORT void
+extern "C" NUMBA_MLIR_PYTHON_RUNTIME_EXPORT void
 dpcompSetMemInfoAllocFunc(void *func) {
   AllocFunc = reinterpret_cast<AllocFuncT>(func);
 }
 
-extern "C" DPCOMP_PYTHON_RUNTIME_EXPORT void *
+extern "C" NUMBA_MLIR_PYTHON_RUNTIME_EXPORT void *
 dpcompAllocMemInfo(void *data, size_t size, MemInfoDtorFunction dtor,
                    void *dtorInfo) {
   if (!AllocFunc)

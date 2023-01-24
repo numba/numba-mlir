@@ -2,7 +2,7 @@
 #
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-project(dpcomp-runtime LANGUAGES CXX C)
+project(numba-mlir-runtime LANGUAGES CXX C)
 
 include(GenerateExportHeader)
 

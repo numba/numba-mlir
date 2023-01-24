@@ -42,7 +42,7 @@ static bool initNumpy() {
   return init;
 }
 
-extern "C" DPCOMP_PYTHON_RUNTIME_EXPORT int
+extern "C" NUMBA_MLIR_PYTHON_RUNTIME_EXPORT int
 dpcompUnboxSyclInterface(PyObject *obj, arystruct_t *arystruct) {
   if (!initNumpy())
     return -1;

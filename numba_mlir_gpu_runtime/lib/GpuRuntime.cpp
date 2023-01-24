@@ -12,7 +12,7 @@
 #include <tuple>
 #include <vector>
 
-#include "dpcomp-gpu-runtime_export.h"
+#include "numba-mlir-gpu-runtime_export.h"
 
 #include "FilterStringParser.hpp"
 #include "LevelZeroPrinting.hpp"
@@ -459,24 +459,24 @@ private:
 };
 } // namespace
 
-extern "C" DPCOMP_GPU_RUNTIME_EXPORT void
+extern "C" NUMBA_MLIR_GPU_RUNTIME_EXPORT void
 dpcompGpuSetMemInfoAllocFunc(void *func) {
   LOG_FUNC();
   AllocFunc = reinterpret_cast<AllocFuncT>(func);
 }
 
-extern "C" DPCOMP_GPU_RUNTIME_EXPORT void *
+extern "C" NUMBA_MLIR_GPU_RUNTIME_EXPORT void *
 dpcompGpuStreamCreate(size_t eventsCount, const char *deviceName) {
   LOG_FUNC();
   return catchAll([&]() { return new Stream(eventsCount, deviceName); });
 }
 
-extern "C" DPCOMP_GPU_RUNTIME_EXPORT void dpcompGpuStreamDestroy(void *stream) {
+extern "C" NUMBA_MLIR_GPU_RUNTIME_EXPORT void dpcompGpuStreamDestroy(void *stream) {
   LOG_FUNC();
   catchAll([&]() { static_cast<Stream *>(stream)->release(); });
 }
 
-extern "C" DPCOMP_GPU_RUNTIME_EXPORT void *
+extern "C" NUMBA_MLIR_GPU_RUNTIME_EXPORT void *
 dpcompGpuModuleLoad(void *stream, const void *data, size_t dataSize) {
   LOG_FUNC();
   return catchAll([&]() {
@@ -484,14 +484,14 @@ dpcompGpuModuleLoad(void *stream, const void *data, size_t dataSize) {
   });
 }
 
-extern "C" DPCOMP_GPU_RUNTIME_EXPORT void dpcompGpuModuleDestroy(void *module) {
+extern "C" NUMBA_MLIR_GPU_RUNTIME_EXPORT void dpcompGpuModuleDestroy(void *module) {
   LOG_FUNC();
   catchAll([&]() {
     Stream::destroyModule(static_cast<ze_module_handle_t>(module));
   });
 }
 
-extern "C" DPCOMP_GPU_RUNTIME_EXPORT void *
+extern "C" NUMBA_MLIR_GPU_RUNTIME_EXPORT void *
 dpcompGpuKernelGet(void *module, const char *name) {
   LOG_FUNC();
   return catchAll([&]() {
@@ -499,14 +499,14 @@ dpcompGpuKernelGet(void *module, const char *name) {
   });
 }
 
-extern "C" DPCOMP_GPU_RUNTIME_EXPORT void dpcompGpuKernelDestroy(void *kernel) {
+extern "C" NUMBA_MLIR_GPU_RUNTIME_EXPORT void dpcompGpuKernelDestroy(void *kernel) {
   LOG_FUNC();
   catchAll([&]() {
     Stream::destroyKernel(static_cast<ze_kernel_handle_t>(kernel));
   });
 }
 
-extern "C" DPCOMP_GPU_RUNTIME_EXPORT void *
+extern "C" NUMBA_MLIR_GPU_RUNTIME_EXPORT void *
 dpcompGpuLaunchKernel(void *stream, void *kernel, size_t gridX, size_t gridY,
                       size_t gridZ, size_t blockX, size_t blockY, size_t blockZ,
                       void *events, void *params, size_t eventIndex) {
@@ -519,7 +519,7 @@ dpcompGpuLaunchKernel(void *stream, void *kernel, size_t gridX, size_t gridY,
   });
 }
 
-extern "C" DPCOMP_GPU_RUNTIME_EXPORT void dpcompGpuWait(void *event) {
+extern "C" NUMBA_MLIR_GPU_RUNTIME_EXPORT void dpcompGpuWait(void *event) {
   LOG_FUNC();
   catchAll([&]() { Stream::waitEvent(static_cast<ze_event_handle_t>(event)); });
 }
@@ -530,7 +530,7 @@ struct AllocResult {
   void *event;
 };
 
-extern "C" DPCOMP_GPU_RUNTIME_EXPORT void
+extern "C" NUMBA_MLIR_GPU_RUNTIME_EXPORT void
 dpcompGpuAlloc(void *stream, size_t size, size_t alignment, int type,
                void *events, size_t eventIndex, AllocResult *ret) {
   LOG_FUNC();
@@ -542,13 +542,13 @@ dpcompGpuAlloc(void *stream, size_t size, size_t alignment, int type,
   });
 }
 
-extern "C" DPCOMP_GPU_RUNTIME_EXPORT void dpcompGpuDeAlloc(void *stream,
+extern "C" NUMBA_MLIR_GPU_RUNTIME_EXPORT void dpcompGpuDeAlloc(void *stream,
                                                            void *ptr) {
   LOG_FUNC();
   catchAll([&]() { static_cast<Stream *>(stream)->deallocBuffer(ptr); });
 }
 
-extern "C" DPCOMP_GPU_RUNTIME_EXPORT void
+extern "C" NUMBA_MLIR_GPU_RUNTIME_EXPORT void
 dpcompGpuSuggestBlockSize(void *stream, void *kernel, const uint32_t *gridSize,
                           uint32_t *blockSize, size_t numDims) {
   LOG_FUNC();
@@ -567,7 +567,7 @@ struct OffloadDeviceCapabilities {
 };
 
 // TODO: device name
-extern "C" DPCOMP_GPU_RUNTIME_EXPORT bool
+extern "C" NUMBA_MLIR_GPU_RUNTIME_EXPORT bool
 dpcompGetDeviceCapabilities(OffloadDeviceCapabilities *ret,
                             const char *deviceName) {
   LOG_FUNC();
