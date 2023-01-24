@@ -23,8 +23,8 @@ static void *toData(void *ptr) {
 }
 
 extern "C" NUMBA_MLIR_RUNTIME_EXPORT void *
-dpcompTakeContext(void **ctxHandle, size_t contextSize, init_func_t init,
-                  release_func_t release) {
+nmrtTakeContext(void **ctxHandle, size_t contextSize, init_func_t init,
+                release_func_t release) {
   assert(ctxHandle);
   assert(contextSize > 0);
   if (!*ctxHandle) {
@@ -42,11 +42,11 @@ dpcompTakeContext(void **ctxHandle, size_t contextSize, init_func_t init,
 }
 
 extern "C" NUMBA_MLIR_RUNTIME_EXPORT void
-dpcompReleaseContext(void * /*context*/) {
+nmrtReleaseContext(void * /*context*/) {
   // Nothing For now
 }
 
-extern "C" NUMBA_MLIR_RUNTIME_EXPORT void dpcompPurgeContext(void **ctxHandle) {
+extern "C" NUMBA_MLIR_RUNTIME_EXPORT void nmrtPurgeContext(void **ctxHandle) {
   assert(ctxHandle);
   if (*ctxHandle) {
     auto &context = *reinterpret_cast<Context *>(*ctxHandle);

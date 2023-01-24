@@ -10,13 +10,13 @@ runtime_lib = load_lib("numba-mlir-python-runtime")
 
 
 def _register_funcs():
-    _funcs = ["dpcompAllocMemInfo", "dpcompUnboxSyclInterface"]
+    _funcs = ["nmrtAllocMemInfo", "nmrtUnboxSyclInterface"]
 
     for name in _funcs:
         func = getattr(runtime_lib, name)
         register_cfunc(name, func)
 
-    _alloc_func = runtime_lib.dpcompSetMemInfoAllocFunc
+    _alloc_func = runtime_lib.nmrtSetMemInfoAllocFunc
     _alloc_func.argtypes = [ctypes.c_void_p]
     _numba_alloc_ptr = ctypes.cast(_nrt.c_helpers["Allocate"], ctypes.c_void_p)
     _alloc_func(_numba_alloc_ptr.value)
@@ -25,7 +25,7 @@ def _register_funcs():
 _register_funcs()
 del _register_funcs
 
-_alloc_func = runtime_lib.dpcompAllocMemInfo
+_alloc_func = runtime_lib.nmrtAllocMemInfo
 
 
 def get_alloc_func():

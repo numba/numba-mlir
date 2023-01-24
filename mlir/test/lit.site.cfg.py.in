@@ -36,8 +36,8 @@ if sys.platform.startswith('win32'):
 else:
     config.mlir_wrappers_dir = os.path.join(config.llvm_obj_root, "lib")
     config.numba_shlib_prefix = "lib"
-config.numba_runtime_dir = os.path.join(config.numba_obj_root, "dpcomp_runtime")
-config.numba_igpu_runtime_dir = os.path.join(config.numba_obj_root, "dpcomp_gpu_runtime")
+config.numba_runtime_dir = os.path.join(config.numba_obj_root, "numba_mlir_runtime")
+config.numba_igpu_runtime_dir = os.path.join(config.numba_obj_root, "numba_mlir_gpu_runtime")
 
 
 # Support substitution of the tools_dir with user parameters. This is

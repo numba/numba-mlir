@@ -42,8 +42,8 @@ from .utils import njit_cached as njit
 kernel_cache = JitfuncCache(kernel)
 kernel_cached = kernel_cache.cached_decorator
 
-GPU_TESTS_ENABLED = _readenv("DPCOMP_ENABLE_GPU_TESTS", int, 0)
-DPCTL_TESTS_ENABLED = _readenv("DPCOMP_ENABLE_DPCTL_TESTS", int, 0)
+GPU_TESTS_ENABLED = _readenv("NUMBA_MLIR_ENABLE_GPU_TESTS", int, 0)
+DPCTL_TESTS_ENABLED = _readenv("NUMBA_MLIR_ENABLE_DPCTL_TESTS", int, 0)
 
 if DPCTL_TESTS_ENABLED:
     import dpctl

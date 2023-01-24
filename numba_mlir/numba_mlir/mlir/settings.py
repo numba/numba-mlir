@@ -22,16 +22,16 @@ def _readenv(name, ctor, default):
         return default
 
 
-USE_MLIR = _readenv("DPCOMP_ENABLE", int, 1)
-DUMP_PLIER = _readenv("DPCOMP_DUMP_PLIER", int, 0)
-DUMP_IR = _readenv("DPCOMP_DUMP_IR", int, 0)
-DUMP_DIAGNOSTICS = _readenv("DPCOMP_DUMP_DIAGNOSTICS", int, 0)
-DUMP_LLVM = _readenv("DPCOMP_DUMP_LLVM", int, 0)
-DUMP_OPTIMIZED = _readenv("DPCOMP_DUMP_OPTIMIZED", int, 0)
-DUMP_ASSEMBLY = _readenv("DPCOMP_DUMP_ASSEMBLY", int, 0)
-DEBUG_TYPE = list(filter(None, _readenv("DPCOMP_DEBUG_TYPE", str, "").split(",")))
+USE_MLIR = _readenv("NUMBA_MLIR_ENABLE", int, 1)
+DUMP_PLIER = _readenv("NUMBA_MLIR_DUMP_PLIER", int, 0)
+DUMP_IR = _readenv("NUMBA_MLIR_DUMP_IR", int, 0)
+DUMP_DIAGNOSTICS = _readenv("NUMBA_MLIR_DUMP_DIAGNOSTICS", int, 0)
+DUMP_LLVM = _readenv("NUMBA_MLIR_DUMP_LLVM", int, 0)
+DUMP_OPTIMIZED = _readenv("NUMBA_MLIR_DUMP_OPTIMIZED", int, 0)
+DUMP_ASSEMBLY = _readenv("NUMBA_MLIR_DUMP_ASSEMBLY", int, 0)
+DEBUG_TYPE = list(filter(None, _readenv("NUMBA_MLIR_DEBUG_TYPE", str, "").split(",")))
 DPNP_AVAILABLE = (
     is_dpnp_supported()
 )  # TODO: check if dpnp library is available at runtime
 MKL_AVAILABLE = is_mkl_supported()
-OPT_LEVEL = _readenv("DPCOMP_OPT_LEVEL", int, 3)
+OPT_LEVEL = _readenv("NUMBA_MLIR_OPT_LEVEL", int, 3)

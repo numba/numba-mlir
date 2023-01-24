@@ -23,7 +23,7 @@ import numba.tests.test_parfors
 
 
 def _gen_tests():
-    if not _readenv("DPCOMP_ENABLE_PARFOR_TESTS", int, 0):
+    if not _readenv("NUMBA_MLIR_ENABLE_PARFOR_TESTS", int, 0):
         return
 
     testcases = [

@@ -54,7 +54,7 @@ private:
 namespace {
 static bool printGpuInfoEnabled() {
   static bool value = []() {
-    auto env = std::getenv("DPCOMP_PRINT_GPU_INFO");
+    auto env = std::getenv("NUMBA_MLIR_PRINT_GPU_INFO");
     return env != nullptr && std::atoi(env) != 0;
   }();
   return value;
@@ -460,49 +460,46 @@ private:
 } // namespace
 
 extern "C" NUMBA_MLIR_GPU_RUNTIME_EXPORT void
-dpcompGpuSetMemInfoAllocFunc(void *func) {
+gpuxSetMemInfoAllocFunc(void *func) {
   LOG_FUNC();
   AllocFunc = reinterpret_cast<AllocFuncT>(func);
 }
 
 extern "C" NUMBA_MLIR_GPU_RUNTIME_EXPORT void *
-dpcompGpuStreamCreate(size_t eventsCount, const char *deviceName) {
+gpuxStreamCreate(size_t eventsCount, const char *deviceName) {
   LOG_FUNC();
   return catchAll([&]() { return new Stream(eventsCount, deviceName); });
 }
 
-extern "C" NUMBA_MLIR_GPU_RUNTIME_EXPORT void
-dpcompGpuStreamDestroy(void *stream) {
+extern "C" NUMBA_MLIR_GPU_RUNTIME_EXPORT void gpuxStreamDestroy(void *stream) {
   LOG_FUNC();
   catchAll([&]() { static_cast<Stream *>(stream)->release(); });
 }
 
 extern "C" NUMBA_MLIR_GPU_RUNTIME_EXPORT void *
-dpcompGpuModuleLoad(void *stream, const void *data, size_t dataSize) {
+gpuxModuleLoad(void *stream, const void *data, size_t dataSize) {
   LOG_FUNC();
   return catchAll([&]() {
     return static_cast<Stream *>(stream)->loadModule(data, dataSize);
   });
 }
 
-extern "C" NUMBA_MLIR_GPU_RUNTIME_EXPORT void
-dpcompGpuModuleDestroy(void *module) {
+extern "C" NUMBA_MLIR_GPU_RUNTIME_EXPORT void gpuxModuleDestroy(void *module) {
   LOG_FUNC();
   catchAll([&]() {
     Stream::destroyModule(static_cast<ze_module_handle_t>(module));
   });
 }
 
-extern "C" NUMBA_MLIR_GPU_RUNTIME_EXPORT void *
-dpcompGpuKernelGet(void *module, const char *name) {
+extern "C" NUMBA_MLIR_GPU_RUNTIME_EXPORT void *gpuxKernelGet(void *module,
+                                                             const char *name) {
   LOG_FUNC();
   return catchAll([&]() {
     return Stream::getKernel(static_cast<ze_module_handle_t>(module), name);
   });
 }
 
-extern "C" NUMBA_MLIR_GPU_RUNTIME_EXPORT void
-dpcompGpuKernelDestroy(void *kernel) {
+extern "C" NUMBA_MLIR_GPU_RUNTIME_EXPORT void gpuxKernelDestroy(void *kernel) {
   LOG_FUNC();
   catchAll([&]() {
     Stream::destroyKernel(static_cast<ze_kernel_handle_t>(kernel));
@@ -510,9 +507,9 @@ dpcompGpuKernelDestroy(void *kernel) {
 }
 
 extern "C" NUMBA_MLIR_GPU_RUNTIME_EXPORT void *
-dpcompGpuLaunchKernel(void *stream, void *kernel, size_t gridX, size_t gridY,
-                      size_t gridZ, size_t blockX, size_t blockY, size_t blockZ,
-                      void *events, void *params, size_t eventIndex) {
+gpuxLaunchKernel(void *stream, void *kernel, size_t gridX, size_t gridY,
+                 size_t gridZ, size_t blockX, size_t blockY, size_t blockZ,
+                 void *events, void *params, size_t eventIndex) {
   LOG_FUNC();
   return catchAll([&]() {
     return static_cast<Stream *>(stream)->launchKernel(
@@ -522,7 +519,7 @@ dpcompGpuLaunchKernel(void *stream, void *kernel, size_t gridX, size_t gridY,
   });
 }
 
-extern "C" NUMBA_MLIR_GPU_RUNTIME_EXPORT void dpcompGpuWait(void *event) {
+extern "C" NUMBA_MLIR_GPU_RUNTIME_EXPORT void gpuxWait(void *event) {
   LOG_FUNC();
   catchAll([&]() { Stream::waitEvent(static_cast<ze_event_handle_t>(event)); });
 }
@@ -534,8 +531,8 @@ struct AllocResult {
 };
 
 extern "C" NUMBA_MLIR_GPU_RUNTIME_EXPORT void
-dpcompGpuAlloc(void *stream, size_t size, size_t alignment, int type,
-               void *events, size_t eventIndex, AllocResult *ret) {
+gpuxAlloc(void *stream, size_t size, size_t alignment, int type, void *events,
+          size_t eventIndex, AllocResult *ret) {
   LOG_FUNC();
   catchAll([&]() {
     auto res = static_cast<Stream *>(stream)->allocBuffer(
@@ -545,15 +542,15 @@ dpcompGpuAlloc(void *stream, size_t size, size_t alignment, int type,
   });
 }
 
-extern "C" NUMBA_MLIR_GPU_RUNTIME_EXPORT void dpcompGpuDeAlloc(void *stream,
-                                                               void *ptr) {
+extern "C" NUMBA_MLIR_GPU_RUNTIME_EXPORT void gpuxDeAlloc(void *stream,
+                                                          void *ptr) {
   LOG_FUNC();
   catchAll([&]() { static_cast<Stream *>(stream)->deallocBuffer(ptr); });
 }
 
 extern "C" NUMBA_MLIR_GPU_RUNTIME_EXPORT void
-dpcompGpuSuggestBlockSize(void *stream, void *kernel, const uint32_t *gridSize,
-                          uint32_t *blockSize, size_t numDims) {
+gpuxSuggestBlockSize(void *stream, void *kernel, const uint32_t *gridSize,
+                     uint32_t *blockSize, size_t numDims) {
   LOG_FUNC();
   catchAll([&]() {
     static_cast<Stream *>(stream)->suggestBlockSize(
@@ -571,8 +568,8 @@ struct OffloadDeviceCapabilities {
 
 // TODO: device name
 extern "C" NUMBA_MLIR_GPU_RUNTIME_EXPORT bool
-dpcompGetDeviceCapabilities(OffloadDeviceCapabilities *ret,
-                            const char *deviceName) {
+gpuxGetDeviceCapabilities(OffloadDeviceCapabilities *ret,
+                          const char *deviceName) {
   LOG_FUNC();
   assert(ret);
   assert(deviceName);

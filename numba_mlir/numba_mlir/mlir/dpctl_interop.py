@@ -167,7 +167,7 @@ if _is_dpctl_available:
     def adapt_sycl_array_from_python(pyapi, ary, ptr):
         assert pyapi.context.enable_nrt
         fnty = ir.FunctionType(ir.IntType(32), [pyapi.pyobj, pyapi.voidptr])
-        fn = pyapi._get_function(fnty, name="dpcompUnboxSyclInterface")
+        fn = pyapi._get_function(fnty, name="nmrtUnboxSyclInterface")
         fn.args[0].add_attribute("nocapture")
         fn.args[1].add_attribute("nocapture")
         return pyapi.builder.call(fn, (ary, ptr))

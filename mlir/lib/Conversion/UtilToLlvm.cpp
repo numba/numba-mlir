@@ -367,7 +367,7 @@ struct LowerTakeContextOp
     }
 
     auto takeCtxFunc = [&]() -> mlir::LLVM::LLVMFuncOp {
-      llvm::StringRef name("dpcompTakeContext");
+      llvm::StringRef name("nmrtTakeContext");
       auto retType = getVoidPtrType();
       const mlir::Type argTypes[] = {
           mlir::LLVM::LLVMPointerType::get(getVoidPtrType()),
@@ -380,7 +380,7 @@ struct LowerTakeContextOp
     }();
 
     auto purgeCtxFunc = [&]() -> mlir::LLVM::LLVMFuncOp {
-      llvm::StringRef name("dpcompPurgeContext");
+      llvm::StringRef name("nmrtPurgeContext");
       auto retType = getVoidType();
       auto argType = mlir::LLVM::LLVMPointerType::get(getVoidPtrType());
       auto funcType = mlir::LLVM::LLVMFunctionType::get(retType, argType);
@@ -395,7 +395,7 @@ struct LowerTakeContextOp
           unknownLoc, ctxType, /*isConstant*/ false,
           mlir::LLVM::Linkage::Internal, name, mlir::Attribute());
 
-      llvm::StringRef cleanupFuncName(".dpcomp_context_cleanup");
+      llvm::StringRef cleanupFuncName(".nmrt_context_cleanup");
       auto cleanupFunc =
           mod.lookupSymbol<mlir::LLVM::LLVMFuncOp>(cleanupFuncName);
       if (!cleanupFunc) {
@@ -479,7 +479,7 @@ struct LowerReleaseContextOp
     };
 
     auto releaseCtxFunc = [&]() -> mlir::LLVM::LLVMFuncOp {
-      llvm::StringRef name("dpcompReleaseContext");
+      llvm::StringRef name("nmrtReleaseContext");
       auto voidPtr = getVoidPtrType();
       auto funcType = mlir::LLVM::LLVMFunctionType::get(voidPtr, voidPtr);
       return lookupFunc(name, funcType);

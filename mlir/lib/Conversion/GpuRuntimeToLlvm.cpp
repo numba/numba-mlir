@@ -79,20 +79,20 @@ protected:
       mlir::LLVM::LLVMPointerType::get(llvmAllocResType);
 
   FunctionCallBuilder streamCreateCallBuilder = {
-      "dpcompGpuStreamCreate",
+      "gpuxStreamCreate",
       llvmPointerType, // stream
       {
           llvmIndexType,  // events count
           llvmPointerType // device name
       }};
 
-  FunctionCallBuilder streamDestroyCallBuilder = {"dpcompGpuStreamDestroy",
+  FunctionCallBuilder streamDestroyCallBuilder = {"gpuxStreamDestroy",
                                                   llvmVoidType,
                                                   {
                                                       llvmPointerType // stream
                                                   }};
 
-  FunctionCallBuilder moduleLoadCallBuilder = {"dpcompGpuModuleLoad",
+  FunctionCallBuilder moduleLoadCallBuilder = {"gpuxModuleLoad",
                                                llvmPointerType, // module
                                                {
                                                    llvmPointerType, // stream
@@ -100,27 +100,27 @@ protected:
                                                    llvmIndexType,   // data size
                                                }};
 
-  FunctionCallBuilder moduleDestroyCallBuilder = {"dpcompGpuModuleDestroy",
+  FunctionCallBuilder moduleDestroyCallBuilder = {"gpuxModuleDestroy",
                                                   llvmVoidType,
                                                   {
                                                       llvmPointerType // module
                                                   }};
 
-  FunctionCallBuilder kernelGetCallBuilder = {"dpcompGpuKernelGet",
+  FunctionCallBuilder kernelGetCallBuilder = {"gpuxKernelGet",
                                               llvmPointerType, // kernel
                                               {
                                                   llvmPointerType, // module
                                                   llvmPointerType, // name
                                               }};
 
-  FunctionCallBuilder kernelDestroyCallBuilder = {"dpcompGpuKernelDestroy",
+  FunctionCallBuilder kernelDestroyCallBuilder = {"gpuxKernelDestroy",
                                                   llvmVoidType,
                                                   {
                                                       llvmPointerType // kernel
                                                   }};
 
   FunctionCallBuilder launchKernelCallBuilder = {
-      "dpcompGpuLaunchKernel",
+      "gpuxLaunchKernel",
       llvmPointerType, // dep
       {
           llvmPointerType,        // stream
@@ -136,14 +136,14 @@ protected:
           llvmIndexType,          // eventIndex
       }};
 
-  FunctionCallBuilder waitEventCallBuilder = {"dpcompGpuWait",
+  FunctionCallBuilder waitEventCallBuilder = {"gpuxWait",
                                               llvmVoidType,
                                               {
                                                   llvmPointerType // dep
                                               }};
 
   FunctionCallBuilder allocCallBuilder = {
-      "dpcompGpuAlloc",
+      "gpuxAlloc",
       llvmVoidType,
       {
           llvmPointerType,        // stream
@@ -156,7 +156,7 @@ protected:
       }};
 
   FunctionCallBuilder deallocCallBuilder = {
-      "dpcompGpuDeAlloc",
+      "gpuxDeAlloc",
       llvmVoidType,
       {
           llvmPointerType, // stream
@@ -164,7 +164,7 @@ protected:
       }};
 
   FunctionCallBuilder suggestBlockSizeBuilder = {
-      "dpcompGpuSuggestBlockSize",
+      "gpuxSuggestBlockSize",
       llvmVoidType,
       {
           llvmPointerType, // stream
