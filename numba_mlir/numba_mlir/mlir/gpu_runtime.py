@@ -20,20 +20,20 @@ if IS_GPU_RUNTIME_AVAILABLE:
 
     def _register_funcs():
         _funcs = [
-            "dpcompGpuStreamCreate",
-            "dpcompGpuStreamDestroy",
-            "dpcompGpuModuleLoad",
-            "dpcompGpuModuleDestroy",
-            "dpcompGpuKernelGet",
-            "dpcompGpuKernelDestroy",
-            "dpcompGpuLaunchKernel",
-            "dpcompGpuSuggestBlockSize",
-            "dpcompGpuWait",
-            "dpcompGpuAlloc",
+            "gpuxAlloc",
+            "gpuxKernelDestroy",
+            "gpuxKernelGet",
+            "gpuxLaunchKernel",
+            "gpuxModuleDestroy",
+            "gpuxModuleLoad",
+            "gpuxStreamCreate",
+            "gpuxStreamDestroy",
+            "gpuxSuggestBlockSize",
+            "gpuxWait",
             mlir_func_name("get_global_id"),
-            mlir_func_name("get_local_id"),
-            mlir_func_name("get_group_id"),
             mlir_func_name("get_global_size"),
+            mlir_func_name("get_group_id"),
+            mlir_func_name("get_local_id"),
             mlir_func_name("get_local_size"),
             mlir_func_name("kernel_barrier"),
             mlir_func_name("kernel_mem_fence"),
@@ -62,7 +62,7 @@ if IS_GPU_RUNTIME_AVAILABLE:
                 func = 1
             register_cfunc(name, func)
 
-        _alloc_func = runtime_lib.dpcompGpuSetMemInfoAllocFunc
+        _alloc_func = runtime_lib.gpuxSetMemInfoAllocFunc
         _alloc_func.argtypes = [ctypes.c_void_p]
         _alloc_func(get_alloc_func())
 
