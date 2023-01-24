@@ -734,7 +734,7 @@ static void createPipeline(numba::PipelineRegistry &registry,
     registerLowerToGPUPipeline(registry);
     // TODO(nbpatel): Add Gpu->GpuRuntime & GpuRuntimetoLlvm Transformation
 #else
-    numba::reportError("DPCOMP was compiled without GPU support");
+    numba::reportError("Numba-MLIR was compiled without GPU support");
 #endif
   }
 }

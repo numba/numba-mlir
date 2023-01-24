@@ -41,7 +41,7 @@ def _mkl_func(func):
 
         def mkl_failure(*args, **kwargs):
             raise Exception(
-                "Attempt to call mkl function, but DPCOMP runtime built without mkl"
+                "Attempt to call mkl function, but Numba-MLIR runtime built without mkl"
             )
 
         return mkl_failure
