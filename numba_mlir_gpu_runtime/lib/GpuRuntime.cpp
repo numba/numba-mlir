@@ -54,7 +54,7 @@ private:
 namespace {
 static bool printGpuInfoEnabled() {
   static bool value = []() {
-    auto env = std::getenv("DPCOMP_PRINT_GPU_INFO");
+    auto env = std::getenv("NUMBA_MLIR_PRINT_GPU_INFO");
     return env != nullptr && std::atoi(env) != 0;
   }();
   return value;

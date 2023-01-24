@@ -24,7 +24,7 @@ else:
 
 # CMAKE =======================================================================
 
-if int(os.environ.get("DPCOMP_SETUP_RUN_CMAKE", 1)):
+if int(os.environ.get("NUMBA_MLIR_SETUP_RUN_CMAKE", 1)):
     root_dir = os.path.dirname(os.path.abspath(__file__))
 
     LLVM_PATH = os.environ["LLVM_PATH"]
