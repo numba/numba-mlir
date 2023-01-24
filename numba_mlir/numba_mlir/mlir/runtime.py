@@ -16,11 +16,11 @@ _init_func(get_thread_count())
 _finalize_func = runtime_lib.dpcompParallelFinalize
 
 _funcs = [
-    "dpcompParallelFor",
     "memrefCopy",
-    "dpcompTakeContext",
-    "dpcompReleaseContext",
-    "dpcompPurgeContext",
+    "nmrtParallelFor",
+    "nmrtPurgeContext",
+    "nmrtReleaseContext",
+    "nmrtTakeContext",
 ]
 
 for name in _funcs:

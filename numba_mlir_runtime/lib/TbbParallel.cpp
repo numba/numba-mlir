@@ -52,7 +52,7 @@ struct TBBContext {
     arena.terminate();
     if (!tbb::finalize(schedulerHandle, std::nothrow)) {
       if (DEBUG) {
-        fprintf(stderr, "dpcomp: failed to finalize tbb runtime\n");
+        fprintf(stderr, "nmrt: failed to finalize tbb runtime\n");
         fflush(stderr);
       }
       tbbTshRelease(schedulerHandle);
@@ -68,7 +68,7 @@ std::unique_ptr<TBBContext> globalContext;
 
 TBBContext &getContext() {
   if (globalContext == nullptr) {
-    fprintf(stderr, "dpcomp: tbb runtime is not initialized\n");
+    fprintf(stderr, "nmrt: tbb runtime is not initialized\n");
     fflush(stderr);
     abort();
   }
@@ -216,10 +216,10 @@ static void parallelForNested(const InputRange *inputRanges, size_t depth,
 } // namespace
 
 extern "C" {
-NUMBA_MLIR_RUNTIME_EXPORT void dpcompParallelFor(const InputRange *inputRanges,
-                                                 size_t numLoops,
-                                                 ParallelForFptr func,
-                                                 void *ctx) {
+NUMBA_MLIR_RUNTIME_EXPORT void nmrtParallelFor(const InputRange *inputRanges,
+                                               size_t numLoops,
+                                               ParallelForFptr func,
+                                               void *ctx) {
   auto &context = getContext();
   auto numThreads = static_cast<size_t>(context.numThreads);
   if (DEBUG) {
@@ -238,17 +238,17 @@ NUMBA_MLIR_RUNTIME_EXPORT void dpcompParallelFor(const InputRange *inputRanges,
   });
 }
 
-NUMBA_MLIR_RUNTIME_EXPORT void dpcompParallelInit(int numThreads) {
+NUMBA_MLIR_RUNTIME_EXPORT void nmrtParallelInit(int numThreads) {
   if (DEBUG)
-    fprintf(stderr, "dpcomp_parallel_init %d\n", numThreads);
+    fprintf(stderr, "nmrt_parallel_init %d\n", numThreads);
 
   if (nullptr == globalContext)
     globalContext = std::make_unique<TBBContext>(numThreads);
 }
 
-NUMBA_MLIR_RUNTIME_EXPORT void dpcompParallelFinalize() {
+NUMBA_MLIR_RUNTIME_EXPORT void nmrtParallelFinalize() {
   if (DEBUG)
-    fprintf(stderr, "dpcomp_parallel_finalize\n");
+    fprintf(stderr, "nmrt_parallel_finalize\n");
 
   globalContext.reset();
 }

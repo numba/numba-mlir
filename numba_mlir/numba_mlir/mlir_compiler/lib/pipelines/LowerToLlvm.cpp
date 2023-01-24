@@ -1240,7 +1240,7 @@ struct LowerParallel : public mlir::OpRewritePattern<numba::util::ParallelOp> {
     }();
 
     auto parallelFor = [&]() {
-      auto funcName = "dpcompParallelFor";
+      auto funcName = "nmrtParallelFor";
       if (auto sym = mod.lookupSymbol<mlir::func::FuncOp>(funcName))
         return sym;
 
