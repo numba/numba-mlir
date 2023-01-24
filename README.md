@@ -4,13 +4,14 @@ SPDX-FileCopyrightText: 2022 Intel Corporation
 SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 -->
 
-# Intel Extension for MLIR
+# MLIR-based numba backend
 
-A staging ground for MLIR dialects and tools.
+The goal of this project is to provide efficient code generation for CPUs and GPUs
+using Multi-Level Intermediate Representation (MLIR) infrastructure.
+It uses Numba infrastructure as a frontend but have completely separate codepaths
+through MLIR infrastructure for low level code generation.
 
-## Python frontend
-
-Python frontend provides set of decorators similar to Numba decorators to compile python code.
+Package provides set of decorators similar to Numba decorators to compile python code.
 
 Example:
 ```Python
@@ -25,7 +26,7 @@ result = foo(np.array([1,2,3]), np.array([4,5,6]))
 print(result)
 ```
 
-## Building and testing Python frontend
+## Building and testing
 
 You will need LLVM built from specific commit, found in `llvm-sha.txt`.
 
@@ -50,7 +51,7 @@ mkdir tbb
 tar -xf "tbb.tgz" -C tbb --strip-components=1
 ```
 
-Getting Level Zero loader (Optional, needed for GPU support)
+Getting Level Zero loader (Optional, needed for Intel GPU support)
 ```Bash
 git clone https://github.com/oneapi-src/level-zero.git
 cd level-zero
@@ -77,3 +78,10 @@ pytest -n8 --capture=tee-sys -rXF
 ### Windows
 
 TBD
+
+
+## Contributing
+
+We are using github issues to report issues and github pull requests for development.
+
+[Code of Conduct](https://github.com/numba/numba-governance/blob/accepted/code-of-conduct.md)
