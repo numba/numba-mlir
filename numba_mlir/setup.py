@@ -34,7 +34,7 @@ if int(os.environ.get("DPCOMP_SETUP_RUN_CMAKE", 1)):
     NUMBA_MLIR_USE_MKL = os.environ.get("NUMBA_MLIR_USE_MKL")
     CMAKE_INSTALL_PREFIX = os.path.join(root_dir, "..")
 
-    cmake_build_dir = os.path.join(CMAKE_INSTALL_PREFIX, "dpcomp_cmake_build")
+    cmake_build_dir = os.path.join(CMAKE_INSTALL_PREFIX, "numba_mlir_cmake_build")
     cmake_cmd = [
         "cmake",
         root_dir,
