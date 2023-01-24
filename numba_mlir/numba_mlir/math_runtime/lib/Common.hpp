@@ -7,7 +7,7 @@
 #include <array>
 #include <cstdlib>
 
-#include "dpcomp-math-runtime_export.h"
+#include "numba-mlir-math-runtime_export.h"
 
 template <size_t NumDims, typename T> struct Memref {
   void *userData;

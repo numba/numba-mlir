@@ -6,7 +6,7 @@ import ctypes
 from numba.core.runtime import _nrt_python as _nrt
 from .utils import load_lib, register_cfunc
 
-runtime_lib = load_lib("dpcomp-python-runtime")
+runtime_lib = load_lib("numba-mlir-python-runtime")
 
 
 def _register_funcs():

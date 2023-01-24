@@ -7,7 +7,7 @@ import atexit
 from numba.np.ufunc.parallel import get_thread_count
 from .utils import load_lib, register_cfunc
 
-runtime_lib = load_lib("dpcomp-runtime")
+runtime_lib = load_lib("numba-mlir-runtime")
 
 _init_func = runtime_lib.dpcompParallelInit
 _init_func.argtypes = [ctypes.c_int]

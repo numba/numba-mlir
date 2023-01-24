@@ -17,7 +17,7 @@
 #include <tbb/parallel_for.h>
 #include <tbb/task_arena.h>
 
-#include "dpcomp-runtime_export.h"
+#include "numba-mlir-runtime_export.h"
 
 #define DEBUG 0
 
@@ -216,9 +216,10 @@ static void parallelForNested(const InputRange *inputRanges, size_t depth,
 } // namespace
 
 extern "C" {
-DPCOMP_RUNTIME_EXPORT void dpcompParallelFor(const InputRange *inputRanges,
-                                             size_t numLoops,
-                                             ParallelForFptr func, void *ctx) {
+NUMBA_MLIR_RUNTIME_EXPORT void dpcompParallelFor(const InputRange *inputRanges,
+                                                 size_t numLoops,
+                                                 ParallelForFptr func,
+                                                 void *ctx) {
   auto &context = getContext();
   auto numThreads = static_cast<size_t>(context.numThreads);
   if (DEBUG) {
@@ -237,7 +238,7 @@ DPCOMP_RUNTIME_EXPORT void dpcompParallelFor(const InputRange *inputRanges,
   });
 }
 
-DPCOMP_RUNTIME_EXPORT void dpcompParallelInit(int numThreads) {
+NUMBA_MLIR_RUNTIME_EXPORT void dpcompParallelInit(int numThreads) {
   if (DEBUG)
     fprintf(stderr, "dpcomp_parallel_init %d\n", numThreads);
 
@@ -245,7 +246,7 @@ DPCOMP_RUNTIME_EXPORT void dpcompParallelInit(int numThreads) {
     globalContext = std::make_unique<TBBContext>(numThreads);
 }
 
-DPCOMP_RUNTIME_EXPORT void dpcompParallelFinalize() {
+NUMBA_MLIR_RUNTIME_EXPORT void dpcompParallelFinalize() {
   if (DEBUG)
     fprintf(stderr, "dpcomp_parallel_finalize\n");
 

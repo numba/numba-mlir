@@ -120,12 +120,12 @@ if(NUMBA_MLIR_ENABLE_IGPU_DIALECT)
     target_compile_definitions(${PROJECT_NAME} PRIVATE NUMBA_MLIR_ENABLE_IGPU_DIALECT=1)
 endif()
 
-install(TARGETS dpcomp-runtime dpcomp-math-runtime dpcomp-python-runtime mlir_compiler
+install(TARGETS numba-mlir-runtime numba-mlir-math-runtime numba-mlir-python-runtime mlir_compiler
         DESTINATION "${CMAKE_INSTALL_PREFIX}/numba_mlir/numba_mlir"
         )
 
 if(NUMBA_MLIR_ENABLE_IGPU_DIALECT)
-    install(TARGETS dpcomp-gpu-runtime
+    install(TARGETS numba-mlir-gpu-runtime
             DESTINATION "${CMAKE_INSTALL_PREFIX}/numba_mlir/numba_mlir"
             )
 endif()

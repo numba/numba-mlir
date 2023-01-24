@@ -126,7 +126,7 @@ static void deviceGemm(void *stream, const Memref<2, T> *a,
 extern "C" {
 
 #define EIG_VARIANT(T, Suff)                                                   \
-  DPCOMP_MATH_RUNTIME_EXPORT void dpcompLinalgEig_##Suff(                      \
+  NUMBA_MLIR_MATH_RUNTIME_EXPORT void dpcompLinalgEig_##Suff(                  \
       Memref<2, const T> *input, Memref<1, T> *vals, Memref<2, T> *vecs) {     \
     eigImpl(input, vals, vecs);                                                \
   }
@@ -148,11 +148,11 @@ static inline void ALL_UNUSED(int dummy, ...) { (void)dummy; }
 #endif
 
 #define GEMM_VARIANT(T, Prefix, Suff)                                          \
-  DPCOMP_MATH_RUNTIME_EXPORT void mkl_gemm_##Suff(                             \
+  NUMBA_MLIR_MATH_RUNTIME_EXPORT void mkl_gemm_##Suff(                         \
       const Memref<2, T> *a, const Memref<2, T> *b, Memref<2, T> *c) {         \
     MKL_CALL(cpuGemm<T>, MKL_GEMM(Prefix), a, b, c, 1, 0);                     \
   }                                                                            \
-  DPCOMP_MATH_RUNTIME_EXPORT void mkl_gemm_##Suff##_device(                    \
+  NUMBA_MLIR_MATH_RUNTIME_EXPORT void mkl_gemm_##Suff##_device(                \
       void *stream, const Memref<2, T> *a, const Memref<2, T> *b,              \
       Memref<2, T> *c) {                                                       \
     MKL_CALL(deviceGemm<T>, stream, a, b, c, 1, 0);                            \

@@ -106,7 +106,7 @@ if int(os.environ.get("DPCOMP_SETUP_RUN_CMAKE", 1)):
 packages = find_packages(where=root_dir, include=["numba_mlir", "numba_mlir.*"])
 
 metadata = dict(
-    name="numba-dpcomp",
+    name="numba-mlir",
     version=versioneer.get_version(),
     cmdclass=versioneer.get_cmdclass(),
     packages=packages,

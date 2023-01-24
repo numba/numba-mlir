@@ -7,7 +7,7 @@ import atexit
 from .utils import load_lib, mlir_func_name, register_cfunc
 from .settings import MKL_AVAILABLE
 
-runtime_lib = load_lib("dpcomp-math-runtime")
+runtime_lib = load_lib("numba-mlir-math-runtime")
 
 _init_func = runtime_lib.dpcompMathRuntimeInit
 _init_func()

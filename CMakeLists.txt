@@ -107,11 +107,11 @@ if(NUMBA_MLIR_ENABLE_IGPU_DIALECT)
     else()
         find_package(LevelZero 1.6 REQUIRED)
     endif()
-    add_subdirectory(dpcomp_gpu_runtime)
+    add_subdirectory(numba_mlir_gpu_runtime)
 endif()
 
 add_subdirectory(mlir)
-add_subdirectory(dpcomp_runtime)
+add_subdirectory(numba_mlir_runtime)
 
 if(NUMBA_MLIR_ENABLE_NUMBA_FE)
     add_subdirectory(numba_mlir)

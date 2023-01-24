@@ -14,10 +14,10 @@ configure_lit_site_cfg(
 
 set(NUMBA_MLIR_TEST_DEPENDS
         FileCheck
-        numba-mlir-opt
         level_zero_runner
-        dpcomp-runtime
-        dpcomp-gpu-runtime
+        numba-mlir-gpu-runtime
+        numba-mlir-opt
+        numba-mlir-runtime
         )
 
 add_lit_testsuite(check-numba-mlir "Running the numba mlir regression tests"

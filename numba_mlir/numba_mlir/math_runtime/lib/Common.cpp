@@ -5,11 +5,11 @@
 #include "Common.hpp"
 
 extern "C" {
-DPCOMP_MATH_RUNTIME_EXPORT void dpcompMathRuntimeInit() {
+NUMBA_MLIR_MATH_RUNTIME_EXPORT void dpcompMathRuntimeInit() {
   // Nothing
 }
 
-DPCOMP_MATH_RUNTIME_EXPORT void dpcompMathRuntimeFinalize() {
+NUMBA_MLIR_MATH_RUNTIME_EXPORT void dpcompMathRuntimeFinalize() {
   // Nothing
 }
 }

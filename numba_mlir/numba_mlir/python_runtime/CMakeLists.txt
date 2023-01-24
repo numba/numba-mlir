@@ -2,7 +2,7 @@
 #
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-project(dpcomp-python-runtime LANGUAGES CXX C)
+project(numba-mlir-python-runtime LANGUAGES CXX C)
 
 find_package (Python3 COMPONENTS Development REQUIRED)
 

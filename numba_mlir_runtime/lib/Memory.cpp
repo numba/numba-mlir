@@ -12,7 +12,7 @@
 #define mlir_c_runner_utils_EXPORTS 1
 #include <mlir/ExecutionEngine/CRunnerUtils.h>
 
-#include "dpcomp-runtime_export.h"
+#include "numba-mlir-runtime_export.h"
 
 template <typename T, int N> struct MemRefDescriptor {
   T *allocated;
@@ -23,13 +23,13 @@ template <typename T, int N> struct MemRefDescriptor {
 };
 
 /// Fills the given 1D float memref with the given float value.
-extern "C" DPCOMP_RUNTIME_EXPORT void
+extern "C" NUMBA_MLIR_RUNTIME_EXPORT void
 _mlir_ciface_fillResource1DFloat(MemRefDescriptor<float, 1> *ptr, // NOLINT
                                  float value) {
   std::fill_n(ptr->allocated, ptr->sizes[0], value);
 }
 
-extern "C" DPCOMP_RUNTIME_EXPORT void
+extern "C" NUMBA_MLIR_RUNTIME_EXPORT void
 memrefCopy(int64_t elemSize, UnrankedMemRefType<char> *srcArg,
            UnrankedMemRefType<char> *dstArg) {
   DynamicMemRefType<char> src(*srcArg);
