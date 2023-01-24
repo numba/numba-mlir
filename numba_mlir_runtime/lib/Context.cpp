@@ -41,7 +41,8 @@ dpcompTakeContext(void **ctxHandle, size_t contextSize, init_func_t init,
   return toData(*ctxHandle);
 }
 
-extern "C" NUMBA_MLIR_RUNTIME_EXPORT void dpcompReleaseContext(void * /*context*/) {
+extern "C" NUMBA_MLIR_RUNTIME_EXPORT void
+dpcompReleaseContext(void * /*context*/) {
   // Nothing For now
 }
 

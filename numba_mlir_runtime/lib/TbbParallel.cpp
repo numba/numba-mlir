@@ -217,8 +217,9 @@ static void parallelForNested(const InputRange *inputRanges, size_t depth,
 
 extern "C" {
 NUMBA_MLIR_RUNTIME_EXPORT void dpcompParallelFor(const InputRange *inputRanges,
-                                             size_t numLoops,
-                                             ParallelForFptr func, void *ctx) {
+                                                 size_t numLoops,
+                                                 ParallelForFptr func,
+                                                 void *ctx) {
   auto &context = getContext();
   auto numThreads = static_cast<size_t>(context.numThreads);
   if (DEBUG) {

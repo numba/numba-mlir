@@ -471,7 +471,8 @@ dpcompGpuStreamCreate(size_t eventsCount, const char *deviceName) {
   return catchAll([&]() { return new Stream(eventsCount, deviceName); });
 }
 
-extern "C" NUMBA_MLIR_GPU_RUNTIME_EXPORT void dpcompGpuStreamDestroy(void *stream) {
+extern "C" NUMBA_MLIR_GPU_RUNTIME_EXPORT void
+dpcompGpuStreamDestroy(void *stream) {
   LOG_FUNC();
   catchAll([&]() { static_cast<Stream *>(stream)->release(); });
 }
@@ -484,7 +485,8 @@ dpcompGpuModuleLoad(void *stream, const void *data, size_t dataSize) {
   });
 }
 
-extern "C" NUMBA_MLIR_GPU_RUNTIME_EXPORT void dpcompGpuModuleDestroy(void *module) {
+extern "C" NUMBA_MLIR_GPU_RUNTIME_EXPORT void
+dpcompGpuModuleDestroy(void *module) {
   LOG_FUNC();
   catchAll([&]() {
     Stream::destroyModule(static_cast<ze_module_handle_t>(module));
@@ -499,7 +501,8 @@ dpcompGpuKernelGet(void *module, const char *name) {
   });
 }
 
-extern "C" NUMBA_MLIR_GPU_RUNTIME_EXPORT void dpcompGpuKernelDestroy(void *kernel) {
+extern "C" NUMBA_MLIR_GPU_RUNTIME_EXPORT void
+dpcompGpuKernelDestroy(void *kernel) {
   LOG_FUNC();
   catchAll([&]() {
     Stream::destroyKernel(static_cast<ze_kernel_handle_t>(kernel));
@@ -543,7 +546,7 @@ dpcompGpuAlloc(void *stream, size_t size, size_t alignment, int type,
 }
 
 extern "C" NUMBA_MLIR_GPU_RUNTIME_EXPORT void dpcompGpuDeAlloc(void *stream,
-                                                           void *ptr) {
+                                                               void *ptr) {
   LOG_FUNC();
   catchAll([&]() { static_cast<Stream *>(stream)->deallocBuffer(ptr); });
 }
