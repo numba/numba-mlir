@@ -24,9 +24,8 @@ struct Conversion {
     dtype = mod.attr("DType");
     array = mod.attr("Array");
 
-    py::object dpcompArrayMod =
-        py::module::import("numba_mlir.mlir.array_type");
-    fixedArray = dpcompArrayMod.attr("FixedArray");
+    py::object arrayMod = py::module::import("numba_mlir.mlir.array_type");
+    fixedArray = arrayMod.attr("FixedArray");
   }
 
   llvm::Optional<mlir::Type> operator()(mlir::MLIRContext &context,
