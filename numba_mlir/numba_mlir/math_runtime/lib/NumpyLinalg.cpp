@@ -126,7 +126,7 @@ static void deviceGemm(void *stream, const Memref<2, T> *a,
 extern "C" {
 
 #define EIG_VARIANT(T, Suff)                                                   \
-  NUMBA_MLIR_MATH_RUNTIME_EXPORT void dpcompLinalgEig_##Suff(                  \
+  NUMBA_MLIR_MATH_RUNTIME_EXPORT void dpnp_linalg_eig_##Suff(                  \
       Memref<2, const T> *input, Memref<1, T> *vals, Memref<2, T> *vecs) {     \
     eigImpl(input, vals, vecs);                                                \
   }
