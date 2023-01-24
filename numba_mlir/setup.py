@@ -22,11 +22,11 @@ elif sys.platform in ["win32", "cygwin"]:
 else:
     assert False, sys.platform + " not supported"
 
+root_dir = os.path.dirname(os.path.abspath(__file__))
+
 # CMAKE =======================================================================
 
 if int(os.environ.get("NUMBA_MLIR_SETUP_RUN_CMAKE", 1)):
-    root_dir = os.path.dirname(os.path.abspath(__file__))
-
     LLVM_PATH = os.environ["LLVM_PATH"]
     LLVM_DIR = os.path.join(LLVM_PATH, "lib", "cmake", "llvm")
     MLIR_DIR = os.path.join(LLVM_PATH, "lib", "cmake", "mlir")
