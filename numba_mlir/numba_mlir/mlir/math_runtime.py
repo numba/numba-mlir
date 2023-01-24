@@ -9,7 +9,7 @@ from .settings import MKL_AVAILABLE
 
 runtime_lib = load_lib("numba-mlir-math-runtime")
 
-_init_func = runtime_lib.dpcompMathRuntimeInit
+_init_func = runtime_lib.nmrtMathRuntimeInit
 _init_func()
 
 
@@ -26,7 +26,7 @@ if MKL_AVAILABLE:
     load_function_variants("mkl_gemm_%s", ["float32", "float64"])
     load_function_variants("mkl_gemm_%s_device", ["float32", "float64"])
 
-_finalize_func = runtime_lib.dpcompMathRuntimeFinalize
+_finalize_func = runtime_lib.nmrtMathRuntimeFinalize
 
 
 @atexit.register

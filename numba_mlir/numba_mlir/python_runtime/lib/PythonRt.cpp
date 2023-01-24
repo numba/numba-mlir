@@ -22,13 +22,13 @@ using AllocFuncT = void *(*)(size_t);
 static AllocFuncT AllocFunc = nullptr;
 
 extern "C" NUMBA_MLIR_PYTHON_RUNTIME_EXPORT void
-dpcompSetMemInfoAllocFunc(void *func) {
+nmrtSetMemInfoAllocFunc(void *func) {
   AllocFunc = reinterpret_cast<AllocFuncT>(func);
 }
 
 extern "C" NUMBA_MLIR_PYTHON_RUNTIME_EXPORT void *
-dpcompAllocMemInfo(void *data, size_t size, MemInfoDtorFunction dtor,
-                   void *dtorInfo) {
+nmrtAllocMemInfo(void *data, size_t size, MemInfoDtorFunction dtor,
+                 void *dtorInfo) {
   if (!AllocFunc)
     return nullptr;
 

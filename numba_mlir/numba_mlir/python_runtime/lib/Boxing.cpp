@@ -43,7 +43,7 @@ static bool initNumpy() {
 }
 
 extern "C" NUMBA_MLIR_PYTHON_RUNTIME_EXPORT int
-dpcompUnboxSyclInterface(PyObject *obj, arystruct_t *arystruct) {
+nmrtUnboxSyclInterface(PyObject *obj, arystruct_t *arystruct) {
   if (!initNumpy())
     return -1;
 
@@ -130,7 +130,7 @@ dpcompUnboxSyclInterface(PyObject *obj, arystruct_t *arystruct) {
 
   // TODO: dtor
   arystruct->meminfo =
-      dpcompAllocMemInfo(data, itemsize * nitems, nullptr, nullptr);
+      nmrtAllocMemInfo(data, itemsize * nitems, nullptr, nullptr);
 
   return 0;
 }
