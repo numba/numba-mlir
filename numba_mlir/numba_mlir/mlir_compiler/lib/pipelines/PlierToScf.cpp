@@ -10,24 +10,12 @@
 
 #include "numba/Compiler/PipelineRegistry.hpp"
 #include "numba/Conversion/CfgToScf.hpp"
-#include "numba/Dialect/plier/Dialect.hpp"
-#include "numba/Transforms/ArgLowering.hpp"
-#include "numba/Transforms/RewriteWrapper.hpp"
 
 #include "BasePipeline.hpp"
 
 namespace {
 
-/// Convert plier::ArgOp into direct function argument access. ArgOp is just an
-/// artifact of Numba IR conversion and doesn't really have any functional
-/// meaning so we can get rid of it early.
-struct LowerArgOps
-    : public numba::RewriteWrapperPass<
-          LowerArgOps, void, numba::DependentDialectsList<plier::PlierDialect>,
-          numba::ArgOpLowering> {};
-
 static void populatePlierToScfPipeline(mlir::OpPassManager &pm) {
-  pm.addNestedPass<mlir::func::FuncOp>(std::make_unique<LowerArgOps>());
   pm.addNestedPass<mlir::func::FuncOp>(mlir::createCanonicalizerPass());
   pm.addNestedPass<mlir::func::FuncOp>(numba::createCFGToSCFPass());
   pm.addNestedPass<mlir::func::FuncOp>(mlir::createCanonicalizerPass());
