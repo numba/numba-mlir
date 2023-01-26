@@ -418,12 +418,12 @@ private:
       reductionIndices[name] = static_cast<unsigned>(i);
     }
 
-    imex::util::EnvironmentRegionOp regionOp;
+    numba::util::EnvironmentRegionOp regionOp;
     if (hasDevice) {
       auto devNameAttr = builder.getStringAttr(deviceName);
       auto attr = gpu_runtime::GPURegionDescAttr::get(&ctx, devNameAttr);
       auto loc = getCurrentLoc();
-      regionOp = builder.create<imex::util::EnvironmentRegionOp>(
+      regionOp = builder.create<numba::util::EnvironmentRegionOp>(
           loc, attr, /*args*/ std::nullopt, reductionTypes);
       mlir::Block &regionBlock = regionOp.getRegion().front();
       assert(llvm::hasSingleElement(regionBlock));
@@ -444,7 +444,7 @@ private:
         index = indices.front();
       } else {
         auto resType = b.getTupleType(indices.getTypes());
-        index = b.create<imex::util::BuildTupleOp>(l, resType, indices);
+        index = b.create<numba::util::BuildTupleOp>(l, resType, indices);
       }
 
       for (auto [i, redvar] : llvm::enumerate(parforInst.attr("redvars"))) {
@@ -505,19 +505,19 @@ private:
     auto loc = getCurrentLoc();
 
     if (hasDevice) {
-      builder.create<imex::util::EnvironmentRegionYieldOp>(loc, results);
+      builder.create<numba::util::EnvironmentRegionYieldOp>(loc, results);
       results = regionOp.getResults();
       builder.setInsertionPointToEnd(block);
     }
 
     mlir::Value result;
     if (results.empty()) {
-      result = builder.create<imex::util::UndefOp>(loc, builder.getNoneType());
+      result = builder.create<numba::util::UndefOp>(loc, builder.getNoneType());
     } else if (results.size() == 1) {
       result = results.front();
     } else {
       auto resType = builder.getTupleType(results.getTypes());
-      result = builder.create<imex::util::BuildTupleOp>(loc, resType, results);
+      result = builder.create<numba::util::BuildTupleOp>(loc, resType, results);
     }
 
     builder.create<mlir::func::ReturnOp>(loc, result);
@@ -564,7 +564,7 @@ private:
     auto loop = loopBuilder.create<mlir::scf::ForOp>(
         loc, begins.front(), ends.front(), steps.front(), iterArgs,
         forBodyBuilder);
-    loop->setAttr(imex::util::attributes::getParallelName(),
+    loop->setAttr(numba::util::attributes::getParallelName(),
                   builder.getUnitAttr());
     return loop.getResults();
   }
