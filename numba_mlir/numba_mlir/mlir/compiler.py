@@ -107,9 +107,9 @@ class mlir_PassBuilder(orig_DefaultPassBuilder):
     def define_replace_parfors_pipeline(state, name="nopython"):
         pm = orig_DefaultPassBuilder.define_nopython_pipeline(state, name)
 
-        import numba_dpcomp.mlir.settings
+        import numba_mlir.mlir.settings
 
-        if numba_dpcomp.mlir.settings.USE_MLIR:
+        if numba_mlir.mlir.settings.USE_MLIR:
             pm.add_pass_after(MlirReplaceParfors, ParforPass)
 
         pm.finalize()
