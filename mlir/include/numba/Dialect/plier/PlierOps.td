@@ -74,17 +74,6 @@ def Plier_OmittedType : Plier_Type<"Omitted", "omitted", [], "::mlir::Type"> {
 class Plier_Op<string mnemonic, list<Trait> traits = []>
     : Op<Plier_Dialect, mnemonic, traits>;
 
-def ArgOp : Plier_Op<"arg", [Pure]> {
-  let arguments = (ins UI32Attr : $index, StrAttr : $name);
-
-  let results = (outs AnyType);
-  let hasFolder = 1;
-
-  let builders = [OpBuilder<(ins "unsigned"
-                             : $index, "::mlir::StringRef"
-                             : $name)>];
-}
-
 def ConstOp : Plier_Op<"const", [Pure]> {
   let arguments = (ins AnyAttr : $val);
 

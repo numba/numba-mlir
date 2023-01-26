@@ -24,9 +24,9 @@ struct PlierInlinerInterface : public mlir::DialectInlinerInterface {
                        mlir::BlockAndValueMapping &) const final override {
     return true;
   }
-  bool isLegalToInline(mlir::Operation *op, mlir::Region *, bool,
+  bool isLegalToInline(mlir::Operation *, mlir::Region *, bool,
                        mlir::BlockAndValueMapping &) const final override {
-    return !mlir::isa<plier::ArgOp>(op);
+    return true;
   }
 };
 } // namespace
@@ -58,24 +58,6 @@ mlir::Operation *PlierDialect::materializeConstant(mlir::OpBuilder &builder,
   if (mlir::arith::ConstantOp::isBuildableWith(value, type))
     return builder.create<mlir::arith::ConstantOp>(loc, type, value);
 
-  return nullptr;
-}
-
-void ArgOp::build(mlir::OpBuilder &builder, mlir::OperationState &state,
-                  unsigned index, mlir::StringRef name) {
-  ArgOp::build(builder, state, PyType::getUndefined(state.getContext()), index,
-               name);
-}
-
-mlir::OpFoldResult ArgOp::fold(llvm::ArrayRef<mlir::Attribute> /*operands*/) {
-  auto func = getOperation()->getParentOfType<mlir::FunctionOpInterface>();
-  if (func) {
-    auto ind = getIndex();
-    if (ind < func.getNumArguments() &&
-        func.getArgument(ind).getType() == getType()) {
-      return func.getArgument(ind);
-    }
-  }
   return nullptr;
 }
 

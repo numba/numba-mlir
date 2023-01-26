@@ -291,8 +291,12 @@ private:
     auto value = inst.attr("value");
     if (py::isinstance(value, insts.Arg)) {
       auto index = value.attr("index").cast<std::size_t>();
-      return builder.create<plier::ArgOp>(
-          getCurrentLoc(), index, target.attr("name").cast<std::string>());
+      auto args = func.getFunctionBody().front().getArguments();
+      if (index >= args.size())
+        numba::reportError(llvm::Twine("Invalid arg index: \"") +
+                           llvm::Twine(index) + "\"");
+
+      return args[index];
     }
 
     if (py::isinstance(value, insts.Expr))
@@ -526,8 +530,14 @@ private:
   }
 
   void storevar(mlir::Value val, py::handle inst) {
+    auto type = getType(inst);
+    if (val.getDefiningOp()) {
+      val.setType(type);
+    } else {
+      // TODO: unify
+      val = builder.create<plier::CastOp>(getCurrentLoc(), type, val);
+    }
     varsMap[inst.attr("name").cast<std::string>()] = val;
-    val.setType(getType(inst));
   }
 
   mlir::Value loadvar(py::handle inst) {

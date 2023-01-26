@@ -52,7 +52,6 @@ set(SOURCES_LIST
     lib/Dialect/ntensor/Transforms/ResolveArrayOps.cpp
     lib/Dialect/plier/Dialect.cpp
     lib/ExecutionEngine/ExecutionEngine.cpp
-    lib/Transforms/ArgLowering.cpp
     lib/Transforms/CallLowering.cpp
     lib/Transforms/CanonicalizeReductions.cpp
     lib/Transforms/CastLowering.cpp
@@ -102,7 +101,6 @@ set(HEADERS_LIST
     include/numba/Dialect/numba_util/Utils.hpp
     include/numba/Dialect/plier/Dialect.hpp
     include/numba/ExecutionEngine/ExecutionEngine.hpp
-    include/numba/Transforms/ArgLowering.hpp
     include/numba/Transforms/CallLowering.hpp
     include/numba/Transforms/CanonicalizeReductions.hpp
     include/numba/Transforms/CastLowering.hpp
