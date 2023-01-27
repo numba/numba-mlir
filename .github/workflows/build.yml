@@ -240,7 +240,7 @@ jobs:
 
         run: |
           mkdir numba_mlir_wheels
-          cd numba_mlir_wheels
+          pushd numba_mlir_wheels
           source $CONDA/bin/activate test-env
           export TBB_PATH=/home/runner/work/tbb/oneapi-tbb-${TBB_VER}
           export LLVM_PATH=/home/runner/work/llvm-mlir/_mlir_install
@@ -248,6 +248,8 @@ jobs:
           export LEVEL_ZERO_VERSION_CHECK_OFF=1
           pip wheel --no-deps -v ../numba_mlir
           ls -l --block-size=M
+          popd
+          rm -rf numba_mlir_cmake_build
 
       - name: Test wheels
         shell: bash -l {0}
@@ -269,7 +271,7 @@ jobs:
 
         run: |
           mkdir numba_mlir_conda
-          cd numba_mlir_conda
+          pushd numba_mlir_conda
           source $CONDA/bin/activate test-env
           export TBB_PATH=/home/runner/work/tbb/oneapi-tbb-${TBB_VER}
           export LLVM_PATH=/home/runner/work/llvm-mlir/_mlir_install
@@ -277,6 +279,8 @@ jobs:
           export LEVEL_ZERO_VERSION_CHECK_OFF=1
           conda build --output-folder=. ../numba_mlir/conda-recipe || exit 1
           ls -l --block-size=M
+          popd
+          rm -rf numba_mlir_cmake_build
 
       - name: Test conda
         shell: bash -l {0}
