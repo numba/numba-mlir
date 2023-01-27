@@ -277,3 +277,18 @@ jobs:
           export LEVEL_ZERO_VERSION_CHECK_OFF=1
           conda build --output-folder=. ../numba_mlir/conda-recipe
           ls -l --block-size=M
+
+      - name: Test conda
+        shell: bash -l {0}
+
+        run: |
+          cd numba_mlir_conda
+          conda create -y -n conda-test-env python=${{ matrix.python }} numba=0.56 numpy=1.22 "setuptools<65.6" scikit-learn pytest-xdist ninja scipy pybind11 pytest lit tbb=${TBB_VER} cmake mkl-devel-dpcpp -c conda-forge -c intel
+          conda info
+          source $CONDA/bin/activate conda-test-env
+          conda list
+          conda install numba-mlir-*.tar.bz2
+          np=`nproc`
+          echo "INFO: nproc $np"
+          export NUMBA_DISABLE_PERFORMANCE_WARNINGS=1
+          pytest -n${np} -vv --capture=tee-sys -rXF --pyargs numba_mlir.mlir.tests -m smoke
