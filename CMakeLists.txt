@@ -50,7 +50,8 @@ if (CMAKE_SYSTEM_NAME STREQUAL Linux)
         "-fstack-clash-protection "
         "-fcf-protection=full "
     )
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${WARN_FLAGS} ${SDL_FLAGS} -lc_nonshared")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${WARN_FLAGS} ${SDL_FLAGS}")
+    add_compile_options(-lc_nonshared)
     # add_compile_options(-mcet) # v8.0 and newer # unrecognized command line option '-mcet', only recommended
     add_link_options(-Wl,-z,noexecstack,-z,relro,-z,now)
 endif()
