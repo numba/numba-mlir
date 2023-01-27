@@ -211,7 +211,7 @@ jobs:
 
         run: |
           cd numba_mlir
-          conda create -y -n test-env python=${{ matrix.python }} "pip>=22" numba=0.56 numpy=1.22 "setuptools<65.6" scikit-learn pytest-xdist ninja scipy pybind11 pytest lit tbb=${TBB_VER} cmake mkl-devel-dpcpp -c conda-forge -c intel
+          conda create -y -n test-env python=${{ matrix.python }} "pip>=22" numba=0.56 numpy=1.22 "setuptools<65.6" scikit-learn pytest-xdist ninja scipy pybind11 pytest lit tbb=${TBB_VER} cmake mkl-devel-dpcpp conda-build -c conda-forge -c intel
           conda info
           source $CONDA/bin/activate test-env
           conda list
