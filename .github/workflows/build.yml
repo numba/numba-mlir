@@ -266,7 +266,7 @@ jobs:
           export NUMBA_DISABLE_PERFORMANCE_WARNINGS=1
           pytest -n${np} -vv --capture=tee-sys -rXF --pyargs numba_mlir.mlir.tests -m smoke
 
-      - name: Build conda
+      - name: Build conda package
         shell: bash -l {0}
 
         run: |
@@ -283,7 +283,7 @@ jobs:
           popd
           rm -rf numba_mlir_cmake_build
 
-      - name: Test conda
+      - name: Test conda package
         shell: bash -l {0}
 
         run: |
