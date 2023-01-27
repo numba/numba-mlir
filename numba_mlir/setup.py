@@ -3,24 +3,10 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 import os
-import sys
 import subprocess
 from setuptools import find_packages, setup
 import versioneer
 import numpy
-
-IS_WIN = False
-IS_LIN = False
-IS_MAC = False
-
-if "linux" in sys.platform:
-    IS_LIN = True
-elif sys.platform == "darwin":
-    IS_MAC = True
-elif sys.platform in ["win32", "cygwin"]:
-    IS_WIN = True
-else:
-    assert False, sys.platform + " not supported"
 
 root_dir = os.path.dirname(os.path.abspath(__file__))
 

@@ -211,7 +211,7 @@ jobs:
 
         run: |
           cd numba_mlir
-          conda create -y -n test-env python=${{ matrix.python }} "pip>=22" numba=0.56 numpy=1.22 "setuptools<65.6" scikit-learn pytest-xdist ninja scipy pybind11 pytest lit tbb=${TBB_VER} cmake mkl-devel-dpcpp -c conda-forge -c intel
+          conda create -y -n test-env python=${{ matrix.python }} "pip>=22" numba=0.56 numpy=1.22 "setuptools<65.6" scikit-learn pytest-xdist ninja scipy pybind11 pytest lit tbb=${TBB_VER} cmake mkl-devel-dpcpp conda-build -c conda-forge -c intel
           conda info
           source $CONDA/bin/activate test-env
           conda list
@@ -240,7 +240,7 @@ jobs:
 
         run: |
           mkdir numba_mlir_wheels
-          cd numba_mlir_wheels
+          pushd numba_mlir_wheels
           source $CONDA/bin/activate test-env
           export TBB_PATH=/home/runner/work/tbb/oneapi-tbb-${TBB_VER}
           export LLVM_PATH=/home/runner/work/llvm-mlir/_mlir_install
@@ -248,6 +248,8 @@ jobs:
           export LEVEL_ZERO_VERSION_CHECK_OFF=1
           pip wheel --no-deps -v ../numba_mlir
           ls -l --block-size=M
+          popd
+          rm -rf numba_mlir_cmake_build
 
       - name: Test wheels
         shell: bash -l {0}
@@ -259,6 +261,38 @@ jobs:
           source $CONDA/bin/activate wheels-test-env
           conda list
           pip install *.whl
+          np=`nproc`
+          echo "INFO: nproc $np"
+          export NUMBA_DISABLE_PERFORMANCE_WARNINGS=1
+          pytest -n${np} -vv --capture=tee-sys -rXF --pyargs numba_mlir.mlir.tests -m smoke
+
+      - name: Build conda package
+        shell: bash -l {0}
+
+        run: |
+          mkdir numba_mlir_conda
+          pushd numba_mlir_conda
+          source $CONDA/bin/activate test-env
+          export TBB_PATH=/home/runner/work/tbb/oneapi-tbb-${TBB_VER}
+          export LLVM_PATH=/home/runner/work/llvm-mlir/_mlir_install
+          export LEVEL_ZERO_DIR=/home/runner/work/level-zero/level-zero/level_zero_install
+          export LEVEL_ZERO_VERSION_CHECK_OFF=1
+          conda build --output-folder=. ../numba_mlir/conda-recipe || exit 1
+          cd linux-64
+          ls -l --block-size=M
+          popd
+          rm -rf numba_mlir_cmake_build
+
+      - name: Test conda package
+        shell: bash -l {0}
+
+        run: |
+          cd numba_mlir_conda/linux-64
+          conda create -y -n conda-test-env python=${{ matrix.python }} numba=0.56 numpy=1.22 "setuptools<65.6" scikit-learn pytest-xdist ninja scipy pybind11 pytest lit tbb=${TBB_VER} cmake mkl-devel-dpcpp -c conda-forge -c intel
+          conda info
+          source $CONDA/bin/activate conda-test-env
+          conda list
+          conda install numba-mlir-*.tar.bz2
           np=`nproc`
           echo "INFO: nproc $np"
           export NUMBA_DISABLE_PERFORMANCE_WARNINGS=1
