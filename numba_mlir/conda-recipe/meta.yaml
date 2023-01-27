@@ -1,0 +1,30 @@
+package:
+    name: numba-mlir
+    version: 0.0
+
+source:
+    path: ../..
+
+build:
+    number: 0
+
+requirements:
+    build:
+        - {{ compiler('cxx') }}
+        - ninja
+        - cmake
+        - pybind11
+        - mkl-devel-dpcpp
+    host:
+        - python
+        - setuptools
+        - numba 0.56*
+        - wheel
+    run:
+        - python
+        - numba 0.56*
+        - packaging
+
+test:
+    requires:
+        - pytest
