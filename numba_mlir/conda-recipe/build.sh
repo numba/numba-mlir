@@ -1,1 +1,3 @@
-$PYTHON numba_mlir/setup.py install
+pushd numba_mlir
+$PYTHON setup.py install
+popd
