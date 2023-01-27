@@ -278,6 +278,7 @@ jobs:
           export LEVEL_ZERO_DIR=/home/runner/work/level-zero/level-zero/level_zero_install
           export LEVEL_ZERO_VERSION_CHECK_OFF=1
           conda build --output-folder=. ../numba_mlir/conda-recipe || exit 1
+          cd linux-64
           ls -l --block-size=M
           popd
           rm -rf numba_mlir_cmake_build
@@ -286,7 +287,7 @@ jobs:
         shell: bash -l {0}
 
         run: |
-          cd numba_mlir_conda
+          cd numba_mlir_conda/linux-64
           conda create -y -n conda-test-env python=${{ matrix.python }} numba=0.56 numpy=1.22 "setuptools<65.6" scikit-learn pytest-xdist ninja scipy pybind11 pytest lit tbb=${TBB_VER} cmake mkl-devel-dpcpp -c conda-forge -c intel
           conda info
           source $CONDA/bin/activate conda-test-env
