@@ -229,11 +229,9 @@ jobs:
 
         run: |
           cd numba_mlir
-          np=`nproc`
-          echo "INFO: nproc $np"
           source $CONDA/bin/activate test-env
           export NUMBA_DISABLE_PERFORMANCE_WARNINGS=1
-          pytest -n${np} -vv --capture=tee-sys -rXF
+          python $GITHUB_WORKSPACE/numba_mlir/runtests.py verbose
 
       - name: Build wheels
         shell: bash -l {0}
@@ -261,10 +259,7 @@ jobs:
           source $CONDA/bin/activate wheels-test-env
           conda list
           pip install *.whl
-          np=`nproc`
-          echo "INFO: nproc $np"
-          export NUMBA_DISABLE_PERFORMANCE_WARNINGS=1
-          pytest -n${np} -vv --capture=tee-sys -rXF --pyargs numba_mlir.mlir.tests -m smoke
+          python $GITHUB_WORKSPACE/numba_mlir/runtests.py verbose smoke
 
       - name: Build conda package
         shell: bash -l {0}
@@ -293,7 +288,4 @@ jobs:
           source $CONDA/bin/activate conda-test-env
           conda list
           conda install numba-mlir-*.tar.bz2
-          np=`nproc`
-          echo "INFO: nproc $np"
-          export NUMBA_DISABLE_PERFORMANCE_WARNINGS=1
-          pytest -n${np} -vv --capture=tee-sys -rXF --pyargs numba_mlir.mlir.tests -m smoke
+          python $GITHUB_WORKSPACE/numba_mlir/runtests.py verbose smoke
