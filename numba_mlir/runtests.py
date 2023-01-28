@@ -7,25 +7,27 @@ import os
 import pytest
 import sys
 
+
 def run_tests(params):
     np = multiprocessing.cpu_count()
     args = [
-        '--capture=tee-sys',
-        '-rXF',
-        '--pyargs', 'numba_mlir.mlir.tests',
+        "--capture=tee-sys",
+        "-rXF",
+        "--pyargs",
+        "numba_mlir.mlir.tests",
     ]
 
-    args += [f'-n{np}']
+    args += [f"-n{np}"]
 
-    if 'smoke' in params:
-        args += ['-m', 'smoke']
+    if "smoke" in params:
+        args += ["-m", "smoke"]
 
-    if 'verbose' in params:
-        args += ['-vv']
+    if "verbose" in params:
+        args += ["-vv"]
 
-    print(f'INFO: nproc {np}')
+    print(f"INFO: nproc {np}")
 
-    os.environ['NUMBA_DISABLE_PERFORMANCE_WARNINGS'] = '1'
+    os.environ["NUMBA_DISABLE_PERFORMANCE_WARNINGS"] = "1"
     return pytest.main(args)
 
 
