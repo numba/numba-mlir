@@ -98,8 +98,8 @@ jobs:
           popd
 
       - name: Download and Build Level-Zero
-        uses: ilammy/msvc-dev-cmd@v1
         if: steps.cache-level-zero.outputs.cache-hit != 'true'
+        uses: ilammy/msvc-dev-cmd@v1
         run: |
           cd $env:WORKSPACE
           mkdir -ea 0 -p level-zero
@@ -125,8 +125,8 @@ jobs:
           popd
 
       - name: Build LLVM-MLIR
-        uses: ilammy/msvc-dev-cmd@v1
         if: steps.cache-llvm-mlir.outputs.cache-hit != 'true'
+        uses: ilammy/msvc-dev-cmd@v1
         timeout-minutes: 420
         run: |
           cd $env:WORKSPACE
