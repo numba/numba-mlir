@@ -27,8 +27,6 @@ jobs:
         python: [3.9]
 
     steps:
-      - uses: ilammy/msvc-dev-cmd@v1
-
       - name: Cancel Previous Runs
         uses: styfle/cancel-workflow-action@0.6.0
         with:
