@@ -27,6 +27,8 @@ jobs:
         python: [3.9]
 
     steps:
+      - uses: ilammy/msvc-dev-cmd@v1
+
       - name: Cancel Previous Runs
         uses: styfle/cancel-workflow-action@0.6.0
         with:
@@ -99,7 +101,6 @@ jobs:
 
       - name: Download and Build Level-Zero
         if: steps.cache-level-zero.outputs.cache-hit != 'true'
-        uses: ilammy/msvc-dev-cmd@v1
         run: |
           cd $env:WORKSPACE
           mkdir -ea 0 -p level-zero
@@ -126,7 +127,6 @@ jobs:
 
       - name: Build LLVM-MLIR
         if: steps.cache-llvm-mlir.outputs.cache-hit != 'true'
-        uses: ilammy/msvc-dev-cmd@v1
         timeout-minutes: 420
         run: |
           cd $env:WORKSPACE
