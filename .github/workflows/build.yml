@@ -46,9 +46,35 @@ jobs:
 
       - name: Setup Cache Vars
         run: |
-          cat $env:GITHUB_ENV
           echo "LLVM_SHA=$env:GITHUB_WORKSPACE\$env:LLVM_SHA_FILE" >> $env:GITHUB_ENV
+          echo "WORKSPACE=$env:GITHUB_WORKSPACE\..\" >> $env:GITHUB_ENV
           cat $env:GITHUB_ENV
+
+      - name: Cache TBB
+        id: cache-tbb
+        uses: actions/cache@v3
+        with:
+          path: |
+            $WORKSPACE/tbb/*
+          key: ${{ runner.os }}-build-tbb-${{ env.TBB_VER }}
+
+      - name: Cache Level-Zero
+        id: cache-level-zero
+        uses: actions/cache@v3
+        with:
+          path: |
+            $WORKSPACE/level-zero/**
+          key: ${{ runner.os }}-build-l0-${{ env.LEVEL_ZERO_VER }}
+
+      - name: Cache LLLVM-MLIR
+        id: cache-llvm-mlir
+        uses: actions/cache@v3
+        env:
+          LLVM_CACHE_NUMBER: 1  # Increase to reset cache
+        with:
+          path: |
+            $WORKSPACE/llvm-mlir/_mlir_install/**
+          key: ${{ runner.os }}-build-llvm-${{ env.LLVM_CACHE_NUMBER }}-${{ env.LLVM_SHA }}
 
   build_linux:
     name: Builds Numba-MLIR on Linux
