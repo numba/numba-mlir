@@ -89,7 +89,7 @@ jobs:
             echo "INFO: Downloading TBB $env:TBB_VER"
             rm -r *
             $TBB_FN="oneapi-tbb-$env:TBB_VER-win.zip"
-            wget $env:TBB_URL_PREFIX/v$env:TBB_VER/$TBB_FN -OutFile out.html $TBB_FN
+            Invoke-WebRequest "$env:TBB_URL_PREFIX/v$env:TBB_VER/$TBB_FN" -OutFile out.html $TBB_FN
             Expand-Archive $TBB_FN
             (Select-String -Pattern "Version: " (ls -Filter tbb.pc -Recurse -Name)).Line.Split(" ")[-1] > bundle_id.txt
           }
