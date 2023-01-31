@@ -76,6 +76,25 @@ jobs:
             $WORKSPACE/llvm-mlir/_mlir_install/**
           key: ${{ runner.os }}-build-llvm-${{ env.LLVM_CACHE_NUMBER }}-${{ env.LLVM_SHA }}
 
+      - name: Download TBB
+        if: steps.cache-tbb.outputs.cache-hit != 'true'
+        run: |
+          cd $env:WORKSPACE
+          mkdir -ea 0 -p tbb
+          pushd tbb
+          if((Test-Path -PathType leaf bundle_id.txt) -and ((cat bundle_id.txt) -eq ($env:TBB_VER)))
+          {
+            echo "INFO: Using cached download of TBB $env:TBB_VER"
+          } else {
+            echo "INFO: Downloading TBB $env:TBB_VER"
+            rm -r *
+            $TBB_FN="oneapi-tbb-$env:TBB_VER-win.zip"
+            wget $env:TBB_URL_PREFIX/v$env:TBB_VER/$TBB_FN -OutFile out.html $TBB_FN
+            Expand-Archive $TBB_FN
+            (Select-String -Pattern "Version: " (ls -Filter tbb.pc -Recurse -Name)).Line.Split(" ")[-1] > bundle_id.txt
+          }
+          popd
+
   build_linux:
     name: Builds Numba-MLIR on Linux
     runs-on: ubuntu-latest
