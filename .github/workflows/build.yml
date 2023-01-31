@@ -117,7 +117,7 @@ jobs:
             mkdir level_zero_install
             mkdir build
             cd build
-            cmake -DNinja -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=../level_zero_install ..
+            cmake -GNinja -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=../level_zero_install ..
             ninja install
             popd
           }
