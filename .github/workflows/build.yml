@@ -97,6 +97,32 @@ jobs:
           }
           popd
 
+      - name: Download and Build Level-Zero
+        if: steps.cache-level-zero.outputs.cache-hit != 'true'
+        run: |
+          cd $env:WORKSPACE
+          mkdir -ea 0 -p level-zero
+          pushd level-zero
+          if((Test-Path -PathType leaf bundle_id.txt) -and ((cat bundle_id.txt) -eq ($env:LEVEL_ZERO_VER)))
+          {
+            echo "INFO: Using cached build of Level-Zero $env:LEVEL_ZERO_VER"
+          } else {
+            echo "INFO: INFO: Downloading and building Level-Zero $env:LEVEL_ZERO_VER"
+            rm -r *
+            echo "$env:LEVEL_ZERO_VER" > bundle_id.txt
+            cat bundle_id.txt
+            git clone https://github.com/oneapi-src/level-zero.git
+            pushd level-zero
+            git checkout $env:LEVEL_ZERO_VER
+            mkdir level_zero_install
+            mkdir build
+            cd build
+            cmake -DNinja -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=../level_zero_install ..
+            ninja install
+            popd
+          }
+          popd
+
   build_linux:
     name: Builds Numba-MLIR on Linux
     runs-on: ubuntu-latest
