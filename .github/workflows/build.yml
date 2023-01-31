@@ -10,17 +10,53 @@ on:
       - main
   pull_request:
 
+env:
+  TBB_VER: 2021.6.0
+  LEVEL_ZERO_VER: v1.6.2
+  TBB_URL_PREFIX: https://github.com/oneapi-src/oneTBB/releases/download/
+  LLVM_SHA_FILE: llvm-sha.txt
+
 jobs:
+  build_win:
+    name: Builds Numba-MLIR on Linux
+    runs-on: windows-latest
+    timeout-minutes: 450
+
+    strategy:
+      matrix:
+        python: [3.9]
+
+    steps:
+      - name: Cancel Previous Runs
+        uses: styfle/cancel-workflow-action@0.6.0
+        with:
+          access_token: ${{ github.token }}
+
+      - name: Cache conda packages
+        uses: actions/cache@v2
+        env:
+          CACHE_NUMBER: 1  # Increase to reset cache
+        with:
+          path: ~/.conda/pkgs
+          key:
+            ${{ runner.os }}-conda-${{ env.CACHE_NUMBER }}-python-${{ matrix.python }}-${{hashFiles('**/meta.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-conda-${{ env.CACHE_NUMBER }}-python-${{ matrix.python }}-
+            ${{ runner.os }}-conda-${{ env.CACHE_NUMBER }}-
+
+      - name: Install CMake and Ninja
+        run: |
+          conda install cmake ninja conda-forge::lit
+
+      - name: Checkout repo
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+
   build_linux:
     name: Builds Numba-MLIR on Linux
     runs-on: ubuntu-latest
     timeout-minutes: 450
-
-    env:
-      TBB_VER: 2021.6.0
-      LEVEL_ZERO_VER: v1.6.2
-      TBB_URL_PREFIX: https://github.com/oneapi-src/oneTBB/releases/download/
-      LLVM_SHA_FILE: llvm-sha.txt
 
     strategy:
       matrix:
