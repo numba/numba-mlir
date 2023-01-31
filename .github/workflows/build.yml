@@ -32,8 +32,10 @@ jobs:
         with:
           access_token: ${{ github.token }}
 
-      - name: Install CMake and Ninja
+      - name: Setup conda
         uses: conda-incubator/setup-miniconda@v2
+
+      - name: Install CMake and Ninja
         run: |
           conda install cmake ninja conda-forge::lit
 
