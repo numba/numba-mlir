@@ -55,7 +55,7 @@ jobs:
         uses: actions/cache@v3
         with:
           path: |
-            $WORKSPACE/tbb/*
+            ${{ vars.WORKSPACE }}/tbb/*
           key: ${{ runner.os }}-build-tbb-${{ env.TBB_VER }}
 
       - name: Cache Level-Zero
@@ -63,7 +63,7 @@ jobs:
         uses: actions/cache@v3
         with:
           path: |
-            $WORKSPACE/level-zero/**
+            ${{ vars.WORKSPACE }}/level-zero/**
           key: ${{ runner.os }}-build-l0-${{ env.LEVEL_ZERO_VER }}
 
       - name: Cache LLLVM-MLIR
@@ -73,7 +73,7 @@ jobs:
           LLVM_CACHE_NUMBER: 1  # Increase to reset cache
         with:
           path: |
-            $WORKSPACE/llvm-mlir/_mlir_install/**
+            ${{ vars.WORKSPACE }}/llvm-mlir/_mlir_install/**
           key: ${{ runner.os }}-build-llvm-${{ env.LLVM_CACHE_NUMBER }}-${{ env.LLVM_SHA }}
 
       - name: Download TBB
