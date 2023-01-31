@@ -44,6 +44,12 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Setup Cache Vars
+        run: |
+          cat $env:GITHUB_ENV
+          $GITHUB_WORKSPACE/$LLVM_SHA_FILE >> $env:GITHUB_ENV
+          cat $env:GITHUB_ENV
+
   build_linux:
     name: Builds Numba-MLIR on Linux
     runs-on: ubuntu-latest
