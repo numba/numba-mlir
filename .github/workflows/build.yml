@@ -166,6 +166,12 @@ jobs:
           cd _build
           echo $env:WORKSPACE
           ls $env:WORKSPACE
+          echo "tbb"
+          ls "$env:WORKSPACE\tbb"
+          echo "level-zero"
+          ls "$env:WORKSPACE\level-zero"
+          echo "llvm-mlir"
+          ls "$env:WORKSPACE\llvm-mlir"
           $env:TBB_PATH=(Resolve-Path "$env:WORKSPACE/tbb/oneapi-tbb-$env:TBB_VER")
           $env:LEVEL_ZERO_DIR=(Resolve-Path "$env:WORKSPACE/level-zero/level-zero/level_zero_install")
           echo "LEVEL_ZERO_DIR"
