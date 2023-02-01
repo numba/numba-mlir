@@ -151,9 +151,9 @@ jobs:
             -DLLVM_DISTRIBUTION_COMPONENTS="llvm-headers;llvm-libraries;cmake-exports;FileCheck;count;not;mlir-headers;mlir-libraries;mlir-cmake-exports;mlir-tblgen;mlir-cpu-runner" `
             -DCMAKE_INSTALL_PREFIX="$env:WORKSPACE/llvm-mlir/_mlir_install"
           ninja install-distribution-stripped
-          cp bin/FileCheck $env:WORKSPACE/_mlir_install/bin/
-          cp bin/count $env:WORKSPACE/_mlir_install/bin/
-          cp bin/not $env:WORKSPACE/_mlir_install/bin/
+          cp bin/FileCheck.exe $env:WORKSPACE/_mlir_install/bin/
+          cp bin/count.exe $env:WORKSPACE/_mlir_install/bin/
+          cp bin/not.exe $env:WORKSPACE/_mlir_install/bin/
           popd
 
   build_linux:
