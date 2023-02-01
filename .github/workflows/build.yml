@@ -164,6 +164,8 @@ jobs:
           echo $external_lit
           mkdir -p _build
           cd _build
+          echo $env:WORKSPACE
+          ls $env:WORKSPACE
           $env:TBB_PATH=(Resolve-Path "$env:WORKSPACE/tbb/oneapi-tbb-$env:TBB_VER")
           $env:LEVEL_ZERO_DIR=(Resolve-Path "$env:WORKSPACE/level-zero/level-zero/level_zero_install")
           echo "LEVEL_ZERO_DIR"
