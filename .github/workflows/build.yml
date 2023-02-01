@@ -169,7 +169,7 @@ jobs:
           echo "tbb"
           ls "$env:WORKSPACE\tbb"
           echo "level-zero"
-          ls "$env:WORKSPACE\level-zero"
+          ls "$env:WORKSPACE\level-zero\level-zero"
           echo "llvm-mlir"
           ls "$env:WORKSPACE\llvm-mlir"
           $env:TBB_PATH=(Resolve-Path "$env:WORKSPACE/tbb/oneapi-tbb-$env:TBB_VER-win")
