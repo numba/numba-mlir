@@ -166,6 +166,8 @@ jobs:
           cd _build
           $env:TBB_PATH="$env:WORKSPACE/tbb/oneapi-tbb-$env:TBB_VER"
           $env:LEVEL_ZERO_DIR="$env:WORKSPACE/level-zero/level-zero/level_zero_install"
+          echo "LEVEL_ZERO_DIR"
+          echo $env:LEVEL_ZERO_DIR
           ls $env:LEVEL_ZERO_DIR
           $env:LEVEL_ZERO_VERSION_CHECK_OFF="1"
           $env:LLVM_DIR="$env:WORKSPACE/llvm-mlir/_mlir_install"
