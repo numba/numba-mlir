@@ -166,6 +166,7 @@ jobs:
           cd _build
           $env:TBB_PATH="$env:WORKSPACE/tbb/oneapi-tbb-$env:TBB_VER"
           $env:LEVEL_ZERO_DIR="$env:WORKSPACE/level-zero/level-zero/level_zero_install"
+          ls $env:LEVEL_ZERO_DIR
           $env:LEVEL_ZERO_VERSION_CHECK_OFF="1"
           $env:LLVM_DIR="$env:WORKSPACE/llvm-mlir/_mlir_install"
           cmake "$env:GITHUB_WORKSPACE"                                        `
@@ -177,7 +178,6 @@ jobs:
             -DNUMBA_MLIR_ENABLE_TESTS=ON                                       `
             -DNUMBA_MLIR_ENABLE_TBB_SUPPORT=ON                                 `
             -DTBB_DIR="$env:TBB_PATH/lib/cmake/tbb"                            `
-            -DLEVEL_ZERO_DIR="$env:LEVEL_ZERO_DIR"                             `
             -DLLVM_EXTERNAL_LIT=$external_lit
           ninja all
 
