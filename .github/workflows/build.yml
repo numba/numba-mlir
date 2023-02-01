@@ -47,7 +47,8 @@ jobs:
 
       - name: Setup Cache Vars
         run: |
-          echo "LLVM_SHA=$env:GITHUB_WORKSPACE\$env:LLVM_SHA_FILE" >> $env:GITHUB_ENV
+          $sha = (cat "$env:GITHUB_WORKSPACE\$env:LLVM_SHA_FILE")
+          echo "LLVM_SHA=$sha" >> $env:GITHUB_ENV
           $wspath = (Resolve-Path "$env:GITHUB_WORKSPACE\..\")
           echo "WORKSPACE=$wspath" >> $env:GITHUB_ENV
           cat $env:GITHUB_ENV
