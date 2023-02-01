@@ -164,13 +164,13 @@ jobs:
           echo $external_lit
           mkdir -p _build
           cd _build
-          $env:TBB_PATH="$env:WORKSPACE/tbb/oneapi-tbb-$env:TBB_VER"
-          $env:LEVEL_ZERO_DIR="$env:WORKSPACE/level-zero/level-zero/level_zero_install"
+          $env:TBB_PATH=(Resolve-Path "$env:WORKSPACE/tbb/oneapi-tbb-$env:TBB_VER")
+          $env:LEVEL_ZERO_DIR=(Resolve-Path "$env:WORKSPACE/level-zero/level-zero/level_zero_install")
           echo "LEVEL_ZERO_DIR"
           echo $env:LEVEL_ZERO_DIR
           ls $env:LEVEL_ZERO_DIR
           $env:LEVEL_ZERO_VERSION_CHECK_OFF="1"
-          $env:LLVM_DIR="$env:WORKSPACE/llvm-mlir/_mlir_install"
+          $env:LLVM_DIR=(Resolve-Path "$env:WORKSPACE/llvm-mlir/_mlir_install")
           cmake "$env:GITHUB_WORKSPACE"                                        `
             -GNinja                                                            `
             -DCMAKE_BUILD_TYPE=Release                                         `
