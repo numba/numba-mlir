@@ -169,13 +169,14 @@ jobs:
           echo "tbb"
           ls "$env:WORKSPACE\tbb"
           echo "level-zero"
-          ls "$env:WORKSPACE\level-zero\level-zero"
+          ls "$env:WORKSPACE\level-zero\level-zero\level_zero_install"
           echo "llvm-mlir"
           ls "$env:WORKSPACE\llvm-mlir"
           $env:TBB_PATH=(Resolve-Path "$env:WORKSPACE/tbb/oneapi-tbb-$env:TBB_VER-win")
           $env:LEVEL_ZERO_DIR=(Resolve-Path "$env:WORKSPACE/level-zero/level-zero/level_zero_install")
           echo "LEVEL_ZERO_DIR"
           echo $env:LEVEL_ZERO_DIR
+          tree "$env:LEVEL_ZERO_DIR"
           ls $env:LEVEL_ZERO_DIR
           $env:LEVEL_ZERO_VERSION_CHECK_OFF="1"
           $env:LLVM_DIR=(Resolve-Path "$env:WORKSPACE/llvm-mlir/_mlir_install")
