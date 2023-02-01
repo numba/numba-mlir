@@ -177,6 +177,7 @@ jobs:
             -DNUMBA_MLIR_ENABLE_TESTS=ON                                       `
             -DNUMBA_MLIR_ENABLE_TBB_SUPPORT=ON                                 `
             -DTBB_DIR="$env:TBB_PATH/lib/cmake/tbb"                            `
+            -DLEVEL_ZERO_DIR="$env:LEVEL_ZERO_DIR"                             `
             -DLLVM_EXTERNAL_LIT=$external_lit
           ninja all
 
