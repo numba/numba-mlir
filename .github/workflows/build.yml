@@ -131,7 +131,7 @@ jobs:
         timeout-minutes: 420
         run: |
           cd $env:WORKSPACE
-          mkdir -p llvm-mlir
+          mkdir -ea 0 -p llvm-mlir
           pushd llvm-mlir
           echo "INFO: Need to rebuild LLVM-MLIR. Previous installation for MLIR not found"
           git clone https://github.com/llvm/llvm-project
@@ -157,6 +157,33 @@ jobs:
           cp bin/count.exe $env:WORKSPACE/llvm-mlir/_mlir_install/bin/
           cp bin/not.exe $env:WORKSPACE/llvm-mlir/_mlir_install/bin/
           popd
+
+      - name: Build Numba-MLIR
+        run: |
+          $external_lit=(Get-Command lit.exe | Select-Object -ExpandProperty Definition)
+          echo $external_lit
+          mkdir -p _build
+          cd _build
+          $env:TBB_PATH="$env:WORKSPACE/tbb/oneapi-tbb-$env:TBB_VER"
+          $env:LEVEL_ZERO_DIR="$env:WORKSPACE/level-zero/level-zero/level_zero_install"
+          $env:LEVEL_ZERO_VERSION_CHECK_OFF="1"
+          $env:LLVM_DIR="$env:WORKSPACE/llvm-mlir/_mlir_install"
+          cmake ${GITHUB_WORKSPACE}                                            `
+            -GNinja                                                            `
+            -DCMAKE_BUILD_TYPE=Release                                         `
+            -DLLVM_DIR="$env:LLVM_DIR/lib/cmake/llvm"                          `
+            -DMLIR_DIR="$env:LLVM_DIR/lib/cmake/mlir"                          `
+            -DNUMBA_MLIR_ENABLE_IGPU_DIALECT=ON                                `
+            -DNUMBA_MLIR_ENABLE_TESTS=ON                                       `
+            -DNUMBA_MLIR_ENABLE_TBB_SUPPORT=ON                                 `
+            -DTBB_DIR=${TBB_PATH}/lib/cmake/tbb                                `
+            -DLLVM_EXTERNAL_LIT=$external_lit
+          ninja all
+
+      - name: Run Numba-MLIR core test cases
+        run: |
+          cd _build
+          ninja check-numba-mlir
 
   build_linux:
     name: Builds Numba-MLIR on Linux
