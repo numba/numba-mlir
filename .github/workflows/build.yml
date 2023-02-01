@@ -168,7 +168,7 @@ jobs:
           $env:LEVEL_ZERO_DIR="$env:WORKSPACE/level-zero/level-zero/level_zero_install"
           $env:LEVEL_ZERO_VERSION_CHECK_OFF="1"
           $env:LLVM_DIR="$env:WORKSPACE/llvm-mlir/_mlir_install"
-          cmake ${GITHUB_WORKSPACE}                                            `
+          cmake "$env:GITHUB_WORKSPACE"                                        `
             -GNinja                                                            `
             -DCMAKE_BUILD_TYPE=Release                                         `
             -DLLVM_DIR="$env:LLVM_DIR/lib/cmake/llvm"                          `
@@ -176,7 +176,7 @@ jobs:
             -DNUMBA_MLIR_ENABLE_IGPU_DIALECT=ON                                `
             -DNUMBA_MLIR_ENABLE_TESTS=ON                                       `
             -DNUMBA_MLIR_ENABLE_TBB_SUPPORT=ON                                 `
-            -DTBB_DIR=${TBB_PATH}/lib/cmake/tbb                                `
+            -DTBB_DIR="$env:TBB_PATH/lib/cmake/tbb"                            `
             -DLLVM_EXTERNAL_LIT=$external_lit
           ninja all
 
