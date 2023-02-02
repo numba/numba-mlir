@@ -187,6 +187,28 @@ jobs:
           cd _build
           ninja check-numba-mlir
 
+      - name: Build Python frontend
+        run: |
+          cd numba_mlir
+          conda create -y -n test-env python=${{ matrix.python }} "pip>=22" numba=0.56 numpy=1.22 "setuptools<65.6" scikit-learn pytest-xdist ninja scipy pybind11 pytest lit "tbb=$env:TBB_VER" cmake mkl-devel-dpcpp conda-build -c conda-forge -c intel
+          conda info
+          conda activate test-env
+          conda list
+          python -c "import numba; print('numba', numba.__version__)"
+          python -c "import numpy; print(numpy.get_include())"
+          cmake --version
+          $env:TBB_PATH=(Resolve-Path "$env:WORKSPACE/tbb/oneapi-tbb-$env:TBB_VER")
+          $env:LEVEL_ZERO_DIR=(Resolve-Path "$env:WORKSPACE/level-zero/level-zero/level_zero_install")
+          $env:LEVEL_ZERO_VERSION_CHECK_OFF="1"
+          $env:LLVM_DIR=(Resolve-Path "$env:WORKSPACE/llvm-mlir/_mlir_install")
+          python setup.py develop
+
+      - name: Test Python frontend
+        run: |
+          cd numba_mlir
+          conda activate test-env
+          python "$env:GITHUB_WORKSPACE/numba_mlir/runtests.py" verbose
+
   build_linux:
     name: Builds Numba-MLIR on Linux
     runs-on: ubuntu-latest
