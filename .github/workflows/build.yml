@@ -125,7 +125,6 @@ jobs:
               -DCMAKE_BUILD_TYPE=Release                                       `
               -DCMAKE_INSTALL_PREFIX="$env:WORKSPACE\level-zero\level-zero\level_zero_install"
             ninja install
-            tree ..
             popd
           }
           popd
