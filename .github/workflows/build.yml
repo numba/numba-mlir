@@ -163,8 +163,7 @@ jobs:
 
       - name: Build Numba-MLIR
         run: |
-          $external_lit=(Get-Command lit.exe | Select-Object -ExpandProperty Definition)
-          echo $external_lit
+          $external_lit="C:\Miniconda\envs\test\Scripts\lit-script.py"
           mkdir -p _build
           cd _build
           $env:TBB_PATH=(Resolve-Path "$env:WORKSPACE/tbb/oneapi-tbb-$env:TBB_VER")
