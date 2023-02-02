@@ -163,6 +163,8 @@ jobs:
 
       - name: Build Numba-MLIR
         run: |
+          $external_lit=(Get-Command lit.exe | Select-Object -ExpandProperty Definition)
+          echo $external_lit
           mkdir -p _build
           cd _build
           $env:TBB_PATH=(Resolve-Path "$env:WORKSPACE/tbb/oneapi-tbb-$env:TBB_VER")
@@ -177,7 +179,8 @@ jobs:
             -DNUMBA_MLIR_ENABLE_IGPU_DIALECT=ON                                `
             -DNUMBA_MLIR_ENABLE_TESTS=ON                                       `
             -DNUMBA_MLIR_ENABLE_TBB_SUPPORT=ON                                 `
-            -DTBB_DIR="$env:TBB_PATH/lib/cmake/tbb"
+            -DTBB_DIR="$env:TBB_PATH/lib/cmake/tbb"                            `
+            -DLLVM_EXTERNAL_LIT=$external_lit
           ninja all
 
       - name: Run Numba-MLIR core test cases
