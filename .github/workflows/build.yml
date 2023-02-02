@@ -193,6 +193,9 @@ jobs:
           conda create -y -n test-env python=${{ matrix.python }} "pip>=22" numba=0.56 numpy=1.22 "setuptools<65.6" scikit-learn pytest-xdist ninja scipy pybind11 pytest lit "tbb=$env:TBB_VER" cmake mkl-devel-dpcpp conda-build -c conda-forge -c intel
           conda info
           conda activate test-env
+          echo "Conda prefix $env:CONDA_PREFIX"
+          echo "Patch broken Windows MKLConfig.cmake"
+          cp "$env:GITHUB_WORKSPACE/numba_mlir/conda-recipe/MKLConfig.cmake" "$env:CONDA_PREFIX/Library/lib/cmake/mkl" -Force
           conda list
           python -c "import numba; print('numba', numba.__version__)"
           python -c "import numpy; print(numpy.get_include())"
