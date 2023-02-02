@@ -247,7 +247,6 @@ jobs:
           conda build --output-folder=. ../numba_mlir/conda-recipe
           cd win-64
           popd
-          rm -r numba_mlir_cmake_build
 
       - name: Test conda package
         run: |
