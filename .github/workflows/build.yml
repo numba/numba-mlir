@@ -10,17 +10,275 @@ on:
       - main
   pull_request:
 
+env:
+  TBB_VER: 2021.6.0
+  LEVEL_ZERO_VER: v1.6.2
+  TBB_URL_PREFIX: https://github.com/oneapi-src/oneTBB/releases/download/
+  LLVM_SHA_FILE: llvm-sha.txt
+
 jobs:
+  build_win:
+    name: Builds Numba-MLIR on Windows
+    runs-on: windows-latest
+    timeout-minutes: 450
+
+    strategy:
+      matrix:
+        python: [3.9]
+
+    steps:
+      - uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Cancel Previous Runs
+        uses: styfle/cancel-workflow-action@0.6.0
+        with:
+          access_token: ${{ github.token }}
+
+      - name: Cache conda packages
+        uses: actions/cache@v2
+        env:
+          CACHE_NUMBER: 1  # Increase to reset cache
+        with:
+          path: ~/conda_pkgs_dir
+          key:
+            ${{ runner.os }}-conda-${{ env.CACHE_NUMBER }}-python-${{ matrix.python }}-${{hashFiles('**/meta.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-conda-${{ env.CACHE_NUMBER }}-python-${{ matrix.python }}-
+            ${{ runner.os }}-conda-${{ env.CACHE_NUMBER }}-
+
+      - name: Setup conda
+        uses: conda-incubator/setup-miniconda@v2
+        with:
+          auto-update-conda: true
+          use-only-tar-bz2: true
+
+      - name: Install CMake and Ninja
+        run: |
+          conda install cmake ninja conda-forge::lit
+
+      - name: Checkout repo
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+
+      - name: Setup Cache Vars
+        run: |
+          $sha = (cat "$env:GITHUB_WORKSPACE\$env:LLVM_SHA_FILE")
+          echo "LLVM_SHA=$sha" >> $env:GITHUB_ENV
+          $wspath = (Resolve-Path "$env:GITHUB_WORKSPACE\..\")
+          echo "WORKSPACE=$wspath" >> $env:GITHUB_ENV
+          cat $env:GITHUB_ENV
+
+      - name: Cache TBB
+        id: cache-tbb
+        uses: actions/cache@v3
+        with:
+          path: |
+            D:\a\numba-mlir\tbb\*
+          key: ${{ runner.os }}-build-tbb-${{ env.TBB_VER }}
+
+      - name: Cache Level-Zero
+        id: cache-level-zero
+        uses: actions/cache@v3
+        with:
+          path: |
+            D:\a\numba-mlir\level-zero\**
+          key: ${{ runner.os }}-build-l0-${{ env.LEVEL_ZERO_VER }}
+
+      - name: Cache LLLVM-MLIR
+        id: cache-llvm-mlir
+        uses: actions/cache@v3
+        env:
+          LLVM_CACHE_NUMBER: 1  # Increase to reset cache
+        with:
+          path: |
+            D:\a\numba-mlir\llvm-mlir\_mlir_install\**
+          key: ${{ runner.os }}-build-llvm-${{ env.LLVM_CACHE_NUMBER }}-${{ env.LLVM_SHA }}
+
+      - name: Download TBB
+        if: steps.cache-tbb.outputs.cache-hit != 'true'
+        run: |
+          cd $env:WORKSPACE
+          mkdir -ea 0 -p tbb
+          pushd tbb
+          if((Test-Path -PathType leaf bundle_id.txt) -and ((cat bundle_id.txt) -eq ($env:TBB_VER)))
+          {
+            echo "INFO: Using cached download of TBB $env:TBB_VER"
+          } else {
+            echo "INFO: Downloading TBB $env:TBB_VER"
+            rm -r *
+            $TBB_FN="oneapi-tbb-$env:TBB_VER-win.zip"
+            Invoke-WebRequest "$env:TBB_URL_PREFIX/v$env:TBB_VER/$TBB_FN" -OutFile $TBB_FN
+            Expand-Archive $TBB_FN -DestinationPath .
+            ls
+            (Select-String -Pattern "Version: " (ls -Filter tbb.pc -Recurse -Name)).Line.Split(" ")[-1] > bundle_id.txt
+            cat bundle_id.txt
+          }
+          popd
+
+      - name: Download and Build Level-Zero
+        if: steps.cache-level-zero.outputs.cache-hit != 'true'
+        run: |
+          cd $env:WORKSPACE
+          mkdir -ea 0 -p level-zero
+          pushd level-zero
+          if((Test-Path -PathType leaf bundle_id.txt) -and ((cat bundle_id.txt) -eq ($env:LEVEL_ZERO_VER)))
+          {
+            echo "INFO: Using cached build of Level-Zero $env:LEVEL_ZERO_VER"
+          } else {
+            echo "INFO: INFO: Downloading and building Level-Zero $env:LEVEL_ZERO_VER"
+            rm -r *
+            echo "$env:LEVEL_ZERO_VER" > bundle_id.txt
+            cat bundle_id.txt
+            git clone https://github.com/oneapi-src/level-zero.git
+            pushd level-zero
+            git checkout $env:LEVEL_ZERO_VER
+            mkdir level_zero_install
+            mkdir build
+            cd build
+            cmake ..                                                           `
+              -GNinja                                                          `
+              -DCMAKE_BUILD_TYPE=Release                                       `
+              -DCMAKE_INSTALL_PREFIX="$env:WORKSPACE\level-zero\level-zero\level_zero_install"
+            ninja install
+            popd
+          }
+          popd
+
+      - name: Build LLVM-MLIR
+        if: steps.cache-llvm-mlir.outputs.cache-hit != 'true'
+        timeout-minutes: 420
+        run: |
+          cd $env:WORKSPACE
+          mkdir -ea 0 -p llvm-mlir
+          pushd llvm-mlir
+          echo "INFO: Need to rebuild LLVM-MLIR. Previous installation for MLIR not found"
+          git clone https://github.com/llvm/llvm-project
+          cd llvm-project
+          git checkout $env:LLVM_SHA
+          mkdir _build
+          cd _build
+          cmake ../llvm                                                    `
+            -GNinja                                                        `
+            -DCMAKE_BUILD_TYPE=Release                                     `
+            -DLLVM_ENABLE_PROJECTS=mlir                                    `
+            -DLLVM_ENABLE_ASSERTIONS=ON                                    `
+            -DLLVM_ENABLE_RTTI=ON                                          `
+            -DLLVM_USE_LINKER=gold                                         `
+            -DLLVM_INSTALL_UTILS=ON                                        `
+            -DLLVM_TARGETS_TO_BUILD=X86                                    `
+            -DLLVM_ENABLE_BINDINGS=OFF                                     `
+            -DLLVM_ENABLE_ZSTD=OFF                                         `
+            -DLLVM_DISTRIBUTION_COMPONENTS="llvm-headers;llvm-libraries;cmake-exports;FileCheck;count;not;mlir-headers;mlir-libraries;mlir-cmake-exports;mlir-tblgen;mlir-cpu-runner" `
+            -DCMAKE_INSTALL_PREFIX="$env:WORKSPACE/llvm-mlir/_mlir_install"
+          ninja install-distribution-stripped
+          cp bin/FileCheck.exe $env:WORKSPACE/llvm-mlir/_mlir_install/bin/
+          cp bin/count.exe $env:WORKSPACE/llvm-mlir/_mlir_install/bin/
+          cp bin/not.exe $env:WORKSPACE/llvm-mlir/_mlir_install/bin/
+          popd
+
+      - name: Build Numba-MLIR
+        run: |
+          $external_lit="C:\Miniconda\envs\test\Scripts\lit-script.py"
+          mkdir -p _build
+          cd _build
+          $env:TBB_PATH=(Resolve-Path "$env:WORKSPACE/tbb/oneapi-tbb-$env:TBB_VER")
+          $env:LEVEL_ZERO_DIR=(Resolve-Path "$env:WORKSPACE/level-zero/level-zero/level_zero_install")
+          $env:LEVEL_ZERO_VERSION_CHECK_OFF="1"
+          $env:LLVM_DIR=(Resolve-Path "$env:WORKSPACE/llvm-mlir/_mlir_install")
+          cmake "$env:GITHUB_WORKSPACE"                                        `
+            -GNinja                                                            `
+            -DCMAKE_BUILD_TYPE=Release                                         `
+            -DLLVM_DIR="$env:LLVM_DIR/lib/cmake/llvm"                          `
+            -DMLIR_DIR="$env:LLVM_DIR/lib/cmake/mlir"                          `
+            -DNUMBA_MLIR_ENABLE_IGPU_DIALECT=ON                                `
+            -DNUMBA_MLIR_ENABLE_TESTS=ON                                       `
+            -DNUMBA_MLIR_ENABLE_TBB_SUPPORT=ON                                 `
+            -DTBB_DIR="$env:TBB_PATH/lib/cmake/tbb"                            `
+            -DLLVM_EXTERNAL_LIT="$external_lit"
+          ninja all
+
+      - name: Run Numba-MLIR core test cases
+        run: |
+          cd _build
+          ninja check-numba-mlir
+
+      - name: Build Python frontend
+        run: |
+          cd numba_mlir
+          conda create -y -n test-env python=${{ matrix.python }} "pip>=22" numba=0.56 numpy=1.22 "setuptools<65.6" scikit-learn pytest-xdist ninja scipy pybind11 pytest lit "tbb=$env:TBB_VER" cmake mkl-devel-dpcpp conda-build zlib -c conda-forge -c intel
+          conda info
+          conda activate test-env
+          echo "Conda prefix: $env:CONDA_PREFIX"
+          echo "Patch broken Windows MKLConfig.cmake"
+          cp "$env:GITHUB_WORKSPACE/numba_mlir/conda-recipe/MKLConfig.cmake" "$env:CONDA_PREFIX/Library/lib/cmake/mkl" -Force
+          conda list
+          python -c "import numba; print('numba', numba.__version__)"
+          python -c "import numpy; print(numpy.get_include())"
+          cmake --version
+          $env:TBB_PATH=(Resolve-Path "$env:WORKSPACE/tbb/oneapi-tbb-$env:TBB_VER")
+          $env:LEVEL_ZERO_DIR=(Resolve-Path "$env:WORKSPACE/level-zero/level-zero/level_zero_install")
+          $env:LEVEL_ZERO_VERSION_CHECK_OFF="1"
+          $env:LLVM_PATH=(Resolve-Path "$env:WORKSPACE/llvm-mlir/_mlir_install")
+          python setup.py develop
+
+      - name: Test Python frontend
+        run: |
+          cd numba_mlir
+          conda activate test-env
+          python "$env:GITHUB_WORKSPACE/numba_mlir/runtests.py" verbose
+
+      - name: Build wheels
+        run: |
+          mkdir numba_mlir_wheels
+          pushd numba_mlir_wheels
+          conda activate test-env
+          $env:TBB_PATH=(Resolve-Path "$env:WORKSPACE/tbb/oneapi-tbb-$env:TBB_VER")
+          $env:LEVEL_ZERO_DIR=(Resolve-Path "$env:WORKSPACE/level-zero/level-zero/level_zero_install")
+          $env:LEVEL_ZERO_VERSION_CHECK_OFF="1"
+          $env:LLVM_PATH=(Resolve-Path "$env:WORKSPACE/llvm-mlir/_mlir_install")
+          pip wheel --no-deps -v ../numba_mlir
+          popd
+          rm -r numba_mlir_cmake_build
+
+      - name: Test wheels
+        run: |
+          cd numba_mlir_wheels
+          conda create -y -n wheels-test-env python=${{ matrix.python }} numba=0.56 numpy=1.22 "setuptools<65.6" scikit-learn pytest-xdist ninja scipy pybind11 pytest lit "tbb=$env:TBB_VER" cmake mkl-devel-dpcpp -c conda-forge -c intel
+          conda info
+          conda activate wheels-test-env
+          conda list
+          pip install *.whl
+          python "$env:GITHUB_WORKSPACE/numba_mlir/runtests.py" verbose smoke
+
+      - name: Build conda package
+        run: |
+          mkdir numba_mlir_conda
+          pushd numba_mlir_conda
+          conda activate test-env
+          $env:TBB_PATH=(Resolve-Path "$env:WORKSPACE/tbb/oneapi-tbb-$env:TBB_VER")
+          $env:LEVEL_ZERO_DIR=(Resolve-Path "$env:WORKSPACE/level-zero/level-zero/level_zero_install")
+          $env:LEVEL_ZERO_VERSION_CHECK_OFF="1"
+          $env:LLVM_PATH=(Resolve-Path "$env:WORKSPACE/llvm-mlir/_mlir_install")
+          conda build --output-folder=. ../numba_mlir/conda-recipe
+          cd win-64
+          popd
+
+      - name: Test conda package
+        run: |
+          cd numba_mlir_conda/win-64
+          conda create -y -n conda-test-env python=${{ matrix.python }} numba=0.56 numpy=1.22 "setuptools<65.6" scikit-learn pytest-xdist ninja scipy pybind11 pytest lit "tbb=$env:TBB_VER" cmake mkl-devel-dpcpp -c conda-forge -c intel
+          conda info
+          conda activate conda-test-env
+          conda list
+          conda install numba-mlir-*.zip
+          python "$env:GITHUB_WORKSPACE/numba_mlir/runtests.py" verbose smoke
+
+
   build_linux:
     name: Builds Numba-MLIR on Linux
     runs-on: ubuntu-latest
     timeout-minutes: 450
-
-    env:
-      TBB_VER: 2021.6.0
-      LEVEL_ZERO_VER: v1.6.2
-      TBB_URL_PREFIX: https://github.com/oneapi-src/oneTBB/releases/download/
-      LLVM_SHA_FILE: llvm-sha.txt
 
     strategy:
       matrix:
@@ -230,7 +488,6 @@ jobs:
         run: |
           cd numba_mlir
           source $CONDA/bin/activate test-env
-          export NUMBA_DISABLE_PERFORMANCE_WARNINGS=1
           python $GITHUB_WORKSPACE/numba_mlir/runtests.py verbose
 
       - name: Build wheels

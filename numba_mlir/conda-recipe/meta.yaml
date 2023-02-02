@@ -15,7 +15,6 @@ build:
 
 requirements:
     build:
-        - {{ compiler('cxx') }} # [not linux]
         - ninja
         - cmake
         - pybind11
