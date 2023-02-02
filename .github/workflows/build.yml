@@ -212,6 +212,54 @@ jobs:
           conda activate test-env
           python "$env:GITHUB_WORKSPACE/numba_mlir/runtests.py" verbose
 
+      - name: Build wheels
+        run: |
+          mkdir numba_mlir_wheels
+          pushd numba_mlir_wheels
+          conda activate test-env
+          $env:TBB_PATH=(Resolve-Path "$env:WORKSPACE/tbb/oneapi-tbb-$env:TBB_VER")
+          $env:LEVEL_ZERO_DIR=(Resolve-Path "$env:WORKSPACE/level-zero/level-zero/level_zero_install")
+          $env:LEVEL_ZERO_VERSION_CHECK_OFF="1"
+          $env:LLVM_PATH=(Resolve-Path "$env:WORKSPACE/llvm-mlir/_mlir_install")
+          pip wheel --no-deps -v ../numba_mlir
+          popd
+          rm -r numba_mlir_cmake_build
+
+      - name: Test wheels
+        run: |
+          cd numba_mlir_wheels
+          conda create -y -n wheels-test-env python=${{ matrix.python }} numba=0.56 numpy=1.22 "setuptools<65.6" scikit-learn pytest-xdist ninja scipy pybind11 pytest lit "tbb=$env:TBB_VER" cmake mkl-devel-dpcpp -c conda-forge -c intel
+          conda info
+          conda activate wheels-test-env
+          conda list
+          pip install *.whl
+          python "$env:GITHUB_WORKSPACE/numba_mlir/runtests.py" verbose smoke
+
+      - name: Build conda package
+        run: |
+          mkdir numba_mlir_conda
+          pushd numba_mlir_conda
+          conda activate test-env
+          $env:TBB_PATH=(Resolve-Path "$env:WORKSPACE/tbb/oneapi-tbb-$env:TBB_VER")
+          $env:LEVEL_ZERO_DIR=(Resolve-Path "$env:WORKSPACE/level-zero/level-zero/level_zero_install")
+          $env:LEVEL_ZERO_VERSION_CHECK_OFF="1"
+          $env:LLVM_PATH=(Resolve-Path "$env:WORKSPACE/llvm-mlir/_mlir_install")
+          conda build --output-folder=. ../numba_mlir/conda-recipe
+          cd win-64
+          popd
+          rm -r numba_mlir_cmake_build
+
+      - name: Test conda package
+        run: |
+          cd numba_mlir_conda/win-64
+          conda create -y -n conda-test-env python=${{ matrix.python }} numba=0.56 numpy=1.22 "setuptools<65.6" scikit-learn pytest-xdist ninja scipy pybind11 pytest lit "tbb=$env:TBB_VER" cmake mkl-devel-dpcpp -c conda-forge -c intel
+          conda info
+          conda activate conda-test-env
+          conda list
+          conda install numba-mlir-*.zip
+          python "$env:GITHUB_WORKSPACE/numba_mlir/runtests.py" verbose smoke
+
+
   build_linux:
     name: Builds Numba-MLIR on Linux
     runs-on: ubuntu-latest
