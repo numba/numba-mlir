@@ -401,7 +401,6 @@ jobs:
         run: |
           cd numba_mlir
           source $CONDA/bin/activate test-env
-          export NUMBA_DISABLE_PERFORMANCE_WARNINGS=1
           python $GITHUB_WORKSPACE/numba_mlir/runtests.py verbose
 
       - name: Build wheels
