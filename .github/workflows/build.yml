@@ -46,6 +46,7 @@ jobs:
         with:
           auto-update-conda: true
           use-only-tar-bz2: true
+          runPost: false
 
       - name: Install CMake and Ninja
         run: |
@@ -223,9 +224,8 @@ jobs:
         with:
           path: ~/conda_pkgs_dir
           key:
-            ${{ runner.os }}-conda-${{ env.CACHE_NUMBER }}-python-${{ matrix.python }}-${{hashFiles('**/meta.yaml') }}
+            ${{ runner.os }}-conda-${{ env.CACHE_NUMBER }}-${{hashFiles('**/meta.yaml') }}
           restore-keys: |
-            ${{ runner.os }}-conda-${{ env.CACHE_NUMBER }}-python-${{ matrix.python }}-
             ${{ runner.os }}-conda-${{ env.CACHE_NUMBER }}-
 
       - name: Setup conda
@@ -233,6 +233,7 @@ jobs:
         with:
           auto-update-conda: true
           use-only-tar-bz2: true
+          runPost: false
 
       - name: Install CMake and Ninja
         run: |
