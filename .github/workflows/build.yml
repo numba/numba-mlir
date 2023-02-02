@@ -93,7 +93,7 @@ jobs:
             rm -r *
             $TBB_FN="oneapi-tbb-$env:TBB_VER-win.zip"
             Invoke-WebRequest "$env:TBB_URL_PREFIX/v$env:TBB_VER/$TBB_FN" -OutFile $TBB_FN
-            Expand-Archive $TBB_FN
+            Expand-Archive $TBB_FN -DestinationPath .
             ls
             (Select-String -Pattern "Version: " (ls -Filter tbb.pc -Recurse -Name)).Line.Split(" ")[-1] > bundle_id.txt
             cat bundle_id.txt
@@ -167,11 +167,8 @@ jobs:
           echo $external_lit
           mkdir -p _build
           cd _build
-          $env:TBB_PATH=(Resolve-Path "$env:WORKSPACE/tbb/oneapi-tbb-$env:TBB_VER-win")
+          $env:TBB_PATH=(Resolve-Path "$env:WORKSPACE/tbb/oneapi-tbb-$env:TBB_VER")
           $env:LEVEL_ZERO_DIR=(Resolve-Path "$env:WORKSPACE/level-zero/level-zero/level_zero_install")
-          echo "TBB_PATH"
-          echo $env:TBB_PATH
-          tree "$env:TBB_PATH"
           $env:LEVEL_ZERO_VERSION_CHECK_OFF="1"
           $env:LLVM_DIR=(Resolve-Path "$env:WORKSPACE/llvm-mlir/_mlir_install")
           cmake "$env:GITHUB_WORKSPACE"                                        `
