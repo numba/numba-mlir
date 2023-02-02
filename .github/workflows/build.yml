@@ -180,7 +180,7 @@ jobs:
             -DNUMBA_MLIR_ENABLE_TESTS=ON                                       `
             -DNUMBA_MLIR_ENABLE_TBB_SUPPORT=ON                                 `
             -DTBB_DIR="$env:TBB_PATH/lib/cmake/tbb"                            `
-            -DLLVM_EXTERNAL_LIT=$external_lit
+            -DLLVM_EXTERNAL_LIT="$external_lit"
           ninja all
 
       - name: Run Numba-MLIR core test cases
