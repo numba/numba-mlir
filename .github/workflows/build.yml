@@ -326,7 +326,7 @@ jobs:
           conda activate wheels-test-env
           conda list
           ls .
-          pip install *.whl
+          ls *.whl | Foreach-Object { pip install $_.FullName }
           python "$env:GITHUB_WORKSPACE/scripts/run_package_tests.py" verbose smoke
 
       - name: Build conda package
