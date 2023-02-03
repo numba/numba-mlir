@@ -351,7 +351,7 @@ jobs:
           conda activate conda-test-env
           conda list
           ls .
-          ls *.zip | Foreach-Object { conda install $_.FullName }
+          ls *.tar.bz2 | Foreach-Object { conda install $_.FullName }
           python "$env:GITHUB_WORKSPACE/scripts/run_package_tests.py" verbose smoke
 
 
