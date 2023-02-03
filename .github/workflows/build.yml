@@ -314,6 +314,7 @@ jobs:
           $env:LEVEL_ZERO_VERSION_CHECK_OFF="1"
           $env:LLVM_PATH=(Resolve-Path "$env:WORKSPACE/llvm-mlir/_mlir_install")
           pip wheel --no-deps -v ../numba_mlir
+          ls .
           popd
           rm -r numba_mlir_cmake_build
 
