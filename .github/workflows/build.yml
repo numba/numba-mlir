@@ -325,6 +325,7 @@ jobs:
           conda info
           conda activate wheels-test-env
           conda list
+          ls .
           pip install *.whl
           python "$env:GITHUB_WORKSPACE/scripts/run_package_tests.py" verbose smoke
 
