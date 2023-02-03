@@ -18,13 +18,9 @@ env:
 
 jobs:
   build_win:
-    name: Builds Numba-MLIR on Windows
+    name: Builds Numba-MLIR core on Windows
     runs-on: windows-latest
     timeout-minutes: 450
-
-    strategy:
-      matrix:
-        python: [3.9]
 
     steps:
       - uses: ilammy/msvc-dev-cmd@v1
@@ -41,9 +37,8 @@ jobs:
         with:
           path: ~/conda_pkgs_dir
           key:
-            ${{ runner.os }}-conda-${{ env.CACHE_NUMBER }}-python-${{ matrix.python }}-${{hashFiles('**/meta.yaml') }}
+            ${{ runner.os }}-conda-${{ env.CACHE_NUMBER }}-${{hashFiles('**/meta.yaml') }}
           restore-keys: |
-            ${{ runner.os }}-conda-${{ env.CACHE_NUMBER }}-python-${{ matrix.python }}-
             ${{ runner.os }}-conda-${{ env.CACHE_NUMBER }}-
 
       - name: Setup conda
@@ -51,6 +46,7 @@ jobs:
         with:
           auto-update-conda: true
           use-only-tar-bz2: true
+          run-post: false
 
       - name: Install CMake and Ninja
         run: |
@@ -179,7 +175,7 @@ jobs:
 
       - name: Build Numba-MLIR
         run: |
-          $external_lit="C:\Miniconda\envs\test\Scripts\lit-script.py"
+          $external_lit="$env:CONDA_PREFIX\Scripts\lit-script.py"
           mkdir -p _build
           cd _build
           $env:TBB_PATH=(Resolve-Path "$env:WORKSPACE/tbb/oneapi-tbb-$env:TBB_VER")
@@ -202,6 +198,86 @@ jobs:
         run: |
           cd _build
           ninja check-numba-mlir
+
+  build_win_python:
+    name: Builds Numba-MLIR on Windows
+    runs-on: windows-latest
+    timeout-minutes: 450
+    needs: build_win
+
+    strategy:
+      matrix:
+        python: [3.9]
+
+    steps:
+      - uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Cancel Previous Runs
+        uses: styfle/cancel-workflow-action@0.6.0
+        with:
+          access_token: ${{ github.token }}
+
+      - name: Cache conda packages
+        uses: actions/cache@v2
+        env:
+          CACHE_NUMBER: 1  # Increase to reset cache
+        with:
+          path: ~/conda_pkgs_dir
+          key:
+            ${{ runner.os }}-conda-${{ env.CACHE_NUMBER }}-${{hashFiles('**/meta.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-conda-${{ env.CACHE_NUMBER }}-
+
+      - name: Setup conda
+        uses: conda-incubator/setup-miniconda@v2
+        with:
+          auto-update-conda: true
+          use-only-tar-bz2: true
+          run-post: false
+
+      - name: Install CMake and Ninja
+        run: |
+          conda install cmake ninja conda-forge::lit
+
+      - name: Checkout repo
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+
+      - name: Setup Cache Vars
+        run: |
+          $sha = (cat "$env:GITHUB_WORKSPACE\$env:LLVM_SHA_FILE")
+          echo "LLVM_SHA=$sha" >> $env:GITHUB_ENV
+          $wspath = (Resolve-Path "$env:GITHUB_WORKSPACE\..\")
+          echo "WORKSPACE=$wspath" >> $env:GITHUB_ENV
+          cat $env:GITHUB_ENV
+
+      - name: Cache TBB
+        id: cache-tbb
+        uses: actions/cache@v3
+        with:
+          path: |
+            D:\a\numba-mlir\tbb\*
+          key: ${{ runner.os }}-build-tbb-${{ env.TBB_VER }}
+
+      - name: Cache Level-Zero
+        id: cache-level-zero
+        uses: actions/cache@v3
+        with:
+          path: |
+            D:\a\numba-mlir\level-zero\**
+          key: ${{ runner.os }}-build-l0-${{ env.LEVEL_ZERO_VER }}
+
+      - name: Cache LLLVM-MLIR
+        id: cache-llvm-mlir
+        uses: actions/cache@v3
+        env:
+          LLVM_CACHE_NUMBER: 1  # Increase to reset cache
+        with:
+          path: |
+            D:\a\numba-mlir\llvm-mlir\_mlir_install\**
+          key: ${{ runner.os }}-build-llvm-${{ env.LLVM_CACHE_NUMBER }}-${{ env.LLVM_SHA }}
+
 
       - name: Build Python frontend
         run: |
@@ -276,13 +352,9 @@ jobs:
 
 
   build_linux:
-    name: Builds Numba-MLIR on Linux
+    name: Builds Numba-MLIR core on Linux
     runs-on: ubuntu-latest
     timeout-minutes: 450
-
-    strategy:
-      matrix:
-        python: [3.9]
 
     steps:
       - name: Cancel Previous Runs
@@ -301,9 +373,8 @@ jobs:
         with:
           path: ~/.conda/pkgs
           key:
-            ${{ runner.os }}-conda-${{ env.CACHE_NUMBER }}-python-${{ matrix.python }}-${{hashFiles('**/meta.yaml') }}
+            ${{ runner.os }}-conda-${{ env.CACHE_NUMBER }}-${{hashFiles('**/meta.yaml') }}
           restore-keys: |
-            ${{ runner.os }}-conda-${{ env.CACHE_NUMBER }}-python-${{ matrix.python }}-
             ${{ runner.os }}-conda-${{ env.CACHE_NUMBER }}-
 
       - name: Add conda to system path
@@ -463,6 +534,83 @@ jobs:
         run: |
           cd _build || exit 1
           ninja check-numba-mlir || exit 1
+
+
+  build_linux_python:
+    name: Builds Numba-MLIR on Linux
+    runs-on: ubuntu-latest
+    timeout-minutes: 450
+    needs: build_linux
+
+    strategy:
+      matrix:
+        python: [3.9]
+
+    steps:
+      - name: Cancel Previous Runs
+        uses: styfle/cancel-workflow-action@0.6.0
+        with:
+          access_token: ${{ github.token }}
+
+      - name: Set pkgs_dirs
+        run: |
+          echo "pkgs_dirs: [~/.conda/pkgs]" >> ~/.condarc
+
+      - name: Cache conda packages
+        uses: actions/cache@v2
+        env:
+          CACHE_NUMBER: 1  # Increase to reset cache
+        with:
+          path: ~/.conda/pkgs
+          key:
+            ${{ runner.os }}-conda-${{ env.CACHE_NUMBER }}-${{hashFiles('**/meta.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-conda-${{ env.CACHE_NUMBER }}-
+
+      - name: Add conda to system path
+        run: echo $CONDA/bin >> $GITHUB_PATH
+
+      - name: Install CMake and Ninja
+        run: |
+          conda install cmake ninja conda-forge::lit
+
+      - name: Checkout repo
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+
+      - name: Setup Cache Vars
+        run: |
+          echo 'LLVM_SHA<<EOF' >> $GITHUB_ENV
+          cat $GITHUB_WORKSPACE/$LLVM_SHA_FILE >> $GITHUB_ENV
+          echo 'EOF' >> $GITHUB_ENV
+
+      - name: Cache TBB
+        id: cache-tbb
+        uses: actions/cache@v3
+        with:
+          path: |
+            /home/runner/work/tbb/*
+          key: ${{ runner.os }}-build-tbb-${{ env.TBB_VER }}
+
+      - name: Cache Level-Zero
+        id: cache-level-zero
+        uses: actions/cache@v3
+        with:
+          path: |
+            /home/runner/work/level-zero/**
+          key: ${{ runner.os }}-build-l0-${{ env.LEVEL_ZERO_VER }}
+
+      - name: Cache LLLVM-MLIR
+        id: cache-llvm-mlir
+        uses: actions/cache@v3
+        env:
+          LLVM_CACHE_NUMBER: 1  # Increase to reset cache
+        with:
+          path: |
+            /home/runner/work/llvm-mlir/_mlir_install/**
+          key: ${{ runner.os }}-build-llvm-${{ env.LLVM_CACHE_NUMBER }}-${{ env.LLVM_SHA }}
+
 
       - name: Build Python frontend
         shell: bash -l {0}
