@@ -340,6 +340,7 @@ jobs:
           $env:LLVM_PATH=(Resolve-Path "$env:WORKSPACE/llvm-mlir/_mlir_install")
           conda build --output-folder=. ../numba_mlir/conda-recipe
           cd win-64
+          ls .
           popd
 
       - name: Test conda package
@@ -349,7 +350,8 @@ jobs:
           conda info
           conda activate conda-test-env
           conda list
-          conda install numba-mlir-*.zip
+          ls .
+          ls *.zip | Foreach-Object { conda install $_.FullName }
           python "$env:GITHUB_WORKSPACE/scripts/run_package_tests.py" verbose smoke
 
 
