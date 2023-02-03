@@ -50,7 +50,7 @@ jobs:
 
       - name: Install CMake and Ninja
         run: |
-          conda install cmake ninja
+          conda install cmake ninja lit
 
       - name: Checkout repo
         uses: actions/checkout@v2
@@ -237,7 +237,7 @@ jobs:
 
       - name: Install CMake and Ninja
         run: |
-          conda install cmake ninja conda-forge::lit
+          conda install cmake ninja lit
 
       - name: Checkout repo
         uses: actions/checkout@v2
@@ -282,7 +282,7 @@ jobs:
       - name: Build Python frontend
         run: |
           cd numba_mlir
-          conda create -y -n test-env python=${{ matrix.python }} "pip>=22" numba=0.56 numpy=1.22 "setuptools<65.6" scikit-learn pytest-xdist ninja scipy pybind11 pytest lit "tbb=$env:TBB_VER" cmake mkl-devel-dpcpp conda-build zlib -c conda-forge -c intel
+          conda create -y -n test-env python=${{ matrix.python }} "pip>=22" numba=0.56 numpy=1.22 "setuptools<65.6" scikit-learn pytest-xdist ninja scipy pybind11 pytest "tbb=$env:TBB_VER" cmake mkl-devel-dpcpp conda-build zlib -c conda-forge -c intel
           conda info
           conda activate test-env
           echo "Conda prefix: $env:CONDA_PREFIX"
@@ -320,7 +320,7 @@ jobs:
       - name: Test wheels
         run: |
           cd numba_mlir_wheels
-          conda create -y -n wheels-test-env python=${{ matrix.python }} numba=0.56 numpy=1.22 "setuptools<65.6" scikit-learn pytest-xdist ninja scipy pybind11 pytest lit "tbb=$env:TBB_VER" cmake mkl-devel-dpcpp -c conda-forge -c intel
+          conda create -y -n wheels-test-env python=${{ matrix.python }} numba=0.56 numpy=1.22 "setuptools<65.6" scikit-learn pytest-xdist ninja scipy pybind11 pytest "tbb=$env:TBB_VER" cmake mkl-devel-dpcpp -c conda-forge -c intel
           conda info
           conda activate wheels-test-env
           conda list
@@ -343,7 +343,7 @@ jobs:
       - name: Test conda package
         run: |
           cd numba_mlir_conda/win-64
-          conda create -y -n conda-test-env python=${{ matrix.python }} numba=0.56 numpy=1.22 "setuptools<65.6" scikit-learn pytest-xdist ninja scipy pybind11 pytest lit "tbb=$env:TBB_VER" cmake mkl-devel-dpcpp -c conda-forge -c intel
+          conda create -y -n conda-test-env python=${{ matrix.python }} numba=0.56 numpy=1.22 "setuptools<65.6" scikit-learn pytest-xdist ninja scipy pybind11 pytest "tbb=$env:TBB_VER" cmake mkl-devel-dpcpp -c conda-forge -c intel
           conda info
           conda activate conda-test-env
           conda list
@@ -382,7 +382,7 @@ jobs:
 
       - name: Install CMake and Ninja
         run: |
-          conda install cmake ninja conda-forge::lit
+          conda install cmake ninja lit
 
       - name: Checkout repo
         uses: actions/checkout@v2
@@ -571,7 +571,7 @@ jobs:
 
       - name: Install CMake and Ninja
         run: |
-          conda install cmake ninja
+          conda install cmake ninja lit
 
       - name: Checkout repo
         uses: actions/checkout@v2
