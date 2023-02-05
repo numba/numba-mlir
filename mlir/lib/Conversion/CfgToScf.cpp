@@ -605,6 +605,20 @@ struct BreakRewrite : public mlir::OpRewritePattern<mlir::cf::CondBranchOp> {
         continue;
       }
 
+      auto check = [&]() {
+        for (auto user :
+             llvm::make_early_inc_range(conditionBlock->getUsers())) {
+          if (user == op)
+            continue;
+
+          if (mlir::isa<mlir::cf::CondBranchOp>(user))
+            return false;
+        }
+        return true;
+      }();
+      if (!check)
+        continue;
+
       auto loc = rewriter.getUnknownLoc();
 
       auto type = rewriter.getIntegerType(1);
