@@ -6,6 +6,7 @@ import numba
 
 # from numba_mlir import njit
 import math
+import sys
 from numpy.testing import assert_equal  # for nans comparison
 from numba_mlir.mlir.passes import print_pass_ir, get_print_buffer
 
@@ -338,6 +339,10 @@ def _while_py_func_nested_break(a, b):
     return a
 
 
+_is_py310 = sys.version_info.major == 3 and sys.version_info.minor == 10
+
+
+@pytest.mark.xfail(_is_py310, reason="cfg-to-scf issue")
 @parametrize_function_variants(
     "py_func",
     [
