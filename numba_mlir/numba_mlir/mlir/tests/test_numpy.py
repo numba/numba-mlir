@@ -130,7 +130,6 @@ _test_binary_test_arrays_ids = [
 ]
 
 
-@pytest.mark.smoke
 @parametrize_function_variants(
     "py_func",
     [
@@ -191,6 +190,7 @@ def test_logical1(py_func, a):
     assert_equal(py_func(a), jit_func(a))
 
 
+@pytest.mark.smoke
 @parametrize_function_variants(
     "py_func",
     [
