@@ -260,6 +260,9 @@ struct ScfIfRewriteTwoExits
         continue;
       }
 
+      if (exitBlock1 == thenBlock)
+        continue;
+
       if (exitBlock1->getNumArguments() != 0)
         continue;
 
