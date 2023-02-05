@@ -11,25 +11,7 @@ import numba
 import itertools
 
 from numba_mlir.mlir.settings import _readenv
-from numba_mlir.mlir.kernel_impl import (
-    kernel,
-    get_global_id,
-    get_local_id,
-    get_group_id,
-    get_global_size,
-    get_local_size,
-    atomic,
-    kernel_func,
-    DEFAULT_LOCAL_SIZE,
-    barrier,
-    mem_fence,
-    CLK_LOCAL_MEM_FENCE,
-    CLK_GLOBAL_MEM_FENCE,
-    local,
-    private,
-    group,
-)
-from numba_mlir.mlir.kernel_sim import kernel as kernel_sim
+from numba_mlir.kernel import *
 from numba_mlir.mlir.passes import (
     print_pass_ir,
     get_print_buffer,
