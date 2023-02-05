@@ -368,6 +368,7 @@ jobs:
         with:
           name: numba-mlir ${{ runner.os }} Python ${{ matrix.python }} SHA ${{ github.sha }}
           path: numba_mlir_conda/win-64/*.tar.bz2
+          retention-days: 30
 
 
   build_linux:
@@ -726,3 +727,4 @@ jobs:
         with:
           name: numba-mlir ${{ runner.os }} Python ${{ matrix.python }} SHA ${{ github.sha }}
           path: numba_mlir_conda/linux-64/*.tar.bz2
+          retention-days: 30
