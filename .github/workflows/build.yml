@@ -208,12 +208,12 @@ jobs:
     strategy:
       matrix:
         python: ["3.8", "3.9", "3.10"]
-        run_full:
+        is_main:
           - ${{ github.ref == 'refs/heads/main' }}
         exclude:
-          - run_full: false
+          - is_main: false
             python: "3.8"
-          - run_full: false
+          - is_main: false
             python: "3.9"
 
     steps:
@@ -360,6 +360,15 @@ jobs:
           ls .
           ls *.tar.bz2 | Foreach-Object { conda install $_.FullName }
           python "$env:GITHUB_WORKSPACE/scripts/run_package_tests.py" verbose smoke
+
+
+      - name: Upload artifact
+        if: matrix.is_main == 'true'
+        uses: actions/upload-artifact@v2
+        with:
+          name: numba-mlir ${{ runner.os }} Python ${{ matrix.python }} SHA ${{ github.sha }}
+          path: numba_mlir_conda/win-64/*.tar.bz2
+          retention-days: 30
 
 
   build_linux:
@@ -555,12 +564,12 @@ jobs:
     strategy:
       matrix:
         python: ["3.8", "3.9", "3.10"]
-        run_full:
+        is_main:
           - ${{ github.ref == 'refs/heads/main' }}
         exclude:
-          - run_full: false
+          - is_main: false
             python: "3.8"
-          - run_full: false
+          - is_main: false
             python: "3.9"
 
     steps:
@@ -711,3 +720,11 @@ jobs:
           conda list
           conda install numba-mlir-*.tar.bz2
           python $GITHUB_WORKSPACE/scripts/run_package_tests.py verbose smoke
+
+      - name: Upload artifact
+        if: matrix.is_main == 'true'
+        uses: actions/upload-artifact@v2
+        with:
+          name: numba-mlir ${{ runner.os }} Python ${{ matrix.python }} SHA ${{ github.sha }}
+          path: numba_mlir_conda/linux-64/*.tar.bz2
+          retention-days: 30
