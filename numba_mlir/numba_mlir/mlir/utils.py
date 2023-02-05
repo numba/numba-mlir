@@ -2,13 +2,13 @@
 #
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-import ctypes
-import os
 import atexit
-import sys
+import ctypes
 import numba_mlir
+import os
+import sys
+import warnings
 import llvmlite.binding as ll
-from .compiler_context import global_compiler_context
 from .. import mlir_compiler
 
 
@@ -45,6 +45,17 @@ def mlir_func_name(name):
 
 
 _registered_cfuncs = []
+_compiler_context = None
+
+
+def _get_compiler_context():
+    global _compiler_context
+    if _compiler_context is None:
+        from . import compiler_context
+
+        _compiler_context = compiler_context.global_compiler_context
+
+    return _compiler_context
 
 
 def register_cfunc(name, cfunc):
@@ -52,4 +63,18 @@ def register_cfunc(name, cfunc):
     ptr = ctypes.cast(cfunc, ctypes.c_void_p)
     _registered_cfuncs.append(ptr)
     ll.add_symbol(name, ptr.value)
-    mlir_compiler.register_symbol(global_compiler_context, name, ptr.value)
+    mlir_compiler.register_symbol(_get_compiler_context(), name, ptr.value)
+
+
+def readenv(name, ctor, default):
+    value = os.environ.get(name)
+    if value is None:
+        return default() if callable(default) else default
+    try:
+        return ctor(value)
+    except Exception:
+        warnings.warn(
+            "environ %s defined but failed to parse '%s'" % (name, value),
+            RuntimeWarning,
+        )
+        return default

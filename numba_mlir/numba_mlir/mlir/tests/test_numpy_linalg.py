@@ -5,9 +5,9 @@
 import pytest
 import numpy
 from numba_mlir import njit
-from numba_mlir.mlir.settings import _readenv
+from numba_mlir.mlir.utils import readenv
 
-DPNP_TESTS_ENABLED = _readenv("NUMBA_MLIR_ENABLE_DPNP_TESTS", int, 0)
+DPNP_TESTS_ENABLED = readenv("NUMBA_MLIR_ENABLE_DPNP_TESTS", int, 0)
 
 
 def require_dpnp(func):
