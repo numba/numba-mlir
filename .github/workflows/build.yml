@@ -363,7 +363,7 @@ jobs:
 
 
       - name: Upload artifact
-        if: matrix.is_main == 'true'
+        if: matrix.is_main
         uses: actions/upload-artifact@v2
         with:
           name: numba-mlir ${{ runner.os }} Python ${{ matrix.python }} SHA ${{ github.sha }}
@@ -722,7 +722,7 @@ jobs:
           python $GITHUB_WORKSPACE/scripts/run_package_tests.py verbose smoke
 
       - name: Upload artifact
-        if: matrix.is_main == 'true'
+        if: matrix.is_main
         uses: actions/upload-artifact@v2
         with:
           name: numba-mlir ${{ runner.os }} Python ${{ matrix.python }} SHA ${{ github.sha }}
