@@ -260,6 +260,9 @@ struct ScfIfRewriteTwoExits
         continue;
       }
 
+      if (exitBlock1 == thenBlock)
+        continue;
+
       if (exitBlock1->getNumArguments() != 0)
         continue;
 
@@ -601,6 +604,20 @@ struct BreakRewrite : public mlir::OpRewritePattern<mlir::cf::CondBranchOp> {
       } else {
         continue;
       }
+
+      auto check = [&]() {
+        for (auto user :
+             llvm::make_early_inc_range(conditionBlock->getUsers())) {
+          if (user == op)
+            continue;
+
+          if (mlir::isa<mlir::cf::CondBranchOp>(user))
+            return false;
+        }
+        return true;
+      }();
+      if (!check)
+        continue;
 
       auto loc = rewriter.getUnknownLoc();
 
