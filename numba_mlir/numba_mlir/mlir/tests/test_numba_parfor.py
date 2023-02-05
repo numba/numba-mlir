@@ -9,7 +9,7 @@ import pytest
 import numpy as np
 import types as pytypes
 
-from numba_mlir.mlir.settings import _readenv
+from numba_mlir.mlir.utils import readenv
 from numba_mlir import njit, jit, vectorize
 
 from numba.core.registry import CPUDispatcher
@@ -23,7 +23,7 @@ import numba.tests.test_parfors
 
 
 def _gen_tests():
-    if not _readenv("NUMBA_MLIR_ENABLE_PARFOR_TESTS", int, 0):
+    if not readenv("NUMBA_MLIR_ENABLE_PARFOR_TESTS", int, 0):
         return
 
     testcases = [

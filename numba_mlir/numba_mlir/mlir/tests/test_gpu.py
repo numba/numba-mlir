@@ -10,7 +10,7 @@ import math
 import numba
 import itertools
 
-from numba_mlir.mlir.settings import _readenv
+from numba_mlir.mlir.utils import readenv
 from numba_mlir.kernel import *
 from numba_mlir.mlir.passes import (
     print_pass_ir,
@@ -24,8 +24,8 @@ from .utils import njit_cached as njit
 kernel_cache = JitfuncCache(kernel)
 kernel_cached = kernel_cache.cached_decorator
 
-GPU_TESTS_ENABLED = _readenv("NUMBA_MLIR_ENABLE_GPU_TESTS", int, 0)
-DPCTL_TESTS_ENABLED = _readenv("NUMBA_MLIR_ENABLE_DPCTL_TESTS", int, 0)
+GPU_TESTS_ENABLED = readenv("NUMBA_MLIR_ENABLE_GPU_TESTS", int, 0)
+DPCTL_TESTS_ENABLED = readenv("NUMBA_MLIR_ENABLE_DPCTL_TESTS", int, 0)
 
 if DPCTL_TESTS_ENABLED:
     import dpctl
