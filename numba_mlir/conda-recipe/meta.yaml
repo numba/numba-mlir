@@ -1,12 +1,12 @@
 package:
     name: numba-mlir
-    version: 0.0
+    version: {{ GIT_DESCRIBE_TAG }}
 
 source:
     path: ../..
 
 build:
-    number: 0
+    number: {{ GIT_DESCRIBE_NUMBER }}
     script_env:
         - TBB_PATH
         - LLVM_PATH
