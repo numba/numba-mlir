@@ -4,7 +4,7 @@
 
 
 from .utils import readenv
-from ..mlir_compiler import is_dpnp_supported, is_mkl_supported
+from ..mlir_compiler import is_dpnp_supported, is_mkl_supported, is_sycl_mkl_supported
 
 
 USE_MLIR = readenv("NUMBA_MLIR_ENABLE", int, 1)
@@ -19,4 +19,5 @@ DPNP_AVAILABLE = (
     is_dpnp_supported()
 )  # TODO: check if dpnp library is available at runtime
 MKL_AVAILABLE = is_mkl_supported()
+SYCL_MKL_AVAILABLE = is_sycl_mkl_supported()
 OPT_LEVEL = readenv("NUMBA_MLIR_OPT_LEVEL", int, 3)
