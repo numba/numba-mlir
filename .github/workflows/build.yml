@@ -345,7 +345,7 @@ jobs:
           $env:LEVEL_ZERO_DIR=(Resolve-Path "$env:WORKSPACE/level-zero/level-zero/level_zero_install")
           $env:LEVEL_ZERO_VERSION_CHECK_OFF="1"
           $env:LLVM_PATH=(Resolve-Path "$env:WORKSPACE/llvm-mlir/_mlir_install")
-          conda build --output-folder=. ../numba_mlir/conda-recipe -c conda-forge -c intel
+          conda build --output-folder=. ../numba_mlir/conda-recipe --python=${{ matrix.python }} -c conda-forge -c intel
           cd win-64
           ls .
           popd
@@ -703,7 +703,7 @@ jobs:
           export LLVM_PATH=/home/runner/work/llvm-mlir/_mlir_install
           export LEVEL_ZERO_DIR=/home/runner/work/level-zero/level-zero/level_zero_install
           export LEVEL_ZERO_VERSION_CHECK_OFF=1
-          conda build --output-folder=. ../numba_mlir/conda-recipe -c conda-forge -c intel || exit 1
+          conda build --output-folder=. ../numba_mlir/conda-recipe --python=${{ matrix.python }} -c conda-forge -c intel || exit 1
           cd linux-64
           ls -l --block-size=M
           popd
