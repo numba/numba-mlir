@@ -18,7 +18,8 @@ requirements:
         - ninja
         - cmake
         - pybind11
-        - mkl-devel-dpcpp
+        - mkl-devel >= 2023.0.0
+        - mkl-devel-dpcpp >= 2023.0.0
     host:
         - python
         - setuptools
@@ -28,6 +29,7 @@ requirements:
         - python
         - numba 0.56*
         - packaging
+        - mkl >= 2023.0.0
 
 test:
     requires:
