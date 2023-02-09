@@ -32,6 +32,8 @@ def run_tests(params):
 
 
 if __name__ == "__main__":
+    import numba_mlir
+
     args = set(sys.argv[1:])
     retcode = run_tests(args)
     sys.exit(retcode)
