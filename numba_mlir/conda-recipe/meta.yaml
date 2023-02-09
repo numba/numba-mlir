@@ -34,6 +34,7 @@ requirements:
         - packaging
         - mkl >=2023.0.0
         - tbb >=2021.6.0
+        - zlib
 
 test:
     requires:
