@@ -326,7 +326,6 @@ jobs:
           rm -r numba_mlir_cmake_build
 
       - name: Test wheels
-        if: false
         run: |
           cd numba_mlir_wheels
           conda create -y -n wheels-test-env python=${{ matrix.python }} numba=0.56 numpy=1.22 "setuptools<65.6" scikit-learn pytest-xdist ninja scipy pybind11 pytest "tbb=$env:TBB_VER" cmake "mkl-devel-dpcpp>=2023.0.0" -c conda-forge -c intel
@@ -335,7 +334,6 @@ jobs:
           conda list
           ls .
           ls *.whl | Foreach-Object { pip install $_.FullName }
-          python -c "import numba_mlir"
           python "$env:GITHUB_WORKSPACE/scripts/run_package_tests.py" verbose smoke
 
       - name: Build conda package
@@ -362,7 +360,6 @@ jobs:
           conda list
           ls .
           ls *.tar.bz2 | Foreach-Object { conda install $_.FullName }
-          python -c "import numba_mlir"
           python "$env:GITHUB_WORKSPACE/scripts/run_package_tests.py" verbose smoke
 
 
@@ -694,7 +691,6 @@ jobs:
           source $CONDA/bin/activate wheels-test-env
           conda list
           pip install *.whl
-          python -c "import numba_mlir"
           python $GITHUB_WORKSPACE/scripts/run_package_tests.py verbose smoke
 
       - name: Build conda package
@@ -724,7 +720,6 @@ jobs:
           source $CONDA/bin/activate conda-test-env
           conda list
           conda install numba-mlir-*.tar.bz2
-          python -c "import numba_mlir"
           python $GITHUB_WORKSPACE/scripts/run_package_tests.py verbose smoke
 
       - name: Upload artifact
