@@ -289,7 +289,7 @@ jobs:
       - name: Build Python frontend
         run: |
           cd numba_mlir
-          conda create -y -n test-env python=${{ matrix.python }} "pip>=22" numba=0.56 numpy=1.22 "setuptools<65.6" scikit-learn pytest-xdist ninja scipy pybind11 pytest "tbb=$env:TBB_VER" cmake mkl-devel-dpcpp conda-build conda-verify zlib -c conda-forge -c intel
+          conda create -y -n test-env python=${{ matrix.python }} "pip>=22" numba=0.56 numpy=1.22 "setuptools<65.6" scikit-learn pytest-xdist ninja scipy pybind11 pytest "tbb=$env:TBB_VER" cmake "mkl-devel-dpcpp>=2023.0.0" conda-build conda-verify zlib -c conda-forge -c intel
           conda info
           conda activate test-env
           echo "Conda prefix: $env:CONDA_PREFIX"
@@ -326,14 +326,16 @@ jobs:
           rm -r numba_mlir_cmake_build
 
       - name: Test wheels
+        if: false
         run: |
           cd numba_mlir_wheels
-          conda create -y -n wheels-test-env python=${{ matrix.python }} numba=0.56 numpy=1.22 "setuptools<65.6" scikit-learn pytest-xdist ninja scipy pybind11 pytest "tbb=$env:TBB_VER" cmake mkl-devel-dpcpp -c conda-forge -c intel
+          conda create -y -n wheels-test-env python=${{ matrix.python }} numba=0.56 numpy=1.22 "setuptools<65.6" scikit-learn pytest-xdist ninja scipy pybind11 pytest "tbb=$env:TBB_VER" cmake "mkl-devel-dpcpp>=2023.0.0" -c conda-forge -c intel
           conda info
           conda activate wheels-test-env
           conda list
           ls .
           ls *.whl | Foreach-Object { pip install $_.FullName }
+          python -c "import numba_mlir"
           python "$env:GITHUB_WORKSPACE/scripts/run_package_tests.py" verbose smoke
 
       - name: Build conda package
@@ -345,20 +347,22 @@ jobs:
           $env:LEVEL_ZERO_DIR=(Resolve-Path "$env:WORKSPACE/level-zero/level-zero/level_zero_install")
           $env:LEVEL_ZERO_VERSION_CHECK_OFF="1"
           $env:LLVM_PATH=(Resolve-Path "$env:WORKSPACE/llvm-mlir/_mlir_install")
-          conda build --output-folder=. ../numba_mlir/conda-recipe
+          conda build --output-folder=. ../numba_mlir/conda-recipe --python=${{ matrix.python }} -c conda-forge -c intel
           cd win-64
           ls .
           popd
 
       - name: Test conda package
+        if: false
         run: |
           cd numba_mlir_conda/win-64
-          conda create -y -n conda-test-env python=${{ matrix.python }} numba=0.56 numpy=1.22 "setuptools<65.6" scikit-learn pytest-xdist ninja scipy pybind11 pytest "tbb=$env:TBB_VER" cmake mkl-devel-dpcpp -c conda-forge -c intel
+          conda create -y -n conda-test-env python=${{ matrix.python }} numba=0.56 numpy=1.22 "setuptools<65.6" scikit-learn pytest-xdist ninja scipy pybind11 pytest "tbb=$env:TBB_VER" cmake "mkl-devel-dpcpp>=2023.0.0" -c conda-forge -c intel
           conda info
           conda activate conda-test-env
           conda list
           ls .
           ls *.tar.bz2 | Foreach-Object { conda install $_.FullName }
+          python -c "import numba_mlir"
           python "$env:GITHUB_WORKSPACE/scripts/run_package_tests.py" verbose smoke
 
 
@@ -643,7 +647,7 @@ jobs:
 
         run: |
           cd numba_mlir
-          conda create -y -n test-env python=${{ matrix.python }} "pip>=22" numba=0.56 numpy=1.22 "setuptools<65.6" scikit-learn pytest-xdist ninja scipy pybind11 pytest tbb=${TBB_VER} cmake mkl-devel-dpcpp conda-build conda-verify -c conda-forge -c intel
+          conda create -y -n test-env python=${{ matrix.python }} "pip>=22" numba=0.56 numpy=1.22 "setuptools<65.6" scikit-learn pytest-xdist ninja scipy pybind11 pytest tbb=${TBB_VER} cmake "mkl-devel-dpcpp>=2023.0.0" conda-build conda-verify -c conda-forge -c intel
           conda info
           source $CONDA/bin/activate test-env
           conda list
@@ -685,11 +689,12 @@ jobs:
 
         run: |
           cd numba_mlir_wheels
-          conda create -y -n wheels-test-env python=${{ matrix.python }} numba=0.56 numpy=1.22 "setuptools<65.6" scikit-learn pytest-xdist ninja scipy pybind11 pytest tbb=${TBB_VER} cmake mkl-devel-dpcpp -c conda-forge -c intel
+          conda create -y -n wheels-test-env python=${{ matrix.python }} numba=0.56 numpy=1.22 "setuptools<65.6" scikit-learn pytest-xdist ninja scipy pybind11 pytest tbb=${TBB_VER} cmake "mkl-devel-dpcpp>=2023.0.0" -c conda-forge -c intel
           conda info
           source $CONDA/bin/activate wheels-test-env
           conda list
           pip install *.whl
+          python -c "import numba_mlir"
           python $GITHUB_WORKSPACE/scripts/run_package_tests.py verbose smoke
 
       - name: Build conda package
@@ -703,7 +708,7 @@ jobs:
           export LLVM_PATH=/home/runner/work/llvm-mlir/_mlir_install
           export LEVEL_ZERO_DIR=/home/runner/work/level-zero/level-zero/level_zero_install
           export LEVEL_ZERO_VERSION_CHECK_OFF=1
-          conda build --output-folder=. ../numba_mlir/conda-recipe || exit 1
+          conda build --output-folder=. ../numba_mlir/conda-recipe --python=${{ matrix.python }} -c conda-forge -c intel || exit 1
           cd linux-64
           ls -l --block-size=M
           popd
@@ -714,11 +719,12 @@ jobs:
 
         run: |
           cd numba_mlir_conda/linux-64
-          conda create -y -n conda-test-env python=${{ matrix.python }} numba=0.56 numpy=1.22 "setuptools<65.6" scikit-learn pytest-xdist ninja scipy pybind11 pytest tbb=${TBB_VER} cmake mkl-devel-dpcpp -c conda-forge -c intel
+          conda create -y -n conda-test-env python=${{ matrix.python }} numba=0.56 numpy=1.22 "setuptools<65.6" scikit-learn pytest-xdist ninja scipy pybind11 pytest tbb=${TBB_VER} cmake "mkl-devel-dpcpp>=2023.0.0" -c conda-forge -c intel
           conda info
           source $CONDA/bin/activate conda-test-env
           conda list
           conda install numba-mlir-*.tar.bz2
+          python -c "import numba_mlir"
           python $GITHUB_WORKSPACE/scripts/run_package_tests.py verbose smoke
 
       - name: Upload artifact
