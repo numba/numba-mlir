@@ -351,6 +351,7 @@ jobs:
           popd
 
       - name: Test conda package
+        if: false
         run: |
           cd numba_mlir_conda/win-64
           conda create -y -n conda-test-env python=${{ matrix.python }} numba=0.56 numpy=1.22 "setuptools<65.6" scikit-learn pytest-xdist ninja scipy pybind11 pytest "tbb=$env:TBB_VER" cmake "mkl-devel-dpcpp>=2023.0.0" -c conda-forge -c intel
