@@ -244,7 +244,6 @@ def test_math_uplifting_minmax(a, b, body, op):
     jit_func = njit(py_func, fastmath=True)
 
     with print_pass_ir([], ["UpliftMathPass"]):
-
         assert_equal(py_func(a, b), jit_func(a, b))
         ir = get_print_buffer()
         assert ir.count(op) == 1, ir
