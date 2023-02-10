@@ -145,7 +145,6 @@ class MlirBackendBase(FunctionPass):
 
 @register_pass(mutates_CFG=True, analysis_only=False)
 class MlirDumpPlier(MlirBackendBase):
-
     _name = "mlir_dump_plier"
 
     def __init__(self):
@@ -166,7 +165,6 @@ def get_mlir_func():
 
 @register_pass(mutates_CFG=True, analysis_only=False)
 class MlirBackend(MlirBackendBase):
-
     _name = "mlir_backend"
 
     def __init__(self):
@@ -211,7 +209,6 @@ class MlirBackendGPU(MlirBackend):
 
 @register_pass(mutates_CFG=True, analysis_only=False)
 class MlirBackendInner(MlirBackendBase):
-
     _name = "mlir_backend_inner"
 
     def __init__(self):

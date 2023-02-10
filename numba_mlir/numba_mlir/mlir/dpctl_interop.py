@@ -203,7 +203,6 @@ if _is_dpctl_available:
         return dpctl.select_default_device().filter_string
 
 else:  # _is_dpctl_available
-
     USMNdArrayType = None  # dummy
 
     def check_usm_ndarray_args(args):
