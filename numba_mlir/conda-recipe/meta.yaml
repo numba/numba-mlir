@@ -7,7 +7,6 @@ source:
 
 build:
     number: {{ GIT_DESCRIBE_NUMBER }}
-    preserve_egg_dir: True
     script_env:
         - TBB_PATH
         - LLVM_PATH
@@ -20,19 +19,22 @@ requirements:
         - ninja
         - cmake
         - pybind11
-        - mkl-devel >=2023.0.0
-        - mkl-devel-dpcpp >=2023.0.0
+        - mkl-devel >=2022.2
+        - mkl-devel-dpcpp >=2022.2
+        - setuptools
+        - zlib
     host:
         - python
-        - mkl-devel >=2023.0.0
-        - mkl-devel-dpcpp >=2023.0.0
-        - setuptools <65.6
+        - mkl-devel >=2022.2
+        - mkl-devel-dpcpp >=2022.2
+        - setuptools
         - numba 0.56*
+        - zlib
     run:
         - python
         - numba 0.56*
         - packaging
-        - mkl >=2023.0.0
+        - mkl >=2022.2
         - tbb >=2021.6.0
 
 test:
