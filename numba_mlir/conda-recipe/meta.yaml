@@ -8,7 +8,6 @@ source:
 build:
     number: {{ GIT_DESCRIBE_NUMBER }}
     script_env:
-        - TBB_PATH
         - LLVM_PATH
         - LEVEL_ZERO_DIR
         - LEVEL_ZERO_VERSION_CHECK_OFF
@@ -23,6 +22,7 @@ requirements:
         - mkl-devel-dpcpp >=2022.2
         - setuptools
         - zlib
+        - tbb-devel >=2021.6.0
     host:
         - python
         - mkl-devel >=2022.2

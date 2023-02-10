@@ -16,7 +16,6 @@ if int(os.environ.get("NUMBA_MLIR_SETUP_RUN_CMAKE", 1)):
     LLVM_PATH = os.environ["LLVM_PATH"]
     LLVM_DIR = os.path.join(LLVM_PATH, "lib", "cmake", "llvm")
     MLIR_DIR = os.path.join(LLVM_PATH, "lib", "cmake", "mlir")
-    TBB_DIR = os.path.join(os.environ["TBB_PATH"], "lib", "cmake", "tbb")
     NUMBA_MLIR_USE_MKL = os.environ.get("NUMBA_MLIR_USE_MKL")
     CMAKE_INSTALL_PREFIX = os.path.join(root_dir, "..")
 
@@ -35,7 +34,6 @@ if int(os.environ.get("NUMBA_MLIR_SETUP_RUN_CMAKE", 1)):
         "-DCMAKE_BUILD_TYPE=Release",
         "-DLLVM_DIR=" + LLVM_DIR,
         "-DMLIR_DIR=" + MLIR_DIR,
-        "-DTBB_DIR=" + TBB_DIR,
         "-DCMAKE_INSTALL_PREFIX=" + CMAKE_INSTALL_PREFIX,
         "-DPython3_NumPy_INCLUDE_DIRS=" + NUMPY_INCLUDE_DIR,
         "-DPython3_FIND_STRATEGY=LOCATION",
