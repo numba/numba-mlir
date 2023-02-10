@@ -44,13 +44,6 @@ cmake ../llvm-project/llvm -GNinja -DCMAKE_BUILD_TYPE=Release -DLLVM_ENABLE_PROJ
 ninja install
 ```
 
-Getting TBB
-```Bash
-wget -O tbb.tgz "https://github.com/oneapi-src/oneTBB/releases/download/v2021.6.0/oneapi-tbb-2021.6.0-lin.tgz"
-mkdir tbb
-tar -xf "tbb.tgz" -C tbb --strip-components=1
-```
-
 Getting Level Zero loader (Optional, needed for Intel GPU support)
 ```Bash
 git clone https://github.com/oneapi-src/level-zero.git
@@ -65,9 +58,8 @@ ninja install
 Building and testing Python package
 ```Bash
 cd numba_mlir
-conda create -n test-env python=3.9 numba=0.56 numpy=1.22 "setuptools<65.6" scikit-learn pytest-xdist ninja scipy pybind11 pytest lit tbb=2021.6.0 cmake "mkl-devel-dpcpp>=2023.0" -c conda-forge -c intel
+conda create -n test-env python=3.9 numba=0.56 numpy=1.22 "setuptools<65.6" scikit-learn pytest-xdist ninja scipy pybind11 pytest lit tbb=2021.6.0 tbb-devel=2021.6.0 cmake "mkl-devel-dpcpp>=2022.2" -c conda-forge -c intel
 conda activate test-env
-export TBB_PATH=<...>/tbb
 export LLVM_PATH=<...>/llvm-install
 export LEVEL_ZERO_DIR=<...>/level-zero-install # Optional
 export LEVEL_ZERO_VERSION_CHECK_OFF=1 # Optional
