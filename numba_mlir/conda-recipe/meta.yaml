@@ -22,12 +22,14 @@ requirements:
         - mkl-devel >=2022.2
         - mkl-devel-dpcpp >=2022.2
         - setuptools
+        - zlib
     host:
         - python
         - mkl-devel >=2022.2
         - mkl-devel-dpcpp >=2022.2
         - setuptools
         - numba 0.56*
+        - zlib
     run:
         - python
         - numba 0.56*
