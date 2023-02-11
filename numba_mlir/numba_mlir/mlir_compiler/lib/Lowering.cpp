@@ -522,6 +522,33 @@ private:
 
     builder.create<mlir::func::ReturnOp>(loc, result);
     fixupPhis();
+
+    if (!deviceName.empty()) {
+      builder.setInsertionPointToStart(block);
+      auto newEnv = gpu_runtime::GPURegionDescAttr::get(
+          builder.getContext(), builder.getStringAttr(deviceName));
+      llvm::SmallVector<mlir::Type> newArgsTypes;
+      for (auto arg : block->getArguments()) {
+        auto argType = arg.getType();
+        newArgsTypes.emplace_back(argType);
+        auto origType = argType.dyn_cast<numba::ntensor::NTensorType>();
+        if (!origType || origType.getEnvironment())
+          continue;
+
+        auto newType = numba::ntensor::NTensorType::get(
+            builder.getContext(), origType.getShape(),
+            origType.getElementType(), newEnv, origType.getLayout());
+        arg.setType(newType);
+        auto cast = builder.create<numba::ntensor::CastOp>(getCurrentLoc(),
+                                                           origType, arg);
+        arg.replaceAllUsesExcept(cast.getResult(), cast);
+        newArgsTypes.back() = newType;
+      }
+      auto origFuncType = func.getFunctionType();
+      auto newFuncType =
+          origFuncType.clone(newArgsTypes, origFuncType.getResults());
+      func.setFunctionType(newFuncType);
+    }
   }
 
   mlir::ValueRange buildNestedParallelLoop(
