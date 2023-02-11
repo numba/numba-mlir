@@ -289,7 +289,6 @@ def get_inner_backend(fp64_trunc, use_64bit_index):
 
 @register_pass(mutates_CFG=True, analysis_only=False)
 class MlirReplaceParfors(MlirBackendBase):
-
     _name = "mlir_replace_parfors"
 
     def __init__(self):
