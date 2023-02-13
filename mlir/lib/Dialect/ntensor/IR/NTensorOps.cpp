@@ -21,11 +21,11 @@ namespace {
 struct NTensorInlinerInterface : public mlir::DialectInlinerInterface {
   using mlir::DialectInlinerInterface::DialectInlinerInterface;
   bool isLegalToInline(mlir::Region *, mlir::Region *, bool,
-                       mlir::BlockAndValueMapping &) const final override {
+                       mlir::IRMapping &) const final override {
     return true;
   }
   bool isLegalToInline(mlir::Operation *op, mlir::Region *, bool,
-                       mlir::BlockAndValueMapping &) const final override {
+                       mlir::IRMapping &) const final override {
     return true;
   }
 };

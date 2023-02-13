@@ -1837,7 +1837,7 @@ struct TileParallelOp : public mlir::OpRewritePattern<mlir::scf::ParallelOp> {
     }
     rewriter.eraseOp(newBlock->getTerminator()); // Erase exisitng yield.
     if (!reductionOps.empty()) {
-      mlir::BlockAndValueMapping mapper;
+      mlir::IRMapping mapper;
       mapper.map(originalBlock->getArguments(), argMapping);
       mlir::OpBuilder::InsertionGuard g(rewriter);
       auto loc = originalBlock->getTerminator()->getLoc();
@@ -2279,7 +2279,7 @@ struct InsertGPUGlobalReduce
     results.reserve(op.getInitVals().size());
 
     auto loc = op.getLoc();
-    mlir::BlockAndValueMapping mapper;
+    mlir::IRMapping mapper;
     mlir::OpBuilder::InsertionGuard g(rewriter);
 
     auto &loopBlock = op.getLoopBody().front();
@@ -2488,7 +2488,7 @@ struct LowerGPUGlobalReduce
       auto reduce = b.create<mlir::scf::ReduceOp>(l, value);
       auto &finalReduceBlock = reduce.getRegion().front();
 
-      mlir::BlockAndValueMapping mapper;
+      mlir::IRMapping mapper;
       mapper.map(reduceBlock.getArguments(), finalReduceBlock.getArguments());
 
       {

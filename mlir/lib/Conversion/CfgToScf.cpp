@@ -9,7 +9,7 @@
 #include <mlir/Dialect/ControlFlow/IR/ControlFlowOps.h>
 #include <mlir/Dialect/Func/IR/FuncOps.h>
 #include <mlir/Dialect/SCF/IR/SCF.h>
-#include <mlir/IR/BlockAndValueMapping.h>
+#include <mlir/IR/IRMapping.h>
 #include <mlir/IR/Dominance.h>
 #include <mlir/Pass/PassManager.h>
 #include <mlir/Transforms/GreedyPatternRewriteDriver.h>
@@ -110,7 +110,7 @@ struct ScfIfRewriteOneExit
         cond = rewriter.create<mlir::arith::XOrIOp>(loc, cond, one);
       }
 
-      mlir::BlockAndValueMapping mapper;
+      mlir::IRMapping mapper;
       llvm::SmallVector<mlir::Value> yieldVals;
       auto copyBlock = [&](mlir::OpBuilder &builder, mlir::Location loc,
                            mlir::Block &block, mlir::ValueRange args) {
@@ -276,7 +276,7 @@ struct ScfIfRewriteTwoExits
             thenValsUsers.emplace_back(res);
 
       auto trueBuilder = [&](mlir::OpBuilder &builder, mlir::Location loc) {
-        mlir::BlockAndValueMapping mapper;
+        mlir::IRMapping mapper;
         for (auto &op : thenBlock->without_terminator())
           builder.clone(op, mapper);
 
@@ -448,7 +448,7 @@ struct ScfWhileRewrite : public mlir::OpRewritePattern<mlir::cf::BranchOp> {
       if (afterBlock->walk(checkOutsideVals).wasInterrupted())
         continue;
 
-      mlir::BlockAndValueMapping mapper;
+      mlir::IRMapping mapper;
       llvm::SmallVector<mlir::Value> yieldVars;
       auto beforeBlockArgs = beforeBlock->getArguments();
       llvm::SmallVector<mlir::Value> origVars(beforeBlockArgs.begin(),

@@ -9,7 +9,7 @@
 
 #include <mlir/Dialect/Arith/IR/Arith.h>
 #include <mlir/Dialect/SCF/IR/SCF.h>
-#include <mlir/IR/BlockAndValueMapping.h>
+#include <mlir/IR/IRMapping.h>
 #include <mlir/Interfaces/CallInterfaces.h>
 #include <mlir/Pass/Pass.h>
 #include <mlir/Transforms/GreedyPatternRewriteDriver.h>
@@ -66,7 +66,7 @@ static void simpleLower(mlir::OpBuilder &builder, mlir::Location loc,
   auto bodyBuilder = [&](mlir::OpBuilder &b, mlir::Location l, mlir::Value lhs,
                          mlir::Value rhs) {
     auto casted = mlir::cast<Op>(origOp);
-    mlir::BlockAndValueMapping mapper;
+    mlir::IRMapping mapper;
     mapper.map(casted.getLhs(), lhs);
     mapper.map(casted.getRhs(), rhs);
     mlir::Value res = b.clone(*origOp, mapper)->getResult(0);
@@ -190,7 +190,7 @@ struct PromoteToParallel : public mlir::OpRewritePattern<mlir::scf::ForOp> {
     auto bodyBuilder = [&](mlir::OpBuilder &builder, mlir::Location loc,
                            mlir::ValueRange iterVals, mlir::ValueRange) {
       assert(1 == iterVals.size());
-      mlir::BlockAndValueMapping mapping;
+      mlir::IRMapping mapping;
       mapping.map(op.getInductionVar(), iterVals.front());
       for (auto &oldOp : loopBody.without_terminator())
         if (0 == reductionOpsSet.count(&oldOp))
@@ -275,7 +275,7 @@ struct MergeNestedForIntoParallel
                            mlir::ValueRange iter_vals, mlir::ValueRange temp) {
       assert(iter_vals.size() == lowerBounds.size());
       assert(temp.empty());
-      mlir::BlockAndValueMapping mapping;
+      mlir::IRMapping mapping;
       assert((oldBody.getNumArguments() + 1) == iter_vals.size());
       mapping.map(block.getArgument(0), iter_vals.front());
       mapping.map(oldBody.getArguments(), iter_vals.drop_front());

@@ -27,7 +27,7 @@
 #include <mlir/Dialect/MemRef/IR/MemRef.h>
 #include <mlir/Dialect/MemRef/Transforms/Passes.h>
 #include <mlir/Dialect/SCF/IR/SCF.h>
-#include <mlir/IR/BlockAndValueMapping.h>
+#include <mlir/IR/IRMapping.h>
 #include <mlir/IR/Builders.h>
 #include <mlir/IR/PatternMatch.h>
 #include <mlir/Pass/Pass.h>
@@ -1182,7 +1182,7 @@ struct LowerParallel : public mlir::OpRewritePattern<numba::util::ParallelOp> {
         copyAttrs(parentFunc, func);
         return func;
       }();
-      mlir::BlockAndValueMapping mapping;
+      mlir::IRMapping mapping;
       auto &oldEntry = op.getLoopBody().front();
       auto entry = func.addEntryBlock();
       auto loc = rewriter.getUnknownLoc();
