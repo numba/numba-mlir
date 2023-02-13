@@ -24,6 +24,7 @@ def NumbaUtil_Dialect : Dialect {
   let hasConstantMaterializer = 1;
   let useDefaultAttributePrinterParser = 1;
   let useDefaultTypePrinterParser = 1;
+  let useFoldAPI = kEmitRawAttributesFolder;
 }
 
 class NumbaUtil_Type<string name, string typeMnemonic, list<Trait> traits = [],

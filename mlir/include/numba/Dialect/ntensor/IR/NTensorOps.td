@@ -17,7 +17,6 @@ include "mlir/IR/BuiltinTypeInterfaces.td"
 include "mlir/IR/EnumAttr.td"
 include "mlir/IR/OpAsmInterface.td"
 include "mlir/IR/OpBase.td"
-include "mlir/IR/SubElementInterfaces.td"
 
 def NTensor_Dialect : Dialect {
   let name = "ntensor";
@@ -50,6 +49,7 @@ def NTensor_Dialect : Dialect {
 
   let hasConstantMaterializer = 1;
   let useDefaultTypePrinterParser = 1;
+  let useFoldAPI = kEmitRawAttributesFolder;
 }
 
 class NTensor_Type<string name, string typeMnemonic, list<Trait> traits = [],
@@ -61,8 +61,7 @@ class NTensor_Type<string name, string typeMnemonic, list<Trait> traits = [],
 class NTensor_OpBase<string mnemonic, list<Trait> traits = []>
     : Op<NTensor_Dialect, mnemonic, traits>;
 
-def NTensor_Tensor : NTensor_Type<"NTensor", "ntensor", [
-  DeclareTypeInterfaceMethods<SubElementTypeInterface>, ShapedTypeInterface],
+def NTensor_Tensor : NTensor_Type<"NTensor", "ntensor", [ShapedTypeInterface],
   "::numba::ntensor::NTensorBase"> {
   let summary = "Multi-dimensional numpy-like array";
   let description = [{
