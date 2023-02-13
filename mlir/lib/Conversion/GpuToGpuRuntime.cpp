@@ -958,7 +958,7 @@ static bool isAllocationSupported(mlir::Operation *allocOp,
     if (!sc || sc.getValue() != mlir::spirv::StorageClass::Workgroup)
       return false;
   } else if (mlir::isa<mlir::memref::AllocaOp>(allocOp)) {
-    auto sc = type.getMemorySpace().dyn_cast_or_null<mlir::IntegerAttr>();
+    auto sc = type.getMemorySpace().dyn_cast_or_null<mlir::gpu::AddressSpaceAttr>();
     if (!sc || sc.getValue() != mlir::gpu::GPUDialect::getPrivateAddressSpace())
       return false;
   } else {
@@ -1063,11 +1063,11 @@ convertStorageClass(mlir::Attribute src) {
   //  if (sc == gpu_runtime::StorageClass::local)
   //    return mlir::spirv::StorageClass::Workgroup;
 
-  if (auto attr = src.dyn_cast_or_null<mlir::IntegerAttr>()) {
-    if (attr.getInt() == mlir::gpu::GPUDialect::getWorkgroupAddressSpace())
+  if (auto attr = src.dyn_cast_or_null<mlir::gpu::AddressSpaceAttr>()) {
+    if (attr.getValue() == mlir::gpu::GPUDialect::getWorkgroupAddressSpace())
       return mlir::spirv::StorageClass::Workgroup;
 
-    if (attr.getInt() == mlir::gpu::GPUDialect::getPrivateAddressSpace())
+    if (attr.getValue() == mlir::gpu::GPUDialect::getPrivateAddressSpace())
       return mlir::spirv::StorageClass::Function;
   }
 
@@ -1826,7 +1826,7 @@ struct TileParallelOp : public mlir::OpRewritePattern<mlir::scf::ParallelOp> {
           };
 
           return rewriter.create<mlir::scf::IfOp>(
-              loc, initVals.getTypes(), inBounds, bodyBuilder, bodyBuilder);
+              loc, inBounds, bodyBuilder, bodyBuilder);
         } else {
           auto thenBuilder = &mlir::scf::buildTerminatedBody;
           return rewriter.create<mlir::scf::IfOp>(loc, inBounds, thenBuilder);

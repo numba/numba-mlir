@@ -1283,11 +1283,8 @@ public:
 
       auto elemType = op.getType();
 
-      // TODO: Fix storage class handling upstream
-      //      auto storageClass = gpu_runtime::StorageClassAttr::get(
-      //          getContext(), gpu_runtime::StorageClass::local);
-      auto storageClass = rewriter.getI64IntegerAttr(
-          mlir::gpu::GPUDialect::getWorkgroupAddressSpace());
+      auto addrSpace = mlir::gpu::GPUDialect::getWorkgroupAddressSpace();
+      auto storageClass = mlir::gpu::AddressSpaceAttr::get(rewriter.getContext(), addrSpace);
       auto memrefType = mlir::MemRefType::get(mlir::ShapedType::kDynamic,
                                               elemType, nullptr, storageClass);
       groupBuffer = rewriter
@@ -1358,7 +1355,7 @@ public:
       ifBuilder.create<mlir::scf::YieldOp>(ifLoc);
     };
 
-    rewriter.create<mlir::scf::IfOp>(loc, /*resultTypes*/ std::nullopt,
+    rewriter.create<mlir::scf::IfOp>(loc,
                                      isFirstSg, ifBodyBuilder);
 
     rewriter.create<gpu_runtime::GPUBarrierOp>(
@@ -1416,13 +1413,9 @@ public:
 
     auto type = mlir::MemRefType::get(shape, oldType.getElementType());
 
-    // TODO: Fix storage class upstream
-    //    auto storageClass = gpu_runtime::StorageClassAttr::get(
-    //        getContext(), gpu_runtime::StorageClass::local);
-
     auto addrSpace = mlir::gpu::GPUDialect::getWorkgroupAddressSpace();
 
-    auto storageClass = rewriter.getI64IntegerAttr(addrSpace);
+    auto storageClass = mlir::gpu::AddressSpaceAttr::get(rewriter.getContext(), addrSpace);
     auto typeLocal = mlir::MemRefType::get(shape, type.getElementType(),
                                            nullptr, storageClass);
 
@@ -1506,13 +1499,9 @@ public:
 
     auto type = mlir::MemRefType::get(shape, oldType.getElementType());
 
-    // TODO: Fix storage class upstream
-    //    auto storageClass = gpu_runtime::StorageClassAttr::get(
-    //        getContext(), gpu_runtime::StorageClass::local);
-
     auto addrSpace = mlir::gpu::GPUDialect::getPrivateAddressSpace();
 
-    auto storageClass = rewriter.getI64IntegerAttr(addrSpace);
+    auto storageClass = mlir::gpu::AddressSpaceAttr::get(rewriter.getContext(), addrSpace);
     auto typeLocal = mlir::MemRefType::get(shape, type.getElementType(),
                                            nullptr, storageClass);
 

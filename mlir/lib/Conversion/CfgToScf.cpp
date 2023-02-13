@@ -158,12 +158,12 @@ struct ScfIfRewriteOneExit
         auto falseBody = [&](mlir::OpBuilder &builder, mlir::Location loc) {
           copyBlock(builder, loc, *falseBlock, getOperands(reverse));
         };
-        ifOp = rewriter.create<mlir::scf::IfOp>(loc, resTypes, cond, trueBody,
+        ifOp = rewriter.create<mlir::scf::IfOp>(loc, cond, trueBody,
                                                 falseBody);
       } else {
         if (resTypes.empty()) {
           ifOp =
-              rewriter.create<mlir::scf::IfOp>(loc, resTypes, cond, trueBody);
+              rewriter.create<mlir::scf::IfOp>(loc, cond, trueBody);
         } else {
           auto falseBody = [&](mlir::OpBuilder &builder, mlir::Location loc) {
             auto res = getOperands(reverse);
@@ -174,7 +174,7 @@ struct ScfIfRewriteOneExit
             }
             builder.create<mlir::scf::YieldOp>(loc, yieldVals);
           };
-          ifOp = rewriter.create<mlir::scf::IfOp>(loc, resTypes, cond, trueBody,
+          ifOp = rewriter.create<mlir::scf::IfOp>(loc, cond, trueBody,
                                                   falseBody);
         }
       }
@@ -329,7 +329,7 @@ struct ScfIfRewriteTwoExits
         retTypes.emplace_back(user.getType());
 
       auto ifResults = rewriter
-                           .create<mlir::scf::IfOp>(loc, retTypes, cond,
+                           .create<mlir::scf::IfOp>(loc, cond,
                                                     trueBuilder, falseBuilder)
                            .getResults();
       cond = rewriter.create<mlir::arith::AndIOp>(loc, cond, ifResults[0]);

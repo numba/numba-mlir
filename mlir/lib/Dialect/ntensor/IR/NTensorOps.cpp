@@ -898,8 +898,8 @@ void numba::ntensor::BroadcastOp::getCanonicalizationPatterns(
 
 static mlir::LogicalResult
 parseShape(mlir::AsmParser &parser,
-           mlir::FailureOr<llvm::SmallVector<int64_t>> &shape,
-           mlir::FailureOr<mlir::Type> &type) {
+           llvm::SmallVector<int64_t> &shape,
+           mlir::Type &type) {
   llvm::SmallVector<int64_t> dimensions;
   if (parser.parseDimensionList(dimensions))
     return mlir::failure();

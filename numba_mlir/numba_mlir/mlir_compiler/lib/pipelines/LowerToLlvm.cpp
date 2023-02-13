@@ -36,7 +36,6 @@
 #include <mlir/Transforms/Passes.h>
 
 #include <llvm/ADT/DenseMap.h>
-#include <llvm/ADT/Triple.h>
 #include <llvm/ADT/TypeSwitch.h>
 #include <llvm/MC/TargetRegistry.h>
 #include <llvm/Support/Host.h>
@@ -797,7 +796,7 @@ private:
         auto one = builder.create<mlir::LLVM::ConstantOp>(
             loc, indexType, builder.getIntegerAttr(indexType, 1));
         builder.create<mlir::LLVM::AtomicRMWOp>(
-            loc, indexType, mlir::LLVM::AtomicBinOp::add, refcntPtr, one,
+            loc, mlir::LLVM::AtomicBinOp::add, refcntPtr, one,
             mlir::LLVM::AtomicOrdering::seq_cst);
         builder.create<mlir::func::ReturnOp>(loc);
       }
@@ -962,7 +961,7 @@ private:
         auto one = builder.create<mlir::LLVM::ConstantOp>(
             loc, indexType, builder.getIntegerAttr(indexType, 1));
         auto res = builder.create<mlir::LLVM::AtomicRMWOp>(
-            loc, indexType, mlir::LLVM::AtomicBinOp::sub, refcntPtr, one,
+            loc, mlir::LLVM::AtomicBinOp::sub, refcntPtr, one,
             mlir::LLVM::AtomicOrdering::seq_cst);
 
         auto isRelease = builder.create<mlir::LLVM::ICmpOp>(
@@ -1489,7 +1488,7 @@ struct LLVMLoweringPass
     RewritePatternSet patterns(&context);
     populateFuncToLLVMFuncOpConversionPattern(typeConverter, patterns);
     populateFuncToLLVMConversionPatterns(typeConverter, patterns);
-    populateMemRefToLLVMConversionPatterns(typeConverter, patterns);
+    populateFinalizeMemRefToLLVMConversionPatterns(typeConverter, patterns);
     populateLinalgToLLVMConversionPatterns(typeConverter, patterns);
     cf::populateControlFlowToLLVMConversionPatterns(typeConverter, patterns);
     arith::populateArithToLLVMConversionPatterns(typeConverter, patterns);

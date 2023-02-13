@@ -495,7 +495,7 @@ static mlir::Value expandDim(mlir::OpBuilder &builder, mlir::Location loc,
     builder.create<mlir::scf::YieldOp>(loc, res);
   };
   return builder
-      .create<mlir::scf::IfOp>(loc, targetType, cond, trueBody, falseBody)
+      .create<mlir::scf::IfOp>(loc, cond, trueBody, falseBody)
       .getResult(0);
 }
 

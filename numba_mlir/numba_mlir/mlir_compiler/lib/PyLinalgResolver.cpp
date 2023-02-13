@@ -875,7 +875,7 @@ static py::object fromElementsImpl(py::capsule context, py::handle values,
   for (auto &val : vals)
     val = doCast(builder, loc, val, type);
 
-  auto res =
+  mlir::Value res =
       builder.create<mlir::tensor::FromElementsOp>(loc, vals).getResult();
   res = builder.createOrFold<mlir::tensor::CastOp>(loc, resTensorType, res);
 

@@ -94,7 +94,7 @@ struct ConvertBarrierOp
 
     mlir::ValueRange yieldArgsRange(yieldArgs);
     auto beforeIf = rewriter.create<mlir::scf::IfOp>(
-        ifLoc, yieldArgsRange.getTypes(), cond, bodyBuilder, bodyBuilder);
+        ifLoc, cond, bodyBuilder, bodyBuilder);
 
     for (auto &op :
          llvm::make_early_inc_range(llvm::reverse(*beforeIf.thenBlock())))

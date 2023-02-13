@@ -134,8 +134,7 @@ struct SCFToAffinePass
     mlir::RewritePatternSet patterns(&getContext());
     patterns.insert<SCFParallelLowering>(&getContext());
     FrozenRewritePatternSet frozenPatterns(std::move(patterns));
-    (void)mlir::applyOpPatternsAndFold(parallelOps, frozenPatterns,
-                                       /*strict=*/true);
+    (void)mlir::applyOpPatternsAndFold(parallelOps, frozenPatterns);
   }
 };
 

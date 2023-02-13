@@ -209,7 +209,7 @@ llvm::SmallVector<mlir::scf::ForOp, 2> numba::lowerWhileToFor(
     auto resTypes = whileOp.getOperands().getTypes();
     if (!ind)
       return builder
-          .create<mlir::scf::IfOp>(loc, resTypes, stepSign,
+          .create<mlir::scf::IfOp>(loc, stepSign,
                                    getIfBodyBuilder(true),
                                    getIfBodyBuilder(false))
           .getResults();
