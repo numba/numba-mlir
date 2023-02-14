@@ -163,10 +163,7 @@ struct SimpleOperationInfo : public llvm::DenseMapInfo<mlir::Operation *> {
         rhs == getTombstoneKey() || rhs == getEmptyKey())
       return false;
     return mlir::OperationEquivalence::isEquivalentTo(
-        lhs,
-        rhs,
-        mlir::OperationEquivalence::exactValueMatch,
-        nullptr,
+        lhs, rhs, mlir::OperationEquivalence::exactValueMatch, nullptr,
         mlir::OperationEquivalence::IgnoreLocations);
   }
 };

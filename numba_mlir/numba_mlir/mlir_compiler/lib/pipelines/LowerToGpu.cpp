@@ -22,8 +22,8 @@
 #include <mlir/Dialect/SPIRV/IR/SPIRVOps.h>
 #include <mlir/Dialect/SPIRV/IR/TargetAndABI.h>
 #include <mlir/Dialect/SPIRV/Transforms/Passes.h>
-#include <mlir/IR/IRMapping.h>
 #include <mlir/IR/Dominance.h>
+#include <mlir/IR/IRMapping.h>
 #include <mlir/Pass/PassManager.h>
 #include <mlir/Transforms/DialectConversion.h>
 #include <mlir/Transforms/Passes.h>
@@ -1284,7 +1284,8 @@ public:
       auto elemType = op.getType();
 
       auto addrSpace = mlir::gpu::GPUDialect::getWorkgroupAddressSpace();
-      auto storageClass = mlir::gpu::AddressSpaceAttr::get(rewriter.getContext(), addrSpace);
+      auto storageClass =
+          mlir::gpu::AddressSpaceAttr::get(rewriter.getContext(), addrSpace);
       auto memrefType = mlir::MemRefType::get(mlir::ShapedType::kDynamic,
                                               elemType, nullptr, storageClass);
       groupBuffer = rewriter
@@ -1355,8 +1356,7 @@ public:
       ifBuilder.create<mlir::scf::YieldOp>(ifLoc);
     };
 
-    rewriter.create<mlir::scf::IfOp>(loc,
-                                     isFirstSg, ifBodyBuilder);
+    rewriter.create<mlir::scf::IfOp>(loc, isFirstSg, ifBodyBuilder);
 
     rewriter.create<gpu_runtime::GPUBarrierOp>(
         loc, static_cast<int64_t>(gpu_runtime::FenceFlags::local));
@@ -1415,7 +1415,8 @@ public:
 
     auto addrSpace = mlir::gpu::GPUDialect::getWorkgroupAddressSpace();
 
-    auto storageClass = mlir::gpu::AddressSpaceAttr::get(rewriter.getContext(), addrSpace);
+    auto storageClass =
+        mlir::gpu::AddressSpaceAttr::get(rewriter.getContext(), addrSpace);
     auto typeLocal = mlir::MemRefType::get(shape, type.getElementType(),
                                            nullptr, storageClass);
 
@@ -1501,7 +1502,8 @@ public:
 
     auto addrSpace = mlir::gpu::GPUDialect::getPrivateAddressSpace();
 
-    auto storageClass = mlir::gpu::AddressSpaceAttr::get(rewriter.getContext(), addrSpace);
+    auto storageClass =
+        mlir::gpu::AddressSpaceAttr::get(rewriter.getContext(), addrSpace);
     auto typeLocal = mlir::MemRefType::get(shape, type.getElementType(),
                                            nullptr, storageClass);
 

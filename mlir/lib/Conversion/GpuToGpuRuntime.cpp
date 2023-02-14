@@ -958,7 +958,8 @@ static bool isAllocationSupported(mlir::Operation *allocOp,
     if (!sc || sc.getValue() != mlir::spirv::StorageClass::Workgroup)
       return false;
   } else if (mlir::isa<mlir::memref::AllocaOp>(allocOp)) {
-    auto sc = type.getMemorySpace().dyn_cast_or_null<mlir::gpu::AddressSpaceAttr>();
+    auto sc =
+        type.getMemorySpace().dyn_cast_or_null<mlir::gpu::AddressSpaceAttr>();
     if (!sc || sc.getValue() != mlir::gpu::GPUDialect::getPrivateAddressSpace())
       return false;
   } else {
@@ -1824,9 +1825,8 @@ struct TileParallelOp : public mlir::OpRewritePattern<mlir::scf::ParallelOp> {
           auto bodyBuilder = [&](mlir::OpBuilder &b, mlir::Location l) {
             b.create<mlir::scf::YieldOp>(l, results);
           };
-
-          return rewriter.create<mlir::scf::IfOp>(
-              loc, inBounds, bodyBuilder, bodyBuilder);
+          return rewriter.create<mlir::scf::IfOp>(loc, inBounds, bodyBuilder,
+                                                  bodyBuilder);
         } else {
           auto thenBuilder = &mlir::scf::buildTerminatedBody;
           return rewriter.create<mlir::scf::IfOp>(loc, inBounds, thenBuilder);

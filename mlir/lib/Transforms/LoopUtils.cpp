@@ -16,9 +16,9 @@
 #include <mlir/Dialect/Arith/IR/Arith.h>
 #include <mlir/Dialect/MemRef/IR/MemRef.h>
 #include <mlir/Dialect/SCF/IR/SCF.h>
-#include <mlir/IR/IRMapping.h>
 #include <mlir/IR/Dominance.h>
 #include <mlir/IR/FunctionInterfaces.h>
+#include <mlir/IR/IRMapping.h>
 #include <mlir/IR/PatternMatch.h>
 #include <mlir/Support/LogicalResult.h>
 
@@ -209,8 +209,7 @@ llvm::SmallVector<mlir::scf::ForOp, 2> numba::lowerWhileToFor(
     auto resTypes = whileOp.getOperands().getTypes();
     if (!ind)
       return builder
-          .create<mlir::scf::IfOp>(loc, stepSign,
-                                   getIfBodyBuilder(true),
+          .create<mlir::scf::IfOp>(loc, stepSign, getIfBodyBuilder(true),
                                    getIfBodyBuilder(false))
           .getResults();
 

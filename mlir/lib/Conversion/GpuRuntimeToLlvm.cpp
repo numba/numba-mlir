@@ -446,7 +446,8 @@ private:
     mlir::Value one = rewriter.create<mlir::LLVM::ConstantOp>(
         loc, llvmInt32Type, rewriter.getI32IntegerAttr(1));
 
-    auto localMemStorageClass = mlir::gpu::AddressSpaceAttr::get(rewriter.getContext(),
+    auto localMemStorageClass = mlir::gpu::AddressSpaceAttr::get(
+        rewriter.getContext(),
         mlir::gpu::GPUDialect::getWorkgroupAddressSpace());
 
     auto computeTypeSize = [&](mlir::Type type) -> mlir::Value {
@@ -580,7 +581,8 @@ private:
 
     bool isShared = op.getHostShared();
 
-    auto localMemStorageClass = mlir::gpu::AddressSpaceAttr::get(rewriter.getContext(),
+    auto localMemStorageClass = mlir::gpu::AddressSpaceAttr::get(
+        rewriter.getContext(),
         mlir::gpu::GPUDialect::getWorkgroupAddressSpace());
     bool isLocal = memrefType.getMemorySpace() == localMemStorageClass;
 

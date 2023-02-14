@@ -494,8 +494,7 @@ static mlir::Value expandDim(mlir::OpBuilder &builder, mlir::Location loc,
       res = builder.create<mlir::tensor::CastOp>(loc, targetType, src);
     builder.create<mlir::scf::YieldOp>(loc, res);
   };
-  return builder
-      .create<mlir::scf::IfOp>(loc, cond, trueBody, falseBody)
+  return builder.create<mlir::scf::IfOp>(loc, cond, trueBody, falseBody)
       .getResult(0);
 }
 
