@@ -78,12 +78,10 @@ struct ConvertBarrierOp
     auto ifLoc = ifOp->getLoc();
     auto cond = ifOp.getCondition();
 
-    auto thenBodyBuilder = [&](mlir::OpBuilder & /*builder*/,
-                               mlir::Location /*loc*/) {
-      // Nothing
-    };
+    auto emptyBodyBuilder = [&](mlir::OpBuilder & /*builder*/,
+                                mlir::Location /*loc*/) {};
 
-    auto elseBodyBuilder = [&](mlir::OpBuilder &builder, mlir::Location loc) {
+    auto bodyBuilder = [&](mlir::OpBuilder &builder, mlir::Location loc) {
       llvm::SmallVector<mlir::Value> results;
       results.reserve(yieldArgs.size());
       for (auto arg : yieldArgs) {
@@ -95,9 +93,13 @@ struct ConvertBarrierOp
     };
 
     mlir::ValueRange yieldArgsRange(yieldArgs);
-    auto beforeIf =
-        rewriter.create<mlir::scf::IfOp>(ifLoc, yieldArgsRange.getTypes(), cond,
-                                         thenBodyBuilder, elseBodyBuilder);
+    auto beforeIf = rewriter.create<mlir::scf::IfOp>(
+        ifLoc, yieldArgsRange.getTypes(), cond, bodyBuilder, bodyBuilder);
+
+    for (auto &op :
+         llvm::make_early_inc_range(llvm::reverse(*beforeIf.thenBlock())))
+      rewriter.eraseOp(&op);
+
     rewriter.mergeBlocks(beforeBlock, beforeIf.thenBlock());
 
     rewriter.create<gpu_runtime::GPUBarrierOp>(barrierLoc, barrierFlags);
@@ -105,7 +107,7 @@ struct ConvertBarrierOp
     auto beforeIfResults = beforeIf.getResults();
 
     auto afterIf =
-        rewriter.create<mlir::scf::IfOp>(ifLoc, cond, thenBodyBuilder);
+        rewriter.create<mlir::scf::IfOp>(ifLoc, cond, emptyBodyBuilder);
     rewriter.mergeBlocks(afterBlock, afterIf.thenBlock());
 
     for (auto &op : *afterIf.thenBlock()) {
