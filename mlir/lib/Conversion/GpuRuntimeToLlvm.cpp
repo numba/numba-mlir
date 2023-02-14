@@ -851,6 +851,13 @@ void gpu_runtime::populateGpuToLLVMPatternsAndLegality(
         return llvmPointerType;
       });
 
+  converter.addTypeAttributeConversion(
+      [](mlir::BaseMemRefType type,
+         mlir::gpu::AddressSpaceAttr /*memorySpaceAttr*/) -> mlir::IntegerAttr {
+        auto ctx = type.getContext();
+        return mlir::IntegerAttr::get(mlir::IntegerType::get(ctx, 64), 0);
+      });
+
   patterns.insert<
       // clang-format off
       ConvertGpuStreamCreatePattern,

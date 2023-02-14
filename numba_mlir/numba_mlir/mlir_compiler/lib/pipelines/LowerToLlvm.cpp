@@ -23,6 +23,7 @@
 #include <mlir/Dialect/Arith/Transforms/Passes.h>
 #include <mlir/Dialect/ControlFlow/IR/ControlFlowOps.h>
 #include <mlir/Dialect/Func/IR/FuncOps.h>
+#include <mlir/Dialect/GPU/IR/GPUDialect.h>
 #include <mlir/Dialect/LLVMIR/LLVMDialect.h>
 #include <mlir/Dialect/MemRef/IR/MemRef.h>
 #include <mlir/Dialect/MemRef/Transforms/Passes.h>
@@ -1484,6 +1485,16 @@ struct LLVMLoweringPass
     ModuleOp m = getOperation();
 
     LLVMTypeConverter typeConverter(&context, options);
+
+    // TODO: move addrspace conversion to separate pass
+    typeConverter.addTypeAttributeConversion(
+        [](mlir::BaseMemRefType type,
+           mlir::gpu::AddressSpaceAttr /*memorySpaceAttr*/)
+            -> mlir::IntegerAttr {
+          auto ctx = type.getContext();
+          return mlir::IntegerAttr::get(mlir::IntegerType::get(ctx, 64), 0);
+        });
+
     populateToLLVMAdditionalTypeConversion(typeConverter);
     RewritePatternSet patterns(&context);
     populateFuncToLLVMFuncOpConversionPattern(typeConverter, patterns);
