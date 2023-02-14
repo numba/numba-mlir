@@ -1812,20 +1812,22 @@ struct TileParallelOp : public mlir::OpRewritePattern<mlir::scf::ParallelOp> {
 
       ifOp = [&]() -> mlir::scf::IfOp {
         if (!reductionOps.empty()) {
-          auto thenBuilder = &mlir::scf::buildTerminatedBody;
-          auto elseBuilder = [&](mlir::OpBuilder &b, mlir::Location l) {
-            llvm::SmallVector<mlir::Value> results;
-            for (auto [i, val] : llvm::enumerate(initVals)) {
-              auto constVal =
-                  b.create<mlir::arith::ConstantOp>(l, neutralValues[i]);
-              results.emplace_back(constVal);
-            }
+          llvm::SmallVector<mlir::Value> results;
+          for (auto [i, val] : llvm::enumerate(initVals)) {
+            auto constVal =
+                rewriter.create<mlir::arith::ConstantOp>(loc, neutralValues[i]);
+            results.emplace_back(constVal);
+          }
+
+          auto bodyBuilder = [&](mlir::OpBuilder &b, mlir::Location l) {
             b.create<mlir::scf::YieldOp>(l, results);
           };
+
           return rewriter.create<mlir::scf::IfOp>(
-              loc, initVals.getTypes(), inBounds, thenBuilder, elseBuilder);
+              loc, initVals.getTypes(), inBounds, bodyBuilder, bodyBuilder);
         } else {
-          return rewriter.create<mlir::scf::IfOp>(loc, std::nullopt, inBounds);
+          auto thenBuilder = &mlir::scf::buildTerminatedBody;
+          return rewriter.create<mlir::scf::IfOp>(loc, inBounds, thenBuilder);
         }
       }();
 
