@@ -43,7 +43,7 @@ bool NumpyResolver::hasFunc(llvm::StringRef name) const {
   return !impl->getFuncDesc(name).is_none();
 }
 
-static llvm::Optional<mlir::Value>
+static std::optional<mlir::Value>
 parseDefault(mlir::OpBuilder &builder, mlir::Location loc, py::handle obj) {
   if (py::isinstance<py::int_>(obj)) {
     auto val = obj.cast<int64_t>();
@@ -96,7 +96,7 @@ mlir::LogicalResult NumpyResolver::resolveFuncArgs(
   for (auto [val, name] : llvm::zip(args, argsNames))
     argsNamesAndValues.emplace_back(val, name.cast<mlir::StringAttr>());
 
-  auto findArg = [&](llvm::StringRef argName) -> llvm::Optional<mlir::Value> {
+  auto findArg = [&](llvm::StringRef argName) -> std::optional<mlir::Value> {
     if (argsNamesAndValues.empty())
       return std::nullopt;
 

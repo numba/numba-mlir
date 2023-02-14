@@ -116,7 +116,7 @@ public:
   }
 
 private:
-  llvm::Optional<llvm::SmallVector<mlir::ConstantIntRanges>> shapeRanges;
+  std::optional<llvm::SmallVector<mlir::ConstantIntRanges>> shapeRanges;
 };
 
 inline llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
@@ -490,7 +490,7 @@ public:
           continue;
 
         auto ind = static_cast<unsigned>(i);
-        auto newRange = [&]() -> llvm::Optional<ShapeValue> {
+        auto newRange = [&]() -> std::optional<ShapeValue> {
           auto attr = func.getArgAttrOfType<mlir::ArrayAttr>(ind, attrName);
           if (attr)
             return ShapeValue::intersect({shaped}, {attr});
@@ -540,7 +540,7 @@ public:
       assert(results.size() == 1);
 
       auto *lattice = results.front();
-      auto newRange = [&]() -> llvm::Optional<mlir::ConstantIntRanges> {
+      auto newRange = [&]() -> std::optional<mlir::ConstantIntRanges> {
         auto state =
             getOrCreateFor<ShapeValueLattice>(op, dim.getShapedValue());
         if (!state)

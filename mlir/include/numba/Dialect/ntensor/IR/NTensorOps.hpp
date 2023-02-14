@@ -55,7 +55,7 @@ public:
 
   /// Clone this type with the given shape and element type. If the
   /// provided shape is `None`, the current shape of the type is used.
-  NTensorBase cloneWith(llvm::Optional<llvm::ArrayRef<int64_t>> shape,
+  NTensorBase cloneWith(std::optional<llvm::ArrayRef<int64_t>> shape,
                         mlir::Type elementType) const;
 
   /// Return true if the specified element type is ok in a tensor.

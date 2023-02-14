@@ -36,7 +36,7 @@ enum EBound {
   UpperBound,
 };
 template <mlir::arith::CmpIPredicate Pred, EBound Bound, int64_t Value>
-static llvm::Optional<int64_t>
+static std::optional<int64_t>
 handlerImpl(mlir::arith::CmpIPredicate pred, mlir::Value lhs, mlir::Value rhs,
             mlir::Value index, mlir::Value lowerBound, mlir::Value upperBound) {
   if (pred != Pred)
@@ -57,7 +57,7 @@ struct CmpLoopBoundsSimplify
   matchAndRewrite(mlir::arith::CmpIOp cmp,
                   mlir::PatternRewriter &rewriter) const override {
     auto res = [&]()
-        -> llvm::Optional<std::tuple<mlir::Value, mlir::Value, mlir::Value>> {
+        -> std::optional<std::tuple<mlir::Value, mlir::Value, mlir::Value>> {
       for (auto val : {cmp.getLhs(), cmp.getRhs()}) {
         auto blockArg = val.dyn_cast<mlir::BlockArgument>();
         if (!blockArg)
@@ -109,8 +109,8 @@ struct CmpLoopBoundsSimplify
         break;
 
     using fptr_t =
-        llvm::Optional<int64_t> (*)(Predicate, mlir::Value, mlir::Value,
-                                    mlir::Value, mlir::Value, mlir::Value);
+        std::optional<int64_t> (*)(Predicate, mlir::Value, mlir::Value,
+                                   mlir::Value, mlir::Value, mlir::Value);
     const fptr_t handlers[] = {
         &handlerImpl<Predicate::sge, UpperBound, 0>,
         &handlerImpl<Predicate::slt, LowerBound, 0>,

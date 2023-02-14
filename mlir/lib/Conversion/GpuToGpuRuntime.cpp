@@ -128,7 +128,7 @@ struct InsertGPUAllocs
     auto &aliases = getAnalysis<mlir::BufferViewFlowAnalysis>();
 
     auto getMemref = [](mlir::Operation *op)
-        -> llvm::Optional<mlir::SmallVector<mlir::Value, 4>> {
+        -> std::optional<mlir::SmallVector<mlir::Value, 4>> {
       if (auto load = mlir::dyn_cast<mlir::memref::LoadOp>(op)) {
         return {{load.getMemref()}};
       } else if (auto store = mlir::dyn_cast<mlir::memref::StoreOp>(op)) {
@@ -658,8 +658,8 @@ struct UnstrideMemrefsPass
   }
 };
 
-static llvm::Optional<mlir::Value> getGpuStream(mlir::OpBuilder &builder,
-                                                mlir::Operation *op) {
+static std::optional<mlir::Value> getGpuStream(mlir::OpBuilder &builder,
+                                               mlir::Operation *op) {
   assert(op);
   auto func = op->getParentOfType<mlir::FunctionOpInterface>();
   if (!func)
@@ -690,7 +690,7 @@ static llvm::Optional<mlir::Value> getGpuStream(mlir::OpBuilder &builder,
   return stream;
 }
 
-static llvm::Optional<unsigned> getTypeSize(mlir::Type type) {
+static std::optional<unsigned> getTypeSize(mlir::Type type) {
   if (type.isIntOrFloat())
     return type.getIntOrFloatBitWidth() / 8;
 
@@ -1050,7 +1050,7 @@ public:
   }
 };
 
-static llvm::Optional<mlir::spirv::StorageClass>
+static std::optional<mlir::spirv::StorageClass>
 convertStorageClass(mlir::Attribute src) {
   // TODO: Fix storage class upstream
   //  auto attr = src.dyn_cast_or_null<gpu_runtime::StorageClassAttr>();
@@ -1271,21 +1271,23 @@ struct GPUToSpirvPass
       mlir::SPIRVTypeConverter typeConverter(targetAttr, options);
       mlir::RewritePatternSet patterns(context);
 
-      typeConverter.addConversion([&typeConverter](mlir::MemRefType type)
-                                      -> llvm::Optional<mlir::Type> {
-        auto srcElemType = type.getElementType();
-        if (!srcElemType.isIntOrFloat() && !srcElemType.isa<mlir::VectorType>())
-          return mlir::Type(nullptr);
+      typeConverter.addConversion(
+          [&typeConverter](mlir::MemRefType type) -> std::optional<mlir::Type> {
+            auto srcElemType = type.getElementType();
+            if (!srcElemType.isIntOrFloat() &&
+                !srcElemType.isa<mlir::VectorType>())
+              return mlir::Type(nullptr);
 
-        auto elemType = typeConverter.convertType(srcElemType);
-        if (!elemType)
-          return mlir::Type(nullptr);
+            auto elemType = typeConverter.convertType(srcElemType);
+            if (!elemType)
+              return mlir::Type(nullptr);
 
-        auto sc = convertStorageClass(
-            type.getMemorySpace(), mlir::spirv::StorageClass::CrossWorkgroup);
+            auto sc =
+                convertStorageClass(type.getMemorySpace(),
+                                    mlir::spirv::StorageClass::CrossWorkgroup);
 
-        return mlir::spirv::PointerType::get(elemType, sc);
-      });
+            return mlir::spirv::PointerType::get(elemType, sc);
+          });
 
       mlir::ScfToSPIRVContext scfToSpirvCtx;
       mlir::populateSCFToSPIRVPatterns(typeConverter, scfToSpirvCtx, patterns);
@@ -1668,7 +1670,7 @@ struct GenDeviceFuncsPass
   }
 };
 
-static llvm::Optional<mlir::Attribute> getNeutralValue(mlir::Block &block) {
+static std::optional<mlir::Attribute> getNeutralValue(mlir::Block &block) {
   auto body = block.without_terminator();
   if (!llvm::hasSingleElement(body))
     return std::nullopt;
@@ -1732,7 +1734,7 @@ struct TileParallelOp : public mlir::OpRewritePattern<mlir::scf::ParallelOp> {
     globalSize.fill(one);
     llvm::copy(oldUpperBounds.take_front(numLoops), globalSize.begin());
 
-    llvm::Optional<mlir::Value> stream;
+    std::optional<mlir::Value> stream;
     auto localSize =
         rewriter
             .create<gpu_runtime::GPUSuggestBlockSizeOp>(loc, stream, globalSize)
@@ -2111,7 +2113,7 @@ struct TruncateF64ForGPUPass
     });
 
     converter.addConversion(
-        [](mlir::MemRefType type) -> llvm::Optional<mlir::Type> {
+        [](mlir::MemRefType type) -> std::optional<mlir::Type> {
           if (!type.getElementType().isF64())
             return std::nullopt;
 
@@ -2123,7 +2125,7 @@ struct TruncateF64ForGPUPass
 
     auto addCast = [](mlir::OpBuilder &builder, mlir::Type dstType,
                       mlir::ValueRange inputs,
-                      mlir::Location loc) -> llvm::Optional<mlir::Value> {
+                      mlir::Location loc) -> std::optional<mlir::Value> {
       if (inputs.size() != 1)
         return std::nullopt;
 
@@ -2162,7 +2164,7 @@ struct TruncateF64ForGPUPass
 
     target.addDynamicallyLegalOp<mlir::memref::LoadOp, mlir::memref::StoreOp,
                                  mlir::memref::ReinterpretCastOp>(
-        [&converter](mlir::Operation *op) -> llvm::Optional<bool> {
+        [&converter](mlir::Operation *op) -> std::optional<bool> {
           if (converter.isLegal(op))
             return true;
 
@@ -2514,7 +2516,7 @@ struct LowerGPUGlobalReduce
 };
 
 template <typename Op, mlir::gpu::AllReduceOperation ReduceOp>
-static llvm::Optional<mlir::gpu::AllReduceOperation>
+static std::optional<mlir::gpu::AllReduceOperation>
 convertAllReduceOp(mlir::Operation *op) {
   if (mlir::isa<Op>(op))
     return ReduceOp;
@@ -2539,7 +2541,7 @@ struct AllReduceRemoveRegion
       return mlir::failure();
 
     using RedOp = mlir::gpu::AllReduceOperation;
-    using Handler = llvm::Optional<RedOp> (*)(mlir::Operation *);
+    using Handler = std::optional<RedOp> (*)(mlir::Operation *);
     const Handler handlers[] = {
         &convertAllReduceOp<mlir::arith::AddIOp, RedOp::ADD>,
         &convertAllReduceOp<mlir::arith::AddFOp, RedOp::ADD>,
@@ -2554,7 +2556,7 @@ struct AllReduceRemoveRegion
         &convertAllReduceOp<mlir::arith::MinFOp, RedOp::MIN>,
     };
 
-    auto result = [&]() -> llvm::Optional<RedOp> {
+    auto result = [&]() -> std::optional<RedOp> {
       auto &reduceOp = *ops.begin();
       for (auto h : handlers)
         if (auto res = h(&reduceOp))

@@ -980,7 +980,7 @@ void PlierToStdPass::runOnOperation() {
   auto context = &getContext();
   typeConverter.addConversion(
       [](mlir::Type type, llvm::SmallVectorImpl<mlir::Type> &retTypes)
-          -> llvm::Optional<mlir::LogicalResult> {
+          -> std::optional<mlir::LogicalResult> {
         if (isOmittedType(type))
           return mlir::success();
 
@@ -990,7 +990,7 @@ void PlierToStdPass::runOnOperation() {
 
   auto materializeCast = [](mlir::OpBuilder &builder, mlir::Type type,
                             mlir::ValueRange inputs,
-                            mlir::Location loc) -> llvm::Optional<mlir::Value> {
+                            mlir::Location loc) -> std::optional<mlir::Value> {
     if (inputs.size() == 1)
       return builder
           .create<mlir::UnrealizedConversionCastOp>(loc, type, inputs.front())
@@ -1064,7 +1064,7 @@ void PlierToStdPass::runOnOperation() {
       });
 
   target.addDynamicallyLegalOp<plier::GetItemOp>(
-      [&](plier::GetItemOp op) -> llvm::Optional<bool> {
+      [&](plier::GetItemOp op) -> std::optional<bool> {
         auto type = typeConverter.convertType(op.getValue().getType());
         if (type.isa_and_nonnull<mlir::TupleType>())
           return false;

@@ -18,7 +18,7 @@ mlir::Type PyTypeConverter::convertType(mlir::MLIRContext &context,
   // Iterate in reverse order to follow mlir type conversion behavior.
   for (auto &conv : llvm::reverse(conversions)) {
     assert(conv && "Invalid conversion func");
-    llvm::Optional<mlir::Type> result = conv(context, pyObj);
+    std::optional<mlir::Type> result = conv(context, pyObj);
     if (!result)
       continue;
 

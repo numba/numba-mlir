@@ -123,7 +123,7 @@ struct DimExpandShape : public mlir::OpRewritePattern<DimOp> {
       return mlir::failure();
 
     auto reassoc = es.getReassociationIndices();
-    auto srcIndexAttr = [&]() -> llvm::Optional<unsigned> {
+    auto srcIndexAttr = [&]() -> std::optional<unsigned> {
       for (auto &it : llvm::enumerate(reassoc))
         for (auto i : it.value())
           if (i == dstIndex)
@@ -926,7 +926,7 @@ struct ChangeLayoutIf : public mlir::OpRewritePattern<mlir::scf::YieldOp> {
   }
 };
 
-static llvm::Optional<unsigned> getSingleDynamicDim(mlir::ShapedType type) {
+static std::optional<unsigned> getSingleDynamicDim(mlir::ShapedType type) {
   if (!type.hasRank())
     return std::nullopt;
 
@@ -1756,7 +1756,7 @@ void TakeContextOp::build(mlir::OpBuilder &b, mlir::OperationState &result,
   build(b, result, allTypes, initFunc, releaseFunc);
 }
 
-llvm::Optional<int64_t> TupleExtractOp::getConstantIndex() {
+std::optional<int64_t> TupleExtractOp::getConstantIndex() {
   if (auto constantOp = getIndex().getDefiningOp<mlir::arith::ConstantOp>())
     return constantOp.getValue().cast<mlir::IntegerAttr>().getInt();
   return {};
@@ -1787,7 +1787,7 @@ TupleExtractOp::fold(mlir::ArrayRef<mlir::Attribute> operands) {
 /// correspond to a constant value for each operand, or null if that operand is
 /// not a constant.
 void EnvironmentRegionOp::getSuccessorRegions(
-    llvm::Optional<unsigned> index, mlir::ArrayRef<mlir::Attribute> operands,
+    std::optional<unsigned> index, mlir::ArrayRef<mlir::Attribute> operands,
     mlir::SmallVectorImpl<mlir::RegionSuccessor> &regions) {
   // Branch into body if we came from parent region.
   if (!index) {

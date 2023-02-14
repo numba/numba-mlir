@@ -13,7 +13,7 @@ struct Meminfo {
   mlir::ValueRange indices;
 };
 
-static llvm::Optional<Meminfo> getMeminfo(mlir::Operation *op) {
+static std::optional<Meminfo> getMeminfo(mlir::Operation *op) {
   assert(nullptr != op);
   if (auto load = mlir::dyn_cast<mlir::memref::LoadOp>(op))
     return Meminfo{load.getMemref(), load.getIndices()};

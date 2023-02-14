@@ -5,10 +5,10 @@
 #pragma once
 
 #include <iterator>
+#include <optional>
 
 #include <llvm/ADT/ArrayRef.h>
 #include <llvm/ADT/DenseMap.h>
-#include <llvm/ADT/Optional.h>
 #include <llvm/ADT/simple_ilist.h>
 #include <llvm/Support/Allocator.h>
 
@@ -105,5 +105,5 @@ private:
                    llvm::ArrayRef<Node *> args);
 };
 
-llvm::Optional<numba::MemorySSA> buildMemorySSA(mlir::Region &region);
+std::optional<numba::MemorySSA> buildMemorySSA(mlir::Region &region);
 } // namespace numba

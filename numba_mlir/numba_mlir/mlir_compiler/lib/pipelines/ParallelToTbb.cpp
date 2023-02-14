@@ -32,7 +32,7 @@ static mlir::MemRefType getReduceType(mlir::Type type, int64_t count) {
   return {};
 }
 
-static llvm::Optional<mlir::Attribute>
+static std::optional<mlir::Attribute>
 getReduceInitVal(mlir::Type type, mlir::Block &reduceBlock) {
   if (!llvm::hasSingleElement(reduceBlock.without_terminator()))
     return std::nullopt;
@@ -220,7 +220,7 @@ struct LoopInfo {
   numba::util::ParallelOp innermostParallel;
 };
 
-static llvm::Optional<LoopInfo> getLoopInfo(mlir::Operation *op) {
+static std::optional<LoopInfo> getLoopInfo(mlir::Operation *op) {
   assert(op);
 
   LoopInfo ret;

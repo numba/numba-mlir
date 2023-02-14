@@ -395,7 +395,7 @@ struct GetitemOpLowering
   }
 };
 
-static llvm::Optional<mlir::Type> isUnituple(mlir::Type type) {
+static std::optional<mlir::Type> isUnituple(mlir::Type type) {
   auto tupleType = type.dyn_cast<mlir::TupleType>();
   if (!tupleType || tupleType.size() == 0)
     return std::nullopt;

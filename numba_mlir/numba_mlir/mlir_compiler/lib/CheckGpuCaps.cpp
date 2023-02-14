@@ -19,7 +19,7 @@ static ResolveFptr getResolver() {
   return resolver;
 }
 
-llvm::Optional<OffloadDeviceCapabilities>
+std::optional<OffloadDeviceCapabilities>
 getOffloadDeviceCapabilities(const std::string &name) {
   auto resolver = getResolver();
   if (!resolver)
@@ -35,7 +35,7 @@ getOffloadDeviceCapabilities(const std::string &name) {
   return ret;
 }
 
-llvm::Optional<std::string> getDefaultDevice() {
+std::optional<std::string> getDefaultDevice() {
   py::object mod = py::module::import("numba_mlir.mlir.dpctl_interop");
   py::object res = mod.attr("get_default_device_name")();
   if (res.is_none())

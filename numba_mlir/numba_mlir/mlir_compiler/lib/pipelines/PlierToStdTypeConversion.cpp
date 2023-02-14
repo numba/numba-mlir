@@ -106,8 +106,8 @@ struct Conversion {
     omittedType = mod.attr("Omitted");
   }
 
-  llvm::Optional<mlir::Type> operator()(mlir::MLIRContext &context,
-                                        py::handle obj) {
+  std::optional<mlir::Type> operator()(mlir::MLIRContext &context,
+                                       py::handle obj) {
     for (auto &[cls, func] : primitiveTypes) {
       if (obj.is(cls))
         return func(context);

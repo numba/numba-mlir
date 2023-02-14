@@ -195,7 +195,7 @@ static auto toValues(py::handle obj, UnwrapFunc &&unwrapFunc) {
   return ret;
 }
 
-static llvm::Optional<py::object> getPyLiteral(mlir::Attribute attr) {
+static std::optional<py::object> getPyLiteral(mlir::Attribute attr) {
   assert(attr);
   if (auto intAttr = attr.dyn_cast<mlir::IntegerAttr>()) {
     if (auto intType = attr.cast<mlir::TypedAttr>()
@@ -399,8 +399,8 @@ struct PyLinalgResolver::Context {
   }
 
 private:
-  llvm::Optional<py::object> makePyLiteral(py::capsule context,
-                                           mlir::Value val) {
+  std::optional<py::object> makePyLiteral(py::capsule context,
+                                          mlir::Value val) {
     assert(val);
     if (auto buildTuple = val.getDefiningOp<numba::util::BuildTupleOp>()) {
       auto args = buildTuple.getArgs();
@@ -1841,20 +1841,20 @@ PyLinalgResolver::PyLinalgResolver(const char *modName, const char *regName)
 
 PyLinalgResolver::~PyLinalgResolver() {}
 
-llvm::Optional<PyLinalgResolver::Values>
+std::optional<PyLinalgResolver::Values>
 PyLinalgResolver::rewriteFunc(llvm::Twine name, mlir::Location loc,
                               mlir::OpBuilder &builder, mlir::ValueRange args,
                               KWArgs kwargs) const {
   return rewrite((name + "()").str(), loc, builder, args, kwargs);
 }
 
-llvm::Optional<PyLinalgResolver::Values>
+std::optional<PyLinalgResolver::Values>
 PyLinalgResolver::rewriteAttr(llvm::Twine name, mlir::Location loc,
                               mlir::OpBuilder &builder, mlir::Value arg) const {
   return rewrite(name.str(), loc, builder, arg, {});
 }
 
-llvm::Optional<PyLinalgResolver::Values>
+std::optional<PyLinalgResolver::Values>
 PyLinalgResolver::rewrite(llvm::StringRef name, mlir::Location loc,
                           mlir::OpBuilder &builder, mlir::ValueRange args,
                           KWArgs kwargs) const {

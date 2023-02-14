@@ -28,8 +28,8 @@ struct Conversion {
     fixedArray = arrayMod.attr("FixedArray");
   }
 
-  llvm::Optional<mlir::Type> operator()(mlir::MLIRContext &context,
-                                        py::handle obj) {
+  std::optional<mlir::Type> operator()(mlir::MLIRContext &context,
+                                       py::handle obj) {
     if (py::isinstance(obj, dtype)) {
       auto type = converter.convertType(context, obj.attr("dtype"));
       if (!type)

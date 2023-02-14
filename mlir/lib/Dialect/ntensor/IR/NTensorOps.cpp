@@ -70,7 +70,7 @@ llvm::ArrayRef<int64_t> numba::ntensor::NTensorBase::getShape() const {
 }
 
 numba::ntensor::NTensorBase numba::ntensor::NTensorBase::cloneWith(
-    llvm::Optional<llvm::ArrayRef<int64_t>> shape, Type elementType) const {
+    std::optional<llvm::ArrayRef<int64_t>> shape, Type elementType) const {
   auto t = cast<NTensorType>();
   return NTensorType::get(shape.value_or(getShape()), elementType,
                           t.getEnvironment(), t.getLayout());
@@ -185,7 +185,7 @@ void numba::ntensor::LoadOp::getCanonicalizationPatterns(
   results.insert<LoadCastFold>(context);
 }
 
-static llvm::Optional<mlir::Value>
+static std::optional<mlir::Value>
 foldLoadFromElements(mlir::Value src, mlir::ValueRange indices) {
   auto fromElements = src.getDefiningOp<numba::ntensor::FromElementsOp>();
   if (!fromElements)
@@ -279,7 +279,7 @@ void numba::ntensor::DimOp::build(mlir::OpBuilder &builder,
   build(builder, result, source, indexValue);
 }
 
-llvm::Optional<int64_t> numba::ntensor::DimOp::getConstantIndex() {
+std::optional<int64_t> numba::ntensor::DimOp::getConstantIndex() {
   if (auto val = mlir::getConstantIntValue(getIndex()))
     return *val;
 
@@ -303,7 +303,7 @@ mlir::Speculation::Speculatability numba::ntensor::DimOp::getSpeculatability() {
 
 mlir::LogicalResult numba::ntensor::DimOp::verify() {
   // Assume unknown index to be in range.
-  llvm::Optional<int64_t> index = getConstantIndex();
+  std::optional<int64_t> index = getConstantIndex();
   if (!index)
     return mlir::success();
 
@@ -638,7 +638,7 @@ llvm::SmallBitVector numba::ntensor::SubviewOp::getDroppedDims() {
   llvm::SmallBitVector droppedDims(mixedSizes.size());
   unsigned shapePos = 0;
   for (const auto &size : enumerate(mixedSizes)) {
-    llvm::Optional<int64_t> sizeVal = getConstantIntValue(size.value());
+    std::optional<int64_t> sizeVal = getConstantIntValue(size.value());
     // If the size is not 1, or if the current matched dimension of the result
     // is the same static shape as the size value (which is 1), then the
     // dimension is preserved.

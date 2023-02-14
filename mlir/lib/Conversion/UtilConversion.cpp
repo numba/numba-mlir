@@ -88,7 +88,7 @@ void numba::populateUtilConversionPatterns(mlir::TypeConverter &converter,
   patterns.insert<ConvertTakeContext>(converter, patterns.getContext());
 
   target.addDynamicallyLegalOp<numba::util::TakeContextOp>(
-      [&](mlir::Operation *op) -> llvm::Optional<bool> {
+      [&](mlir::Operation *op) -> std::optional<bool> {
         for (auto range : {mlir::TypeRange(op->getOperandTypes()),
                            mlir::TypeRange(op->getResultTypes())})
           for (auto type : range)
@@ -103,7 +103,7 @@ void numba::populateUtilConversionPatterns(mlir::TypeConverter &converter,
 
   target.addDynamicallyLegalOp<numba::util::EnvironmentRegionOp,
                                numba::util::EnvironmentRegionYieldOp>(
-      [&](mlir::Operation *op) -> llvm::Optional<bool> {
+      [&](mlir::Operation *op) -> std::optional<bool> {
         if (converter.isLegal(op))
           return true;
 

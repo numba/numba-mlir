@@ -1094,7 +1094,7 @@ struct LowerGpuBuiltinsPass
     : public numba::RewriteWrapperPass<LowerGpuBuiltinsPass, void, void,
                                        LowerPlierCalls> {};
 
-static llvm::Optional<gpu_runtime::FenceFlags>
+static std::optional<gpu_runtime::FenceFlags>
 getFenceFlags(mlir::OpFoldResult arg) {
   auto val = mlir::getConstantIntValue(arg);
   if (!val)
@@ -1708,8 +1708,8 @@ struct GPUToLLVMPass
   }
 };
 
-static llvm::Optional<mlir::spirv::Version> mapSpirvVersion(uint16_t major,
-                                                            uint16_t minor) {
+static std::optional<mlir::spirv::Version> mapSpirvVersion(uint16_t major,
+                                                           uint16_t minor) {
   if (major == 1) {
     const mlir::spirv::Version mapping[] = {
         mlir::spirv::Version::V_1_0, mlir::spirv::Version::V_1_1,

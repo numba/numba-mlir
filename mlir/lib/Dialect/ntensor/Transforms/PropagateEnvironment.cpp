@@ -29,7 +29,7 @@ static bool needPropagation(mlir::Operation *op) {
   return needUpdate(op) || mlir::isa<mlir::arith::SelectOp>(op);
 }
 
-static llvm::Optional<mlir::Attribute> getTensorEnv(mlir::Value val) {
+static std::optional<mlir::Attribute> getTensorEnv(mlir::Value val) {
   if (auto tensor = val.getType().dyn_cast<numba::ntensor::NTensorType>())
     return tensor.getEnvironment();
 

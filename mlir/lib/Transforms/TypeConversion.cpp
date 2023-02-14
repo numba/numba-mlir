@@ -44,7 +44,7 @@ unpackUnrealizedConversionCast(mlir::ValueRange values) {
   return ret;
 }
 
-static llvm::Optional<llvm::SmallVector<mlir::Value>>
+static std::optional<llvm::SmallVector<mlir::Value>>
 packResults(mlir::OpBuilder &rewriter, mlir::Location loc,
             mlir::TypeConverter &typeConverter, mlir::TypeRange resTypes,
             mlir::ValueRange newResults) {
@@ -266,7 +266,7 @@ void numba::populateControlFlowTypeConversionRewritesAndTarget(
   mlir::populateAnyFunctionOpInterfaceTypeConversionPattern(patterns,
                                                             typeConverter);
   target.markUnknownOpDynamicallyLegal(
-      [&](mlir::Operation *op) -> llvm::Optional<bool> {
+      [&](mlir::Operation *op) -> std::optional<bool> {
         if (auto func = mlir::dyn_cast<mlir::FunctionOpInterface>(op)) {
           if (typeConverter.isSignatureLegal(
                   func.getFunctionType().cast<mlir::FunctionType>()) &&
@@ -287,7 +287,7 @@ void numba::populateControlFlowTypeConversionRewritesAndTarget(
 
   mlir::populateCallOpTypeConversionPattern(patterns, typeConverter);
   target.addDynamicallyLegalOp<mlir::arith::SelectOp>(
-      [&](mlir::Operation *op) -> llvm::Optional<bool> {
+      [&](mlir::Operation *op) -> std::optional<bool> {
         if (typeConverter.isLegal(op))
           return true;
 
@@ -295,7 +295,7 @@ void numba::populateControlFlowTypeConversionRewritesAndTarget(
       });
 
   target.addDynamicallyLegalOp<numba::util::EnvironmentRegionOp>(
-      [&](numba::util::EnvironmentRegionOp op) -> llvm::Optional<bool> {
+      [&](numba::util::EnvironmentRegionOp op) -> std::optional<bool> {
         if (typeConverter.isLegal(op.getArgs().getTypes()) &&
             typeConverter.isLegal(op.getResults().getTypes()))
           return true;
@@ -304,7 +304,7 @@ void numba::populateControlFlowTypeConversionRewritesAndTarget(
       });
 
   target.addDynamicallyLegalOp<numba::util::EnvironmentRegionYieldOp>(
-      [&](numba::util::EnvironmentRegionYieldOp op) -> llvm::Optional<bool> {
+      [&](numba::util::EnvironmentRegionYieldOp op) -> std::optional<bool> {
         if (typeConverter.isLegal(op.getResults().getTypes()))
           return true;
 
@@ -393,7 +393,7 @@ struct GetItemTupleConversionPattern
 
 void numba::populateTupleTypeConverter(mlir::TypeConverter &typeConverter) {
   typeConverter.addConversion(
-      [&typeConverter](mlir::TupleType type) -> llvm::Optional<mlir::Type> {
+      [&typeConverter](mlir::TupleType type) -> std::optional<mlir::Type> {
         auto count = static_cast<unsigned>(type.size());
         llvm::SmallVector<mlir::Type> newTypes(count);
         bool changed = false;
@@ -427,7 +427,7 @@ void numba::populateTupleTypeConversionRewritesAndTarget(
       });
 
   target.addDynamicallyLegalOp<numba::util::TupleExtractOp>(
-      [&typeConverter](numba::util::TupleExtractOp op) -> llvm::Optional<bool> {
+      [&typeConverter](numba::util::TupleExtractOp op) -> std::optional<bool> {
         auto inputType = op.getSource().getType();
         auto tupleType = typeConverter.convertType(inputType)
                              .dyn_cast_or_null<mlir::TupleType>();

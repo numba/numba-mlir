@@ -212,7 +212,7 @@ static const std::pair<llvm::StringRef, func_t> builtinFuncsHandlers[] = {
     // clang-format on
 };
 
-static llvm::Optional<mlir::Type> isUniTuple(mlir::TupleType type) {
+static std::optional<mlir::Type> isUniTuple(mlir::TupleType type) {
   auto count = type.size();
   if (count == 0)
     return std::nullopt;
@@ -224,7 +224,7 @@ static llvm::Optional<mlir::Type> isUniTuple(mlir::TupleType type) {
   return elemType;
 }
 
-static llvm::Optional<mlir::Type> isUniTuple(mlir::Type type) {
+static std::optional<mlir::Type> isUniTuple(mlir::Type type) {
   auto tupleType = type.dyn_cast<mlir::TupleType>();
   if (!tupleType)
     return std::nullopt;
@@ -1134,9 +1134,9 @@ static mlir::Value castType(mlir::OpBuilder &builder, mlir::Location loc,
   llvm_unreachable("Invalid shaped type");
 }
 
-static llvm::Optional<mlir::Value> doCast(mlir::OpBuilder &builder,
-                                          mlir::Location loc, mlir::Value src,
-                                          mlir::Type dstType) {
+static std::optional<mlir::Value> doCast(mlir::OpBuilder &builder,
+                                         mlir::Location loc, mlir::Value src,
+                                         mlir::Type dstType) {
   auto srcType = src.getType();
   if (srcType == dstType)
     return src;
@@ -1302,7 +1302,7 @@ struct PlierToNtensorPass
 
     numba::populateTupleTypeConverter(typeConverter);
     typeConverter.addConversion(
-        [](plier::SliceType type) -> llvm::Optional<mlir::Type> {
+        [](plier::SliceType type) -> std::optional<mlir::Type> {
           return numba::ntensor::SliceType::get(type.getContext());
         });
 
@@ -1310,7 +1310,7 @@ struct PlierToNtensorPass
                                 mlir::ValueRange inputs, mlir::Location loc) {
       auto cast =
           builder.create<mlir::UnrealizedConversionCastOp>(loc, type, inputs);
-      return llvm::Optional<mlir::Value>(cast.getResult(0));
+      return std::optional<mlir::Value>(cast.getResult(0));
     };
     typeConverter.addArgumentMaterialization(addUnrealizedCast);
     typeConverter.addSourceMaterialization(addUnrealizedCast);
@@ -1325,7 +1325,7 @@ struct PlierToNtensorPass
                                                         target);
 
     target.addDynamicallyLegalOp<plier::GetItemOp>(
-        [&typeConverter](plier::GetItemOp op) -> llvm::Optional<bool> {
+        [&typeConverter](plier::GetItemOp op) -> std::optional<bool> {
           auto containerType = op.getValue().getType();
           if (isNtensor(typeConverter, containerType))
             return false;
@@ -1333,7 +1333,7 @@ struct PlierToNtensorPass
           return std::nullopt;
         });
     target.addDynamicallyLegalOp<plier::SetItemOp>(
-        [&typeConverter](plier::SetItemOp op) -> llvm::Optional<bool> {
+        [&typeConverter](plier::SetItemOp op) -> std::optional<bool> {
           auto containerType = op.getTarget().getType();
           if (isNtensor(typeConverter, containerType))
             return false;
@@ -1348,7 +1348,7 @@ struct PlierToNtensorPass
         });
 
     target.addDynamicallyLegalOp<plier::BinOp>(
-        [&typeConverter](plier::BinOp op) -> llvm::Optional<bool> {
+        [&typeConverter](plier::BinOp op) -> std::optional<bool> {
           auto lhs = op.getLhs().getType();
           auto rhs = op.getRhs().getType();
           if (isNtensor(typeConverter, lhs) || isNtensor(typeConverter, rhs))
@@ -1358,7 +1358,7 @@ struct PlierToNtensorPass
         });
 
     target.addDynamicallyLegalOp<plier::PyCallOp>(
-        [this, &typeConverter](plier::PyCallOp op) -> llvm::Optional<bool> {
+        [this, &typeConverter](plier::PyCallOp op) -> std::optional<bool> {
           auto funcName = op.getFuncName();
           if (resolver->hasFunc(funcName))
             return false;
@@ -1371,7 +1371,7 @@ struct PlierToNtensorPass
         });
 
     target.addDynamicallyLegalOp<plier::GetattrOp>(
-        [&typeConverter](plier::GetattrOp op) -> llvm::Optional<bool> {
+        [&typeConverter](plier::GetattrOp op) -> std::optional<bool> {
           auto containerType = op.getValue().getType();
           if (isNtensor(typeConverter, containerType))
             return false;
@@ -1380,7 +1380,7 @@ struct PlierToNtensorPass
         });
 
     target.addDynamicallyLegalOp<plier::CastOp>(
-        [&typeConverter](plier::CastOp op) -> llvm::Optional<bool> {
+        [&typeConverter](plier::CastOp op) -> std::optional<bool> {
           auto srcType = op.getValue().getType();
           auto dstType = op.getType();
           if (isNtensor(typeConverter, srcType) ||
@@ -1391,7 +1391,7 @@ struct PlierToNtensorPass
         });
 
     target.addDynamicallyLegalOp<numba::util::TupleExtractOp>(
-        [](numba::util::TupleExtractOp op) -> llvm::Optional<bool> {
+        [](numba::util::TupleExtractOp op) -> std::optional<bool> {
           if (auto elemType = isUniTuple(op.getSource().getType()))
             if (numba::ntensor::NTensorType::isValidElementType(*elemType))
               return false;
@@ -1491,7 +1491,7 @@ struct SetitemArrayOpLowering
 static PyLinalgResolver::Values
 castRetTypes(mlir::Location loc, mlir::PatternRewriter &rewriter,
              mlir::TypeRange resultTypes,
-             llvm::Optional<PyLinalgResolver::Values> vals) {
+             std::optional<PyLinalgResolver::Values> vals) {
   auto results = std::move(vals).value();
   assert(results.size() == resultTypes.size());
   for (auto [i, ret] : llvm::enumerate(results)) {
@@ -1531,7 +1531,7 @@ rewritePrimitiveFunc(mlir::PatternRewriter &rewriter, mlir::Location loc,
                      const PyLinalgResolver &resolver, mlir::ValueRange args,
                      mlir::TypeRange resultTypes, mlir::Attribute env,
                      llvm::StringRef opName) {
-  auto getRes = [&]() -> llvm::Optional<PyLinalgResolver::Values> {
+  auto getRes = [&]() -> std::optional<PyLinalgResolver::Values> {
     auto funcRes =
         resolver.rewriteFunc(opName, loc, rewriter, args, std::nullopt);
     if (funcRes)
@@ -1849,7 +1849,7 @@ struct WrapParforRegionsPass
   void runOnOperation() override {
     auto op = getOperation();
 
-    auto getOpEnv = [](mlir::Operation *op) -> llvm::Optional<mlir::Attribute> {
+    auto getOpEnv = [](mlir::Operation *op) -> std::optional<mlir::Attribute> {
       if (auto load = mlir::dyn_cast<numba::ntensor::LoadOp>(op))
         return load.getArray().getType().getEnvironment();
 
@@ -1869,7 +1869,7 @@ struct WrapParforRegionsPass
       if (!forOp->hasAttr(attrName))
         return mlir::WalkResult::advance();
 
-      llvm::Optional<mlir::Attribute> env;
+      std::optional<mlir::Attribute> env;
       auto innerVisitor = [&](mlir::Operation *innerOp) -> mlir::WalkResult {
         auto opEnv = getOpEnv(innerOp);
         if (!opEnv)
@@ -1944,7 +1944,7 @@ struct MarkInputShapesRanges
         if (!shaped)
           continue;
 
-        auto newRange = [&]() -> llvm::Optional<mlir::ArrayAttr> {
+        auto newRange = [&]() -> std::optional<mlir::ArrayAttr> {
           auto uses = mlir::SymbolTable::getSymbolUses(func, mod);
           if (!uses || !uses->empty())
             return std::nullopt;
@@ -2269,7 +2269,7 @@ struct SliceOfGeneric : public mlir::OpRewritePattern<mlir::linalg::GenericOp> {
       auto dst = mlir::getAffineDimExpr(dstDim, ctx);
       return expr.replace(src, dst);
     };
-    auto findResDim = [&](unsigned inputDim) -> llvm::Optional<unsigned> {
+    auto findResDim = [&](unsigned inputDim) -> std::optional<unsigned> {
       for (auto d : llvm::seq(0u, resRank)) {
         if (resMap.getDimPosition(d) == inputDim)
           return d;
@@ -2787,7 +2787,7 @@ struct AdditionalBufferize
 
     auto materializeTupleCast =
         [](mlir::OpBuilder &builder, mlir::Type type, mlir::ValueRange inputs,
-           mlir::Location loc) -> llvm::Optional<mlir::Value> {
+           mlir::Location loc) -> std::optional<mlir::Value> {
       if (inputs.size() != 1)
         return std::nullopt;
 

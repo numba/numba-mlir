@@ -24,7 +24,7 @@ struct Meminfo {
   }
 };
 
-static llvm::Optional<Meminfo> getMeminfo(mlir::Operation *op) {
+static std::optional<Meminfo> getMeminfo(mlir::Operation *op) {
   assert(nullptr != op);
   if (auto load = mlir::dyn_cast<mlir::memref::LoadOp>(op))
     return Meminfo{load.getMemref(), load.getIndices()};
@@ -225,7 +225,7 @@ static mlir::LogicalResult loadCSE(numba::MemorySSAAnalysis &memSSAAnalysis) {
 
 } // namespace
 
-llvm::Optional<mlir::LogicalResult>
+std::optional<mlir::LogicalResult>
 numba::optimizeMemoryOps(mlir::AnalysisManager &am) {
   auto &memSSAAnalysis = am.getAnalysis<MemorySSAAnalysis>();
   if (!memSSAAnalysis.memssa)
