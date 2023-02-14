@@ -172,7 +172,7 @@ void numba::populateArithConversionRewritesAndTarget(
     mlir::TypeConverter &converter, mlir::RewritePatternSet &patterns,
     mlir::ConversionTarget &target) {
   target.addDynamicallyLegalDialect<mlir::arith::ArithDialect>(
-      [&converter](mlir::Operation *op) -> llvm::Optional<bool> {
+      [&converter](mlir::Operation *op) -> std::optional<bool> {
         if (converter.isLegal(op))
           return true;
 
@@ -238,7 +238,7 @@ void numba::populateMathConversionRewritesAndTarget(
     mlir::TypeConverter &converter, mlir::RewritePatternSet &patterns,
     mlir::ConversionTarget &target) {
   target.addDynamicallyLegalDialect<mlir::math::MathDialect>(
-      [&converter](mlir::Operation *op) -> llvm::Optional<bool> {
+      [&converter](mlir::Operation *op) -> std::optional<bool> {
         if (converter.isLegal(op))
           return true;
 

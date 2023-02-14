@@ -157,7 +157,7 @@ void LaunchGpuKernelOp::build(::mlir::OpBuilder &builder,
 
 void GPUSuggestBlockSizeOp::build(::mlir::OpBuilder &odsBuilder,
                                   ::mlir::OperationState &odsState,
-                                  ::llvm::Optional<::mlir::Value> stream,
+                                  ::std::optional<::mlir::Value> stream,
                                   ::mlir::ValueRange gridSize,
                                   ::mlir::Value kernel) {
   auto dimCount = gridSize.size();
@@ -172,7 +172,7 @@ void GPUSuggestBlockSizeOp::build(::mlir::OpBuilder &odsBuilder,
 
 void GPUSuggestBlockSizeOp::build(::mlir::OpBuilder &odsBuilder,
                                   ::mlir::OperationState &odsState,
-                                  ::llvm::Optional<::mlir::Value> stream,
+                                  ::std::optional<::mlir::Value> stream,
                                   ::mlir::ValueRange gridSize,
                                   ::mlir::SymbolRefAttr kernel) {
   auto dimCount = gridSize.size();
@@ -187,7 +187,7 @@ void GPUSuggestBlockSizeOp::build(::mlir::OpBuilder &odsBuilder,
 
 void GPUSuggestBlockSizeOp::build(::mlir::OpBuilder &odsBuilder,
                                   ::mlir::OperationState &odsState,
-                                  ::llvm::Optional<::mlir::Value> stream,
+                                  ::std::optional<::mlir::Value> stream,
                                   ::mlir::ValueRange gridSize) {
   auto dimCount = gridSize.size();
   assert(dimCount > 0 && dimCount <= 3);

@@ -398,7 +398,7 @@ struct ConvertLinalgYield
 };
 } // namespace
 
-static llvm::Optional<mlir::Type> makeSignlessType(mlir::Type type) {
+static std::optional<mlir::Type> makeSignlessType(mlir::Type type) {
   if (auto intType = type.dyn_cast<mlir::IntegerType>()) {
     if (intType.getSignedness() != mlir::IntegerType::Signless)
       return mlir::IntegerType::get(type.getContext(), intType.getWidth());

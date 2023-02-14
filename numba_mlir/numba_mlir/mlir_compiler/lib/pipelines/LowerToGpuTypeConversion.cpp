@@ -23,8 +23,8 @@ struct Conversion {
     usmArrayType = mod.attr("USMNdArrayType");
   }
 
-  llvm::Optional<mlir::Type> operator()(mlir::MLIRContext &context,
-                                        py::handle obj) {
+  std::optional<mlir::Type> operator()(mlir::MLIRContext &context,
+                                       py::handle obj) {
     if (usmArrayType.is_none() || !py::isinstance(obj, usmArrayType))
       return std::nullopt;
 

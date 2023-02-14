@@ -67,10 +67,10 @@ public:
   }
 };
 
-static llvm::Optional<mlir::Value> reconstructTuple(mlir::OpBuilder &builder,
-                                                    mlir::Location loc,
-                                                    mlir::TupleType tupleType,
-                                                    mlir::ValueRange values) {
+static std::optional<mlir::Value> reconstructTuple(mlir::OpBuilder &builder,
+                                                   mlir::Location loc,
+                                                   mlir::TupleType tupleType,
+                                                   mlir::ValueRange values) {
   llvm::SmallVector<mlir::Value, 4> vals(tupleType.size());
   for (auto [i, type] : llvm::enumerate(tupleType.getTypes())) {
     if (auto innerTuple = type.dyn_cast<mlir::TupleType>()) {
@@ -91,10 +91,10 @@ static llvm::Optional<mlir::Value> reconstructTuple(mlir::OpBuilder &builder,
   return builder.create<numba::util::BuildTupleOp>(loc, tupleType, vals);
 }
 
-static llvm::Optional<mlir::Value> tupleToElem(mlir::OpBuilder &builder,
-                                               mlir::Location loc,
-                                               mlir::Type type,
-                                               mlir::ValueRange values) {
+static std::optional<mlir::Value> tupleToElem(mlir::OpBuilder &builder,
+                                              mlir::Location loc,
+                                              mlir::Type type,
+                                              mlir::ValueRange values) {
   if (values.size() != 1)
     return std::nullopt;
 
@@ -129,7 +129,7 @@ struct ExpandTuplePass
     typeConverter.addConversion(
         [&typeConverter](mlir::TupleType type,
                          llvm::SmallVectorImpl<mlir::Type> &ret)
-            -> llvm::Optional<mlir::LogicalResult> {
+            -> std::optional<mlir::LogicalResult> {
           if (mlir::failed(typeConverter.convertTypes(type.getTypes(), ret)))
             return std::nullopt;
 
@@ -138,7 +138,7 @@ struct ExpandTuplePass
 
     auto materializeTupleCast =
         [](mlir::OpBuilder &builder, mlir::Type type, mlir::ValueRange inputs,
-           mlir::Location loc) -> llvm::Optional<mlir::Value> {
+           mlir::Location loc) -> std::optional<mlir::Value> {
       if (auto tupleType = type.dyn_cast<mlir::TupleType>())
         return reconstructTuple(builder, loc, tupleType, inputs);
 

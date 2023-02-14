@@ -5,8 +5,8 @@
 #pragma once
 
 #include <functional>
+#include <optional>
 
-#include <llvm/ADT/Optional.h>
 #include <llvm/ADT/SmallVector.h>
 
 namespace mlir {
@@ -23,7 +23,7 @@ public:
   PyTypeConverter() = default;
   PyTypeConverter(const PyTypeConverter &) = delete;
 
-  using Conversion = std::function<llvm::Optional<mlir::Type>(
+  using Conversion = std::function<std::optional<mlir::Type>(
       mlir::MLIRContext &, pybind11::handle)>;
 
   void addConversion(Conversion conv);

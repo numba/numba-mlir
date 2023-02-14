@@ -23,7 +23,7 @@ public:
 
   static bool isInvalidated(const mlir::AnalysisManager::PreservedAnalyses &pa);
 
-  llvm::Optional<numba::MemorySSA> memssa;
+  std::optional<numba::MemorySSA> memssa;
   mlir::AliasAnalysis *aliasAnalysis = nullptr;
 };
 } // namespace numba

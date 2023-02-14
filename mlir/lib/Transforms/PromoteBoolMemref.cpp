@@ -23,7 +23,7 @@ static bool isMemI1(mlir::Type type) {
   return false;
 }
 
-static llvm::Optional<bool> checkOp(mlir::Operation *op) {
+static std::optional<bool> checkOp(mlir::Operation *op) {
   if (llvm::any_of(op->getOperandTypes(), &isMemI1) ||
       llvm::any_of(op->getResultTypes(), &isMemI1))
     return false;
@@ -204,7 +204,7 @@ void numba::populatePromoteBoolMemrefConversionRewritesAndTarget(
   auto context = patterns.getContext();
   auto i8 = mlir::IntegerType::get(context, 8);
   typeConverter.addConversion(
-      [i8](mlir::MemRefType type) -> llvm::Optional<mlir::Type> {
+      [i8](mlir::MemRefType type) -> std::optional<mlir::Type> {
         auto elemType = type.getElementType();
         if (isI1(elemType))
           return type.clone(i8);

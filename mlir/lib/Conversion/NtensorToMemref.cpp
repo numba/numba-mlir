@@ -422,7 +422,7 @@ void numba::populateNtensorToMemrefRewritesAndTarget(
     mlir::TypeConverter &converter, mlir::RewritePatternSet &patterns,
     mlir::ConversionTarget &target) {
   converter.addConversion(
-      [](numba::ntensor::NTensorType type) -> llvm::Optional<mlir::Type> {
+      [](numba::ntensor::NTensorType type) -> std::optional<mlir::Type> {
         auto elemType = type.getElementType();
         if (mlir::MemRefType::isValidElementType(elemType))
           return mlir::MemRefType::get(type.getShape(), elemType);
@@ -473,7 +473,7 @@ struct NtensorToMemrefPass
                                 mlir::ValueRange inputs, mlir::Location loc) {
       auto cast =
           builder.create<mlir::UnrealizedConversionCastOp>(loc, type, inputs);
-      return llvm::Optional<mlir::Value>(cast.getResult(0));
+      return std::optional<mlir::Value>(cast.getResult(0));
     };
     converter.addArgumentMaterialization(addUnrealizedCast);
     converter.addSourceMaterialization(addUnrealizedCast);

@@ -5,9 +5,8 @@
 #pragma once
 
 #include <cstdint>
+#include <optional>
 #include <string>
-
-#include <llvm/ADT/Optional.h>
 
 // Must be kept in sync with gpu_runtime version.
 struct OffloadDeviceCapabilities {
@@ -18,7 +17,7 @@ struct OffloadDeviceCapabilities {
 };
 
 // TODO: device name
-llvm::Optional<OffloadDeviceCapabilities>
+std::optional<OffloadDeviceCapabilities>
 getOffloadDeviceCapabilities(const std::string &name);
 
-llvm::Optional<std::string> getDefaultDevice();
+std::optional<std::string> getDefaultDevice();

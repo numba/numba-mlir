@@ -6,9 +6,9 @@
 
 #include <functional>
 #include <memory>
+#include <optional>
 #include <string>
 
-#include <llvm/ADT/Optional.h>
 #include <llvm/ADT/SmallVector.h>
 #include <llvm/ADT/StringRef.h>
 
@@ -39,7 +39,7 @@ public:
     bool irDumpStderr = false;
     bool diagDumpStderr = false;
 
-    llvm::Optional<IRPrintingSettings> irPrinting;
+    std::optional<IRPrintingSettings> irPrinting;
   };
 
   class CompilerContextImpl;

@@ -451,12 +451,12 @@ numba::MemorySSA::Node *memSSAProcessRegion(mlir::Region &region,
       } else if (auto branchReg =
                      mlir::dyn_cast<mlir::RegionBranchOpInterface>(op)) {
         auto numRegions = op.getNumRegions();
-        llvm::SmallVector<llvm::Optional<unsigned>, 2> parentPredecessors;
-        llvm::SmallVector<llvm::SmallVector<llvm::Optional<unsigned>, 2>, 2>
+        llvm::SmallVector<std::optional<unsigned>, 2> parentPredecessors;
+        llvm::SmallVector<llvm::SmallVector<std::optional<unsigned>, 2>, 2>
             predecessors(numRegions);
 
         auto getRegionIndex =
-            [&](mlir::Region *reg) -> llvm::Optional<unsigned> {
+            [&](mlir::Region *reg) -> std::optional<unsigned> {
           if (nullptr == reg)
             return {};
 
@@ -503,7 +503,7 @@ numba::MemorySSA::Node *memSSAProcessRegion(mlir::Region &region,
           decltype(memSSA) &_memSSA;
           decltype(predecessors) &_predecessors;
 
-          numba::MemorySSA::Node *visit(llvm::Optional<unsigned> ii) {
+          numba::MemorySSA::Node *visit(std::optional<unsigned> ii) {
             if (!ii)
               return _currentNode;
 
@@ -604,7 +604,7 @@ numba::MemorySSA::Node *memSSAProcessRegion(mlir::Region &region,
 }
 } // namespace
 
-llvm::Optional<numba::MemorySSA> numba::buildMemorySSA(mlir::Region &region) {
+std::optional<numba::MemorySSA> numba::buildMemorySSA(mlir::Region &region) {
   numba::MemorySSA ret;
   if (auto last = memSSAProcessRegion(region, ret.getRoot(), ret)) {
     ret.getTerm()->setArgument(0, last);

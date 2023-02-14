@@ -5,8 +5,7 @@
 #pragma once
 
 #include <memory>
-
-#include <llvm/ADT/Optional.h>
+#include <optional>
 
 namespace mlir {
 class AnalysisManager;
@@ -15,8 +14,7 @@ struct LogicalResult;
 } // namespace mlir
 
 namespace numba {
-llvm::Optional<mlir::LogicalResult>
-optimizeMemoryOps(mlir::AnalysisManager &am);
+std::optional<mlir::LogicalResult> optimizeMemoryOps(mlir::AnalysisManager &am);
 
 std::unique_ptr<mlir::Pass> createMemoryOptPass();
 } // namespace numba

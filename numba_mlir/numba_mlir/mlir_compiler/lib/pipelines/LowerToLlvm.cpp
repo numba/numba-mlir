@@ -127,7 +127,7 @@ static mlir::Type convertTuple(mlir::MLIRContext &context,
 static void
 populateToLLVMAdditionalTypeConversion(mlir::LLVMTypeConverter &converter) {
   converter.addConversion(
-      [&converter](mlir::TupleType type) -> llvm::Optional<mlir::Type> {
+      [&converter](mlir::TupleType type) -> std::optional<mlir::Type> {
         auto res = convertTuple(*type.getContext(), converter, type);
         if (!res)
           return std::nullopt;
@@ -136,15 +136,15 @@ populateToLLVMAdditionalTypeConversion(mlir::LLVMTypeConverter &converter) {
   auto voidPtrType = mlir::LLVM::LLVMPointerType::get(
       mlir::IntegerType::get(&converter.getContext(), 8));
   converter.addConversion(
-      [voidPtrType](mlir::NoneType) -> llvm::Optional<mlir::Type> {
+      [voidPtrType](mlir::NoneType) -> std::optional<mlir::Type> {
         return voidPtrType;
       });
   converter.addConversion(
-      [voidPtrType](numba::util::OpaqueType) -> llvm::Optional<mlir::Type> {
+      [voidPtrType](numba::util::OpaqueType) -> std::optional<mlir::Type> {
         return voidPtrType;
       });
   converter.addConversion(
-      [voidPtrType](numba::util::TypeVarType) -> llvm::Optional<mlir::Type> {
+      [voidPtrType](numba::util::TypeVarType) -> std::optional<mlir::Type> {
         return voidPtrType;
       });
 }

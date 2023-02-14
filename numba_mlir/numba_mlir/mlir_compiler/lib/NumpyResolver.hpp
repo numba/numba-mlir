@@ -5,9 +5,9 @@
 #pragma once
 
 #include <memory>
+#include <optional>
 #include <string>
 
-#include <llvm/ADT/Optional.h>
 #include <llvm/ADT/SmallVector.h>
 
 namespace llvm {

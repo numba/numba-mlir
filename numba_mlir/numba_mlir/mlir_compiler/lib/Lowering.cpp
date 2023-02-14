@@ -718,7 +718,7 @@ static void createPipeline(numba::PipelineRegistry &registry,
                            PyTypeConverter &converter,
                            const ModuleSettings &settings) {
   converter.addConversion(
-      [](mlir::MLIRContext &ctx, py::handle obj) -> llvm::Optional<mlir::Type> {
+      [](mlir::MLIRContext &ctx, py::handle obj) -> std::optional<mlir::Type> {
         return plier::PyType::get(&ctx, py::str(obj).cast<std::string>());
       });
 
