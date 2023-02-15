@@ -1009,10 +1009,11 @@ public:
                   mlir::ConversionPatternRewriter &rewriter) const override {
     auto scope = mlir::spirv::Scope::Workgroup;
     mlir::spirv::MemorySemantics semantics;
-    if (adaptor.getFlags() == gpu_runtime::FenceFlags::global) {
+    auto flags = static_cast<gpu_runtime::FenceFlags>(adaptor.getFlags());
+    if (flags == gpu_runtime::FenceFlags::global) {
       semantics = mlir::spirv::MemorySemantics::SequentiallyConsistent |
                   mlir::spirv::MemorySemantics::CrossWorkgroupMemory;
-    } else if (adaptor.getFlags() == gpu_runtime::FenceFlags::local) {
+    } else if (flags == gpu_runtime::FenceFlags::local) {
       semantics = mlir::spirv::MemorySemantics::SequentiallyConsistent |
                   mlir::spirv::MemorySemantics::WorkgroupMemory;
     } else {
@@ -1035,10 +1036,11 @@ public:
                   mlir::ConversionPatternRewriter &rewriter) const override {
     auto scope = mlir::spirv::Scope::Workgroup;
     mlir::spirv::MemorySemantics semantics;
-    if (adaptor.getFlags() == gpu_runtime::FenceFlags::global) {
+    auto flags = static_cast<gpu_runtime::FenceFlags>(adaptor.getFlags());
+    if (flags == gpu_runtime::FenceFlags::global) {
       semantics = mlir::spirv::MemorySemantics::SequentiallyConsistent |
                   mlir::spirv::MemorySemantics::CrossWorkgroupMemory;
-    } else if (adaptor.getFlags() == gpu_runtime::FenceFlags::local) {
+    } else if (flags == gpu_runtime::FenceFlags::local) {
       semantics = mlir::spirv::MemorySemantics::SequentiallyConsistent |
                   mlir::spirv::MemorySemantics::WorkgroupMemory;
     } else {

@@ -44,27 +44,6 @@ class GpuRuntime_Attr<string attrName, string attrMnemonic, list<Trait> traits =
 class GpuRuntime_Op<string mnemonic, list<Trait> traits = []> :
       Op<GpuRuntime_Dialect, mnemonic, traits>;
 
-def GpuRuntime_FenceFlags : I32EnumAttr<"FenceFlags",
-    "Kernel barrier and fence flags",
-    [
-      I32EnumAttrCase<"local", 1>,
-      I32EnumAttrCase<"global", 2>
-    ]>{
-  let genSpecializedAttr = 0;
-  let cppNamespace = "::gpu_runtime";
-}
-def GpuRuntime_FenceFlagsAttr : EnumAttr<GpuRuntime_Dialect, GpuRuntime_FenceFlags, "fence_flags">;
-
-def GpuRuntime_StorageClass : I32EnumAttr<"StorageClass",
-    "Kernel barrier and fence flags",
-    [
-      I32EnumAttrCase<"local", 1>,
-    ]>{
-  let genSpecializedAttr = 0;
-  let cppNamespace = "::gpu_runtime";
-}
-def GpuRuntime_StorageClassAttr : EnumAttr<GpuRuntime_Dialect, GpuRuntime_StorageClass, "storage_class">;
-
 def GPURegionDescAttr
     : GpuRuntime_Attr<"GPURegionDesc", "region_desc"> {
   let parameters = (ins "::mlir::StringAttr":$device);
@@ -210,7 +189,7 @@ def GPUSuggestBlockSizeOp : GpuRuntime_Op<"suggest_block_size",
 def GPUBarrierOp : GpuRuntime_Op<"barrier"> {
   let summary = "Synchronizes all work items of a workgroup.";
 
-  let arguments = (ins GpuRuntime_FenceFlagsAttr:$flags);
+  let arguments = (ins I64Attr:$flags);
 
   let assemblyFormat = "$flags attr-dict";
 }
@@ -218,7 +197,7 @@ def GPUBarrierOp : GpuRuntime_Op<"barrier"> {
 def GPUMemFenceOp : GpuRuntime_Op<"mem_fence"> {
   let summary = "Orders loads and stores of a work-item executing a kernel.";
 
-  let arguments = (ins GpuRuntime_FenceFlagsAttr:$flags);
+  let arguments = (ins I64Attr:$flags);
 
   let assemblyFormat = "$flags attr-dict";
 }
