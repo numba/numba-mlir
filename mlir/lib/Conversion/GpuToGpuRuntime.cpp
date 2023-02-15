@@ -372,7 +372,7 @@ struct InsertGPUAllocs
                                loc, allocType, /*asyncToken*/ nullptr,
                                /*asyncDependencies*/ std::nullopt, dims,
                                /*symbolOperands*/ std::nullopt, hostShared);
-                           auto allocResult = gpuAlloc.getMemref();
+                           mlir::Value allocResult = gpuAlloc.getMemref();
                            if (allocType != memrefType)
                              allocResult = builder.create<mlir::memref::CastOp>(
                                  loc, memrefType, allocResult);
