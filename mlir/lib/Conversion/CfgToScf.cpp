@@ -312,8 +312,8 @@ struct ScfIfRewriteTwoExits
         builder.create<mlir::scf::YieldOp>(loc, ret);
       };
 
-      auto cond = op.getCondition();
-      auto loc = op->getLoc();
+      mlir::Value cond = op.getCondition();
+      auto loc = op.getLoc();
       if (reverse) {
         auto one = rewriter.create<mlir::arith::ConstantIntOp>(loc, /*value*/ 1,
                                                                /*width*/ 1);

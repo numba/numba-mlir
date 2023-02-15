@@ -469,7 +469,7 @@ static mlir::Value getChangeLayoutParent(mlir::Value val) {
 
 mlir::OpFoldResult
 ChangeLayoutOp::fold(llvm::ArrayRef<mlir::Attribute> /*operands*/) {
-  auto src = getSource();
+  mlir::Value src = getSource();
   auto thisType = getType();
   do {
     if (thisType == src.getType())
@@ -850,8 +850,8 @@ struct ChangeLayoutIf : public mlir::OpRewritePattern<mlir::scf::YieldOp> {
         if (!cl)
           continue;
 
-        auto src = cl.getSource();
-        auto srcType = src.getType();
+        mlir::Value src = cl.getSource();
+        auto srcType = src.getType().cast<mlir::MemRefType>();
 
         auto otherArg = otherYield.getResults()[i];
 

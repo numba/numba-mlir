@@ -261,5 +261,3 @@ static void printAsyncDependencies(mlir::OpAsmPrinter &printer,
 
 #define GET_TYPEDEF_CLASSES
 #include "numba/Dialect/gpu_runtime/IR/GpuRuntimeOpsTypes.cpp.inc"
-
-#include "numba/Dialect/gpu_runtime/IR/GpuRuntimeOpsEnums.cpp.inc"

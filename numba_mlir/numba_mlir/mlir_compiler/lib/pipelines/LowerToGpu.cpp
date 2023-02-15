@@ -1114,7 +1114,7 @@ template <typename Op>
 static void genBarrierOp(mlir::Operation *srcOp,
                          mlir::PatternRewriter &rewriter,
                          gpu_runtime::FenceFlags flags) {
-  rewriter.create<Op>(srcOp->getLoc(), flags);
+  rewriter.create<Op>(srcOp->getLoc(), static_cast<int64_t>(flags));
 
   // TODO: remove
   assert(srcOp->getNumResults() == 1);
@@ -1315,8 +1315,8 @@ public:
     rewriter.create<mlir::memref::StoreOp>(loc, sgResult, groupBuffer,
                                            subgroupId);
 
-    rewriter.create<gpu_runtime::GPUBarrierOp>(loc,
-                                               gpu_runtime::FenceFlags::local);
+    rewriter.create<gpu_runtime::GPUBarrierOp>(
+        loc, static_cast<int64_t>(gpu_runtime::FenceFlags::local));
 
     mlir::Value numSubgroups = [&]() {
       mlir::OpBuilder::InsertionGuard g(rewriter);
@@ -1361,8 +1361,8 @@ public:
     rewriter.create<mlir::scf::IfOp>(loc, /*resultTypes*/ std::nullopt,
                                      isFirstSg, ifBodyBuilder);
 
-    rewriter.create<gpu_runtime::GPUBarrierOp>(loc,
-                                               gpu_runtime::FenceFlags::local);
+    rewriter.create<gpu_runtime::GPUBarrierOp>(
+        loc, static_cast<int64_t>(gpu_runtime::FenceFlags::local));
 
     mlir::Value result =
         rewriter.create<mlir::memref::LoadOp>(loc, groupBuffer, zero);

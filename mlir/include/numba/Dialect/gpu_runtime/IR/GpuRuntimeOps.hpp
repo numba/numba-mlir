@@ -18,8 +18,6 @@
 
 #include "numba/Dialect/gpu_runtime/IR/GpuRuntimeOpsDialect.h.inc"
 
-#include "numba/Dialect/gpu_runtime/IR/GpuRuntimeOpsEnums.h.inc"
-
 #define GET_TYPEDEF_CLASSES
 #include "numba/Dialect/gpu_runtime/IR/GpuRuntimeOpsTypes.h.inc"
 
@@ -31,4 +29,9 @@
 
 namespace gpu_runtime {
 mlir::StringRef getGpuAccessibleAttrName();
-}
+
+enum class FenceFlags : int64_t {
+  local = 1,
+  global = 2,
+};
+} // namespace gpu_runtime
