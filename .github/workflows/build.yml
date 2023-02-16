@@ -662,10 +662,6 @@ jobs:
         run: |
           cd numba_mlir
           source $CONDA/bin/activate test-env
-          ls /usr/lib/
-          export SEGFAULT_SIGNALS="abrt segv"
-          export LD_PRELOAD=/usr/lib/libSegFault.so
-          export LIBC_FATAL_STDERR_=1
           python $GITHUB_WORKSPACE/scripts/run_package_tests.py verbose
 
       - name: Build wheels
