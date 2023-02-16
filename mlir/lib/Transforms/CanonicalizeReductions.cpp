@@ -83,8 +83,7 @@ struct CanonicalizeReduction : public mlir::OpRewritePattern<mlir::scf::ForOp> {
       auto memref = store.getMemRef();
 
       bool aliasing = false;
-      for (auto &otherDesc :
-           llvm::makeMutableArrayRef(stores).drop_front(i + 1)) {
+      for (auto &otherDesc : llvm::MutableArrayRef(stores).drop_front(i + 1)) {
         auto otherMemref = otherDesc.store.getMemRef();
         if (!aliasAnalysis.alias(memref, otherMemref).isNo()) {
           desc.aliasing = true;

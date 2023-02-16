@@ -23,12 +23,13 @@
 #include <mlir/Dialect/Arith/Transforms/Passes.h>
 #include <mlir/Dialect/ControlFlow/IR/ControlFlowOps.h>
 #include <mlir/Dialect/Func/IR/FuncOps.h>
+#include <mlir/Dialect/GPU/IR/GPUDialect.h>
 #include <mlir/Dialect/LLVMIR/LLVMDialect.h>
 #include <mlir/Dialect/MemRef/IR/MemRef.h>
 #include <mlir/Dialect/MemRef/Transforms/Passes.h>
 #include <mlir/Dialect/SCF/IR/SCF.h>
-#include <mlir/IR/BlockAndValueMapping.h>
 #include <mlir/IR/Builders.h>
+#include <mlir/IR/IRMapping.h>
 #include <mlir/IR/PatternMatch.h>
 #include <mlir/Pass/Pass.h>
 #include <mlir/Pass/PassManager.h>
@@ -36,7 +37,6 @@
 #include <mlir/Transforms/Passes.h>
 
 #include <llvm/ADT/DenseMap.h>
-#include <llvm/ADT/Triple.h>
 #include <llvm/ADT/TypeSwitch.h>
 #include <llvm/MC/TargetRegistry.h>
 #include <llvm/Support/Host.h>
@@ -797,7 +797,7 @@ private:
         auto one = builder.create<mlir::LLVM::ConstantOp>(
             loc, indexType, builder.getIntegerAttr(indexType, 1));
         builder.create<mlir::LLVM::AtomicRMWOp>(
-            loc, indexType, mlir::LLVM::AtomicBinOp::add, refcntPtr, one,
+            loc, mlir::LLVM::AtomicBinOp::add, refcntPtr, one,
             mlir::LLVM::AtomicOrdering::seq_cst);
         builder.create<mlir::func::ReturnOp>(loc);
       }
@@ -962,7 +962,7 @@ private:
         auto one = builder.create<mlir::LLVM::ConstantOp>(
             loc, indexType, builder.getIntegerAttr(indexType, 1));
         auto res = builder.create<mlir::LLVM::AtomicRMWOp>(
-            loc, indexType, mlir::LLVM::AtomicBinOp::sub, refcntPtr, one,
+            loc, mlir::LLVM::AtomicBinOp::sub, refcntPtr, one,
             mlir::LLVM::AtomicOrdering::seq_cst);
 
         auto isRelease = builder.create<mlir::LLVM::ICmpOp>(
@@ -1182,7 +1182,7 @@ struct LowerParallel : public mlir::OpRewritePattern<numba::util::ParallelOp> {
         copyAttrs(parentFunc, func);
         return func;
       }();
-      mlir::BlockAndValueMapping mapping;
+      mlir::IRMapping mapping;
       auto &oldEntry = op.getLoopBody().front();
       auto entry = func.addEntryBlock();
       auto loc = rewriter.getUnknownLoc();
@@ -1485,11 +1485,21 @@ struct LLVMLoweringPass
     ModuleOp m = getOperation();
 
     LLVMTypeConverter typeConverter(&context, options);
+
+    // TODO: move addrspace conversion to separate pass
+    typeConverter.addTypeAttributeConversion(
+        [](mlir::BaseMemRefType type,
+           mlir::gpu::AddressSpaceAttr /*memorySpaceAttr*/)
+            -> mlir::IntegerAttr {
+          auto ctx = type.getContext();
+          return mlir::IntegerAttr::get(mlir::IntegerType::get(ctx, 64), 0);
+        });
+
     populateToLLVMAdditionalTypeConversion(typeConverter);
     RewritePatternSet patterns(&context);
     populateFuncToLLVMFuncOpConversionPattern(typeConverter, patterns);
     populateFuncToLLVMConversionPatterns(typeConverter, patterns);
-    populateMemRefToLLVMConversionPatterns(typeConverter, patterns);
+    populateFinalizeMemRefToLLVMConversionPatterns(typeConverter, patterns);
     populateLinalgToLLVMConversionPatterns(typeConverter, patterns);
     cf::populateControlFlowToLLVMConversionPatterns(typeConverter, patterns);
     arith::populateArithToLLVMConversionPatterns(typeConverter, patterns);

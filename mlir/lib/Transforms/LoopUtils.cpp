@@ -16,9 +16,9 @@
 #include <mlir/Dialect/Arith/IR/Arith.h>
 #include <mlir/Dialect/MemRef/IR/MemRef.h>
 #include <mlir/Dialect/SCF/IR/SCF.h>
-#include <mlir/IR/BlockAndValueMapping.h>
 #include <mlir/IR/Dominance.h>
 #include <mlir/IR/FunctionInterfaces.h>
+#include <mlir/IR/IRMapping.h>
 #include <mlir/IR/PatternMatch.h>
 #include <mlir/Support/LogicalResult.h>
 
@@ -154,7 +154,7 @@ llvm::SmallVector<mlir::scf::ForOp, 2> numba::lowerWhileToFor(
         if (!positive)
           iv = getNeg(iv);
 
-        mlir::BlockAndValueMapping mapper;
+        mlir::IRMapping mapper;
         assert(beforeBlock.getNumArguments() == iterargs.size());
         assert(afterBlock.getNumArguments() == beforeTerm.getArgs().size());
         mapper.map(beforeBlock.getArguments(), iterargs);
@@ -209,8 +209,7 @@ llvm::SmallVector<mlir::scf::ForOp, 2> numba::lowerWhileToFor(
     auto resTypes = whileOp.getOperands().getTypes();
     if (!ind)
       return builder
-          .create<mlir::scf::IfOp>(loc, resTypes, stepSign,
-                                   getIfBodyBuilder(true),
+          .create<mlir::scf::IfOp>(loc, stepSign, getIfBodyBuilder(true),
                                    getIfBodyBuilder(false))
           .getResults();
 
@@ -324,7 +323,7 @@ static bool equalIterationSpaces(scf::ParallelOp firstPloop,
 /// loop reads.
 static bool haveNoReadsAfterWriteExceptSameIndex(
     scf::ParallelOp firstPloop, scf::ParallelOp secondPloop,
-    const BlockAndValueMapping &firstToSecondPloopIndices,
+    const IRMapping &firstToSecondPloopIndices,
     llvm::function_ref<mlir::AliasAnalysis &()> getAnalysis) {
   DenseMap<Value, SmallVector<ValueRange, 1>> bufferStores;
   SmallVector<Value> bufferStoresVec;
@@ -376,7 +375,7 @@ static bool haveNoReadsAfterWriteExceptSameIndex(
 /// write patterns.
 static LogicalResult
 verifyDependencies(scf::ParallelOp firstPloop, scf::ParallelOp secondPloop,
-                   const BlockAndValueMapping &firstToSecondPloopIndices,
+                   const IRMapping &firstToSecondPloopIndices,
                    llvm::function_ref<mlir::AliasAnalysis &()> getAnalysis) {
   for (auto res : firstPloop.getResults()) {
     for (auto user : res.getUsers()) {
@@ -389,7 +388,7 @@ verifyDependencies(scf::ParallelOp firstPloop, scf::ParallelOp secondPloop,
           firstPloop, secondPloop, firstToSecondPloopIndices, getAnalysis))
     return failure();
 
-  BlockAndValueMapping secondToFirstPloopIndices;
+  IRMapping secondToFirstPloopIndices;
   secondToFirstPloopIndices.map(secondPloop.getBody()->getArguments(),
                                 firstPloop.getBody()->getArguments());
   return success(haveNoReadsAfterWriteExceptSameIndex(
@@ -398,7 +397,7 @@ verifyDependencies(scf::ParallelOp firstPloop, scf::ParallelOp secondPloop,
 
 static bool
 isFusionLegal(scf::ParallelOp firstPloop, scf::ParallelOp secondPloop,
-              const BlockAndValueMapping &firstToSecondPloopIndices,
+              const IRMapping &firstToSecondPloopIndices,
               llvm::function_ref<mlir::AliasAnalysis &()> getAnalysis) {
   return !hasNestedParallelOp(firstPloop) &&
          !hasNestedParallelOp(secondPloop) &&
@@ -412,7 +411,7 @@ static bool
 fuseIfLegal(scf::ParallelOp firstPloop, scf::ParallelOp &secondPloop,
             OpBuilder &b,
             llvm::function_ref<mlir::AliasAnalysis &()> getAnalysis) {
-  BlockAndValueMapping firstToSecondPloopIndices;
+  IRMapping firstToSecondPloopIndices;
   firstToSecondPloopIndices.map(firstPloop.getBody()->getArguments(),
                                 secondPloop.getBody()->getArguments());
 

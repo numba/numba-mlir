@@ -421,9 +421,8 @@ struct ReshapeChangeLayout
       builder.create<mlir::scf::YieldOp>(loc, res);
     };
 
-    auto res =
-        rewriter.create<mlir::scf::IfOp>(loc, dstType, cmp, trueBody, falseBody)
-            .getResult(0);
+    auto res = rewriter.create<mlir::scf::IfOp>(loc, cmp, trueBody, falseBody)
+                   .getResult(0);
     rewriter.replaceOpWithNewOp<mlir::memref::ReshapeOp>(op, op.getType(), res,
                                                          op.getShape());
     return mlir::success();

@@ -21,11 +21,11 @@ namespace {
 struct NTensorInlinerInterface : public mlir::DialectInlinerInterface {
   using mlir::DialectInlinerInterface::DialectInlinerInterface;
   bool isLegalToInline(mlir::Region *, mlir::Region *, bool,
-                       mlir::BlockAndValueMapping &) const final override {
+                       mlir::IRMapping &) const final override {
     return true;
   }
   bool isLegalToInline(mlir::Operation *op, mlir::Region *, bool,
-                       mlir::BlockAndValueMapping &) const final override {
+                       mlir::IRMapping &) const final override {
     return true;
   }
 };
@@ -896,10 +896,9 @@ void numba::ntensor::BroadcastOp::getCanonicalizationPatterns(
   results.insert<BroadcastSameStaticShape>(context);
 }
 
-static mlir::LogicalResult
-parseShape(mlir::AsmParser &parser,
-           mlir::FailureOr<llvm::SmallVector<int64_t>> &shape,
-           mlir::FailureOr<mlir::Type> &type) {
+static mlir::LogicalResult parseShape(mlir::AsmParser &parser,
+                                      llvm::SmallVector<int64_t> &shape,
+                                      mlir::Type &type) {
   llvm::SmallVector<int64_t> dimensions;
   if (parser.parseDimensionList(dimensions))
     return mlir::failure();

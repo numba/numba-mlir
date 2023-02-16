@@ -28,11 +28,11 @@ namespace {
 struct NumbaUtilInlinerInterface : public mlir::DialectInlinerInterface {
   using mlir::DialectInlinerInterface::DialectInlinerInterface;
   bool isLegalToInline(mlir::Region *, mlir::Region *, bool,
-                       mlir::BlockAndValueMapping &) const final override {
+                       mlir::IRMapping &) const final override {
     return true;
   }
   bool isLegalToInline(mlir::Operation *op, mlir::Region *, bool,
-                       mlir::BlockAndValueMapping &) const final override {
+                       mlir::IRMapping &) const final override {
     return true;
   }
 };
@@ -1601,7 +1601,7 @@ struct SignCastForPropagate : public mlir::OpRewritePattern<mlir::scf::ForOp> {
     auto bodyBuilder = [&](mlir::OpBuilder &builder, mlir::Location loc,
                            mlir::Value iter, mlir::ValueRange iterVals) {
       assert(iterVals.size() == count);
-      mlir::BlockAndValueMapping mapping;
+      mlir::IRMapping mapping;
       mapping.map(body.getArguments()[0], iter);
       auto oldIterVals = body.getArguments().drop_front(1);
       for (auto i : llvm::seq(0u, count)) {

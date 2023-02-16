@@ -9,8 +9,8 @@
 #include <mlir/Dialect/ControlFlow/IR/ControlFlowOps.h>
 #include <mlir/Dialect/Func/IR/FuncOps.h>
 #include <mlir/Dialect/SCF/IR/SCF.h>
-#include <mlir/IR/BlockAndValueMapping.h>
 #include <mlir/IR/Dominance.h>
+#include <mlir/IR/IRMapping.h>
 #include <mlir/Pass/PassManager.h>
 #include <mlir/Transforms/GreedyPatternRewriteDriver.h>
 #include <mlir/Transforms/Passes.h>
@@ -110,7 +110,7 @@ struct ScfIfRewriteOneExit
         cond = rewriter.create<mlir::arith::XOrIOp>(loc, cond, one);
       }
 
-      mlir::BlockAndValueMapping mapper;
+      mlir::IRMapping mapper;
       llvm::SmallVector<mlir::Value> yieldVals;
       auto copyBlock = [&](mlir::OpBuilder &builder, mlir::Location loc,
                            mlir::Block &block, mlir::ValueRange args) {
@@ -158,12 +158,10 @@ struct ScfIfRewriteOneExit
         auto falseBody = [&](mlir::OpBuilder &builder, mlir::Location loc) {
           copyBlock(builder, loc, *falseBlock, getOperands(reverse));
         };
-        ifOp = rewriter.create<mlir::scf::IfOp>(loc, resTypes, cond, trueBody,
-                                                falseBody);
+        ifOp = rewriter.create<mlir::scf::IfOp>(loc, cond, trueBody, falseBody);
       } else {
         if (resTypes.empty()) {
-          ifOp =
-              rewriter.create<mlir::scf::IfOp>(loc, resTypes, cond, trueBody);
+          ifOp = rewriter.create<mlir::scf::IfOp>(loc, cond, trueBody);
         } else {
           auto falseBody = [&](mlir::OpBuilder &builder, mlir::Location loc) {
             auto res = getOperands(reverse);
@@ -174,8 +172,8 @@ struct ScfIfRewriteOneExit
             }
             builder.create<mlir::scf::YieldOp>(loc, yieldVals);
           };
-          ifOp = rewriter.create<mlir::scf::IfOp>(loc, resTypes, cond, trueBody,
-                                                  falseBody);
+          ifOp =
+              rewriter.create<mlir::scf::IfOp>(loc, cond, trueBody, falseBody);
         }
       }
 
@@ -276,7 +274,7 @@ struct ScfIfRewriteTwoExits
             thenValsUsers.emplace_back(res);
 
       auto trueBuilder = [&](mlir::OpBuilder &builder, mlir::Location loc) {
-        mlir::BlockAndValueMapping mapper;
+        mlir::IRMapping mapper;
         for (auto &op : thenBlock->without_terminator())
           builder.clone(op, mapper);
 
@@ -328,10 +326,9 @@ struct ScfIfRewriteTwoExits
       for (auto user : thenValsUsers)
         retTypes.emplace_back(user.getType());
 
-      auto ifResults = rewriter
-                           .create<mlir::scf::IfOp>(loc, retTypes, cond,
-                                                    trueBuilder, falseBuilder)
-                           .getResults();
+      auto ifResults =
+          rewriter.create<mlir::scf::IfOp>(loc, cond, trueBuilder, falseBuilder)
+              .getResults();
       cond = rewriter.create<mlir::arith::AndIOp>(loc, cond, ifResults[0]);
       ifResults = ifResults.drop_front();
       rewriter.replaceOpWithNewOp<mlir::cf::CondBranchOp>(
@@ -448,7 +445,7 @@ struct ScfWhileRewrite : public mlir::OpRewritePattern<mlir::cf::BranchOp> {
       if (afterBlock->walk(checkOutsideVals).wasInterrupted())
         continue;
 
-      mlir::BlockAndValueMapping mapper;
+      mlir::IRMapping mapper;
       llvm::SmallVector<mlir::Value> yieldVars;
       auto beforeBlockArgs = beforeBlock->getArguments();
       llvm::SmallVector<mlir::Value> origVars(beforeBlockArgs.begin(),
@@ -600,7 +597,7 @@ struct BreakRewrite : public mlir::OpRewritePattern<mlir::cf::CondBranchOp> {
       } else if (conditionBr.getTrueDest() == exitBlock &&
                  conditionBr.getFalseDest() == bodyBlock) {
         std::swap(exitBlock, bodyBlock);
-        std::swap(exitArgs, bodyArgs);
+        //        std::swap(exitArgs, bodyArgs);
       } else {
         continue;
       }

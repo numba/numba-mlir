@@ -958,7 +958,8 @@ static bool isAllocationSupported(mlir::Operation *allocOp,
     if (!sc || sc.getValue() != mlir::spirv::StorageClass::Workgroup)
       return false;
   } else if (mlir::isa<mlir::memref::AllocaOp>(allocOp)) {
-    auto sc = type.getMemorySpace().dyn_cast_or_null<mlir::IntegerAttr>();
+    auto sc =
+        type.getMemorySpace().dyn_cast_or_null<mlir::gpu::AddressSpaceAttr>();
     if (!sc || sc.getValue() != mlir::gpu::GPUDialect::getPrivateAddressSpace())
       return false;
   } else {
@@ -1063,11 +1064,11 @@ convertStorageClass(mlir::Attribute src) {
   //  if (sc == gpu_runtime::StorageClass::local)
   //    return mlir::spirv::StorageClass::Workgroup;
 
-  if (auto attr = src.dyn_cast_or_null<mlir::IntegerAttr>()) {
-    if (attr.getInt() == mlir::gpu::GPUDialect::getWorkgroupAddressSpace())
+  if (auto attr = src.dyn_cast_or_null<mlir::gpu::AddressSpaceAttr>()) {
+    if (attr.getValue() == mlir::gpu::GPUDialect::getWorkgroupAddressSpace())
       return mlir::spirv::StorageClass::Workgroup;
 
-    if (attr.getInt() == mlir::gpu::GPUDialect::getPrivateAddressSpace())
+    if (attr.getValue() == mlir::gpu::GPUDialect::getPrivateAddressSpace())
       return mlir::spirv::StorageClass::Function;
   }
 
@@ -1824,9 +1825,8 @@ struct TileParallelOp : public mlir::OpRewritePattern<mlir::scf::ParallelOp> {
           auto bodyBuilder = [&](mlir::OpBuilder &b, mlir::Location l) {
             b.create<mlir::scf::YieldOp>(l, results);
           };
-
-          return rewriter.create<mlir::scf::IfOp>(
-              loc, initVals.getTypes(), inBounds, bodyBuilder, bodyBuilder);
+          return rewriter.create<mlir::scf::IfOp>(loc, inBounds, bodyBuilder,
+                                                  bodyBuilder);
         } else {
           auto thenBuilder = &mlir::scf::buildTerminatedBody;
           return rewriter.create<mlir::scf::IfOp>(loc, inBounds, thenBuilder);
@@ -1837,7 +1837,7 @@ struct TileParallelOp : public mlir::OpRewritePattern<mlir::scf::ParallelOp> {
     }
     rewriter.eraseOp(newBlock->getTerminator()); // Erase exisitng yield.
     if (!reductionOps.empty()) {
-      mlir::BlockAndValueMapping mapper;
+      mlir::IRMapping mapper;
       mapper.map(originalBlock->getArguments(), argMapping);
       mlir::OpBuilder::InsertionGuard g(rewriter);
       auto loc = originalBlock->getTerminator()->getLoc();
@@ -2279,7 +2279,7 @@ struct InsertGPUGlobalReduce
     results.reserve(op.getInitVals().size());
 
     auto loc = op.getLoc();
-    mlir::BlockAndValueMapping mapper;
+    mlir::IRMapping mapper;
     mlir::OpBuilder::InsertionGuard g(rewriter);
 
     auto &loopBlock = op.getLoopBody().front();
@@ -2488,7 +2488,7 @@ struct LowerGPUGlobalReduce
       auto reduce = b.create<mlir::scf::ReduceOp>(l, value);
       auto &finalReduceBlock = reduce.getRegion().front();
 
-      mlir::BlockAndValueMapping mapper;
+      mlir::IRMapping mapper;
       mapper.map(reduceBlock.getArguments(), finalReduceBlock.getArguments());
 
       {

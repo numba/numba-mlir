@@ -22,8 +22,8 @@
 #include <mlir/Dialect/SPIRV/IR/SPIRVOps.h>
 #include <mlir/Dialect/SPIRV/IR/TargetAndABI.h>
 #include <mlir/Dialect/SPIRV/Transforms/Passes.h>
-#include <mlir/IR/BlockAndValueMapping.h>
 #include <mlir/IR/Dominance.h>
+#include <mlir/IR/IRMapping.h>
 #include <mlir/Pass/PassManager.h>
 #include <mlir/Transforms/DialectConversion.h>
 #include <mlir/Transforms/Passes.h>
@@ -140,7 +140,7 @@ convertParallelToFor(mlir::scf::ParallelOp op,
   auto buildFunc = [&](mlir::OpBuilder &builder, mlir::Location loc,
                        mlir::Value index, mlir::ValueRange args) {
     llvm::SmallVector<mlir::Value> yieldArgs(initVals.size());
-    mlir::BlockAndValueMapping mapping;
+    mlir::IRMapping mapping;
     mapping.map(srcBlock.getArgument(0), index);
     unsigned reduceIndex = 0;
     for (auto &bodyOp : srcBlock.without_terminator()) {
@@ -397,7 +397,7 @@ struct FlattenScfIf : public mlir::OpRewritePattern<mlir::scf::IfOp> {
         if (!canFlatten(&op))
           return mlir::failure();
 
-    mlir::BlockAndValueMapping mapper;
+    mlir::IRMapping mapper;
     for (auto *block : {&trueBody, &falseBody})
       for (auto &op : block->without_terminator())
         rewriter.clone(op, mapper);
@@ -540,7 +540,7 @@ struct OutlineInitPass
     llvm::SmallVector<mlir::Operation *> deinitOps;
     llvm::SmallVector<mlir::Type> types;
     llvm::SmallVector<mlir::Value> values;
-    mlir::BlockAndValueMapping mapper;
+    mlir::IRMapping mapper;
     auto tryOutlineOp = [&](mlir::Operation &op) {
       for (auto arg : op.getOperands()) {
         auto argOp = arg.getDefiningOp();
@@ -1283,11 +1283,9 @@ public:
 
       auto elemType = op.getType();
 
-      // TODO: Fix storage class handling upstream
-      //      auto storageClass = gpu_runtime::StorageClassAttr::get(
-      //          getContext(), gpu_runtime::StorageClass::local);
-      auto storageClass = rewriter.getI64IntegerAttr(
-          mlir::gpu::GPUDialect::getWorkgroupAddressSpace());
+      auto addrSpace = mlir::gpu::GPUDialect::getWorkgroupAddressSpace();
+      auto storageClass =
+          mlir::gpu::AddressSpaceAttr::get(rewriter.getContext(), addrSpace);
       auto memrefType = mlir::MemRefType::get(mlir::ShapedType::kDynamic,
                                               elemType, nullptr, storageClass);
       groupBuffer = rewriter
@@ -1358,8 +1356,7 @@ public:
       ifBuilder.create<mlir::scf::YieldOp>(ifLoc);
     };
 
-    rewriter.create<mlir::scf::IfOp>(loc, /*resultTypes*/ std::nullopt,
-                                     isFirstSg, ifBodyBuilder);
+    rewriter.create<mlir::scf::IfOp>(loc, isFirstSg, ifBodyBuilder);
 
     rewriter.create<gpu_runtime::GPUBarrierOp>(
         loc, static_cast<int64_t>(gpu_runtime::FenceFlags::local));
@@ -1416,13 +1413,10 @@ public:
 
     auto type = mlir::MemRefType::get(shape, oldType.getElementType());
 
-    // TODO: Fix storage class upstream
-    //    auto storageClass = gpu_runtime::StorageClassAttr::get(
-    //        getContext(), gpu_runtime::StorageClass::local);
-
     auto addrSpace = mlir::gpu::GPUDialect::getWorkgroupAddressSpace();
 
-    auto storageClass = rewriter.getI64IntegerAttr(addrSpace);
+    auto storageClass =
+        mlir::gpu::AddressSpaceAttr::get(rewriter.getContext(), addrSpace);
     auto typeLocal = mlir::MemRefType::get(shape, type.getElementType(),
                                            nullptr, storageClass);
 
@@ -1506,13 +1500,10 @@ public:
 
     auto type = mlir::MemRefType::get(shape, oldType.getElementType());
 
-    // TODO: Fix storage class upstream
-    //    auto storageClass = gpu_runtime::StorageClassAttr::get(
-    //        getContext(), gpu_runtime::StorageClass::local);
-
     auto addrSpace = mlir::gpu::GPUDialect::getPrivateAddressSpace();
 
-    auto storageClass = rewriter.getI64IntegerAttr(addrSpace);
+    auto storageClass =
+        mlir::gpu::AddressSpaceAttr::get(rewriter.getContext(), addrSpace);
     auto typeLocal = mlir::MemRefType::get(shape, type.getElementType(),
                                            nullptr, storageClass);
 

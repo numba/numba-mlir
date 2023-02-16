@@ -9,7 +9,7 @@
 #include <mlir/Dialect/Linalg/Utils/Utils.h>
 #include <mlir/Dialect/MemRef/IR/MemRef.h>
 #include <mlir/Dialect/SCF/IR/SCF.h>
-#include <mlir/IR/BlockAndValueMapping.h>
+#include <mlir/IR/IRMapping.h>
 #include <mlir/Pass/Pass.h>
 #include <mlir/Pass/PassManager.h>
 #include <mlir/Transforms/GreedyPatternRewriteDriver.h>
@@ -97,7 +97,7 @@ struct ParallelToTbb : public mlir::OpRewritePattern<mlir::scf::ParallelOp> {
     numba::AllocaInsertionPoint allocaIP(op);
 
     auto loc = op.getLoc();
-    mlir::BlockAndValueMapping mapping;
+    mlir::IRMapping mapping;
     llvm::SmallVector<mlir::Value> reduceVars(op.getNumResults());
     for (auto [i, type] : llvm::enumerate(op.getResultTypes())) {
       auto reduceType = getReduceType(type, maxConcurrency);
