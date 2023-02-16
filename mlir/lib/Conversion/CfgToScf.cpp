@@ -597,7 +597,7 @@ struct BreakRewrite : public mlir::OpRewritePattern<mlir::cf::CondBranchOp> {
       } else if (conditionBr.getTrueDest() == exitBlock &&
                  conditionBr.getFalseDest() == bodyBlock) {
         std::swap(exitBlock, bodyBlock);
-        std::swap(exitArgs, bodyArgs);
+        //        std::swap(exitArgs, bodyArgs);
       } else {
         continue;
       }
