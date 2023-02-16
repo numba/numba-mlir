@@ -662,9 +662,7 @@ jobs:
         run: |
           cd numba_mlir
           source $CONDA/bin/activate test-env
-          export NUMBA_MLIR_DUMP_IR=1
-          export NUMBA_MLIR_DEBUG_TYPE=pattern-application
-          pytest -vv --capture=tee-sys -rXF "numba_mlir/mlir/tests/test_basic.py::test_while"
+          python $GITHUB_WORKSPACE/scripts/run_package_tests.py verbose
 
       - name: Build wheels
         shell: bash -l {0}
