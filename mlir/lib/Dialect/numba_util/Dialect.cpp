@@ -330,46 +330,6 @@ void EnforceShapeOp::build(mlir::OpBuilder &builder,
   EnforceShapeOp::build(builder, state, value.getType(), value, shape);
 }
 
-mlir::OpFoldResult
-EnforceShapeOp::fold(llvm::ArrayRef<mlir::Attribute> operands) {
-  //  operands = operands.drop_front();
-  //  auto numDims = static_cast<unsigned>(operands.size());
-  //  auto srcType = getType().cast<mlir::ShapedType>();
-  //  llvm::SmallVector<int64_t> finalShape(numDims,
-  //                                        mlir::ShapedType::kDynamicSize);
-  //  if (srcType.hasRank()) {
-  //    auto shape = srcType.getShape();
-  //    if (shape.size() != numDims)
-  //      return nullptr;
-
-  //    finalShape.assign(shape.begin(), shape.end());
-  //  }
-  //  bool changed = false;
-  //  for (unsigned i = 0; i < numDims; ++i) {
-  //    if (auto attr = operands[i].dyn_cast_or_null<mlir::IntegerAttr>()) {
-  //      auto val = attr.getInt();
-  //      if (val != mlir::ShapedType::kDynamicSize) {
-  //        if (finalShape[i] != mlir::ShapedType::kDynamicSize) {
-  //          if (finalShape[i] != val)
-  //            return nullptr;
-
-  //        } else {
-  //          changed = true;
-  //          finalShape[i] = val;
-  //        }
-  //      }
-  //    }
-  //  }
-
-  //  if (changed) {
-  //    auto finalType =
-  //        mlir::RankedTensorType::get(finalShape, srcType.getElementType());
-  //    getResult().setType(finalType);
-  //    return getResult();
-  //  }
-  return nullptr;
-}
-
 namespace {
 struct EnforceShapeDim
     : public mlir::OpInterfaceRewritePattern<mlir::ShapedDimOpInterface> {
@@ -467,8 +427,7 @@ static mlir::Value getChangeLayoutParent(mlir::Value val) {
   return {};
 }
 
-mlir::OpFoldResult
-ChangeLayoutOp::fold(llvm::ArrayRef<mlir::Attribute> /*operands*/) {
+mlir::OpFoldResult ChangeLayoutOp::fold(FoldAdaptor) {
   mlir::Value src = getSource();
   auto thisType = getType();
   do {
@@ -1272,10 +1231,9 @@ static mlir::Value propagateCasts(mlir::Value val, mlir::Type thisType) {
   return {};
 }
 
-mlir::OpFoldResult SignCastOp::fold(llvm::ArrayRef<mlir::Attribute> operands) {
-  assert(operands.size() == 1);
+mlir::OpFoldResult SignCastOp::fold(FoldAdaptor adaptor) {
   auto thisType = getType();
-  auto attrOperand = operands.front().dyn_cast_or_null<mlir::TypedAttr>();
+  auto attrOperand = adaptor.getSource().dyn_cast_or_null<mlir::TypedAttr>();
   if (attrOperand && attrOperand.getType() == thisType)
     return attrOperand;
 
@@ -1762,10 +1720,9 @@ std::optional<int64_t> TupleExtractOp::getConstantIndex() {
   return {};
 }
 
-mlir::OpFoldResult
-TupleExtractOp::fold(mlir::ArrayRef<mlir::Attribute> operands) {
+mlir::OpFoldResult TupleExtractOp::fold(FoldAdaptor adaptor) {
   // All forms of folding require a known index.
-  auto index = operands[1].dyn_cast_or_null<mlir::IntegerAttr>();
+  auto index = adaptor.getIndex().dyn_cast_or_null<mlir::IntegerAttr>();
   if (!index)
     return {};
 
@@ -2077,8 +2034,7 @@ mlir::LogicalResult BitcastOp::verify() {
   return mlir::success();
 }
 
-mlir::OpFoldResult
-BitcastOp::fold(llvm::ArrayRef<mlir::Attribute> /*operands*/) {
+mlir::OpFoldResult BitcastOp::fold(FoldAdaptor) {
   auto src = getSource();
   auto srcType = src.getType();
   auto dstType = getResult().getType();
@@ -2104,8 +2060,7 @@ mlir::LogicalResult MemrefBitcastOp::verify() {
   return mlir::success();
 }
 
-mlir::OpFoldResult
-MemrefBitcastOp::fold(llvm::ArrayRef<mlir::Attribute> /*operands*/) {
+mlir::OpFoldResult MemrefBitcastOp::fold(FoldAdaptor) {
   auto src = getSource();
   auto srcType = src.getType();
   auto dstType = getResult().getType();

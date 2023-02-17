@@ -118,7 +118,7 @@ static mlir::Value propagateCasts(mlir::Value val, mlir::Type thisType) {
   return {};
 }
 
-mlir::OpFoldResult CastOp::fold(llvm::ArrayRef<mlir::Attribute> /*operands*/) {
+mlir::OpFoldResult CastOp::fold(FoldAdaptor) {
   auto arg = getValue();
   auto opType = arg.getType();
   auto retType = getType();
@@ -236,8 +236,7 @@ void ExhaustIterOp::build(mlir::OpBuilder &builder, mlir::OperationState &state,
                        value, builder.getI64IntegerAttr(count));
 }
 
-mlir::OpFoldResult
-ExhaustIterOp::fold(llvm::ArrayRef<mlir::Attribute> /*operands*/) {
+mlir::OpFoldResult ExhaustIterOp::fold(FoldAdaptor) {
   if (getType() == getOperand().getType() &&
       getType() != plier::PyType::getUndefined(getContext())) {
     return getOperand();

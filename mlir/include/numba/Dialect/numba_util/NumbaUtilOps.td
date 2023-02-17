@@ -24,7 +24,6 @@ def NumbaUtil_Dialect : Dialect {
   let hasConstantMaterializer = 1;
   let useDefaultAttributePrinterParser = 1;
   let useDefaultTypePrinterParser = 1;
-  let useFoldAPI = kEmitRawAttributesFolder;
 }
 
 class NumbaUtil_Type<string name, string typeMnemonic, list<Trait> traits = [],
@@ -76,7 +75,6 @@ def EnforceShapeOp : NumbaUtil_Op<"enforce_shape"> {
     "::mlir::ValueRange":$shape)
   >];
 
-  let hasFolder = 1;
   let hasCanonicalizer = 1;
 
   let assemblyFormat = "attr-dict $value `:` type($value) `(` $sizes `)` `->` type($result)";
