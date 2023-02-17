@@ -331,6 +331,9 @@ struct ScfIfRewriteTwoExits
               .getResults();
       cond = rewriter.create<mlir::arith::AndIOp>(loc, cond, ifResults[0]);
       ifResults = ifResults.drop_front();
+
+      assert(exitBlock1->getNumArguments() == ops1.size());
+      assert(exitBlock2->getNumArguments() == exitOps.size());
       rewriter.replaceOpWithNewOp<mlir::cf::CondBranchOp>(
           op, cond, exitBlock1, ops1, exitBlock2,
           ifResults.take_front(exitOps.size()));
@@ -651,6 +654,8 @@ struct BreakRewrite : public mlir::OpRewritePattern<mlir::cf::CondBranchOp> {
         cond = rewriter.create<mlir::arith::XOrIOp>(loc, one, cond);
 
       params.push_back(cond);
+
+      assert(conditionBlock->getNumArguments() == params.size());
       rewriter.replaceOpWithNewOp<mlir::cf::BranchOp>(op, conditionBlock,
                                                       params);
 
@@ -658,6 +663,9 @@ struct BreakRewrite : public mlir::OpRewritePattern<mlir::cf::CondBranchOp> {
       auto oldCond = conditionBr.getCondition();
       mlir::Value newCond = conditionBlock->getArguments().back();
       newCond = rewriter.create<mlir::arith::AndIOp>(loc, newCond, oldCond);
+
+      assert(bodyBlock->getNumArguments() == bodyArgs.size());
+      assert(exitBlock->getNumArguments() == exitArgs.size());
       rewriter.replaceOpWithNewOp<mlir::cf::CondBranchOp>(
           conditionBr, newCond, bodyBlock, bodyArgs, exitBlock, exitArgs);
       return mlir::success();
@@ -711,6 +719,7 @@ struct CondBranchSameTargetRewrite
       }
     }
 
+    assert(trueDest->getNumArguments() == newOperands.size());
     rewriter.replaceOpWithNewOp<mlir::cf::BranchOp>(op, trueDest, newOperands);
     return mlir::success();
   }
