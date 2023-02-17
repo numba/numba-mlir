@@ -49,7 +49,6 @@ def NTensor_Dialect : Dialect {
 
   let hasConstantMaterializer = 1;
   let useDefaultTypePrinterParser = 1;
-  let useFoldAPI = kEmitRawAttributesFolder;
 }
 
 class NTensor_Type<string name, string typeMnemonic, list<Trait> traits = [],

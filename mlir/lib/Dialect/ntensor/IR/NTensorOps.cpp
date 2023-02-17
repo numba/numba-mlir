@@ -210,8 +210,7 @@ foldLoadFromElements(mlir::Value src, mlir::ValueRange indices) {
   return args[idx];
 }
 
-mlir::OpFoldResult
-numba::ntensor::LoadOp::fold(llvm::ArrayRef<mlir::Attribute> /*operands*/) {
+mlir::OpFoldResult numba::ntensor::LoadOp::fold(FoldAdaptor) {
   if (auto result = foldLoadFromElements(getArray(), getIndices()))
     return *result;
 
@@ -426,8 +425,7 @@ void numba::ntensor::DimOp::getCanonicalizationPatterns(
                  LinalgGenericDimPropagate, ExtractSliceDimPropagate>(context);
 }
 
-mlir::OpFoldResult
-numba::ntensor::DimOp::fold(llvm::ArrayRef<mlir::Attribute> /*operands*/) {
+mlir::OpFoldResult numba::ntensor::DimOp::fold(FoldAdaptor) {
   auto idxVal = getConstantIndex();
   if (!idxVal || *idxVal < 0)
     return nullptr;
@@ -690,16 +688,14 @@ static bool isIdentitySubview(numba::ntensor::SubviewOp op) {
   return true;
 }
 
-mlir::OpFoldResult
-numba::ntensor::SubviewOp::fold(llvm::ArrayRef<mlir::Attribute> /*operands*/) {
+mlir::OpFoldResult numba::ntensor::SubviewOp::fold(FoldAdaptor) {
   if (isIdentitySubview(*this))
     return getSource();
 
   return nullptr;
 }
 
-mlir::OpFoldResult numba::ntensor::FromTensorOp::fold(
-    llvm::ArrayRef<mlir::Attribute> /*operands*/) {
+mlir::OpFoldResult numba::ntensor::FromTensorOp::fold(FoldAdaptor) {
   if (auto to = getTensor().getDefiningOp<numba::ntensor::ToTensorOp>()) {
     auto array = to.getArray();
     if (getType() == array.getType())
@@ -708,8 +704,7 @@ mlir::OpFoldResult numba::ntensor::FromTensorOp::fold(
   return nullptr;
 }
 
-mlir::OpFoldResult
-numba::ntensor::ToTensorOp::fold(llvm::ArrayRef<mlir::Attribute> /*operands*/) {
+mlir::OpFoldResult numba::ntensor::ToTensorOp::fold(FoldAdaptor) {
   if (auto from = getArray().getDefiningOp<numba::ntensor::FromTensorOp>()) {
     auto val = from.getTensor();
     auto haveOnlySafeUses = [](mlir::Operation *op) -> bool {
@@ -737,8 +732,7 @@ numba::ntensor::ToTensorOp::fold(llvm::ArrayRef<mlir::Attribute> /*operands*/) {
   return nullptr;
 }
 
-mlir::OpFoldResult numba::ntensor::FromMemrefOp::fold(
-    llvm::ArrayRef<mlir::Attribute> /*operands*/) {
+mlir::OpFoldResult numba::ntensor::FromMemrefOp::fold(FoldAdaptor) {
   if (auto to = getMemref().getDefiningOp<numba::ntensor::ToMemrefOp>()) {
     auto array = to.getArray();
     if (getType() == array.getType())
@@ -747,8 +741,7 @@ mlir::OpFoldResult numba::ntensor::FromMemrefOp::fold(
   return nullptr;
 }
 
-mlir::OpFoldResult
-numba::ntensor::ToMemrefOp::fold(llvm::ArrayRef<mlir::Attribute> /*operands*/) {
+mlir::OpFoldResult numba::ntensor::ToMemrefOp::fold(FoldAdaptor) {
   if (auto from = getArray().getDefiningOp<numba::ntensor::FromMemrefOp>()) {
     auto val = from.getMemref();
     if (getType() == val.getType())
@@ -780,8 +773,7 @@ mlir::LogicalResult numba::ntensor::SubviewOp::reifyResultShapes(
   return mlir::success();
 }
 
-mlir::OpFoldResult
-numba::ntensor::CastOp::fold(llvm::ArrayRef<mlir::Attribute> /*operands*/) {
+mlir::OpFoldResult numba::ntensor::CastOp::fold(FoldAdaptor) {
   mlir::Value current = getSource();
   while (auto parent = current.getDefiningOp<CastOp>()) {
     auto parentSource = parent.getSource();
@@ -833,8 +825,7 @@ void numba::ntensor::ElementwiseOp::build(
 }
 
 mlir::LogicalResult numba::ntensor::BroadcastOp::fold(
-    mlir::ArrayRef<mlir::Attribute> /*operands*/,
-    llvm::SmallVectorImpl<mlir::OpFoldResult> &results) {
+    FoldAdaptor, llvm::SmallVectorImpl<mlir::OpFoldResult> &results) {
   assert(getInputs().size() == getResults().size());
   if (getInputs().size() == 1) {
     if (getInputs().front().getType().cast<mlir::ShapedType>().getShape() !=
