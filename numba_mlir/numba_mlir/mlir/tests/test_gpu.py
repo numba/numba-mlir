@@ -1191,6 +1191,10 @@ _shapes = (1, 7, 16, 25, 64, 65)
         "lambda a: a.sum(axis=0)",
         "lambda a: a.sum(axis=1)",
         "lambda a: np.prod(a)",
+        "lambda a: np.prod(a, axis=0)",
+        "lambda a: np.prod(a, axis=1)",
+        "lambda a: np.amin(a)",
+        "lambda a: np.amax(a)",
     ],
 )
 @pytest.mark.parametrize("shape", itertools.product(_shapes, _shapes))
