@@ -166,6 +166,11 @@ def sum_impl(builder, arg, axis=None):
     return _array_reduce(builder, arg, axis, lambda a, b: a + b, lambda b, t: 0)
 
 
+@register_func("numpy.prod", numpy.prod)
+def sum_impl(builder, arg, axis=None):
+    return _array_reduce(builder, arg, axis, lambda a, b: a * b, lambda b, t: 1)
+
+
 @register_func("numpy.flip", numpy.flip)
 def flip_impl(builder, arg, axis=None):
     shape = arg.shape
