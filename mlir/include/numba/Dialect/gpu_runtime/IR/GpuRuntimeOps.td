@@ -24,7 +24,6 @@ def GpuRuntime_Dialect : Dialect {
   let hasConstantMaterializer = 1;
   let useDefaultAttributePrinterParser = 1;
   let useDefaultTypePrinterParser = 1;
-  let useFoldAPI = kEmitRawAttributesFolder;
 }
 
 class GpuRuntime_Type<string name, string typeMnemonic, list<Trait> traits = [],
