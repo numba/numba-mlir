@@ -167,7 +167,7 @@ def sum_impl(builder, arg, axis=None):
 
 
 @register_func("numpy.prod", numpy.prod)
-def sum_impl(builder, arg, axis=None):
+def prod_impl(builder, arg, axis=None):
     return _array_reduce(builder, arg, axis, lambda a, b: a * b, lambda b, t: 1)
 
 
@@ -218,7 +218,7 @@ def _get_max_init_value(builder, dtype):
 
 @register_func("array.max")
 @register_func("numpy.amax", numpy.amax)
-def min_impl(builder, arg, axis=None):
+def max_impl(builder, arg, axis=None):
     return _array_reduce(
         builder, arg, axis, lambda a, b: max(a, b), _get_max_init_value
     )
