@@ -82,6 +82,7 @@ _test_arrays_ids = [
         "lambda a: a.max()",
         "lambda a: a.mean()",
         "lambda a: np.sum(a)",
+        "lambda a: np.prod(a)",
         "lambda a: np.amax(a)",
         "lambda a: np.amin(a)",
         "lambda a: np.mean(a)",

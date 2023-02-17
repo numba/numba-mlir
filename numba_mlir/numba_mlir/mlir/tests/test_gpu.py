@@ -1190,18 +1190,27 @@ _shapes = (1, 7, 16, 25, 64, 65)
         "lambda a: a.sum()",
         "lambda a: a.sum(axis=0)",
         "lambda a: a.sum(axis=1)",
+        "lambda a: np.prod(a)",
+        "lambda a: np.prod(a, axis=0)",
+        "lambda a: np.prod(a, axis=1)",
+        "lambda a: np.amin(a)",
+        "lambda a: np.amax(a)",
     ],
 )
 @pytest.mark.parametrize("shape", itertools.product(_shapes, _shapes))
 @pytest.mark.parametrize("dtype", [np.int32, np.int64, np.float32])
-def test_cfd_reduce2(py_func, shape, dtype):
+def test_cfd_reduce2(py_func, shape, dtype, request):
     if shape[0] == 1 or shape[1] == 1:
         # TODO: Handle gpu array access outside the loops
         pytest.xfail()
 
-    jit_func = njit(py_func)
+    count = math.prod(shape)
+    if count > 30 and "np.prod" in str(request.node.callspec.id):
+        # TODO: investigate overflow handling by spirv group ops
+        pytest.skip()
 
-    a = np.arange(math.prod(shape), dtype=dtype).reshape(shape).copy()
+    jit_func = njit(py_func)
+    a = np.arange(1, count + 1, dtype=dtype).reshape(shape).copy()
 
     da = _from_host(a, buffer="device")
     assert_allclose(jit_func(da), py_func(a), rtol=1e-5)
