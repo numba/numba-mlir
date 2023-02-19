@@ -21,6 +21,7 @@ if int(os.environ.get("NUMBA_MLIR_SETUP_RUN_CMAKE", 1)):
     NUMBA_MLIR_USE_MKL = os.environ.get("NUMBA_MLIR_USE_MKL")
     CMAKE_INSTALL_PREFIX = os.path.join(str(Path(root_dir).parent))
     NUMBA_MLIR_USE_DPNP = os.environ.get("NUMBA_MLIR_USE_DPNP")
+    NUMBA_MLIR_ENABLE_IGPU_DIALECT = os.environ.get("NUMBA_MLIR_ENABLE_IGPU_DIALECT")
 
     cmake_build_dir = os.path.join(CMAKE_INSTALL_PREFIX, "numba_mlir_cmake_build")
     cmake_cmd = [
@@ -77,7 +78,13 @@ if int(os.environ.get("NUMBA_MLIR_SETUP_RUN_CMAKE", 1)):
     else:
         print("LEVEL_ZERO_DIR is", LEVEL_ZERO_DIR)
         cmake_cmd += [
-            "-DNUMBA_MLIR_ENABLE_IGPU_DIALECT=ON",
+                "-DNUMBA_MLIR_ENABLE_IGPU_DIALECT=ON",
+        ]
+    
+    # If L0 is already on the system
+    if NUMBA_MLIR_ENABLE_IGPU_DIALECT == '1':
+        cmake_cmd += [
+                "-DNUMBA_MLIR_ENABLE_IGPU_DIALECT=ON",
         ]
 
     try:
