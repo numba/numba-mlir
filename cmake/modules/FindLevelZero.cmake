@@ -50,6 +50,7 @@ else()
 
     find_library(LevelZero_LIBRARY
         NAMES ze_loader
+        HINTS /usr/lib/x86_64-linux-gnu
     )
 endif()
 
