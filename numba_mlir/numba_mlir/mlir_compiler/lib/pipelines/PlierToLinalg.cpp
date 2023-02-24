@@ -921,29 +921,34 @@ struct BuildSliceToNtensor
                   mlir::ConversionPatternRewriter &rewriter) const override {
     auto indexType = rewriter.getIndexType();
 
-    auto loc = op->getLoc();
-    auto doCast = [&](mlir::Value val) -> mlir::Value {
-      if (val.getType() != indexType) {
-        val = rewriter.create<plier::CastOp>(loc, indexType, val);
-        rerunScfPipeline(op);
-      }
+    auto loc = op.getLoc();
+    auto doCast = [&](mlir::Value val) -> std::optional<mlir::Value> {
+      if (numba::canConvert(val.getType(), indexType))
+        return numba::doConvert(rewriter, loc, val, indexType);
 
-      return val;
+      return std::nullopt;
     };
 
     auto isNone = [](mlir::Value val) {
       return val.getType().isa<mlir::NoneType>();
     };
 
-    auto getVal = [&](mlir::Value orig, mlir::Value converted) {
-      return isNone(orig) ? mlir::Value() : doCast(converted);
+    auto getVal = [&](mlir::Value orig,
+                      mlir::Value converted) -> std::optional<mlir::Value> {
+      if (isNone(orig))
+        return mlir::Value{};
+
+      return doCast(orig);
     };
 
     auto begin = getVal(op.getBegin(), adaptor.getBegin());
     auto end = getVal(op.getEnd(), adaptor.getEnd());
     auto step = getVal(op.getStep(), adaptor.getStep());
-    rewriter.replaceOpWithNewOp<numba::ntensor::BuildSliceOp>(op, begin, end,
-                                                              step);
+    if (!begin || !end || !step)
+      return mlir::failure();
+
+    rewriter.replaceOpWithNewOp<numba::ntensor::BuildSliceOp>(op, *begin, *end,
+                                                              *step);
     return mlir::success();
   }
 };
