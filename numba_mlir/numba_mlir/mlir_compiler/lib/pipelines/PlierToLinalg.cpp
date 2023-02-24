@@ -1091,16 +1091,19 @@ struct BuiltinCallsToNtensor
   }
 };
 
-static mlir::Value addElementConversion(mlir::OpBuilder &builder,
-                                        mlir::Location loc,
-                                        mlir::Value srcArray,
-                                        mlir::Type dstType) {
+static std::optional<mlir::Value> addElementConversion(mlir::OpBuilder &builder,
+                                                       mlir::Location loc,
+                                                       mlir::Value srcArray,
+                                                       mlir::Type dstType) {
   auto srcType = srcArray.getType().cast<numba::ntensor::NTensorType>();
   auto dstShaped = dstType.cast<mlir::ShapedType>();
   auto srcElementType = srcType.getElementType();
   auto dstElementType = dstShaped.getElementType();
   if (srcElementType == dstElementType)
     return srcArray;
+
+  if (!numba::canConvert(srcElementType, dstElementType))
+    return std::nullopt;
 
   auto dstArrayTupe = numba::ntensor::NTensorType::get(
       dstShaped.getShape(), dstElementType, srcType.getEnvironment(),
@@ -1110,7 +1113,7 @@ static mlir::Value addElementConversion(mlir::OpBuilder &builder,
   auto bodyBuilder = [&](mlir::OpBuilder &b, mlir::Location l,
                          mlir::ValueRange vals) {
     assert(vals.size() == 1);
-    mlir::Value res = b.create<plier::CastOp>(l, dstElementType, vals.front());
+    mlir::Value res = numba::doConvert(b, l, vals.front(), dstElementType);
     b.create<numba::ntensor::ElementwiseYieldOp>(l, res);
   };
 
@@ -1153,7 +1156,11 @@ static std::optional<mlir::Value> doCast(mlir::OpBuilder &builder,
     if (!dstShapedType)
       return std::nullopt;
 
-    mlir::Value res = addElementConversion(builder, loc, src, dstShapedType);
+    auto elemConverted = addElementConversion(builder, loc, src, dstShapedType);
+    if (!elemConverted)
+      return std::nullopt;
+
+    mlir::Value res = *elemConverted;
     if (dstShapedType.isa<mlir::MemRefType>()) {
       auto dstMemrefType = mlir::MemRefType::get(
           srcArrayType.getShape(), dstShapedType.getElementType());
