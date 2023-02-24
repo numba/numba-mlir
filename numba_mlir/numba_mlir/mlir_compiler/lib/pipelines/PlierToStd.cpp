@@ -441,10 +441,7 @@ struct BinOpLowering : public mlir::OpConversionPattern<plier::BinOp> {
 
     auto loc = op.getLoc();
     auto literalCast = [&](mlir::Value val, mlir::Type dstType) -> mlir::Value {
-      if (dstType != val.getType())
-        return rewriter.createOrFold<plier::CastOp>(loc, dstType, val);
-
-      return val;
+      return numba::doConvert(rewriter, loc, val, dstType);
     };
 
     std::array<mlir::Value, 2> convertedOperands = {
