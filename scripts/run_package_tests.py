@@ -13,6 +13,8 @@ def run_tests(params):
     args = [
         "--capture=tee-sys",
         "-rXF",
+        "-p",
+        "no:faulthandler",
         "--pyargs",
         "numba_mlir.mlir.tests",
     ]
