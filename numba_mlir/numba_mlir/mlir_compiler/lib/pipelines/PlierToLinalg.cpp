@@ -2804,7 +2804,9 @@ struct AdditionalBufferize
 
       auto input = inputs.front();
       if (input.getType().isa<mlir::TupleType>() || type.isa<mlir::TupleType>())
-        return builder.createOrFold<plier::CastOp>(loc, type, input);
+        return builder
+            .create<mlir::UnrealizedConversionCastOp>(loc, type, input)
+            .getResult(0);
 
       return std::nullopt;
     };
