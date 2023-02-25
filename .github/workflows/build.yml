@@ -44,8 +44,6 @@ jobs:
           path: ~/conda_pkgs_dir
           key:
             ${{ runner.os }}-conda-${{ env.CACHE_NUMBER }}-${{hashFiles(env.CORE_ENV_FILE) }}
-          restore-keys: |
-            ${{ runner.os }}-conda-${{ env.CACHE_NUMBER }}-
 
       - name: Setup conda
         uses: conda-incubator/setup-miniconda@v2
@@ -386,8 +384,6 @@ jobs:
           path: ~/.conda/pkgs
           key:
             ${{ runner.os }}-conda-${{ env.CACHE_NUMBER }}-${{hashFiles(env.CORE_ENV_FILE) }}
-          restore-keys: |
-            ${{ runner.os }}-conda-${{ env.CACHE_NUMBER }}-
 
       - name: Add conda to system path
         run: echo $CONDA/bin >> $GITHUB_PATH
