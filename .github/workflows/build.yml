@@ -15,6 +15,7 @@ env:
   LEVEL_ZERO_VER: v1.6.2
   TBB_URL_PREFIX: https://github.com/oneapi-src/oneTBB/releases/download/
   LLVM_SHA_FILE: llvm-sha.txt
+  CORE_ENV_FILE: scripts/core-env.yml
 
 jobs:
   build_win:
@@ -42,7 +43,7 @@ jobs:
         with:
           path: ~/conda_pkgs_dir
           key:
-            ${{ runner.os }}-conda-${{ env.CACHE_NUMBER }}-${{hashFiles('scripts/core-env.yml') }}
+            ${{ runner.os }}-conda-${{ env.CACHE_NUMBER }}-${{hashFiles(env.CORE_ENV_FILE) }}
           restore-keys: |
             ${{ runner.os }}-conda-${{ env.CACHE_NUMBER }}-
 
@@ -224,17 +225,6 @@ jobs:
         with:
           access_token: ${{ github.token }}
 
-      - name: Cache conda packages
-        uses: actions/cache@v2
-        env:
-          CACHE_NUMBER: 1  # Increase to reset cache
-        with:
-          path: ~/conda_pkgs_dir
-          key:
-            ${{ runner.os }}-conda-${{ env.CACHE_NUMBER }}-${{hashFiles('scripts/core-env.yml') }}
-          restore-keys: |
-            ${{ runner.os }}-conda-${{ env.CACHE_NUMBER }}-
-
       - name: Setup conda
         uses: conda-incubator/setup-miniconda@v2
         with:
@@ -394,7 +384,7 @@ jobs:
         with:
           path: ~/.conda/pkgs
           key:
-            ${{ runner.os }}-conda-${{ env.CACHE_NUMBER }}-${{hashFiles('**/meta.yaml') }}
+            ${{ runner.os }}-conda-${{ env.CACHE_NUMBER }}-${{hashFiles(env.CORE_ENV_FILE) }}
           restore-keys: |
             ${{ runner.os }}-conda-${{ env.CACHE_NUMBER }}-
 
@@ -577,17 +567,6 @@ jobs:
       - name: Set pkgs_dirs
         run: |
           echo "pkgs_dirs: [~/.conda/pkgs]" >> ~/.condarc
-
-      - name: Cache conda packages
-        uses: actions/cache@v2
-        env:
-          CACHE_NUMBER: 1  # Increase to reset cache
-        with:
-          path: ~/.conda/pkgs
-          key:
-            ${{ runner.os }}-conda-${{ env.CACHE_NUMBER }}-${{hashFiles('**/meta.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-conda-${{ env.CACHE_NUMBER }}-
 
       - name: Add conda to system path
         run: echo $CONDA/bin >> $GITHUB_PATH
