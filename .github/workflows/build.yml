@@ -54,8 +54,8 @@ jobs:
 
       - name: Install CMake and Ninja
         run: |
-          conda list
           conda env update -n base -f $env:CORE_ENV_FILE --prune
+          conda list
 
       - name: Setup Cache Vars
         run: |
@@ -390,8 +390,8 @@ jobs:
 
       - name: Install CMake and Ninja
         run: |
-          conda list
           conda env update -n base -f $CORE_ENV_FILE --prune
+          conda list
 
       - name: Setup Cache Vars
         run: |
