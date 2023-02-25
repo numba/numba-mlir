@@ -55,7 +55,7 @@ jobs:
 
       - name: Install CMake and Ninja
         run: |
-          conda env update -n test -f $env:CORE_ENV_FILE --prune -c conda-forge --override-channels
+          conda env update -n test -f $env:CORE_ENV_FILE --prune
           conda list
 
       - name: Setup Cache Vars
@@ -394,7 +394,7 @@ jobs:
 
       - name: Install CMake and Ninja
         run: |
-          conda env update -n base -f $CORE_ENV_FILE --prune -c conda-forge --override-channels
+          conda env update -n base -f $CORE_ENV_FILE --prune
           conda list
 
       - name: Setup Cache Vars
