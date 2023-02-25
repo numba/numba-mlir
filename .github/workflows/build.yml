@@ -37,7 +37,7 @@ jobs:
         with:
           path: ~/conda_pkgs_dir
           key:
-            ${{ runner.os }}-conda-${{ env.CACHE_NUMBER }}-${{hashFiles('**/meta.yaml') }}
+            ${{ runner.os }}-conda-${{ env.CACHE_NUMBER }}-${{hashFiles('scripts/core-env.yml') }}
           restore-keys: |
             ${{ runner.os }}-conda-${{ env.CACHE_NUMBER }}-
 
@@ -50,7 +50,7 @@ jobs:
 
       - name: Install CMake and Ninja
         run: |
-          conda install cmake ninja lit
+          conda env update -n base -f scripts/core-env.yml --prune
 
       - name: Checkout repo
         uses: actions/checkout@v2
@@ -231,7 +231,7 @@ jobs:
         with:
           path: ~/conda_pkgs_dir
           key:
-            ${{ runner.os }}-conda-${{ env.CACHE_NUMBER }}-${{hashFiles('**/meta.yaml') }}
+            ${{ runner.os }}-conda-${{ env.CACHE_NUMBER }}-${{hashFiles('scripts/core-env.yml') }}
           restore-keys: |
             ${{ runner.os }}-conda-${{ env.CACHE_NUMBER }}-
 
@@ -241,10 +241,6 @@ jobs:
           auto-update-conda: true
           use-only-tar-bz2: true
           run-post: false
-
-      - name: Install CMake and Ninja
-        run: |
-          conda install cmake ninja lit
 
       - name: Checkout repo
         uses: actions/checkout@v2
@@ -402,7 +398,7 @@ jobs:
 
       - name: Install CMake and Ninja
         run: |
-          conda install cmake ninja lit
+          conda env update -n base -f scripts/core-env.yml --prune
 
       - name: Checkout repo
         uses: actions/checkout@v2
@@ -595,10 +591,6 @@ jobs:
 
       - name: Add conda to system path
         run: echo $CONDA/bin >> $GITHUB_PATH
-
-      - name: Install CMake and Ninja
-        run: |
-          conda install cmake ninja lit
 
       - name: Checkout repo
         uses: actions/checkout@v2
