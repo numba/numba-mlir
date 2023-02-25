@@ -7,3 +7,4 @@ dependencies:
   - cmake
   - ninja
   - lit
+  - zlib
