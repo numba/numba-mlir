@@ -1,0 +1,11 @@
+name: dev
+channels:
+  - defaults
+  - conda-forge
+dependencies:
+  - python=3.10
+  - cmake
+  - ninja
+  - lit
+  - zlib
+  - gxx_linux-64

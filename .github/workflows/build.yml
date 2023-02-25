@@ -15,10 +15,11 @@ env:
   LEVEL_ZERO_VER: v1.6.2
   TBB_URL_PREFIX: https://github.com/oneapi-src/oneTBB/releases/download/
   LLVM_SHA_FILE: llvm-sha.txt
-  CORE_ENV_FILE: scripts/core-env.yml
 
 jobs:
   build_win:
+    env:
+      CORE_ENV_FILE: scripts/core-env-win.yml
     name: Builds Numba-MLIR core on Windows
     runs-on: windows-latest
     timeout-minutes: 450
@@ -357,6 +358,8 @@ jobs:
 
 
   build_linux:
+    env:
+      CORE_ENV_FILE: scripts/core-env-linux.yml
     name: Builds Numba-MLIR core on Linux
     runs-on: ubuntu-latest
     timeout-minutes: 450

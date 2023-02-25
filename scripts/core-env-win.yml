@@ -8,4 +8,4 @@ dependencies:
   - ninja
   - lit
   - zlib
-  - compilers
+  - vs2019_win-64
