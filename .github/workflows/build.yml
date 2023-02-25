@@ -153,6 +153,8 @@ jobs:
           git checkout $env:LLVM_SHA
           mkdir _build
           cd _build
+          $env:CXX="cl.exe"
+          $env:CC="cl.exe"
           cmake ../llvm                                                    `
             -GNinja                                                        `
             -DCMAKE_BUILD_TYPE=Release                                     `
