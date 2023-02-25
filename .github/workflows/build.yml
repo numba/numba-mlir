@@ -48,14 +48,14 @@ jobs:
           use-only-tar-bz2: true
           run-post: false
 
-      - name: Install CMake and Ninja
-        run: |
-          conda env update -f scripts/core-env.yml --prune
-
       - name: Checkout repo
         uses: actions/checkout@v2
         with:
           fetch-depth: 0
+
+      - name: Install CMake and Ninja
+        run: |
+          conda env update -f scripts/core-env.yml --prune
 
       - name: Setup Cache Vars
         run: |
@@ -396,14 +396,14 @@ jobs:
       - name: Add conda to system path
         run: echo $CONDA/bin >> $GITHUB_PATH
 
-      - name: Install CMake and Ninja
-        run: |
-          conda env update -f scripts/core-env.yml --prune
-
       - name: Checkout repo
         uses: actions/checkout@v2
         with:
           fetch-depth: 0
+
+      - name: Install CMake and Ninja
+        run: |
+          conda env update -f scripts/core-env.yml --prune
 
       - name: Setup Cache Vars
         run: |
