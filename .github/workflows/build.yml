@@ -15,6 +15,7 @@ env:
   LEVEL_ZERO_VER: v1.6.2
   TBB_URL_PREFIX: https://github.com/oneapi-src/oneTBB/releases/download/
   LLVM_SHA_FILE: llvm-sha.txt
+  CORE_ENV_FILE: scripts/core-env.yml
 
 jobs:
   build_win:
@@ -30,6 +31,11 @@ jobs:
         with:
           access_token: ${{ github.token }}
 
+      - name: Checkout repo
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+
       - name: Cache conda packages
         uses: actions/cache@v2
         env:
@@ -37,9 +43,7 @@ jobs:
         with:
           path: ~/conda_pkgs_dir
           key:
-            ${{ runner.os }}-conda-${{ env.CACHE_NUMBER }}-${{hashFiles('**/meta.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-conda-${{ env.CACHE_NUMBER }}-
+            ${{ runner.os }}-conda-${{ env.CACHE_NUMBER }}-${{ hashFiles(env.CORE_ENV_FILE) }}
 
       - name: Setup conda
         uses: conda-incubator/setup-miniconda@v2
@@ -50,12 +54,8 @@ jobs:
 
       - name: Install CMake and Ninja
         run: |
-          conda install cmake ninja lit
-
-      - name: Checkout repo
-        uses: actions/checkout@v2
-        with:
-          fetch-depth: 0
+          conda env update -n test -f $env:CORE_ENV_FILE --prune
+          conda list
 
       - name: Setup Cache Vars
         run: |
@@ -224,27 +224,12 @@ jobs:
         with:
           access_token: ${{ github.token }}
 
-      - name: Cache conda packages
-        uses: actions/cache@v2
-        env:
-          CACHE_NUMBER: 1  # Increase to reset cache
-        with:
-          path: ~/conda_pkgs_dir
-          key:
-            ${{ runner.os }}-conda-${{ env.CACHE_NUMBER }}-${{hashFiles('**/meta.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-conda-${{ env.CACHE_NUMBER }}-
-
       - name: Setup conda
         uses: conda-incubator/setup-miniconda@v2
         with:
           auto-update-conda: true
           use-only-tar-bz2: true
           run-post: false
-
-      - name: Install CMake and Ninja
-        run: |
-          conda install cmake ninja lit
 
       - name: Checkout repo
         uses: actions/checkout@v2
@@ -386,6 +371,11 @@ jobs:
         run: |
           echo "pkgs_dirs: [~/.conda/pkgs]" >> ~/.condarc
 
+      - name: Checkout repo
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+
       - name: Cache conda packages
         uses: actions/cache@v2
         env:
@@ -393,21 +383,15 @@ jobs:
         with:
           path: ~/.conda/pkgs
           key:
-            ${{ runner.os }}-conda-${{ env.CACHE_NUMBER }}-${{hashFiles('**/meta.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-conda-${{ env.CACHE_NUMBER }}-
+            ${{ runner.os }}-conda-${{ env.CACHE_NUMBER }}-${{ hashFiles(env.CORE_ENV_FILE) }}
 
       - name: Add conda to system path
         run: echo $CONDA/bin >> $GITHUB_PATH
 
       - name: Install CMake and Ninja
         run: |
-          conda install cmake ninja lit
-
-      - name: Checkout repo
-        uses: actions/checkout@v2
-        with:
-          fetch-depth: 0
+          conda env update -n base -f $CORE_ENV_FILE --prune
+          conda list
 
       - name: Setup Cache Vars
         run: |
@@ -582,23 +566,8 @@ jobs:
         run: |
           echo "pkgs_dirs: [~/.conda/pkgs]" >> ~/.condarc
 
-      - name: Cache conda packages
-        uses: actions/cache@v2
-        env:
-          CACHE_NUMBER: 1  # Increase to reset cache
-        with:
-          path: ~/.conda/pkgs
-          key:
-            ${{ runner.os }}-conda-${{ env.CACHE_NUMBER }}-${{hashFiles('**/meta.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-conda-${{ env.CACHE_NUMBER }}-
-
       - name: Add conda to system path
         run: echo $CONDA/bin >> $GITHUB_PATH
-
-      - name: Install CMake and Ninja
-        run: |
-          conda install cmake ninja lit
 
       - name: Checkout repo
         uses: actions/checkout@v2
