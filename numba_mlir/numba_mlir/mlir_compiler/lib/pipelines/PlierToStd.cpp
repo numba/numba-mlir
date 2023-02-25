@@ -75,21 +75,14 @@ struct ConstOpLowering : public mlir::OpConversionPattern<plier::ConstOp> {
     auto typeAttr = value.dyn_cast_or_null<mlir::TypedAttr>();
     if (typeAttr && isSupportedType(typeAttr.getType())) {
       if (auto intAttr = value.dyn_cast<mlir::IntegerAttr>()) {
-        auto type = intAttr.getType().cast<mlir::IntegerType>();
-        if (!type.isSignless()) {
-          auto loc = op.getLoc();
-          auto intVal = intAttr.getValue().getSExtValue();
-          auto constVal = rewriter.create<mlir::arith::ConstantIntOp>(
-              loc, intVal, type.getWidth());
-          mlir::Value res =
-              rewriter.create<numba::util::SignCastOp>(loc, type, constVal);
-          if (res.getType() != expectedType)
-            res = rewriter.create<plier::CastOp>(loc, expectedType, res);
-
-          rewriter.replaceOp(op, res);
-        } else {
-          rewriter.replaceOpWithNewOp<mlir::arith::ConstantOp>(op, value);
-        }
+        auto intVal = intAttr.getValue().getSExtValue();
+        auto origType = intAttr.getType().cast<mlir::IntegerType>();
+        auto type = numba::makeSignlessType(origType);
+        auto loc = op.getLoc();
+        mlir::Value res = rewriter.create<mlir::arith::ConstantIntOp>(
+            loc, intVal, type.getWidth());
+        res = numba::doConvert(rewriter, loc, res, origType);
+        rewriter.replaceOp(op, res);
         return mlir::success();
       }
 
@@ -441,10 +434,7 @@ struct BinOpLowering : public mlir::OpConversionPattern<plier::BinOp> {
 
     auto loc = op.getLoc();
     auto literalCast = [&](mlir::Value val, mlir::Type dstType) -> mlir::Value {
-      if (dstType != val.getType())
-        return rewriter.createOrFold<plier::CastOp>(loc, dstType, val);
-
-      return val;
+      return numba::doConvert(rewriter, loc, val, dstType);
     };
 
     std::array<mlir::Value, 2> convertedOperands = {

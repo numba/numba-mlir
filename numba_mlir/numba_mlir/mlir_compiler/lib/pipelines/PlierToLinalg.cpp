@@ -921,29 +921,34 @@ struct BuildSliceToNtensor
                   mlir::ConversionPatternRewriter &rewriter) const override {
     auto indexType = rewriter.getIndexType();
 
-    auto loc = op->getLoc();
-    auto doCast = [&](mlir::Value val) -> mlir::Value {
-      if (val.getType() != indexType) {
-        val = rewriter.create<plier::CastOp>(loc, indexType, val);
-        rerunScfPipeline(op);
-      }
+    auto loc = op.getLoc();
+    auto doCast = [&](mlir::Value val) -> std::optional<mlir::Value> {
+      if (numba::canConvert(val.getType(), indexType))
+        return numba::doConvert(rewriter, loc, val, indexType);
 
-      return val;
+      return std::nullopt;
     };
 
     auto isNone = [](mlir::Value val) {
       return val.getType().isa<mlir::NoneType>();
     };
 
-    auto getVal = [&](mlir::Value orig, mlir::Value converted) {
-      return isNone(orig) ? mlir::Value() : doCast(converted);
+    auto getVal = [&](mlir::Value orig,
+                      mlir::Value converted) -> std::optional<mlir::Value> {
+      if (isNone(orig))
+        return mlir::Value{};
+
+      return doCast(orig);
     };
 
     auto begin = getVal(op.getBegin(), adaptor.getBegin());
     auto end = getVal(op.getEnd(), adaptor.getEnd());
     auto step = getVal(op.getStep(), adaptor.getStep());
-    rewriter.replaceOpWithNewOp<numba::ntensor::BuildSliceOp>(op, begin, end,
-                                                              step);
+    if (!begin || !end || !step)
+      return mlir::failure();
+
+    rewriter.replaceOpWithNewOp<numba::ntensor::BuildSliceOp>(op, *begin, *end,
+                                                              *step);
     return mlir::success();
   }
 };
@@ -1086,16 +1091,19 @@ struct BuiltinCallsToNtensor
   }
 };
 
-static mlir::Value addElementConversion(mlir::OpBuilder &builder,
-                                        mlir::Location loc,
-                                        mlir::Value srcArray,
-                                        mlir::Type dstType) {
+static std::optional<mlir::Value> addElementConversion(mlir::OpBuilder &builder,
+                                                       mlir::Location loc,
+                                                       mlir::Value srcArray,
+                                                       mlir::Type dstType) {
   auto srcType = srcArray.getType().cast<numba::ntensor::NTensorType>();
   auto dstShaped = dstType.cast<mlir::ShapedType>();
   auto srcElementType = srcType.getElementType();
   auto dstElementType = dstShaped.getElementType();
   if (srcElementType == dstElementType)
     return srcArray;
+
+  if (!numba::canConvert(srcElementType, dstElementType))
+    return std::nullopt;
 
   auto dstArrayTupe = numba::ntensor::NTensorType::get(
       dstShaped.getShape(), dstElementType, srcType.getEnvironment(),
@@ -1105,7 +1113,7 @@ static mlir::Value addElementConversion(mlir::OpBuilder &builder,
   auto bodyBuilder = [&](mlir::OpBuilder &b, mlir::Location l,
                          mlir::ValueRange vals) {
     assert(vals.size() == 1);
-    mlir::Value res = b.create<plier::CastOp>(l, dstElementType, vals.front());
+    mlir::Value res = numba::doConvert(b, l, vals.front(), dstElementType);
     b.create<numba::ntensor::ElementwiseYieldOp>(l, res);
   };
 
@@ -1148,7 +1156,11 @@ static std::optional<mlir::Value> doCast(mlir::OpBuilder &builder,
     if (!dstShapedType)
       return std::nullopt;
 
-    mlir::Value res = addElementConversion(builder, loc, src, dstShapedType);
+    auto elemConverted = addElementConversion(builder, loc, src, dstShapedType);
+    if (!elemConverted)
+      return std::nullopt;
+
+    mlir::Value res = *elemConverted;
     if (dstShapedType.isa<mlir::MemRefType>()) {
       auto dstMemrefType = mlir::MemRefType::get(
           srcArrayType.getShape(), dstShapedType.getElementType());
@@ -2792,7 +2804,9 @@ struct AdditionalBufferize
 
       auto input = inputs.front();
       if (input.getType().isa<mlir::TupleType>() || type.isa<mlir::TupleType>())
-        return builder.createOrFold<plier::CastOp>(loc, type, input);
+        return builder
+            .create<mlir::UnrealizedConversionCastOp>(loc, type, input)
+            .getResult(0);
 
       return std::nullopt;
     };
