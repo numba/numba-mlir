@@ -50,7 +50,7 @@ jobs:
 
       - name: Install CMake and Ninja
         run: |
-          conda env update -n base -f scripts/core-env.yml --prune
+          conda env update -f scripts/core-env.yml --prune
 
       - name: Checkout repo
         uses: actions/checkout@v2
@@ -398,7 +398,7 @@ jobs:
 
       - name: Install CMake and Ninja
         run: |
-          conda env update -n base -f scripts/core-env.yml --prune
+          conda env update -f scripts/core-env.yml --prune
 
       - name: Checkout repo
         uses: actions/checkout@v2
