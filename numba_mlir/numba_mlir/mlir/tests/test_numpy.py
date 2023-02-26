@@ -429,6 +429,10 @@ def test_sum_add2():
 _dot_args = [
     (np.array([1, 2, 3], np.float32), np.array([4, 5, 6], np.float32)),
     (
+        np.flip(np.array([1, 2, 3], np.float32), 0),
+        np.flip(np.array([4, 5, 6], np.float32), 0),
+    ),
+    (
         np.array([[1, 2, 3], [4, 5, 6]], np.float32),
         np.array([[1, 2], [3, 4], [5, 6]], np.float32),
     ),
