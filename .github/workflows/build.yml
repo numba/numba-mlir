@@ -153,6 +153,7 @@ jobs:
           git checkout $env:LLVM_SHA
           mkdir _build
           cd _build
+          conda deactivate
           conda activate test
           $env:CXX="cl.exe"
           $env:CC="cl.exe"
