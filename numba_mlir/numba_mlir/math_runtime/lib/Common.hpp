@@ -5,6 +5,7 @@
 #pragma once
 
 #include <array>
+#include <cstdint>
 #include <cstdlib>
 
 #include "numba-mlir-math-runtime_export.h"
