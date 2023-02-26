@@ -436,6 +436,18 @@ _dot_args = [
         np.array([[1, 2, 3], [4, 5, 6]], np.float32),
         np.array([[1, 2], [3, 4], [5, 6]], np.float32),
     ),
+    (
+        np.flip(np.array([[1, 2, 3], [4, 5, 6]], np.float32), 0),
+        np.array([[1, 2], [3, 4], [5, 6]], np.float32),
+    ),
+    (
+        np.array([[1, 2, 3], [4, 5, 6]], np.float32),
+        np.flip(np.array([[1, 2], [3, 4], [5, 6]], np.float32), 1),
+    ),
+    (
+        np.flip(np.array([[1, 2, 3], [4, 5, 6]], np.float32), 0),
+        np.flip(np.array([[1, 2], [3, 4], [5, 6]], np.float32), 1),
+    ),
 ]
 
 
