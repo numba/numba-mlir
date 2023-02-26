@@ -1430,6 +1430,82 @@ static py::object selectImpl(py::capsule context, py::handle cond,
   return ctx.context.createVar(context, res);
 }
 
+static mlir::Value wrapMultiresult(mlir::OpBuilder &builder, mlir::Location loc,
+                                   mlir::ValueRange args) {
+  if (args.empty())
+    return builder.create<numba::util::UndefOp>(loc, builder.getNoneType());
+
+  if (args.size() == 1)
+    return args.front();
+
+  auto tupleType = builder.getTupleType(args.getTypes());
+  return builder.create<numba::util::BuildTupleOp>(loc, tupleType, args);
+}
+
+static py::object ifopImpl(py::capsule context, py::handle cond,
+                           py::handle thenFunc, py::handle elseFunc) {
+  auto &ctx = getPyContext(context);
+  auto &builder = ctx.builder;
+  auto loc = ctx.loc;
+
+  auto unwrap = [&](py::handle obj) {
+    return ctx.context.unwrapVal(loc, builder, obj);
+  };
+
+  auto condVal = unwrap(cond);
+
+  std::optional<llvm::SmallVector<mlir::Type>> prevResultTypes;
+  auto getBodyBuilder = [&](py::handle func) {
+    return [&, bodyFunc = func](mlir::OpBuilder &b, mlir::Location l) {
+      mlir::OpBuilder::InsertionGuard g(builder);
+      builder.restoreInsertionPoint(b.saveInsertionPoint());
+      ctx.loc = l;
+      auto res = bodyFunc();
+      ctx.loc = loc; // TODO: RAII
+
+      llvm::SmallVector<mlir::Value> yieldArgs;
+      if (!res.is_none()) {
+        if (py::isinstance<py::tuple>(res)) {
+          for (auto elem : res.cast<py::tuple>()) {
+            yieldArgs.emplace_back(unwrap(elem));
+          }
+        } else {
+          yieldArgs.emplace_back(unwrap(res));
+        }
+      }
+
+      if (!prevResultTypes) {
+        mlir::ValueRange yieldArgsR(yieldArgs);
+        prevResultTypes = llvm::to_vector(yieldArgsR.getTypes());
+      } else {
+        auto &prevResults = *prevResultTypes;
+        assert(prevResults.size() == yieldArgs.size());
+        for (auto i : llvm::seq<size_t>(0, prevResults.size())) {
+          auto arg = yieldArgs[i];
+          yieldArgs[i] = doCast(builder, loc, arg, prevResults[i]);
+        }
+      }
+      b.create<mlir::scf::YieldOp>(l, yieldArgs);
+    };
+  };
+
+  assert(!thenFunc.is_none());
+  auto results = [&]() -> mlir::ValueRange {
+    if (elseFunc.is_none()) {
+      return builder
+          .create<mlir::scf::IfOp>(loc, condVal, getBodyBuilder(thenFunc))
+          .getResults();
+    } else {
+      return builder
+          .create<mlir::scf::IfOp>(loc, condVal, getBodyBuilder(thenFunc),
+                                   getBodyBuilder(elseFunc))
+          .getResults();
+    }
+  }();
+  mlir::Value res = wrapMultiresult(builder, loc, results);
+  return ctx.context.createVar(context, res);
+}
+
 static py::object arrayTypeImpl(py::capsule context, py::iterable dims,
                                 py::handle dtype) {
   auto &ctx = getPyContext(context);
@@ -1461,6 +1537,7 @@ setupPyBuilder(py::handle builder, mlir::OpBuilder &b,
   py::setattr(builder, "_subview", py::cpp_function(&subviewImpl));
   py::setattr(builder, "_force_copy", py::cpp_function(&forceCopyImpl));
   py::setattr(builder, "_select", py::cpp_function(&selectImpl));
+  py::setattr(builder, "_ifop", py::cpp_function(&ifopImpl));
 
   py::setattr(builder, "_array_type", py::cpp_function(&arrayTypeImpl));
 
@@ -1722,13 +1799,16 @@ static py::object binopImpl(py::capsule context, py::capsule ssaVal,
        &binopCmpF<mlir::arith::CmpFPredicate::OEQ>},
       {"ne", &binopCmpI<mlir::arith::CmpIPredicate::ne>,
        &binopCmpF<mlir::arith::CmpFPredicate::ONE>},
+
+      {"and", &binopFunc<mlir::arith::AndIOp>, nullptr},
+      {"or", &binopFunc<mlir::arith::OrIOp>, nullptr},
   };
 
   auto opName = static_cast<std::string>(op);
   for (auto f : funcs) {
     auto name = std::get<0>(f);
     auto func = (isFloat ? std::get<2>(f) : std::get<1>(f));
-    if (name == opName) {
+    if (name == opName && func) {
       auto rhsVar =
           doCast(builder, loc, ctx.context.unwrapVal(loc, builder, rhs), type);
       auto res = func(loc, builder, lhs, rhsVar);
