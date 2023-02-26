@@ -155,6 +155,7 @@ jobs:
           cd _build
           conda deactivate
           conda activate test
+          conda list
           $env:CXX="cl.exe"
           $env:CC="cl.exe"
           cmake ../llvm                                                    `
