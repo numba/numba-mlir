@@ -86,6 +86,12 @@ class Var:
     def __pos__(self):
         return self._unop(self._context, self._ssa_val, "+")
 
+    def and_op(self, o):
+        return self._binop(self._context, self._ssa_val, o, "and")
+
+    def or_op(self, o):
+        return self._binop(self._context, self._ssa_val, o, "or")
+
     def __str__(self):
         return self._str(self._context, self._ssa_val)
 
@@ -180,6 +186,9 @@ class Builder:
 
     def select(self, cond, true_val, false_val):
         return self._select(self._context, cond, true_val, false_val)
+
+    def ifop(self, cond, then_builder, else_builder=None):
+        return self._ifop(self._context, cond, then_builder, else_builder)
 
     def force_copy(self, arr):
         return self._force_copy(self._context, arr)

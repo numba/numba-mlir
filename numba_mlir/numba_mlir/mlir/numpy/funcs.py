@@ -525,8 +525,21 @@ def eye_impl(builder, N, M=None, k=0, dtype=None):
     return builder.linalg_generic(idx, init, iterators, maps, body)
 
 
+def _check_mkl_strides(arr):
+    strides = arr.strides
+    res = (strides[0] <= 0).or_op(strides[1] <= 0)
+    res = ((strides[0] != 1).and_op(strides[1] != 1)).or_op(res)
+    return res
+
+
 @_mkl_func
 def _mkl_gemm(builder, a, b, alpha, beta, shape1, shape2):
+    copy_a = _check_mkl_strides(a)
+    copy_b = _check_mkl_strides(b)
+
+    a = builder.ifop(copy_a, lambda: builder.force_copy(a), lambda: a)
+    b = builder.ifop(copy_b, lambda: builder.force_copy(b), lambda: b)
+
     dtype = a.dtype
     func_name = f"mkl_gemm_{dtype_str(builder, dtype)}"
     device_func_name = func_name + "_device"

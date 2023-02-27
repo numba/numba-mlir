@@ -63,13 +63,18 @@ using GemmFunc = void(const CBLAS_LAYOUT, const CBLAS_TRANSPOSE,
 template <typename T>
 static void cpuGemm(GemmFunc<T> Gemm, const Memref<2, T> *a,
                     const Memref<2, T> *b, Memref<2, T> *c, T alpha, T beta) {
-  auto isContiguous = [](const Memref<2, T> *arr, char arr_name) {
+  auto isContiguous = [](const Memref<2, T> *arr, char arrName) {
+    if (arr->strides[0] <= 0 || arr->strides[1] <= 0) {
+      fatal_failure("Strides must be positive. '%c' strides are %d and %d.\n",
+                    arrName, int(arr->strides[0]), int(arr->strides[1]));
+    }
+
     if (arr->strides[0] != 1 && arr->strides[1] != 1) {
       fatal_failure(
           "mkl gemm suports only arrays contiguous on inner dimension.\n"
           "stride for at least one dimension should be equal to 1.\n"
           "'%c' parameter is not contiguous. '%c' strides are %d and %d.\n",
-          arr_name, arr_name, int(arr->strides[0]), int(arr->strides[1]));
+          arrName, arrName, int(arr->strides[0]), int(arr->strides[1]));
     }
   };
 

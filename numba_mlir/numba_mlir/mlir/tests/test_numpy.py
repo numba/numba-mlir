@@ -426,16 +426,32 @@ def test_sum_add2():
     assert_equal(py_func(arr1, arr2, arr3), jit_func(arr1, arr2, arr3))
 
 
-@pytest.mark.parametrize(
-    "a,b",
-    [
-        (np.array([1, 2, 3], np.float32), np.array([4, 5, 6], np.float32)),
-        (
-            np.array([[1, 2, 3], [4, 5, 6]], np.float32),
-            np.array([[1, 2], [3, 4], [5, 6]], np.float32),
-        ),
-    ],
-)
+_dot_args = [
+    (np.array([1, 2, 3], np.float32), np.array([4, 5, 6], np.float32)),
+    (
+        np.flip(np.array([1, 2, 3], np.float32), 0),
+        np.flip(np.array([4, 5, 6], np.float32), 0),
+    ),
+    (
+        np.array([[1, 2, 3], [4, 5, 6]], np.float32),
+        np.array([[1, 2], [3, 4], [5, 6]], np.float32),
+    ),
+    (
+        np.flip(np.array([[1, 2, 3], [4, 5, 6]], np.float32), 0),
+        np.array([[1, 2], [3, 4], [5, 6]], np.float32),
+    ),
+    (
+        np.array([[1, 2, 3], [4, 5, 6]], np.float32),
+        np.flip(np.array([[1, 2], [3, 4], [5, 6]], np.float32), 1),
+    ),
+    (
+        np.flip(np.array([[1, 2, 3], [4, 5, 6]], np.float32), 0),
+        np.flip(np.array([[1, 2], [3, 4], [5, 6]], np.float32), 1),
+    ),
+]
+
+
+@pytest.mark.parametrize("a,b", _dot_args)
 @pytest.mark.parametrize("parallel", [False, True])
 def test_dot(a, b, parallel):
     def py_func(a, b):
@@ -445,15 +461,7 @@ def test_dot(a, b, parallel):
     assert_equal(py_func(a, b), jit_func(a, b))
 
 
-@pytest.mark.parametrize(
-    "a,b",
-    [
-        (
-            np.array([[1, 2, 3], [4, 5, 6]], np.float32),
-            np.array([[1, 2], [3, 4], [5, 6]], np.float32),
-        ),
-    ],
-)
+@pytest.mark.parametrize("a,b", _dot_args)
 @parametrize_function_variants(
     "py_func",
     [
@@ -462,6 +470,9 @@ def test_dot(a, b, parallel):
     ],
 )
 def test_dot_out(a, b, py_func):
+    if a.ndim == 1 or b.ndim == 1:
+        pytest.xfail()  # Not supported by Numba
+
     jit_func = njit(py_func)
 
     tmp = np.dot(a, b)

@@ -5,6 +5,7 @@
 #pragma once
 
 #include <array>
+#include <cstdint>
 #include <cstdlib>
 
 #include "numba-mlir-math-runtime_export.h"
@@ -13,6 +14,6 @@ template <size_t NumDims, typename T> struct Memref {
   void *userData;
   T *data;
   size_t offset;
-  std::array<size_t, NumDims> dims;
-  std::array<size_t, NumDims> strides;
+  std::array<intptr_t, NumDims> dims;
+  std::array<intptr_t, NumDims> strides;
 };
