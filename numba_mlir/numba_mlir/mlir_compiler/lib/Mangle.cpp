@@ -16,6 +16,25 @@
 namespace {
 static const constexpr auto PREFIX = "_Z";
 
+static bool isValidChar(char c) {
+  return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
+         (c >= '0' && c <= '9') || (c == '_');
+}
+
+static std::string escapeString(llvm::StringRef str) {
+  std::string ret;
+  llvm::raw_string_ostream ss(ret);
+  for (auto c : str) {
+    if (isValidChar(c)) {
+      ss << c;
+    } else {
+      ss << "$" << llvm::format_hex_no_prefix(static_cast<unsigned>(c), 2);
+    }
+  }
+  ss.flush();
+  return ret;
+}
+
 template <unsigned Width, mlir::IntegerType::SignednessSemantics Sign,
           char Symbol>
 bool mangleInt(llvm::raw_ostream &res, mlir::Type type) {
@@ -55,6 +74,16 @@ static bool mangleNone(llvm::raw_ostream & /*res*/, mlir::Type type) {
   return false;
 }
 
+static bool mangleAny(llvm::raw_ostream &res, mlir::Type type) {
+  std::string str;
+  llvm::raw_string_ostream os(str);
+  os << type;
+  os.flush();
+
+  res << escapeString(os.str());
+  return true;
+}
+
 using type_mangler_t = bool (*)(llvm::raw_ostream &, mlir::Type);
 
 static const constexpr type_mangler_t typeManglers[] = {
@@ -90,6 +119,8 @@ static const constexpr type_mangler_t typeManglers[] = {
     &mangleMemref,
 
     &mangleNone,
+
+    &mangleAny, // Must be last
 };
 
 static bool checkType(mlir::Type type) {
@@ -99,25 +130,6 @@ static bool checkType(mlir::Type type) {
       return true;
 
   return false;
-}
-
-static bool isValidChar(char c) {
-  return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
-         (c >= '0' && c <= '9') || (c == '_');
-}
-
-static std::string escapeString(llvm::StringRef str) {
-  std::string ret;
-  llvm::raw_string_ostream ss(ret);
-  for (auto c : str) {
-    if (isValidChar(c)) {
-      ss << c;
-    } else {
-      ss << "$" << llvm::format_hex_no_prefix(static_cast<unsigned>(c), 2);
-    }
-  }
-  ss.flush();
-  return ret;
 }
 
 template <typename F>
