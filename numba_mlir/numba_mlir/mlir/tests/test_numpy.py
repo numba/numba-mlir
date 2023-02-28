@@ -462,6 +462,8 @@ def test_complex_unary(a, py_func):
     "py_func",
     [
         "lambda a, b: np.add(a, b)",
+        "lambda a, b: a + b",
+        "lambda a, b: a * b",
     ],
 )
 def test_complex_binary(a, b, py_func):
