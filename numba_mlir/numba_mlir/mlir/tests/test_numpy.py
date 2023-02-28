@@ -474,6 +474,21 @@ def test_complex_binary(a, b, py_func):
     assert_allclose(py_func(a, b), jit_func(a, b), rtol=1e-7, atol=1e-7)
 
 
+@pytest.mark.parametrize("dtype", [np.int32, np.float32])
+def test_dtype_indirect(dtype):
+    def py_func1(dtype):
+        return np.ones(10, dtype=dtype)
+
+    jit_func1 = njit(py_func1, parallel=True)
+
+    def py_func2(dtype):
+        return jit_func1(dtype)
+
+    jit_func2 = njit(py_func2, parallel=True)
+
+    assert_equal(py_func2(dtype), jit_func2(dtype))
+
+
 _dot_args = [
     (np.array([1, 2, 3], np.float32), np.array([4, 5, 6], np.float32)),
     (
