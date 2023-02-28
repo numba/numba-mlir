@@ -16,6 +16,13 @@ func.func private @test(%arg1: index) {
 
 // -----
 
+// CHECK-LABEL: func private @test()
+func.func private @test(%arg1: index {test.test}) {
+  return
+}
+
+// -----
+
 // CHECK-LABEL: func private @test(index)
 func.func private @test(index)
 
