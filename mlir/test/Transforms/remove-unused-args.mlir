@@ -34,4 +34,3 @@ func.func private @test(%arg1: index) {
   "test.test"() : () -> ()
   return
 }
-
