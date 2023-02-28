@@ -190,6 +190,7 @@ private:
   py::handle currentInstr;
   py::handle typemap;
   py::handle funcNameResolver;
+  py::handle globals;
 
   std::unordered_map<mlir::Block *, BlockInfo> blockInfos;
 
@@ -219,6 +220,8 @@ private:
     if (maxConcurrency > 0)
       func->setAttr(numba::util::attributes::getMaxConcurrencyName(),
                     builder.getI64IntegerAttr(maxConcurrency));
+
+    globals = compilationContext["globals"]();
 
     mod.push_back(func);
     return func;
@@ -312,7 +315,7 @@ private:
         py::isinstance(value, insts.FreeVar)) {
       auto constVal = getConstOrNull(value.attr("value"));
       if (constVal)
-        return constVal;
+        return *constVal;
       auto name = value.attr("name").cast<std::string>();
       return builder.create<plier::GlobalOp>(getCurrentLoc(), name);
     }
@@ -506,10 +509,69 @@ private:
                        py::str(op).cast<std::string>() + "\"");
   }
 
+  std::optional<mlir::Attribute> resolveConstant(py::handle val) {
+    if (py::isinstance<py::int_>(val)) {
+      auto type = mlir::IntegerType::get(builder.getContext(), 64,
+                                         mlir::IntegerType::Signed);
+      return builder.getIntegerAttr(type, val.cast<int64_t>());
+    }
+
+    if (py::isinstance<py::float_>(val))
+      return builder.getF64FloatAttr(val.cast<double>());
+
+    if (py::isinstance<dummy_complex>(val)) {
+      auto c = val.cast<std::complex<double>>();
+      auto type = mlir::ComplexType::get(builder.getF64Type());
+      return mlir::complex::NumberAttr::get(type, c.real(), c.imag());
+    }
+
+    if (py::isinstance<py::none>(val))
+      return builder.getUnitAttr();
+
+    return std::nullopt;
+  }
+
+  std::optional<mlir::Attribute>
+  resolveGlobalAttrImpl(mlir::Value val,
+                        llvm::SmallVectorImpl<llvm::StringRef> &names) {
+    if (auto global = val.getDefiningOp<plier::GlobalOp>()) {
+      std::string name = global.getName().str();
+      py::object attr = globals[name.c_str()];
+      while (!names.empty()) {
+        name = names.pop_back_val().str();
+        attr = attr.attr(name.c_str());
+      }
+
+      return resolveConstant(attr);
+    }
+
+    if (auto getattr = val.getDefiningOp<plier::GetattrOp>()) {
+      auto name = getattr.getName();
+      names.emplace_back(name);
+      return resolveGlobalAttrImpl(getattr.getValue(), names);
+    }
+
+    return std::nullopt;
+  }
+
+  std::optional<mlir::Attribute> resolveGlobalAttr(mlir::Value val,
+                                                   llvm::StringRef name) {
+    llvm::SmallVector<llvm::StringRef> names;
+    names.emplace_back(name);
+    return resolveGlobalAttrImpl(val, names);
+  }
+
   mlir::Value lowerGetattr(py::handle inst) {
     auto value = loadvar(inst.attr("value"));
     auto name = inst.attr("attr").cast<std::string>();
-    return builder.create<plier::GetattrOp>(getCurrentLoc(), value, name);
+    auto loc = getCurrentLoc();
+    if (auto attr = resolveGlobalAttr(value, name)) {
+      // Resolve constant attributes early.
+      // TODO: Should be done as part of actual lowering pipeline.
+      return builder.create<plier::ConstOp>(loc, *attr);
+    }
+
+    return builder.create<plier::GetattrOp>(loc, value, name);
   }
 
   mlir::Value lowerExhaustIter(py::handle inst) {
@@ -577,31 +639,12 @@ private:
     builder.create<mlir::cf::BranchOp>(getCurrentLoc(), std::nullopt, block);
   }
 
-  mlir::Value getConstOrNull(py::handle val) {
-    auto getVal = [&](mlir::Attribute attr) {
-      return builder.create<plier::ConstOp>(getCurrentLoc(), attr);
-    };
-    if (py::isinstance<py::int_>(val)) {
-      auto type = mlir::IntegerType::get(builder.getContext(), 64,
-                                         mlir::IntegerType::Signed);
-      auto attr = builder.getIntegerAttr(type, val.cast<int64_t>());
-      return getVal(attr);
-    }
+  std::optional<mlir::Value> getConstOrNull(py::handle val) {
+    auto attr = resolveConstant(val);
+    if (!attr)
+      return std::nullopt;
 
-    if (py::isinstance<py::float_>(val))
-      return getVal(builder.getF64FloatAttr(val.cast<double>()));
-
-    if (py::isinstance<dummy_complex>(val)) {
-      auto c = val.cast<std::complex<double>>();
-      auto type = mlir::ComplexType::get(builder.getF64Type());
-      auto attr = mlir::complex::NumberAttr::get(type, c.real(), c.imag());
-      return getVal(attr);
-    }
-
-    if (py::isinstance<py::none>(val))
-      return getVal(builder.getUnitAttr());
-
-    return {};
+    return builder.create<plier::ConstOp>(getCurrentLoc(), *attr);
   }
 
   mlir::Value getConst(py::handle val) {
@@ -609,7 +652,7 @@ private:
     if (!ret)
       numba::reportError(llvm::Twine("get_const unhandled type \"") +
                          py::str(val.get_type()).cast<std::string>() + "\"");
-    return ret;
+    return *ret;
   }
 
   mlir::FunctionType getFuncType(py::handle fnargs, py::handle restype) {

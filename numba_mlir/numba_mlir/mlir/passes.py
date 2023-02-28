@@ -140,6 +140,7 @@ class MlirBackendBase(FunctionPass):
             lambda: get_thread_count() if state.flags.auto_parallel.enabled else 0
         )
         ctx["opt_level"] = lambda: OPT_LEVEL
+        ctx["globals"] = lambda: state.func_id.func.__globals__
         return ctx
 
 
