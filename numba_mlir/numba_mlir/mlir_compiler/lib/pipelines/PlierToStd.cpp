@@ -194,54 +194,6 @@ struct OmittedLowering : public mlir::OpConversionPattern<plier::CastOp> {
   }
 };
 
-static mlir::Value lowerConst(mlir::Location loc, mlir::OpBuilder &builder,
-                              double value) {
-  auto type = builder.getF64Type();
-  return builder.create<mlir::arith::ConstantFloatOp>(loc, llvm::APFloat(value),
-                                                      type);
-}
-
-static mlir::Value lowerPi(mlir::Location loc, mlir::OpBuilder &builder) {
-  return lowerConst(loc, builder, M_PI);
-}
-
-static mlir::Value lowerE(mlir::Location loc, mlir::OpBuilder &builder) {
-  return lowerConst(loc, builder, M_E);
-}
-
-// TODO: unhardcode
-struct LowerGlobals : public mlir::OpConversionPattern<plier::GlobalOp> {
-  using OpConversionPattern::OpConversionPattern;
-
-  mlir::LogicalResult
-  matchAndRewrite(plier::GlobalOp op, plier::GlobalOp::Adaptor /*adaptor*/,
-                  mlir::ConversionPatternRewriter &rewriter) const override {
-    using lower_f = mlir::Value (*)(mlir::Location, mlir::OpBuilder &);
-    const std::pair<llvm::StringRef, lower_f> handlers[] = {
-        // clang-format off
-        {"math.pi", &lowerPi},
-        {"math.e", &lowerE},
-        // clang-format on
-    };
-
-    mlir::Value res;
-    auto name = op.getName();
-    auto loc = op.getLoc();
-    for (auto h : handlers) {
-      if (h.first == name) {
-        res = h.second(loc, rewriter);
-        break;
-      }
-    }
-
-    if (!res)
-      return mlir::failure();
-
-    rewriter.replaceOp(op, res);
-    return mlir::success();
-  }
-};
-
 struct UndefOpLowering
     : public mlir::OpConversionPattern<numba::util::UndefOp> {
   using OpConversionPattern::OpConversionPattern;
@@ -1076,7 +1028,6 @@ void PlierToStdPass::runOnOperation() {
       LiteralLowering<plier::CastOp>,
       LiteralLowering<plier::GlobalOp>,
       OmittedLowering,
-      LowerGlobals,
       UndefOpLowering,
       BuildTupleConversionPattern,
       GetItemTupleConversionPattern
