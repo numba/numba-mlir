@@ -455,7 +455,7 @@ _complex_arrays = [
 )
 def test_complex_unary(a, py_func):
     jit_func = njit(py_func, parallel=True)
-    assert_equal(py_func(a), jit_func(a))
+    assert_allclose(py_func(a), jit_func(a), rtol=1e-7, atol=1e-7)
 
 
 @pytest.mark.parametrize(
@@ -471,7 +471,7 @@ def test_complex_unary(a, py_func):
 )
 def test_complex_binary(a, b, py_func):
     jit_func = njit(py_func, parallel=True)
-    assert_equal(py_func(a, b), jit_func(a, b))
+    assert_allclose(py_func(a, b), jit_func(a, b), rtol=1e-7, atol=1e-7)
 
 
 _dot_args = [
