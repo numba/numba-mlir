@@ -536,9 +536,15 @@ private:
                         llvm::SmallVectorImpl<llvm::StringRef> &names) {
     if (auto global = val.getDefiningOp<plier::GlobalOp>()) {
       std::string name = global.getName().str();
+      if (!globals.contains(name.c_str()))
+        return std::nullopt;
+
       py::object attr = globals[name.c_str()];
       while (!names.empty()) {
         name = names.pop_back_val().str();
+        if (!py::hasattr(attr, name.c_str()))
+          return std::nullopt;
+
         attr = attr.attr(name.c_str());
       }
 
