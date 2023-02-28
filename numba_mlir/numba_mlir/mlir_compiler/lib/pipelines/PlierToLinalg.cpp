@@ -49,6 +49,7 @@
 #include "numba/Transforms/CastUtils.hpp"
 #include "numba/Transforms/CommonOpts.hpp"
 #include "numba/Transforms/CompositePass.hpp"
+#include "numba/Transforms/FuncTransforms.hpp"
 #include "numba/Transforms/InlineUtils.hpp"
 #include "numba/Transforms/LoopUtils.hpp"
 #include "numba/Transforms/MakeSignless.hpp"
@@ -3147,6 +3148,7 @@ static void populatePlierToLinalgOptPipeline(mlir::OpPassManager &pm) {
         p.addNestedPass<mlir::func::FuncOp>(mlir::createCSEPass());
         p.addNestedPass<mlir::func::FuncOp>(
             std::make_unique<LinalgOptInnerPass>());
+        p.addPass(numba::createRemoveUnusedArgsPass());
       }));
 
   pm.addPass(numba::createNtensorToMemrefPass());
@@ -3223,6 +3225,7 @@ static void populatePlierToLinalgOptPipeline(mlir::OpPassManager &pm) {
         // split in separate pass
         p.addNestedPass<mlir::func::FuncOp>(
             std::make_unique<PostLinalgOptInnerPass>());
+        p.addPass(numba::createRemoveUnusedArgsPass());
       }));
 
   // Uplifting FMAs con interfere with other optimizations, like loop reduction
