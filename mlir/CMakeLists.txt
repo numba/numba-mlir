@@ -45,11 +45,11 @@ set(SOURCES_LIST
     lib/Conversion/UtilToLlvm.cpp
     lib/Dialect/gpu_runtime/IR/GpuRuntimeOps.cpp
     lib/Dialect/gpu_runtime/Transforms/MakeBarriersUniform.cpp
-    lib/Dialect/numba_util/Dialect.cpp
     lib/Dialect/ntensor/IR/NTensorOps.cpp
     lib/Dialect/ntensor/Transforms/CopyRemoval.cpp
     lib/Dialect/ntensor/Transforms/PropagateEnvironment.cpp
     lib/Dialect/ntensor/Transforms/ResolveArrayOps.cpp
+    lib/Dialect/numba_util/Dialect.cpp
     lib/Dialect/plier/Dialect.cpp
     lib/ExecutionEngine/ExecutionEngine.cpp
     lib/Transforms/CallLowering.cpp
@@ -60,6 +60,7 @@ set(SOURCES_LIST
     lib/Transforms/CompositePass.cpp
     lib/Transforms/ConstUtils.cpp
     lib/Transforms/ExpandTuple.cpp
+    lib/Transforms/FuncTransforms.cpp
     lib/Transforms/FuncUtils.cpp
     lib/Transforms/IfRewrites.cpp
     lib/Transforms/IndexTypePropagation.cpp
@@ -109,6 +110,7 @@ set(HEADERS_LIST
     include/numba/Transforms/CompositePass.hpp
     include/numba/Transforms/ConstUtils.hpp
     include/numba/Transforms/ExpandTuple.hpp
+    include/numba/Transforms/FuncTransforms.hpp
     include/numba/Transforms/FuncUtils.hpp
     include/numba/Transforms/IfRewrites.hpp
     include/numba/Transforms/IndexTypePropagation.hpp

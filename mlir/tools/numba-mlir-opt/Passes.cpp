@@ -24,6 +24,7 @@
 #include "numba/Dialect/ntensor/Transforms/ResolveArrayOps.hpp"
 #include "numba/Transforms/CanonicalizeReductions.hpp"
 #include "numba/Transforms/ExpandTuple.hpp"
+#include "numba/Transforms/FuncTransforms.hpp"
 #include "numba/Transforms/MakeSignless.hpp"
 #include "numba/Transforms/MemoryRewrites.hpp"
 #include "numba/Transforms/PromoteToParallel.hpp"
@@ -202,3 +203,10 @@ static mlir::PassPipelineRegistration<> shapeIntegerRangePropagation(
     [](mlir::OpPassManager &pm) {
       pm.addPass(numba::createShapeIntegerRangePropagationPass());
     });
+
+static mlir::PassPipelineRegistration<>
+    funcRemoveUnusedArgs("numba-remove-unused-args",
+                         "Remove unused functions arguments",
+                         [](mlir::OpPassManager &pm) {
+                           pm.addPass(numba::createRemoveUnusedArgsPass());
+                         });
