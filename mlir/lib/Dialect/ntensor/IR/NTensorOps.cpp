@@ -77,7 +77,7 @@ numba::ntensor::NTensorBase numba::ntensor::NTensorBase::cloneWith(
 }
 
 bool numba::ntensor::NTensorBase::isValidElementType(Type type) {
-  return type.isIntOrIndexOrFloat();
+  return type.isIntOrIndexOrFloat() || type.isa<mlir::ComplexType>();
 }
 
 static mlir::Value handleSliceIndexVars(mlir::OpBuilder &builder,
