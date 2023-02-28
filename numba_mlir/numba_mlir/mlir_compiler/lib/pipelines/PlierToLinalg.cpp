@@ -1441,44 +1441,6 @@ private:
   std::shared_ptr<NumpyResolver> resolver;
 };
 
-struct CleanupDTypePass
-    : public mlir::PassWrapper<CleanupDTypePass, mlir::OperationPass<void>> {
-  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(CleanupDTypePass)
-
-  virtual void
-  getDependentDialects(mlir::DialectRegistry &registry) const override {
-    registry.insert<mlir::func::FuncDialect>();
-    registry.insert<numba::util::NumbaUtilDialect>();
-  }
-
-  void runOnOperation() override {
-    auto *ctx = &getContext();
-    mlir::ConversionTarget target(*ctx);
-    mlir::TypeConverter converter;
-
-    // Convert unknown types to itself
-    converter.addConversion([](mlir::Type type) { return type; });
-
-    converter.addConversion([](numba::util::TypeVarType type) {
-      return numba::util::OpaqueType::get(type.getContext());
-    });
-
-    numba::populateTupleTypeConverter(converter);
-
-    mlir::RewritePatternSet patterns(ctx);
-
-    numba::populateControlFlowTypeConversionRewritesAndTarget(converter,
-                                                              patterns, target);
-    numba::populateTupleTypeConversionRewritesAndTarget(converter, patterns,
-                                                        target);
-
-    auto op = getOperation();
-    if (mlir::failed(
-            mlir::applyPartialConversion(op, target, std::move(patterns))))
-      signalPassFailure();
-  }
-};
-
 struct GetitemArrayOpLowering
     : public mlir::OpRewritePattern<numba::ntensor::GetitemOp> {
   using OpRewritePattern::OpRewritePattern;
@@ -3180,7 +3142,6 @@ static void populatePlierToLinalgGenPipeline(mlir::OpPassManager &pm) {
 }
 
 static void populatePlierToLinalgOptPipeline(mlir::OpPassManager &pm) {
-  pm.addPass(std::make_unique<CleanupDTypePass>());
   pm.addPass(
       numba::createCompositePass("LinalgOptPass", [](mlir::OpPassManager &p) {
         p.addPass(numba::createShapeIntegerRangePropagationPass());
