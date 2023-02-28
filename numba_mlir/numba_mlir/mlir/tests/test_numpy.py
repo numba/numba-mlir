@@ -244,6 +244,18 @@ def test_broadcast(a, b):
     assert_equal(py_func(a, b), jit_func(a, b))
 
 
+@parametrize_function_variants(
+    "py_func",
+    [
+        "lambda: np.pi",
+        "lambda: np.e",
+    ],
+)
+def test_np_const(py_func):
+    jit_func = njit(py_func)
+    assert_equal(py_func(), jit_func())
+
+
 def test_staticgetitem():
     def py_func(a):
         return a[1]
