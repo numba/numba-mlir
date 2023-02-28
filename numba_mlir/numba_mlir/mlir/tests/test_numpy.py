@@ -438,6 +438,7 @@ def test_sum_add2():
     assert_equal(py_func(arr1, arr2, arr3), jit_func(arr1, arr2, arr3))
 
 
+_scalars = [1, 2.5, 3.6 + 4.7j]
 _complex_arrays = [
     np.array([1, 2, 3]),
     np.array([1.5, 2.6, 3.7]),
@@ -457,7 +458,9 @@ def test_complex_unary(a, py_func):
     assert_equal(py_func(a), jit_func(a))
 
 
-@pytest.mark.parametrize("a,b", itertools.product(_complex_arrays, _complex_arrays))
+@pytest.mark.parametrize(
+    "a,b", itertools.product(_scalars + _complex_arrays, _complex_arrays)
+)
 @parametrize_function_variants(
     "py_func",
     [
