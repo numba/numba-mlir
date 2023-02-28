@@ -9,6 +9,8 @@
 #include <mlir/IR/BuiltinTypes.h>
 #include <mlir/IR/TypeRange.h>
 
+#include "numba/Dialect/numba_util/Dialect.hpp"
+
 namespace py = pybind11;
 
 namespace {
@@ -103,6 +105,15 @@ static py::object mapType(const py::handle &typesMod, mlir::Type type) {
       ret[i] = std::move(inner);
     }
     return std::move(ret);
+  }
+
+  if (auto dtype = type.dyn_cast<numba::util::TypeVarType>()) {
+    auto inner = mapType(typesMod, dtype.getType());
+    if (!inner)
+      return {};
+
+    auto dtypeType = typesMod.attr("DType");
+    return dtypeType(inner);
   }
   return {};
 }

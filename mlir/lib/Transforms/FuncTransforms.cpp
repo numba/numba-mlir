@@ -83,10 +83,7 @@ struct RemoveUnusedArgsPass
       }
 
       block.eraseArguments(removeArgs);
-
-      auto funcType = func.getFunctionType();
-      auto newFuncType = funcType.clone(newArgTypes, funcType.getResults());
-      func.setFunctionType(newFuncType);
+      func.eraseArguments(removeArgs);
       changed = true;
     });
 
