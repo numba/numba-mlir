@@ -438,6 +438,25 @@ def test_sum_add2():
     assert_equal(py_func(arr1, arr2, arr3), jit_func(arr1, arr2, arr3))
 
 
+_complex_arrays = [
+    np.array([1, 2, 3]),
+    np.array([1.5, 2.6, 3.7]),
+    np.array([1.0 + 2.0j, -3.0 + 4.0j, 5.0 + -6.0j]),
+]
+
+
+@pytest.mark.parametrize("a", _complex_arrays)
+@parametrize_function_variants(
+    "py_func",
+    [
+        "lambda a: np.abs(a)",
+    ],
+)
+def test_complex_unary(a, py_func):
+    jit_func = njit(py_func, parallel=True)
+    assert_equal(py_func(a), jit_func(a))
+
+
 _dot_args = [
     (np.array([1, 2, 3], np.float32), np.array([4, 5, 6], np.float32)),
     (

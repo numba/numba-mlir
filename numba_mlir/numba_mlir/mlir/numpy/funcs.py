@@ -12,6 +12,7 @@ from ..linalg_builder import (
     FuncRegistry,
     get_array_type,
     get_val_type,
+    is_complex,
     is_float,
     is_int,
     is_literal,
@@ -250,6 +251,15 @@ def _gen_unary_ops():
             return t
         return builder.float64
 
+    def complex_to_real(builder, t):
+        if builder.complex64 == t:
+            return builder.float32
+
+        if builder.complex128 == t:
+            return builder.float64
+
+        return t
+
     def bool_type(builder, t):
         return builder.bool
 
@@ -264,7 +274,7 @@ def _gen_unary_ops():
         (reg_func("numpy.cos", numpy.cos), f64_type, lambda a, b: math.cos(a)),
         (reg_func("numpy.exp", numpy.exp), f64_type, lambda a, b: math.exp(a)),
         (reg_func("numpy.tanh", numpy.tanh), f64_type, lambda a, b: math.tanh(a)),
-        (reg_func("numpy.abs", numpy.abs), None, lambda a, b: abs(a)),
+        (reg_func("numpy.abs", numpy.abs), complex_to_real, lambda a, b: abs(a)),
         (reg_func("numpy.negative", numpy.negative), None, lambda a, b: -a),
         (
             reg_func("numpy.logical_not", numpy.logical_not),
@@ -294,6 +304,10 @@ def _select_float_type(builder, a, b):
     db = get_array_type(builder, b)
     if da == db:
         return da
+
+    if is_complex(da, builder) or is_complex(db, builder):
+        return broadcast_type_arrays(builder, (a, b))
+
     if is_float(da, builder) and not is_float(db, builder):
         return da
     if is_float(db, builder) and not is_float(da, builder):
@@ -311,6 +325,10 @@ def _gen_binary_ops():
         db = get_array_type(builder, b)
         if da == db and is_float(da, builder):
             return da
+
+        if is_complex(da, builder) or is_complex(db, builder):
+            return broadcast_type_arrays(builder, (a, b))
+
         if is_float(da, builder) and not is_float(db, builder):
             return da
         if is_float(db, builder) and not is_float(da, builder):
