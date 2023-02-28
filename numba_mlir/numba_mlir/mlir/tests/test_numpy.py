@@ -457,6 +457,18 @@ def test_complex_unary(a, py_func):
     assert_equal(py_func(a), jit_func(a))
 
 
+@pytest.mark.parametrize("a,b", itertools.product(_complex_arrays, _complex_arrays))
+@parametrize_function_variants(
+    "py_func",
+    [
+        "lambda a, b: np.add(a, b)",
+    ],
+)
+def test_complex_binary(a, b, py_func):
+    jit_func = njit(py_func, parallel=True)
+    assert_equal(py_func(a, b), jit_func(a, b))
+
+
 _dot_args = [
     (np.array([1, 2, 3], np.float32), np.array([4, 5, 6], np.float32)),
     (
