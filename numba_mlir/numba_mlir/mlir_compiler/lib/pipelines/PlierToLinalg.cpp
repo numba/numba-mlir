@@ -64,9 +64,7 @@
 
 #include "BasePipeline.hpp"
 #include "LoopUtils.hpp"
-#include "Mangle.hpp"
 #include "NumpyResolver.hpp"
-#include "PyFuncResolver.hpp"
 #include "PyLinalgResolver.hpp"
 
 #include <cctype>
@@ -168,24 +166,6 @@ static void rerunScfPipeline(mlir::Operation *op) {
   assert(nullptr != mod);
   numba::addPipelineJumpMarker(mod, marker);
 }
-
-static mlir::Value skipCasts(mlir::Value val) {
-  auto getArg = [](mlir::Value arg) -> mlir::Value {
-    auto cast = arg.getDefiningOp<mlir::UnrealizedConversionCastOp>();
-    if (!cast)
-      return {};
-
-    auto inputs = cast.getInputs();
-    if (inputs.size() != 1)
-      return {};
-
-    return inputs.front();
-  };
-  while (auto arg = getArg(val))
-    val = arg;
-
-  return val;
-};
 
 static mlir::LogicalResult
 lowerPrange(plier::PyCallOp op, mlir::ValueRange operands,
@@ -1700,76 +1680,6 @@ private:
   NumpyResolver &resolver;
 };
 
-struct ExternalCallsResolver final : mlir::OpRewritePattern<plier::PyCallOp> {
-  using OpRewritePattern::OpRewritePattern;
-
-protected:
-  mlir::LogicalResult
-  matchAndRewrite(plier::PyCallOp op,
-                  mlir::PatternRewriter &rewriter) const override {
-    if (!op.getKwargs().empty())
-      return mlir::failure(); // TODO: kwargs support
-
-    auto name = op.getFuncName();
-    auto args = op.getArgs();
-
-    llvm::SmallVector<mlir::Type> types(args.size());
-    for (auto [i, arg] : llvm::enumerate(args)) {
-      arg = skipCasts(arg);
-      types[i] = arg.getType();
-    }
-
-    auto mangledName = mangle(name, types);
-    if (mangledName.empty())
-      return mlir::failure();
-
-    auto mod = op->getParentOfType<mlir::ModuleOp>();
-    assert(mod);
-
-    auto externalFunc = mod.lookupSymbol<mlir::func::FuncOp>(mangledName);
-    if (!externalFunc) {
-      externalFunc = resolver.getFunc(name, types);
-      if (externalFunc) {
-        externalFunc.setPrivate();
-        externalFunc.setName(mangledName);
-      }
-    }
-    if (!externalFunc)
-      return mlir::failure();
-
-    assert(externalFunc.getFunctionType().getNumResults() ==
-           op->getNumResults());
-
-    auto loc = op.getLoc();
-
-    llvm::SmallVector<mlir::Value> castedArgs(args.size());
-    auto funcTypes = externalFunc.getFunctionType().getInputs();
-    for (auto [i, arg] : llvm::enumerate(args)) {
-      auto dstType = funcTypes[i];
-      castedArgs[i] = doSafeCast(rewriter, loc, arg, dstType);
-    }
-
-    auto newFuncCall =
-        rewriter.create<mlir::func::CallOp>(loc, externalFunc, castedArgs);
-
-    auto results = newFuncCall.getResults();
-    llvm::SmallVector<mlir::Value> castedResults(results.size());
-
-    for (auto [ind, res] : llvm::enumerate(results)) {
-      auto i = static_cast<unsigned>(ind);
-      auto oldResType = op->getResult(i).getType();
-      castedResults[i] = doSafeCast(rewriter, loc, res, oldResType);
-    }
-
-    rerunScfPipeline(op);
-    rewriter.replaceOp(op, castedResults);
-    return mlir::success();
-  }
-
-private:
-  PyFuncResolver resolver;
-};
-
 struct BuiltinCallsLowering : public mlir::OpRewritePattern<plier::PyCallOp> {
   using OpRewritePattern::OpRewritePattern;
 
@@ -1838,8 +1748,8 @@ struct ResolveNtensorPass
     mlir::RewritePatternSet patterns(&ctx);
 
     patterns.insert<NtensorPrimitiveCallsLowering,
-                    NtensorViewPrimitiveCallsLowering, BuiltinCallsLowering,
-                    ExternalCallsResolver>(&ctx);
+                    NtensorViewPrimitiveCallsLowering, BuiltinCallsLowering>(
+        &ctx);
 
     (void)mlir::applyPatternsAndFoldGreedily(getOperation(),
                                              std::move(patterns));

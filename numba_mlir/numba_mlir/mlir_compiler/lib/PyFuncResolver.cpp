@@ -4,6 +4,7 @@
 
 #include "PyFuncResolver.hpp"
 
+#include "Mangle.hpp"
 #include "PyMapTypes.hpp"
 
 #include <pybind11/pybind11.h>
@@ -29,22 +30,65 @@ PyFuncResolver::PyFuncResolver() : context(std::make_unique<Context>()) {
 
 PyFuncResolver::~PyFuncResolver() {}
 
-mlir::func::FuncOp PyFuncResolver::getFunc(llvm::StringRef name,
-                                           mlir::TypeRange types) const {
+std::optional<PyFuncResolver::Result> PyFuncResolver::getFunc(
+    mlir::ModuleOp module, llvm::StringRef name, mlir::ValueRange args,
+    llvm::ArrayRef<llvm::StringRef> kwnames, mlir::ValueRange kwargs) const {
   assert(!name.empty());
   auto funcDesc = context->resolver(py::str(name.data(), name.size()));
   if (funcDesc.is_none())
-    return {};
+    return std::nullopt;
 
   auto funcDescTuple = funcDesc.cast<py::tuple>();
 
   auto pyFunc = funcDescTuple[0];
   auto flags = funcDescTuple[1];
+  auto argNames = funcDescTuple[2].cast<py::list>();
+
+  Result res;
+
+  res.mappedArgs.reserve(args.size() + kwargs.size());
+  for (auto arg : argNames) {
+    auto kwarg = [&]() -> mlir::Value {
+      auto argName = arg.cast<std::string>();
+      for (auto [name, kw] : llvm::zip(kwnames, kwargs)) {
+        if (argName == name)
+          return kw;
+      }
+      return {};
+    }();
+
+    if (kwarg) {
+      res.mappedArgs.emplace_back(kwarg);
+      continue;
+    }
+
+    if (args.empty())
+      return std::nullopt;
+
+    res.mappedArgs.emplace_back(args.front());
+    args = args.drop_front();
+  }
+
+  mlir::ValueRange argsRande(res.mappedArgs);
+  auto types = argsRande.getTypes();
   auto pyTypes = mapTypesToNumba(context->types, types);
   if (pyTypes.is_none())
-    return {};
+    return std::nullopt;
 
-  auto res = static_cast<mlir::Operation *>(
-      context->compiler(pyFunc, pyTypes, flags).cast<py::capsule>());
-  return mlir::cast_or_null<mlir::func::FuncOp>(res);
+  auto mangledName = mangle(name, types);
+  auto externalFunc = module.lookupSymbol<mlir::func::FuncOp>(mangledName);
+  if (externalFunc) {
+    res.func = externalFunc;
+  } else {
+    auto resOp = static_cast<mlir::Operation *>(
+        context->compiler(pyFunc, pyTypes, flags).cast<py::capsule>());
+    if (!resOp)
+      return std::nullopt;
+
+    res.func = mlir::cast<mlir::func::FuncOp>(resOp);
+    res.func.setPrivate();
+    res.func.setName(mangledName);
+  }
+
+  return res;
 }
