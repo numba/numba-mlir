@@ -889,3 +889,18 @@ def test_fastmath_indirect():
         assert_equal(py_func2(a, b, c), jit_func2(a, b, c))
         ir = get_print_buffer()
         assert ir.count("math.fma") > 0, ir
+
+
+def test_named_args_indirect():
+    def py_func1(a, b, c, d):
+        return a + b * 10 + c * 100 + d * 1000
+
+    jit_func1 = njit(py_func1)
+
+    def py_func2(a, b, c, d):
+        return jit_func1(d, a, d=c, c=b)
+
+    jit_func2 = njit(py_func2)
+
+    a, b, c, d = (2.0, 3.5, 4.7, 5.9)
+    assert_equal(py_func2(a, b, c, d), jit_func2(a, b, c, d))
