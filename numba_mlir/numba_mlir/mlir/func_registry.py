@@ -2,6 +2,9 @@
 #
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+
+import inspect
+
 _mlir_func_names = {}
 _active_funcs_stack = []
 
@@ -32,7 +35,8 @@ def add_active_funcs(name, func, flags):
     global _active_funcs_stack
     assert len(_active_funcs_stack) > 0
     top = _active_funcs_stack[-1]
-    top[name] = (func, flags)
+    arg_names = list(inspect.signature(func).parameters)
+    top[name] = (func, flags, arg_names)
 
 
 def find_active_func(name):
