@@ -11,6 +11,7 @@
 #include <mlir/Dialect/Bufferization/Transforms/BufferViewFlowAnalysis.h>
 #include <mlir/Dialect/Bufferization/Transforms/Bufferize.h>
 #include <mlir/Dialect/Bufferization/Transforms/Passes.h>
+#include <mlir/Dialect/Complex/IR/Complex.h>
 #include <mlir/Dialect/Func/IR/FuncOps.h>
 #include <mlir/Dialect/Func/Transforms/Passes.h>
 #include <mlir/Dialect/Linalg/IR/Linalg.h>
@@ -2344,9 +2345,9 @@ struct OptimizeGlobalsConstsLoad
     // We access data outside function, but doesnt change it, lets hope it
     // is safe.
     auto mod = op->getParentOfType<mlir::ModuleOp>();
-    if (!mod) {
+    if (!mod)
       return mlir::failure();
-    }
+
     mlir::SymbolTable symbolTable(mod);
 
     llvm::SmallVector<uint64_t> indices(op.getIndices().size());
@@ -2389,7 +2390,16 @@ struct OptimizeGlobalsConstsLoad
     if (!vals)
       return mlir::failure();
 
-    rewriter.replaceOpWithNewOp<mlir::arith::ConstantOp>(op, (*vals)[indices]);
+    mlir::Attribute val = (*vals)[indices];
+
+    if (auto complexType = mlir::dyn_cast<mlir::ComplexType>(
+            op.getMemRefType().getElementType())) {
+      rewriter.replaceOpWithNewOp<mlir::complex::ConstantOp>(
+          op, complexType, val.cast<mlir::ArrayAttr>());
+    } else {
+      rewriter.replaceOpWithNewOp<mlir::arith::ConstantOp>(op, val);
+    }
+
     return mlir::success();
   }
 };

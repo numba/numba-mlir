@@ -192,6 +192,21 @@ def test_binary_scalar(py_func, a, b):
     assert_allclose(py_func(a, b), jit_func(a, b), rtol=1e-7, atol=1e-7)
 
 
+@parametrize_function_variants(
+    "py_func",
+    [
+        "lambda a: a * 2",
+        "lambda a: a * 2.3",
+        "lambda a: a * 2.3j",
+        "lambda a: a * 2.3 + 4.5j",
+    ],
+)
+@pytest.mark.parametrize("a", [np.array([2.3 + 4.5j])] + _test_binary_test_arrays)
+def test_binary_scalar_const(py_func, a):
+    jit_func = njit(py_func)
+    assert_allclose(py_func(a), jit_func(a), rtol=1e-7, atol=1e-7)
+
+
 _test_logical_arrays = [
     True,
     False,
