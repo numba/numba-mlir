@@ -6,18 +6,11 @@
 
 #include <memory>
 
-namespace llvm {
-class StringRef;
-}
+#include <mlir/Dialect/Func/IR/FuncOps.h>
 
 namespace mlir {
-namespace func {
-class FuncOp;
-}
-} // namespace mlir
-
-namespace mlir {
-class TypeRange;
+class ModuleOp;
+class ValueRange;
 } // namespace mlir
 
 class PyFuncResolver {
@@ -25,7 +18,15 @@ public:
   PyFuncResolver();
   ~PyFuncResolver();
 
-  mlir::func::FuncOp getFunc(llvm::StringRef name, mlir::TypeRange types) const;
+  struct Result {
+    mlir::func::FuncOp func;
+    llvm::SmallVector<mlir::Value> mappedArgs;
+  };
+
+  std::optional<Result> getFunc(mlir::ModuleOp module, llvm::StringRef name,
+                                mlir::ValueRange args,
+                                llvm::ArrayRef<llvm::StringRef> kwnames,
+                                mlir::ValueRange kwargs) const;
 
 private:
   struct Context;

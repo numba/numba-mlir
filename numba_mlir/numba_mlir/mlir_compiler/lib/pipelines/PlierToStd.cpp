@@ -35,7 +35,6 @@
 
 #include "BasePipeline.hpp"
 #include "LoopUtils.hpp"
-#include "Mangle.hpp"
 #include "PyFuncResolver.hpp"
 #include "PyLinalgResolver.hpp"
 
@@ -779,46 +778,64 @@ private:
   PyLinalgResolver resolver;
 };
 
-struct ExternalCallsLowering final : public numba::CallOpLowering {
-  using CallOpLowering::CallOpLowering;
+static std::optional<mlir::Value> doCast(mlir::OpBuilder &builder,
+                                         mlir::Location loc, mlir::Value src,
+                                         mlir::Type dstType) {
+  auto srcType = src.getType();
+  if (srcType == dstType)
+    return src;
+
+  if (numba::canConvert(srcType, dstType))
+    return numba::doConvert(builder, loc, src, dstType);
+
+  return std::nullopt;
+}
+
+static mlir::Value doSafeCast(mlir::OpBuilder &builder, mlir::Location loc,
+                              mlir::Value src, mlir::Type dstType) {
+  auto res = doCast(builder, loc, src, dstType);
+  if (res)
+    return *res;
+
+  return builder.create<plier::CastOp>(loc, dstType, src);
+}
+
+struct ExternalCallsLowering final : mlir::OpRewritePattern<plier::PyCallOp> {
+  using OpRewritePattern::OpRewritePattern;
 
 protected:
-  virtual mlir::LogicalResult
-  resolveCall(plier::PyCallOp op, mlir::StringRef name, mlir::Location loc,
-              mlir::PatternRewriter &rewriter, mlir::ValueRange args,
-              KWargs kwargs) const override {
-    if (!kwargs.empty())
-      return mlir::failure(); // TODO: kwargs support
+  mlir::LogicalResult
+  matchAndRewrite(plier::PyCallOp op,
+                  mlir::PatternRewriter &rewriter) const override {
+    auto name = op.getFuncName();
+    mlir::ValueRange args = op.getArgs();
 
-    auto types = args.getTypes();
-    auto mangledName = mangle(name, types);
-    if (mangledName.empty())
-      return mlir::failure();
+    auto kwn = op.getKwNames();
+    llvm::SmallVector<llvm::StringRef> kwNames;
+    kwNames.reserve(kwn.size());
+    for (auto name : kwn.getAsValueRange<mlir::StringAttr>()) {
+      kwNames.emplace_back(name);
+    }
 
     auto mod = op->getParentOfType<mlir::ModuleOp>();
     assert(mod);
-    auto externalFunc = mod.lookupSymbol<mlir::func::FuncOp>(mangledName);
-    if (!externalFunc) {
-      externalFunc = resolver.getFunc(name, types);
-      if (externalFunc) {
-        externalFunc.setPrivate();
-        externalFunc.setName(mangledName);
-      }
-    }
-    if (!externalFunc)
+
+    rewriter.startRootUpdate(mod);
+    auto res =
+        resolver.getFunc(mod, name, op.getArgs(), kwNames, op.getKwargs());
+    rewriter.finalizeRootUpdate(mod);
+    if (!res)
       return mlir::failure();
 
-    assert(externalFunc.getFunctionType().getNumResults() ==
-           op->getNumResults());
+    auto externalFunc = res->func;
+    mlir::ValueRange mappedArgs(res->mappedArgs);
+    auto loc = op.getLoc();
 
-    llvm::SmallVector<mlir::Value> castedArgs(args.size());
+    llvm::SmallVector<mlir::Value> castedArgs(mappedArgs.size());
     auto funcTypes = externalFunc.getFunctionType().getInputs();
-    for (auto [i, arg] : llvm::enumerate(args)) {
+    for (auto [i, arg] : llvm::enumerate(mappedArgs)) {
       auto dstType = funcTypes[i];
-      if (arg.getType() != dstType)
-        castedArgs[i] = rewriter.createOrFold<plier::CastOp>(loc, dstType, arg);
-      else
-        castedArgs[i] = arg;
+      castedArgs[i] = doSafeCast(rewriter, loc, arg, dstType);
     }
 
     auto newFuncCall =
@@ -830,11 +847,7 @@ protected:
     for (auto [ind, res] : llvm::enumerate(results)) {
       auto i = static_cast<unsigned>(ind);
       auto oldResType = op->getResult(i).getType();
-      if (res.getType() != oldResType)
-        castedResults[i] =
-            rewriter.createOrFold<plier::CastOp>(loc, oldResType, res);
-      else
-        castedResults[i] = res;
+      castedResults[i] = doSafeCast(rewriter, loc, res, oldResType);
     }
 
     rerunScfPipeline(op);
@@ -845,7 +858,6 @@ protected:
 private:
   PyFuncResolver resolver;
 };
-
 struct BuiltinCallsLoweringPass
     : public numba::RewriteWrapperPass<
           BuiltinCallsLoweringPass, void, void, BuiltinCallsLowering,
