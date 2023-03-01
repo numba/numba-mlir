@@ -41,6 +41,8 @@ _arr_dtypes = np.array(
         np.uint64,
         np.float32,
         np.float64,
+        np.complex64,
+        np.complex128,
     ]
 )
 _arr_1d_bool = np.array([True, False, True, True, False, True, True, True])
@@ -123,7 +125,7 @@ _test_binary_test_arrays_ids = [
     # 'True',
     "1",
     "2.5",
-    # 'np.array([True, False, True])',
+    # 'np.array([True, False, True])', TODO
     "np.array([1,2,3], dtype=np.int32)",
     "np.array([1,2,3], dtype=np.int64)",
     "np.array([4.4,5.5,6.6], dtype=np.float32)",
@@ -167,8 +169,42 @@ _test_binary_test_arrays_ids = [
 )
 def test_binary(py_func, a, b):
     jit_func = njit(py_func)
-    # assert_equal(py_func(a,b), jit_func(a,b))
     assert_allclose(py_func(a, b), jit_func(a, b), rtol=1e-7, atol=1e-7)
+
+
+@parametrize_function_variants(
+    "py_func",
+    [
+        "lambda a, b: np.add(a, b)",
+        "lambda a, b: a + b",
+        "lambda a, b: np.subtract(a, b)",
+        "lambda a, b: a - b",
+        "lambda a, b: np.multiply(a, b)",
+        "lambda a, b: a * b",
+        "lambda a, b: np.true_divide(a, b)",
+        "lambda a, b: a / b",
+    ],
+)
+@pytest.mark.parametrize("a", [np.array([2.3 + 4.5j])] + _test_binary_test_arrays)
+@pytest.mark.parametrize("b", [2, 3.5, 4.6 + 7.8j])
+def test_binary_scalar(py_func, a, b):
+    jit_func = njit(py_func)
+    assert_allclose(py_func(a, b), jit_func(a, b), rtol=1e-7, atol=1e-7)
+
+
+@parametrize_function_variants(
+    "py_func",
+    [
+        "lambda a: a * 2",
+        "lambda a: a * 2.3",
+        "lambda a: a * 2.3j",
+        "lambda a: a * 2.3 + 4.5j",
+    ],
+)
+@pytest.mark.parametrize("a", [np.array([2.3 + 4.5j])] + _test_binary_test_arrays)
+def test_binary_scalar_const(py_func, a):
+    jit_func = njit(py_func)
+    assert_allclose(py_func(a), jit_func(a), rtol=1e-7, atol=1e-7)
 
 
 _test_logical_arrays = [
@@ -1088,7 +1124,7 @@ def test_init1(func):
 
 
 @pytest.mark.parametrize("func", [np.zeros, np.ones], ids=["zeros", "ones"])
-@pytest.mark.parametrize("dtype", ["int32", "int64", "float32", "float64"])
+@pytest.mark.parametrize("dtype", _arr_dtypes)
 def test_init2(func, dtype):
     def py_func(a):
         return func(a.shape, a.dtype)
@@ -1119,7 +1155,7 @@ def test_init4(func):
 
 
 @pytest.mark.parametrize("shape", [2, (3, 4), (5, 6, 7)])
-@pytest.mark.parametrize("dtype", ["int32", "int64", "float32", "float64"])
+@pytest.mark.parametrize("dtype", _arr_dtypes)
 @pytest.mark.parametrize(
     "func", [np.zeros_like, np.ones_like], ids=["zeros_like", "ones_like"]
 )

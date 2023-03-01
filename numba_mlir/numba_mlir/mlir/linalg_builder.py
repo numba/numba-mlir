@@ -410,6 +410,8 @@ def dtype_str(builder, dtype):
         (builder.int64_signless, "int64"),
         (builder.float32, "float32"),
         (builder.float64, "float64"),
+        (builder.complex64, "complex64"),
+        (builder.complex128, "complex128"),
     ]
     for t, name in names:
         if t == dtype:
@@ -435,6 +437,8 @@ def dtype_size(builder, dtype):
         (builder.int64_signless, 8),
         (builder.float32, 4),
         (builder.float64, 8),
+        (builder.complex64, 8),
+        (builder.complex128, 16),
     ]
     for t, size in sizes:
         if t == dtype:
