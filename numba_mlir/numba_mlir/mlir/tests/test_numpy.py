@@ -41,6 +41,8 @@ _arr_dtypes = np.array(
         np.uint64,
         np.float32,
         np.float64,
+        np.complex64,
+        np.complex128,
     ]
 )
 _arr_1d_bool = np.array([True, False, True, True, False, True, True, True])
@@ -1088,9 +1090,7 @@ def test_init1(func):
 
 
 @pytest.mark.parametrize("func", [np.zeros, np.ones], ids=["zeros", "ones"])
-@pytest.mark.parametrize(
-    "dtype", [np.int32, np.int64, np.float32, np.float64, np.complex64, np.complex128]
-)
+@pytest.mark.parametrize("dtype", _arr_dtypes)
 def test_init2(func, dtype):
     def py_func(a):
         return func(a.shape, a.dtype)
@@ -1121,7 +1121,7 @@ def test_init4(func):
 
 
 @pytest.mark.parametrize("shape", [2, (3, 4), (5, 6, 7)])
-@pytest.mark.parametrize("dtype", ["int32", "int64", "float32", "float64"])
+@pytest.mark.parametrize("dtype", _arr_dtypes)
 @pytest.mark.parametrize(
     "func", [np.zeros_like, np.ones_like], ids=["zeros_like", "ones_like"]
 )
