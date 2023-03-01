@@ -84,7 +84,10 @@ std::optional<PyFuncResolver::Result> PyFuncResolver::getFunc(
         context->compiler(pyFunc, pyTypes, flags).cast<py::capsule>());
     if (!resOp)
       return std::nullopt;
+
     res.func = mlir::cast<mlir::func::FuncOp>(resOp);
+    res.func.setPrivate();
+    res.func.setName(mangledName);
   }
 
   return res;
