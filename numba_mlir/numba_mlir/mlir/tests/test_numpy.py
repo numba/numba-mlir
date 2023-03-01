@@ -185,9 +185,7 @@ def test_binary(py_func, a, b):
         "lambda a, b: a / b",
     ],
 )
-@pytest.mark.parametrize(
-    "a", _test_binary_test_arrays, ids=_test_binary_test_arrays_ids
-)
+@pytest.mark.parametrize("a", [np.array([2.3 + 4.5j])] + _test_binary_test_arrays)
 @pytest.mark.parametrize("b", [2, 3.5, 4.6 + 7.8j])
 def test_binary_scalar(py_func, a, b):
     jit_func = njit(py_func)
