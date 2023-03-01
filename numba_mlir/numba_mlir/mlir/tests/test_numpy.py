@@ -125,7 +125,7 @@ _test_binary_test_arrays_ids = [
     # 'True',
     "1",
     "2.5",
-    # 'np.array([True, False, True])',
+    # 'np.array([True, False, True])', TODO
     "np.array([1,2,3], dtype=np.int32)",
     "np.array([1,2,3], dtype=np.int64)",
     "np.array([4.4,5.5,6.6], dtype=np.float32)",
@@ -169,7 +169,28 @@ _test_binary_test_arrays_ids = [
 )
 def test_binary(py_func, a, b):
     jit_func = njit(py_func)
-    # assert_equal(py_func(a,b), jit_func(a,b))
+    assert_allclose(py_func(a, b), jit_func(a, b), rtol=1e-7, atol=1e-7)
+
+
+@parametrize_function_variants(
+    "py_func",
+    [
+        "lambda a, b: np.add(a, b)",
+        "lambda a, b: a + b",
+        "lambda a, b: np.subtract(a, b)",
+        "lambda a, b: a - b",
+        "lambda a, b: np.multiply(a, b)",
+        "lambda a, b: a * b",
+        "lambda a, b: np.true_divide(a, b)",
+        "lambda a, b: a / b",
+    ],
+)
+@pytest.mark.parametrize(
+    "a", _test_binary_test_arrays, ids=_test_binary_test_arrays_ids
+)
+@pytest.mark.parametrize("b", [2, 3.5, 4.6 + 7.8j])
+def test_binary_scalar(py_func, a, b):
+    jit_func = njit(py_func)
     assert_allclose(py_func(a, b), jit_func(a, b), rtol=1e-7, atol=1e-7)
 
 
