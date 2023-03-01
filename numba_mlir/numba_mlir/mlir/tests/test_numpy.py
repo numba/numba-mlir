@@ -1088,7 +1088,9 @@ def test_init1(func):
 
 
 @pytest.mark.parametrize("func", [np.zeros, np.ones], ids=["zeros", "ones"])
-@pytest.mark.parametrize("dtype", ["int32", "int64", "float32", "float64"])
+@pytest.mark.parametrize(
+    "dtype", [np.int32, np.int64, np.float32, np.float64, np.complex64, np.complex128]
+)
 def test_init2(func, dtype):
     def py_func(a):
         return func(a.shape, a.dtype)
