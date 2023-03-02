@@ -63,6 +63,19 @@ using GemmFunc = void(const CBLAS_LAYOUT, const CBLAS_TRANSPOSE,
 template <typename T>
 static void cpuGemm(GemmFunc<T> Gemm, const Memref<2, T> *a,
                     const Memref<2, T> *b, Memref<2, T> *c, T alpha, T beta) {
+  auto isEmpty = [](const Memref<2, T> *arr, char arrName) {
+    if (arr->dims[0] < 0 || arr->dims[1] < 0) {
+      fatal_failure(
+          "Array dims must not be negative. '%c' dims are %d and %d.\n",
+          arrName, int(arr->dims[0]), int(arr->dims[1]));
+    }
+    return arr->dims[0] == 0 && arr->dims[1] == 0;
+  };
+
+  // Special case when we matmul empty arrays. Nothing to do in this case.
+  if (isEmpty(a, 'a') && isEmpty(b, 'b'))
+    return;
+
   auto isContiguous = [](const Memref<2, T> *arr, char arrName) {
     if (arr->strides[0] <= 0 || arr->strides[1] <= 0) {
       fatal_failure("Strides must be positive. '%c' strides are %d and %d.\n",

@@ -13,7 +13,7 @@
 template <size_t NumDims, typename T> struct Memref {
   void *userData;
   T *data;
-  size_t offset;
+  intptr_t offset;
   std::array<intptr_t, NumDims> dims;
   std::array<intptr_t, NumDims> strides;
 };
