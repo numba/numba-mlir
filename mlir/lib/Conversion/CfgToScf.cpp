@@ -533,6 +533,112 @@ struct ScfWhileRewrite : public mlir::OpRewritePattern<mlir::cf::BranchOp> {
   }
 };
 
+namespace {
+struct SCC {
+  struct Node {
+    llvm::SmallVector<mlir::Block *, 4> blocks;
+  };
+  llvm::SmallVector<Node> nodes;
+};
+
+struct BlockDesc {
+  enum { UndefinedIndex = -1 };
+  int index = UndefinedIndex;
+  int lowLink = UndefinedIndex;
+  bool onStack = false;
+};
+} // namespace
+
+static void strongconnect(mlir::Block *block,
+                          llvm::SmallDenseMap<mlir::Block *, BlockDesc> &blocks,
+                          llvm::SmallVectorImpl<mlir::Block *> &stack,
+                          int &index, SCC &scc) {
+  assert(block);
+  auto &desc = blocks[block];
+  if (desc.index != BlockDesc::UndefinedIndex)
+    return;
+
+  desc.index = index;
+  desc.lowLink = index;
+  ++index;
+
+  desc.onStack = true;
+  stack.push_back(block);
+
+  auto region = block->getParent();
+  for (mlir::Block *successor : block->getSuccessors()) {
+    if (region != successor->getParent())
+      continue;
+
+    auto &successorDesc = blocks[successor];
+    if (successorDesc.index == BlockDesc::UndefinedIndex) {
+      strongconnect(successor, blocks, stack, index, scc);
+      desc.lowLink = std::min(desc.lowLink, successorDesc.lowLink);
+    } else if (successorDesc.onStack) {
+      desc.lowLink = std::min(desc.lowLink, successorDesc.index);
+    }
+  }
+
+  if (desc.lowLink != desc.index)
+    return;
+
+  auto &sccNode = scc.nodes.emplace_back();
+  mlir::Block *currentBlock = nullptr;
+  do {
+    assert(!stack.empty());
+    currentBlock = stack.pop_back_val();
+    blocks[currentBlock].onStack = false;
+    sccNode.blocks.emplace_back(currentBlock);
+  } while (currentBlock != block);
+}
+
+/// SCC construction algorithm from
+/// https://en.wikipedia.org/wiki/Tarjan%27s_strongly_connected_components_algorithm
+static std::optional<SCC> buildSCC(mlir::Block &entryBlock) {
+  SCC scc;
+
+  llvm::SmallDenseMap<mlir::Block *, BlockDesc> blocks;
+  llvm::SmallVector<mlir::Block *> stack;
+  int index = 0;
+  auto region = entryBlock.getParent();
+  for (auto &block : region->getBlocks())
+    strongconnect(&block, blocks, stack, index, scc);
+
+  return scc;
+}
+
+static bool isEntryBlock(mlir::Block &block) {
+  auto region = block.getParent();
+  return &(region->front()) == &block;
+}
+
+struct LoopRestructuringBr : public mlir::OpRewritePattern<mlir::cf::BranchOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(mlir::cf::BranchOp op,
+                  mlir::PatternRewriter &rewriter) const override {
+    auto block = op->getBlock();
+    if (!isEntryBlock(*block))
+      return mlir::failure();
+
+    llvm::errs() << "Build scc\n";
+    auto scc = buildSCC(*block);
+    if (!scc)
+      return mlir::failure();
+
+    for (auto [i, node] : llvm::enumerate(scc->nodes)) {
+      llvm::errs() << "scc node " << i << "\n";
+      for (auto b : node.blocks) {
+        llvm::errs() << " block ";
+        b->dump();
+      }
+    }
+
+    return mlir::success(false);
+  }
+};
+
 /// Changes conditional branch on the end of loop body block to unconditiona to
 /// open opportunities for scf.while rewrites.
 ///
@@ -742,11 +848,12 @@ struct CFGToSCFPass
 
     patterns.insert<
         // clang-format off
-        BreakRewrite,
+//        BreakRewrite,
         ScfIfRewriteOneExit,
-        ScfIfRewriteTwoExits,
-        ScfWhileRewrite,
-        CondBranchSameTargetRewrite
+        LoopRestructuringBr
+//        ScfIfRewriteTwoExits,
+//        ScfWhileRewrite,
+//        CondBranchSameTargetRewrite
         // clang-format on
         >(context);
 
