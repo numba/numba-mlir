@@ -102,6 +102,9 @@ struct ScfIfRewriteOneExit
       if (!isBlocksDifferent({startBlock, trueBlock, postBlock}))
         continue;
 
+      if (trueBlock == falseBlock)
+        continue;
+
       mlir::Value cond = op.getCondition();
       if (reverse) {
         auto i1 = mlir::IntegerType::get(op.getContext(), 1);
