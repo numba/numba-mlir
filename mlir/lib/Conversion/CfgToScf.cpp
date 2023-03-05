@@ -607,6 +607,329 @@ static std::optional<SCC> buildSCC(mlir::Block &entryBlock) {
   return scc;
 }
 
+static mlir::ValueRange getTerminatorArgs(mlir::Operation *term,
+                                          mlir::Block *target) {
+  assert(term);
+  assert(target);
+  if (auto br = mlir::dyn_cast<mlir::cf::BranchOp>(term))
+    return br.getDestOperands();
+
+  if (auto condBr = mlir::dyn_cast<mlir::cf::CondBranchOp>(term))
+    return target == condBr.getTrueDest() ? condBr.getTrueDestOperands()
+                                          : condBr.getFalseDestOperands();
+
+  llvm_unreachable("getTerminatorArgs: unsupported terminator");
+}
+
+static mlir::ValueRange
+getEdgeArgs(std::pair<mlir::Block *, mlir::Block *> edge) {
+  auto term = edge.first->getTerminator();
+  return getTerminatorArgs(term, edge.second);
+}
+
+static void replaceEdgeDest(mlir::PatternRewriter &rewriter,
+                            std::pair<mlir::Block *, mlir::Block *> edge,
+                            mlir::Block *newDest, mlir::ValueRange newArgs) {
+  auto term = edge.first->getTerminator();
+  mlir::OpBuilder::InsertionGuard g(rewriter);
+  rewriter.setInsertionPoint(term);
+  if (auto br = mlir::dyn_cast<mlir::cf::BranchOp>(term)) {
+    assert(edge.second == br.getDest());
+    rewriter.replaceOpWithNewOp<mlir::cf::BranchOp>(br, newDest, newArgs);
+    return;
+  }
+
+  if (auto condBr = mlir::dyn_cast<mlir::cf::CondBranchOp>(term)) {
+    mlir::Block *trueDest = condBr.getTrueDest();
+    mlir::ValueRange trueArgs = condBr.getTrueDestOperands();
+    mlir::Block *falseDest = condBr.getFalseDest();
+    mlir::ValueRange falseArgs = condBr.getFalseDestOperands();
+    if (edge.second == trueDest) {
+      trueDest = newDest;
+      trueArgs = newArgs;
+    }
+    if (edge.second == falseDest) {
+      falseDest = newDest;
+      falseArgs = newArgs;
+    }
+
+    auto cond = condBr.getCondition();
+    rewriter.replaceOpWithNewOp<mlir::cf::CondBranchOp>(
+        condBr, cond, trueDest, trueArgs, falseDest, falseArgs);
+    return;
+  }
+
+  llvm_unreachable("replaceEdgeDest: unsupported terminator");
+}
+
+/// Restructure loop into tail-controlled form according to algorithm described
+/// in https://dl.acm.org/doi/pdf/10.1145/2693261
+///
+/// Returns true if any modifications to IR were made.
+static bool restructureLoop(mlir::PatternRewriter &rewriter, SCC::Node &node) {
+  assert(!node.blocks.empty());
+
+  if (node.blocks.size() == 1)
+    return false;
+
+  auto &blocks = node.blocks;
+  auto region = blocks.front()->getParent();
+
+  llvm::SmallDenseSet<mlir::Block *> blocksSet(blocks.begin(), blocks.end());
+
+  auto isInSCC = [&](mlir::Block *block) {
+    assert(block);
+    return blocksSet.count(block) != 0;
+  };
+
+  llvm::SmallVector<std::pair<mlir::Block *, mlir::Block *>> inEdges;
+  llvm::SmallVector<std::pair<mlir::Block *, mlir::Block *>> outEdges;
+  llvm::SmallVector<std::pair<mlir::Block *, mlir::Block *>> repetitionEdges;
+
+  for (auto block : blocks) {
+    bool isInput = false;
+    for (auto predecessor : block->getPredecessors()) {
+      if (predecessor->getParent() != region)
+        continue;
+
+      if (!isInSCC(predecessor)) {
+        inEdges.emplace_back(predecessor, block);
+        isInput = true;
+      }
+    }
+
+    for (auto succesor : block->getSuccessors()) {
+      if (succesor->getParent() != region)
+        continue;
+
+      if (!isInSCC(succesor))
+        outEdges.emplace_back(block, succesor);
+    }
+
+    if (isInput) {
+      for (auto predecessor : block->getPredecessors()) {
+        if (predecessor->getParent() != region)
+          continue;
+
+        if (isInSCC(predecessor)) {
+          repetitionEdges.emplace_back(predecessor, block);
+          isInput = true;
+        }
+      }
+    }
+  }
+
+  // Check if we are already in structured form.
+  if (inEdges.size() == 1 && outEdges.size() == 1) {
+    if (outEdges.front().first->getNumSuccessors() == 2) {
+      auto inBlock = inEdges.front().second;
+      auto successors = outEdges.front().first->getSuccessors();
+      if (successors[0] == inBlock || successors[1] == inBlock)
+        return false;
+    }
+  }
+
+  auto boolType = rewriter.getI1Type();
+  auto numInMultiplexVars = inEdges.size() - 1;
+  mlir::Block *multiplexEntryBlock = nullptr;
+  auto loc = rewriter.getUnknownLoc();
+  {
+    llvm::SmallVector<mlir::Type> entryBlockTypes(numInMultiplexVars, boolType);
+    for (auto inEdge : inEdges) {
+      auto edgeArgs = inEdge.second->getArgumentTypes();
+      entryBlockTypes.append(edgeArgs.begin(), edgeArgs.end());
+    }
+    multiplexEntryBlock = rewriter.createBlock(region, {}, entryBlockTypes);
+    mlir::ValueRange entryBlockArgs =
+        multiplexEntryBlock->getArguments().drop_front(numInMultiplexVars);
+
+    mlir::Block *currentBlock = multiplexEntryBlock;
+    for (auto [i, inEdge] :
+         llvm::enumerate(llvm::ArrayRef(inEdges).drop_back())) {
+      auto dst = inEdge.second;
+      auto numArgs = dst->getNumArguments();
+      auto args = entryBlockArgs.take_front(numArgs);
+      rewriter.setInsertionPointToStart(currentBlock);
+      auto cond = multiplexEntryBlock->getArgument(i);
+      mlir::Block *nextBlock = nullptr;
+      if (i == numInMultiplexVars - 1) {
+        auto lastEdge = inEdges.back();
+        auto lastDst = lastEdge.second;
+        auto falseArgs = entryBlockArgs.drop_front(numArgs);
+        assert(falseArgs.size() == lastDst->getNumArguments());
+        rewriter.create<mlir::cf::CondBranchOp>(loc, cond, dst, args, lastDst,
+                                                falseArgs);
+      } else {
+        nextBlock = rewriter.createBlock(region);
+        rewriter.create<mlir::cf::CondBranchOp>(loc, cond, dst, args, nextBlock,
+                                                mlir::ValueRange{});
+        currentBlock = nextBlock;
+      }
+      entryBlockArgs = entryBlockArgs.drop_front(numArgs);
+    }
+  }
+
+  llvm::SmallVector<mlir::Value> branchArgs;
+  for (auto [i, inEdge] : llvm::enumerate(inEdges)) {
+    auto entryBlock = rewriter.createBlock(region);
+    rewriter.setInsertionPointToStart(entryBlock);
+    branchArgs.clear();
+    for (auto j : llvm::seq<size_t>(0, numInMultiplexVars)) {
+      auto val = static_cast<int64_t>(j == i);
+      branchArgs.emplace_back(
+          rewriter.create<mlir::arith::ConstantIntOp>(loc, val, boolType));
+    }
+
+    for (auto [j, inEdgeTmp] : llvm::enumerate(inEdges)) {
+      auto args = getEdgeArgs(inEdgeTmp);
+      if (j == i) {
+        branchArgs.append(args.begin(), args.end());
+      } else {
+        for (auto arg : args) {
+          mlir::Value init =
+              rewriter.create<numba::util::UndefOp>(loc, arg.getType());
+          branchArgs.emplace_back(init);
+        }
+      }
+    }
+    rewriter.create<mlir::cf::BranchOp>(loc, multiplexEntryBlock, branchArgs);
+    replaceEdgeDest(rewriter, inEdge, entryBlock, {});
+  }
+
+  mlir::ValueRange exitArgs;
+  mlir::Block *exitBlock = nullptr;
+  auto numOutMultiplexVars = outEdges.size() - 1;
+  {
+    llvm::SmallVector<mlir::Type> repBlockTypes(numOutMultiplexVars + 1,
+                                                boolType);
+    for (auto &repEdge : repetitionEdges) {
+      auto edgeArgs = repEdge.second->getArgumentTypes();
+      repBlockTypes.append(edgeArgs.begin(), edgeArgs.end());
+    }
+    auto numRepArgs = repBlockTypes.size() - numOutMultiplexVars - 1;
+    for (auto &outEdge : outEdges) {
+      auto edgeArgs = outEdge.second->getArgumentTypes();
+      repBlockTypes.append(edgeArgs.begin(), edgeArgs.end());
+    }
+    auto repBlock = rewriter.createBlock(region, {}, repBlockTypes);
+    exitBlock = rewriter.createBlock(region);
+    rewriter.setInsertionPointToStart(repBlock);
+    mlir::Value cond = repBlock->getArgument(0);
+    auto repBlockArgs =
+        repBlock->getArguments().drop_front(numOutMultiplexVars + 1);
+    mlir::ValueRange repetitionArgs = repBlockArgs.take_front(numRepArgs);
+    exitArgs = repBlockArgs.drop_front(numRepArgs);
+    assert(multiplexEntryBlock->getNumArguments() == repetitionArgs.size());
+    rewriter.create<mlir::cf::CondBranchOp>(loc, cond, multiplexEntryBlock,
+                                            repetitionArgs, exitBlock,
+                                            mlir::ValueRange{});
+
+    llvm::SmallVector<mlir::Value> branchArgs;
+    for (auto [i, repEdge] : llvm::enumerate(repetitionEdges)) {
+      auto preRepBlock = rewriter.createBlock(region);
+      rewriter.setInsertionPointToStart(preRepBlock);
+      mlir::Value trueVal =
+          rewriter.create<mlir::arith::ConstantIntOp>(loc, 1, boolType);
+      mlir::Value undefVal =
+          rewriter.create<numba::util::UndefOp>(loc, boolType);
+
+      branchArgs.clear();
+      branchArgs.emplace_back(trueVal);
+      for (auto j : llvm::seq<size_t>(0, numOutMultiplexVars)) {
+        (void)j;
+        branchArgs.emplace_back(undefVal);
+      }
+
+      for (auto [j, repEdgeTmp] : llvm::enumerate(repetitionEdges)) {
+        auto args = getEdgeArgs(repEdgeTmp);
+        if (j == i) {
+          branchArgs.append(args.begin(), args.end());
+        } else {
+          for (auto arg : args) {
+            mlir::Value init =
+                rewriter.create<numba::util::UndefOp>(loc, arg.getType());
+            branchArgs.emplace_back(init);
+          }
+        }
+      }
+
+      for (auto type :
+           llvm::ArrayRef(repBlockTypes).drop_front(numRepArgs + 1)) {
+        mlir::Value val = rewriter.create<numba::util::UndefOp>(loc, type);
+        branchArgs.emplace_back(val);
+      }
+      assert(branchArgs.size() == repBlock->getNumArguments());
+      rewriter.create<mlir::cf::BranchOp>(loc, repBlock, branchArgs);
+      replaceEdgeDest(rewriter, repEdge, preRepBlock, {});
+    }
+
+    for (auto [i, outEdge] : llvm::enumerate(outEdges)) {
+      auto preRepBlock = rewriter.createBlock(region);
+      rewriter.setInsertionPointToStart(preRepBlock);
+      mlir::Value falseVal =
+          rewriter.create<mlir::arith::ConstantIntOp>(loc, 0, boolType);
+
+      branchArgs.clear();
+      branchArgs.emplace_back(falseVal);
+      for (auto j : llvm::seq<size_t>(0, numOutMultiplexVars)) {
+        auto val = static_cast<int64_t>(j == i);
+        branchArgs.emplace_back(
+            rewriter.create<mlir::arith::ConstantIntOp>(loc, val, boolType));
+      }
+
+      for (auto type :
+           llvm::ArrayRef(repBlockTypes).drop_front(1).take_front(numRepArgs)) {
+        mlir::Value val = rewriter.create<numba::util::UndefOp>(loc, type);
+        branchArgs.emplace_back(val);
+      }
+
+      for (auto [j, outEdgeTmp] : llvm::enumerate(outEdges)) {
+        auto args = getEdgeArgs(outEdgeTmp);
+        if (j == i) {
+          branchArgs.append(args.begin(), args.end());
+        } else {
+          for (auto arg : args) {
+            mlir::Value init =
+                rewriter.create<numba::util::UndefOp>(loc, arg.getType());
+            branchArgs.emplace_back(init);
+          }
+        }
+      }
+
+      assert(branchArgs.size() == repBlock->getNumArguments());
+      rewriter.create<mlir::cf::BranchOp>(loc, repBlock, branchArgs);
+      replaceEdgeDest(rewriter, outEdge, preRepBlock, {});
+    }
+  }
+
+  mlir::Block *currentBlock = exitBlock;
+  for (auto [i, outEdge] :
+       llvm::enumerate(llvm::ArrayRef(outEdges).drop_back())) {
+    auto dst = outEdge.second;
+    auto numArgs = dst->getNumArguments();
+    auto args = exitArgs.take_front(numArgs);
+    rewriter.setInsertionPointToStart(currentBlock);
+    auto cond = exitBlock->getArgument(i + 1);
+    mlir::Block *nextBlock = nullptr;
+    if (i == numOutMultiplexVars - 1) {
+      auto lastEdge = outEdges.back();
+      auto lastDst = lastEdge.second;
+      auto falseArgs = exitArgs.drop_front(numArgs);
+      assert(falseArgs.size() == lastDst->getNumArguments());
+      rewriter.create<mlir::cf::CondBranchOp>(loc, cond, dst, args, lastDst,
+                                              falseArgs);
+    } else {
+      nextBlock = rewriter.createBlock(region);
+      rewriter.create<mlir::cf::CondBranchOp>(loc, cond, dst, args, nextBlock,
+                                              mlir::ValueRange{});
+      currentBlock = nextBlock;
+    }
+    exitArgs = exitArgs.drop_front(numArgs);
+  }
+
+  return true;
+}
+
 static bool isEntryBlock(mlir::Block &block) {
   auto region = block.getParent();
   return &(region->front()) == &block;
@@ -635,7 +958,11 @@ struct LoopRestructuringBr : public mlir::OpRewritePattern<mlir::cf::BranchOp> {
       }
     }
 
-    return mlir::success(false);
+    bool changed = false;
+    for (auto &node : scc->nodes)
+      changed = restructureLoop(rewriter, node) || changed;
+
+    return mlir::success(changed);
   }
 };
 
