@@ -547,6 +547,8 @@ struct BlockDesc {
   int lowLink = UndefinedIndex;
   bool onStack = false;
 };
+
+using Edge = std::pair<mlir::Block *, mlir::Block *>;
 } // namespace
 
 static void strongconnect(mlir::Block *block,
@@ -621,14 +623,12 @@ static mlir::ValueRange getTerminatorArgs(mlir::Operation *term,
   llvm_unreachable("getTerminatorArgs: unsupported terminator");
 }
 
-static mlir::ValueRange
-getEdgeArgs(std::pair<mlir::Block *, mlir::Block *> edge) {
+static mlir::ValueRange getEdgeArgs(Edge edge) {
   auto term = edge.first->getTerminator();
   return getTerminatorArgs(term, edge.second);
 }
 
-static void replaceEdgeDest(mlir::PatternRewriter &rewriter,
-                            std::pair<mlir::Block *, mlir::Block *> edge,
+static void replaceEdgeDest(mlir::PatternRewriter &rewriter, Edge edge,
                             mlir::Block *newDest, mlir::ValueRange newArgs) {
   auto term = edge.first->getTerminator();
   mlir::OpBuilder::InsertionGuard g(rewriter);
@@ -662,6 +662,14 @@ static void replaceEdgeDest(mlir::PatternRewriter &rewriter,
   llvm_unreachable("replaceEdgeDest: unsupported terminator");
 }
 
+static void addTypesFromEdges(llvm::ArrayRef<Edge> edges,
+                              llvm::SmallVectorImpl<mlir::Type> &ret) {
+  for (auto edge : edges) {
+    auto edgeArgs = edge.second->getArgumentTypes();
+    ret.append(edgeArgs.begin(), edgeArgs.end());
+  }
+}
+
 /// Restructure loop into tail-controlled form according to algorithm described
 /// in https://dl.acm.org/doi/pdf/10.1145/2693261
 ///
@@ -682,9 +690,9 @@ static bool restructureLoop(mlir::PatternRewriter &rewriter, SCC::Node &node) {
     return blocksSet.count(block) != 0;
   };
 
-  llvm::SmallVector<std::pair<mlir::Block *, mlir::Block *>> inEdges;
-  llvm::SmallVector<std::pair<mlir::Block *, mlir::Block *>> outEdges;
-  llvm::SmallVector<std::pair<mlir::Block *, mlir::Block *>> repetitionEdges;
+  llvm::SmallVector<Edge> inEdges;
+  llvm::SmallVector<Edge> outEdges;
+  llvm::SmallVector<Edge> repetitionEdges;
 
   for (auto block : blocks) {
     bool isInput = false;
@@ -741,10 +749,7 @@ static bool restructureLoop(mlir::PatternRewriter &rewriter, SCC::Node &node) {
 
   {
     llvm::SmallVector<mlir::Type> entryBlockTypes(numInMultiplexVars, boolType);
-    for (auto inEdge : inEdges) {
-      auto edgeArgs = inEdge.second->getArgumentTypes();
-      entryBlockTypes.append(edgeArgs.begin(), edgeArgs.end());
-    }
+    addTypesFromEdges(inEdges, entryBlockTypes);
     multiplexEntryBlock = createBlock(entryBlockTypes);
     mlir::ValueRange entryBlockArgs =
         multiplexEntryBlock->getArguments().drop_front(numInMultiplexVars);
@@ -808,15 +813,11 @@ static bool restructureLoop(mlir::PatternRewriter &rewriter, SCC::Node &node) {
   {
     llvm::SmallVector<mlir::Type> repBlockTypes(numOutMultiplexVars + 1,
                                                 boolType);
-    for (auto &repEdge : repetitionEdges) {
-      auto edgeArgs = repEdge.second->getArgumentTypes();
-      repBlockTypes.append(edgeArgs.begin(), edgeArgs.end());
-    }
+    addTypesFromEdges(repetitionEdges, repBlockTypes);
     auto numRepArgs = repBlockTypes.size() - numOutMultiplexVars - 1;
-    for (auto &outEdge : outEdges) {
-      auto edgeArgs = outEdge.second->getArgumentTypes();
-      repBlockTypes.append(edgeArgs.begin(), edgeArgs.end());
-    }
+
+    addTypesFromEdges(outEdges, repBlockTypes);
+
     auto repBlock = createBlock(repBlockTypes);
     exitBlock = createBlock();
     rewriter.setInsertionPointToStart(repBlock);
