@@ -575,13 +575,21 @@ static void strongconnect(mlir::Block *block,
     auto &successorDesc = blocks[successor];
     if (successorDesc.index == BlockDesc::UndefinedIndex) {
       strongconnect(successor, blocks, stack, index, scc);
-      desc.lowLink = std::min(desc.lowLink, successorDesc.lowLink);
+
+      // Do not use cached values as underlying map may have been reallocated.
+      auto &successorDesc1 = blocks[successor];
+      auto &desc1 = blocks[block];
+      desc1.lowLink = std::min(desc1.lowLink, successorDesc1.lowLink);
     } else if (successorDesc.onStack) {
-      desc.lowLink = std::min(desc.lowLink, successorDesc.index);
+      // Do not use cached values as underlying map may have been reallocated.
+      auto &successorDesc1 = blocks[successor];
+      auto &desc1 = blocks[block];
+      desc1.lowLink = std::min(desc1.lowLink, successorDesc1.index);
     }
   }
 
-  if (desc.lowLink != desc.index)
+  auto &desc1 = blocks[block];
+  if (desc1.lowLink != desc1.index)
     return;
 
   auto &sccNode = scc.nodes.emplace_back();
