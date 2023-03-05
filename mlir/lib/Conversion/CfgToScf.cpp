@@ -539,6 +539,14 @@ struct SCC {
     llvm::SmallVector<mlir::Block *, 4> blocks;
   };
   llvm::SmallVector<Node> nodes;
+
+  void dump() const {
+    for (auto [i, node] : llvm::enumerate(nodes)) {
+      llvm::errs() << "scc node " << i << "\n";
+      for (auto b : node.blocks)
+        b->dump();
+    }
+  }
 };
 
 struct BlockDesc {
@@ -964,13 +972,7 @@ struct LoopRestructuringBr : public mlir::OpRewritePattern<mlir::cf::BranchOp> {
     if (!scc)
       return mlir::failure();
 
-    for (auto [i, node] : llvm::enumerate(scc->nodes)) {
-      llvm::errs() << "scc node " << i << "\n";
-      for (auto b : node.blocks) {
-        llvm::errs() << " block ";
-        b->dump();
-      }
-    }
+    scc->dump();
 
     bool changed = false;
     for (auto &node : scc->nodes)
