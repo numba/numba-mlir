@@ -961,10 +961,13 @@ struct LoopRestructuringBr : public mlir::OpRewritePattern<mlir::cf::BranchOp> {
 
     scc->dump();
 
+    auto f = op->getParentOfType<mlir::func::FuncOp>();
     bool changed = false;
     for (auto &node : scc->nodes)
       changed = restructureLoop(rewriter, node) || changed;
 
+    llvm::errs() << "-=-=-=-=-=-=-=-\n";
+    f->dump();
     return mlir::success(changed);
   }
 };
