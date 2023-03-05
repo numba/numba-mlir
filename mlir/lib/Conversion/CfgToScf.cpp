@@ -867,7 +867,7 @@ static bool restructureLoop(mlir::PatternRewriter &rewriter, SCC::Node &node) {
 
     auto repBlock = createBlock(repBlockTypes);
     exitBlock = createBlock();
-    rewriter.setInsertionPointToStart(repBlock);
+
     mlir::Value cond = repBlock->getArgument(0);
     auto repBlockArgs =
         repBlock->getArguments().drop_front(numOutMultiplexVars + 1);
@@ -877,6 +877,7 @@ static bool restructureLoop(mlir::PatternRewriter &rewriter, SCC::Node &node) {
     mlir::ValueRange repetitionArgs = repBlockArgs.take_front(numRepArgs);
     exitArgs = repBlockArgs.drop_front(numRepArgs);
     assert(multiplexEntryBlock->getNumArguments() == repetitionArgs.size());
+    rewriter.setInsertionPointToStart(repBlock);
     rewriter.create<mlir::cf::CondBranchOp>(loc, cond, multiplexEntryBlock,
                                             repetitionArgs, exitBlock,
                                             mlir::ValueRange{});
