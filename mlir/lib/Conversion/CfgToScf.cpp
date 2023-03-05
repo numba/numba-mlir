@@ -724,9 +724,10 @@ static void initMultiplexConds(mlir::PatternRewriter &rewriter,
                                mlir::Location loc, size_t currentBlock,
                                size_t numBlocks,
                                llvm::SmallVectorImpl<mlir::Value> &res) {
+  assert(numBlocks > 0);
   assert(currentBlock < numBlocks);
   auto boolType = rewriter.getI1Type();
-  for (auto j : llvm::seq<size_t>(0, numBlocks)) {
+  for (auto j : llvm::seq<size_t>(0, numBlocks - 1)) {
     auto val = static_cast<int64_t>(j == currentBlock);
     mlir::Value cond =
         rewriter.create<mlir::arith::ConstantIntOp>(loc, val, boolType);
@@ -846,7 +847,7 @@ static bool restructureLoop(mlir::PatternRewriter &rewriter, SCC::Node &node) {
     auto entryBlock = createBlock();
     rewriter.setInsertionPointToStart(entryBlock);
     branchArgs.clear();
-    initMultiplexConds(rewriter, loc, i, numInMultiplexVars, branchArgs);
+    initMultiplexConds(rewriter, loc, i, inEdges.size(), branchArgs);
     initMultiplexVars(rewriter, loc, i, inEdges, branchArgs);
 
     rewriter.create<mlir::cf::BranchOp>(loc, multiplexEntryBlock, branchArgs);
@@ -917,7 +918,7 @@ static bool restructureLoop(mlir::PatternRewriter &rewriter, SCC::Node &node) {
 
       branchArgs.clear();
       branchArgs.emplace_back(falseVal);
-      initMultiplexConds(rewriter, loc, i, numOutMultiplexVars, branchArgs);
+      initMultiplexConds(rewriter, loc, i, outEdges.size(), branchArgs);
 
       for (auto type :
            llvm::ArrayRef(repBlockTypes).drop_front(1).take_front(numRepArgs)) {
