@@ -11,6 +11,8 @@
 #include <mlir/Dialect/SCF/IR/SCF.h>
 #include <mlir/IR/Dominance.h>
 #include <mlir/IR/IRMapping.h>
+#include <mlir/Interfaces/CallInterfaces.h>
+#include <mlir/Interfaces/SideEffectInterfaces.h>
 #include <mlir/Pass/PassManager.h>
 #include <mlir/Transforms/GreedyPatternRewriteDriver.h>
 #include <mlir/Transforms/Passes.h>
@@ -1143,6 +1145,154 @@ struct TailLoopToWhile : public mlir::OpRewritePattern<mlir::cf::BranchOp> {
   }
 };
 
+static bool hasSideEffects(mlir::Operation *op) {
+  assert(op);
+  if (mlir::isa<mlir::CallOpInterface>(op))
+    return true;
+
+  return !mlir::isPure(op);
+}
+
+static bool isInverse(mlir::Value cond1, mlir::Value cond2) {
+  auto op = cond1.getDefiningOp<mlir::arith::XOrIOp>();
+  if (!op)
+    return false;
+
+  if ((op.getLhs() == cond2 && mlir::isConstantIntValue(op.getRhs(), 1)) ||
+      (op.getRhs() == cond2 && mlir::isConstantIntValue(op.getLhs(), 1)))
+    return true;
+
+  return false;
+}
+
+struct WhileMoveToAfter : public mlir::OpRewritePattern<mlir::scf::WhileOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(mlir::scf::WhileOp op,
+                  mlir::PatternRewriter &rewriter) const override {
+    auto &beforeBlock = op.getBefore().front();
+    auto it = beforeBlock.end();
+    auto begin = beforeBlock.begin();
+    if (it == begin)
+      return mlir::failure();
+
+    mlir::scf::IfOp ifOp;
+    while (true) {
+      --it;
+      if (it == begin)
+        return mlir::failure();
+
+      auto &itOp = *it;
+      if (auto i = mlir::dyn_cast<mlir::scf::IfOp>(itOp)) {
+        ifOp = i;
+        break;
+      }
+
+      if (hasSideEffects(&itOp))
+        return mlir::failure();
+    }
+    auto condOp =
+        mlir::cast<mlir::scf::ConditionOp>(beforeBlock.getTerminator());
+
+    for (auto user : ifOp->getUsers()) {
+      if (user != condOp)
+        return mlir::failure();
+    }
+
+    bool inverse = false;
+    auto condCond = condOp.getCondition();
+    auto cond = ifOp.getCondition();
+    if (condCond == cond) {
+      // Nothing
+    } else if (isInverse(condCond, cond)) {
+      inverse = true;
+    } else {
+      return mlir::failure();
+    }
+
+    auto ifBlock = inverse ? ifOp.elseBlock() : ifOp.thenBlock();
+    auto ifBlockRegion = ifBlock->getParent();
+
+    llvm::SmallVector<mlir::Value> definedOutside;
+    ifBlock->walk([&](mlir::Operation *innerOp) {
+      for (auto arg : innerOp->getOperands())
+        if (!ifBlockRegion->isAncestor(arg.getParentRegion()))
+          definedOutside.emplace_back(arg);
+    });
+
+    auto loc = rewriter.getUnknownLoc();
+
+    mlir::OpBuilder::InsertionGuard g(rewriter);
+    auto &afterBlock = op.getAfter().front();
+    for (auto val : definedOutside)
+      afterBlock.addArgument(val.getType(), loc);
+
+    mlir::ValueRange oldArgs =
+        afterBlock.getArguments().drop_back(definedOutside.size());
+    mlir::ValueRange newArgs =
+        afterBlock.getArguments().take_back(definedOutside.size());
+
+    mlir::IRMapping mapping;
+    for (auto [oldVal, newVal] : llvm::zip(definedOutside, newArgs))
+      mapping.map(oldVal, newVal);
+
+    rewriter.setInsertionPointToStart(&afterBlock);
+    for (auto &op : ifBlock->without_terminator())
+      rewriter.clone(op, mapping);
+
+    auto term = mlir::cast<mlir::scf::YieldOp>(ifBlock->getTerminator());
+    for (auto [termVal, ifVal] :
+         llvm::zip(term.getResults(), ifOp.getResults())) {
+      for (auto &use : ifVal.getUses()) {
+        assert(use.getOwner() == condOp);
+        assert(use.getOperandNumber() < oldArgs.size());
+        rewriter.replaceAllUsesWith(oldArgs[use.getOperandNumber()],
+                                    mapping.lookupOrDefault(termVal));
+      }
+    }
+
+    rewriter.setInsertionPoint(condOp);
+    for (auto res : ifOp.getResults()) {
+      mlir::Value undef =
+          rewriter.create<numba::util::UndefOp>(loc, res.getType());
+      rewriter.replaceAllUsesWith(res, undef);
+    }
+
+    rewriter.eraseOp(ifOp);
+
+    auto condArgs = condOp.getArgs();
+    llvm::SmallVector<mlir::Value> newCondArgs(condArgs.begin(),
+                                               condArgs.end());
+    newCondArgs.append(definedOutside.begin(), definedOutside.end());
+
+    assert(newCondArgs.size() == afterBlock.getNumArguments());
+    rewriter.replaceOpWithNewOp<mlir::scf::ConditionOp>(condOp, condCond,
+                                                        newCondArgs);
+
+    mlir::ValueRange newCondArgsRange(newCondArgs);
+
+    auto emptyBuilder = [](mlir::OpBuilder &, mlir::Location,
+                           mlir::ValueRange) {
+      // Nothing
+    };
+
+    rewriter.setInsertionPoint(op);
+    auto newWhile = rewriter.create<mlir::scf::WhileOp>(
+        op.getLoc(), newCondArgsRange.getTypes(), op.getInits(), emptyBuilder,
+        emptyBuilder);
+    auto &newBeforeBlock = newWhile.getBefore().front();
+    auto &newAfterBlock = newWhile.getAfter().front();
+    rewriter.mergeBlocks(&beforeBlock, &newBeforeBlock,
+                         newBeforeBlock.getArguments());
+    rewriter.mergeBlocks(&afterBlock, &newAfterBlock,
+                         newAfterBlock.getArguments());
+    rewriter.replaceOp(op, newWhile.getResults().take_front(condArgs.size()));
+
+    return mlir::success();
+  }
+};
+
 /// Changes conditional branch on the end of loop body block to unconditiona to
 /// open opportunities for scf.while rewrites.
 ///
@@ -1356,7 +1506,8 @@ struct CFGToSCFPass
         ScfIfRewriteOneExit,
         LoopRestructuringBr,
         LoopRestructuringCondBr,
-        TailLoopToWhile
+        TailLoopToWhile,
+        WhileMoveToAfter
 //        ScfIfRewriteTwoExits,
 //        ScfWhileRewrite,
 //        CondBranchSameTargetRewrite
@@ -1373,7 +1524,9 @@ struct CFGToSCFPass
     mlir::scf::WhileOp::getCanonicalizationPatterns(patterns, context);
 
     auto op = getOperation();
-    (void)mlir::applyPatternsAndFoldGreedily(op, std::move(patterns));
+    if (mlir::failed(
+            mlir::applyPatternsAndFoldGreedily(op, std::move(patterns))))
+      return signalPassFailure();
 
     op->walk([&](mlir::Operation *o) -> mlir::WalkResult {
       if (mlir::isa<mlir::cf::BranchOp, mlir::cf::CondBranchOp>(o)) {
