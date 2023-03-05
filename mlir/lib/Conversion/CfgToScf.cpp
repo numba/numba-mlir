@@ -733,13 +733,18 @@ static bool restructureLoop(mlir::PatternRewriter &rewriter, SCC::Node &node) {
   auto numInMultiplexVars = inEdges.size() - 1;
   mlir::Block *multiplexEntryBlock = nullptr;
   auto loc = rewriter.getUnknownLoc();
+  auto createBlock = [&](mlir::TypeRange types = std::nullopt) -> mlir::Block* {
+    llvm::SmallVector<mlir::Location> locs(types.size(), loc);
+    return rewriter.createBlock(region, {}, types, locs);
+  };
+
   {
     llvm::SmallVector<mlir::Type> entryBlockTypes(numInMultiplexVars, boolType);
     for (auto inEdge : inEdges) {
       auto edgeArgs = inEdge.second->getArgumentTypes();
       entryBlockTypes.append(edgeArgs.begin(), edgeArgs.end());
     }
-    multiplexEntryBlock = rewriter.createBlock(region, {}, entryBlockTypes);
+    multiplexEntryBlock = createBlock(entryBlockTypes);
     mlir::ValueRange entryBlockArgs =
         multiplexEntryBlock->getArguments().drop_front(numInMultiplexVars);
 
@@ -760,7 +765,7 @@ static bool restructureLoop(mlir::PatternRewriter &rewriter, SCC::Node &node) {
         rewriter.create<mlir::cf::CondBranchOp>(loc, cond, dst, args, lastDst,
                                                 falseArgs);
       } else {
-        nextBlock = rewriter.createBlock(region);
+        nextBlock = createBlock();
         rewriter.create<mlir::cf::CondBranchOp>(loc, cond, dst, args, nextBlock,
                                                 mlir::ValueRange{});
         currentBlock = nextBlock;
@@ -771,7 +776,7 @@ static bool restructureLoop(mlir::PatternRewriter &rewriter, SCC::Node &node) {
 
   llvm::SmallVector<mlir::Value> branchArgs;
   for (auto [i, inEdge] : llvm::enumerate(inEdges)) {
-    auto entryBlock = rewriter.createBlock(region);
+    auto entryBlock = createBlock();
     rewriter.setInsertionPointToStart(entryBlock);
     branchArgs.clear();
     for (auto j : llvm::seq<size_t>(0, numInMultiplexVars)) {
@@ -811,8 +816,8 @@ static bool restructureLoop(mlir::PatternRewriter &rewriter, SCC::Node &node) {
       auto edgeArgs = outEdge.second->getArgumentTypes();
       repBlockTypes.append(edgeArgs.begin(), edgeArgs.end());
     }
-    auto repBlock = rewriter.createBlock(region, {}, repBlockTypes);
-    exitBlock = rewriter.createBlock(region);
+    auto repBlock = createBlock(repBlockTypes);
+    exitBlock = createBlock();
     rewriter.setInsertionPointToStart(repBlock);
     mlir::Value cond = repBlock->getArgument(0);
     auto repBlockArgs =
@@ -826,7 +831,7 @@ static bool restructureLoop(mlir::PatternRewriter &rewriter, SCC::Node &node) {
 
     llvm::SmallVector<mlir::Value> branchArgs;
     for (auto [i, repEdge] : llvm::enumerate(repetitionEdges)) {
-      auto preRepBlock = rewriter.createBlock(region);
+      auto preRepBlock = createBlock();
       rewriter.setInsertionPointToStart(preRepBlock);
       mlir::Value trueVal =
           rewriter.create<mlir::arith::ConstantIntOp>(loc, 1, boolType);
@@ -864,7 +869,7 @@ static bool restructureLoop(mlir::PatternRewriter &rewriter, SCC::Node &node) {
     }
 
     for (auto [i, outEdge] : llvm::enumerate(outEdges)) {
-      auto preRepBlock = rewriter.createBlock(region);
+      auto preRepBlock = createBlock();
       rewriter.setInsertionPointToStart(preRepBlock);
       mlir::Value falseVal =
           rewriter.create<mlir::arith::ConstantIntOp>(loc, 0, boolType);
@@ -919,7 +924,7 @@ static bool restructureLoop(mlir::PatternRewriter &rewriter, SCC::Node &node) {
       rewriter.create<mlir::cf::CondBranchOp>(loc, cond, dst, args, lastDst,
                                               falseArgs);
     } else {
-      nextBlock = rewriter.createBlock(region);
+      nextBlock = createBlock();
       rewriter.create<mlir::cf::CondBranchOp>(loc, cond, dst, args, nextBlock,
                                               mlir::ValueRange{});
       currentBlock = nextBlock;
