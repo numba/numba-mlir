@@ -727,11 +727,23 @@ static void initMultiplexConds(mlir::PatternRewriter &rewriter,
   assert(numBlocks > 0);
   assert(currentBlock < numBlocks);
   auto boolType = rewriter.getI1Type();
+  auto trueVal = rewriter.create<mlir::arith::ConstantIntOp>(loc, 1, boolType);
+  auto falseVal = rewriter.create<mlir::arith::ConstantIntOp>(loc, 0, boolType);
   for (auto j : llvm::seq<size_t>(0, numBlocks - 1)) {
-    auto val = static_cast<int64_t>(j == currentBlock);
-    mlir::Value cond =
-        rewriter.create<mlir::arith::ConstantIntOp>(loc, val, boolType);
-    res.emplace_back(cond);
+    auto val = (j == currentBlock ? trueVal : falseVal);
+    res.emplace_back(val);
+  }
+}
+
+static void initUndefMultiplexConds(mlir::PatternRewriter &rewriter,
+                                    mlir::Location loc, size_t numBlocks,
+                                    llvm::SmallVectorImpl<mlir::Value> &res) {
+  assert(numBlocks > 0);
+  auto boolType = rewriter.getI1Type();
+  auto undefVal = rewriter.create<numba::util::UndefOp>(loc, boolType);
+  for (auto j : llvm::seq<size_t>(0, numBlocks - 1)) {
+    (void)j;
+    res.emplace_back(undefVal);
   }
 }
 
@@ -888,16 +900,11 @@ static bool restructureLoop(mlir::PatternRewriter &rewriter, SCC::Node &node) {
       rewriter.setInsertionPointToStart(preRepBlock);
       mlir::Value trueVal =
           rewriter.create<mlir::arith::ConstantIntOp>(loc, 1, boolType);
-      mlir::Value undefVal =
-          rewriter.create<numba::util::UndefOp>(loc, boolType);
 
       branchArgs.clear();
       branchArgs.emplace_back(trueVal);
-      for (auto j : llvm::seq<size_t>(0, numOutMultiplexVars)) {
-        (void)j;
-        branchArgs.emplace_back(undefVal);
-      }
 
+      initUndefMultiplexConds(rewriter, loc, outEdges.size(), branchArgs);
       initMultiplexVars(rewriter, loc, i, repetitionEdges, branchArgs);
 
       for (auto type : llvm::ArrayRef(repBlockTypes)
