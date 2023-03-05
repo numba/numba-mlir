@@ -741,12 +741,11 @@ static void initMultiplexVars(mlir::PatternRewriter &rewriter,
                               llvm::SmallVectorImpl<mlir::Value> &res) {
   assert(currentBlock < edges.size());
   for (auto [j, edge] : llvm::enumerate(edges)) {
-    auto args = getEdgeArgs(edge);
+    mlir::ValueRange args = getEdgeArgs(edge);
     if (j == currentBlock) {
       res.append(args.begin(), args.end());
     } else {
-      for (auto arg : args) {
-        auto type = arg.getType();
+      for (auto type : args.getTypes()) {
         mlir::Value init = rewriter.create<numba::util::UndefOp>(loc, type);
         res.emplace_back(init);
       }
