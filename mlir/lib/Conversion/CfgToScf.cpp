@@ -965,6 +965,22 @@ static bool isEntryBlock(mlir::Block &block) {
   return &(region->front()) == &block;
 }
 
+static mlir::LogicalResult runLoopRestructuring(mlir::PatternRewriter &rewriter,
+                                                mlir::Region &region) {
+  llvm::errs() << "Build scc\n";
+  auto scc = buildSCC(region);
+  if (!scc)
+    return mlir::failure();
+
+  scc->dump();
+
+  bool changed = false;
+  for (auto &node : scc->nodes)
+    changed = restructureLoop(rewriter, node) || changed;
+
+  return mlir::success(changed);
+}
+
 struct LoopRestructuringBr : public mlir::OpRewritePattern<mlir::cf::BranchOp> {
   // Set low benefit, so all if simplifications will run first.
   LoopRestructuringBr(mlir::MLIRContext *context)
@@ -978,21 +994,25 @@ struct LoopRestructuringBr : public mlir::OpRewritePattern<mlir::cf::BranchOp> {
     if (!isEntryBlock(*block))
       return mlir::failure();
 
-    llvm::errs() << "Build scc\n";
-    auto scc = buildSCC(*block->getParent());
-    if (!scc)
+    return runLoopRestructuring(rewriter, *block->getParent());
+  }
+};
+
+struct LoopRestructuringCondBr
+    : public mlir::OpRewritePattern<mlir::cf::CondBranchOp> {
+  // Set low benefit, so all if simplifications will run first.
+  LoopRestructuringCondBr(mlir::MLIRContext *context)
+      : mlir::OpRewritePattern<mlir::cf::CondBranchOp>(context,
+                                                       /*benefit*/ 0) {}
+
+  mlir::LogicalResult
+  matchAndRewrite(mlir::cf::CondBranchOp op,
+                  mlir::PatternRewriter &rewriter) const override {
+    auto block = op->getBlock();
+    if (!isEntryBlock(*block))
       return mlir::failure();
 
-    scc->dump();
-
-    auto f = op->getParentOfType<mlir::func::FuncOp>();
-    bool changed = false;
-    for (auto &node : scc->nodes)
-      changed = restructureLoop(rewriter, node) || changed;
-
-    llvm::errs() << "-=-=-=-=-=-=-=-\n";
-    f->dump();
-    return mlir::success(changed);
+    return runLoopRestructuring(rewriter, *block->getParent());
   }
 };
 
@@ -1207,7 +1227,8 @@ struct CFGToSCFPass
         // clang-format off
 //        BreakRewrite,
         ScfIfRewriteOneExit,
-        LoopRestructuringBr
+        LoopRestructuringBr,
+        LoopRestructuringCondBr
 //        ScfIfRewriteTwoExits,
 //        ScfWhileRewrite,
 //        CondBranchSameTargetRewrite
