@@ -966,7 +966,10 @@ static bool isEntryBlock(mlir::Block &block) {
 }
 
 struct LoopRestructuringBr : public mlir::OpRewritePattern<mlir::cf::BranchOp> {
-  using OpRewritePattern::OpRewritePattern;
+  // Set low benefit, so all if simplifications will run first.
+  LoopRestructuringBr(mlir::MLIRContext *context)
+      : mlir::OpRewritePattern<mlir::cf::BranchOp>(context,
+                                                   /*benefit*/ 0) {}
 
   mlir::LogicalResult
   matchAndRewrite(mlir::cf::BranchOp op,
