@@ -615,7 +615,7 @@ static void strongconnect(mlir::Block *block,
 
 /// SCC construction algorithm from
 /// https://en.wikipedia.org/wiki/Tarjan%27s_strongly_connected_components_algorithm
-static std::optional<SCC> buildSCC(mlir::Region &region) {
+static SCC buildSCC(mlir::Region &region) {
   SCC scc;
 
   llvm::SmallDenseMap<mlir::Block *, BlockDesc> blocks;
@@ -969,13 +969,11 @@ static mlir::LogicalResult runLoopRestructuring(mlir::PatternRewriter &rewriter,
                                                 mlir::Region &region) {
   llvm::errs() << "Build scc\n";
   auto scc = buildSCC(region);
-  if (!scc)
-    return mlir::failure();
 
-  scc->dump();
+  scc.dump();
 
   bool changed = false;
-  for (auto &node : scc->nodes)
+  for (auto &node : scc.nodes)
     changed = restructureLoop(rewriter, node) || changed;
 
   return mlir::success(changed);
