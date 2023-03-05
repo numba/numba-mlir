@@ -596,14 +596,13 @@ static void strongconnect(mlir::Block *block,
 
 /// SCC construction algorithm from
 /// https://en.wikipedia.org/wiki/Tarjan%27s_strongly_connected_components_algorithm
-static std::optional<SCC> buildSCC(mlir::Block &entryBlock) {
+static std::optional<SCC> buildSCC(mlir::Region &region) {
   SCC scc;
 
   llvm::SmallDenseMap<mlir::Block *, BlockDesc> blocks;
   llvm::SmallVector<mlir::Block *> stack;
   int index = 0;
-  auto region = entryBlock.getParent();
-  for (auto &block : region->getBlocks())
+  for (auto &block : region)
     strongconnect(&block, blocks, stack, index, scc);
 
   return scc;
@@ -953,7 +952,7 @@ struct LoopRestructuringBr : public mlir::OpRewritePattern<mlir::cf::BranchOp> {
       return mlir::failure();
 
     llvm::errs() << "Build scc\n";
-    auto scc = buildSCC(*block);
+    auto scc = buildSCC(*block->getParent());
     if (!scc)
       return mlir::failure();
 
