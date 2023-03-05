@@ -1235,10 +1235,12 @@ struct CFGToSCFPass
 
     context->getLoadedDialect<mlir::cf::ControlFlowDialect>()
         ->getCanonicalizationPatterns(patterns);
+
     mlir::cf::BranchOp::getCanonicalizationPatterns(patterns, context);
     mlir::cf::CondBranchOp::getCanonicalizationPatterns(patterns, context);
-
     mlir::scf::ExecuteRegionOp::getCanonicalizationPatterns(patterns, context);
+    mlir::scf::IfOp::getCanonicalizationPatterns(patterns, context);
+    mlir::scf::WhileOp::getCanonicalizationPatterns(patterns, context);
 
     auto op = getOperation();
     (void)mlir::applyPatternsAndFoldGreedily(op, std::move(patterns));
