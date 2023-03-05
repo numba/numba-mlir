@@ -938,8 +938,7 @@ static bool restructureLoop(mlir::PatternRewriter &rewriter, SCC::Node &node) {
       branchArgs.emplace_back(falseVal);
       initMultiplexConds(rewriter, loc, i, outEdges.size(), branchArgs);
 
-      for (auto type :
-           llvm::ArrayRef(repBlockTypes).drop_front(1).take_front(numRepArgs)) {
+      for (auto type : repetitionArgs.getTypes()) {
         mlir::Value val = rewriter.create<numba::util::UndefOp>(loc, type);
         branchArgs.emplace_back(val);
       }
