@@ -692,16 +692,24 @@ static void generateMultiplexedBranches(mlir::PatternRewriter &rewriter,
                                         mlir::ValueRange srcArgs,
                                         llvm::ArrayRef<Edge> edges) {
   assert(srcBlock);
+  assert(!edges.empty());
   mlir::OpBuilder::InsertionGuard g(rewriter);
-  mlir::Block *currentBlock = srcBlock;
   auto region = srcBlock->getParent();
   auto numMultiplexVars = edges.size() - 1;
   assert(multiplexArgs.size() == numMultiplexVars);
+  if (edges.size() == 1) {
+    rewriter.setInsertionPointToEnd(srcBlock);
+    auto dst = edges.front().second;
+    rewriter.create<mlir::cf::BranchOp>(loc, dst, srcArgs);
+    return;
+  }
+
+  mlir::Block *currentBlock = srcBlock;
   for (auto [i, edge] : llvm::enumerate(edges.drop_back())) {
     auto dst = edge.second;
     auto numArgs = dst->getNumArguments();
     auto args = srcArgs.take_front(numArgs);
-    rewriter.setInsertionPointToStart(currentBlock);
+    rewriter.setInsertionPointToEnd(currentBlock);
     auto cond = multiplexArgs[i];
     if (i == numMultiplexVars - 1) {
       auto lastEdge = edges.back();
@@ -711,7 +719,10 @@ static void generateMultiplexedBranches(mlir::PatternRewriter &rewriter,
       rewriter.create<mlir::cf::CondBranchOp>(loc, cond, dst, args, lastDst,
                                               falseArgs);
     } else {
-      mlir::Block *nextBlock = rewriter.createBlock(region);
+      auto nextBlock = [&]() -> mlir::Block * {
+        mlir::OpBuilder::InsertionGuard g(rewriter);
+        return rewriter.createBlock(region);
+      }();
       rewriter.create<mlir::cf::CondBranchOp>(loc, cond, dst, args, nextBlock,
                                               mlir::ValueRange{});
       currentBlock = nextBlock;
