@@ -733,7 +733,8 @@ static bool restructureLoop(mlir::PatternRewriter &rewriter, SCC::Node &node) {
   auto numInMultiplexVars = inEdges.size() - 1;
   mlir::Block *multiplexEntryBlock = nullptr;
   auto loc = rewriter.getUnknownLoc();
-  auto createBlock = [&](mlir::TypeRange types = std::nullopt) -> mlir::Block* {
+  auto createBlock = [&](mlir::TypeRange types =
+                             std::nullopt) -> mlir::Block * {
     llvm::SmallVector<mlir::Location> locs(types.size(), loc);
     return rewriter.createBlock(region, {}, types, locs);
   };
@@ -858,8 +859,8 @@ static bool restructureLoop(mlir::PatternRewriter &rewriter, SCC::Node &node) {
         }
       }
 
-      for (auto type :
-           llvm::ArrayRef(repBlockTypes).drop_front(numRepArgs + 1)) {
+      for (auto type : llvm::ArrayRef(repBlockTypes)
+                           .drop_front(numRepArgs + numOutMultiplexVars + 1)) {
         mlir::Value val = rewriter.create<numba::util::UndefOp>(loc, type);
         branchArgs.emplace_back(val);
       }
