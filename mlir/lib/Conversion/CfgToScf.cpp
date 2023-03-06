@@ -210,8 +210,10 @@ struct SCC {
   void dump() const {
     for (auto [i, node] : llvm::enumerate(nodes)) {
       llvm::errs() << "scc node " << i << "\n";
-      for (auto b : node.blocks)
+      for (auto b : node.blocks) {
+        llvm::errs() << " block ";
         b->dump();
+      }
     }
   }
 };
