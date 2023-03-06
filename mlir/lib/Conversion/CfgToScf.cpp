@@ -1210,6 +1210,66 @@ struct WhileRemoveDuplicatedResults
   }
 };
 
+// TODO: upstream
+struct WhileRemoveUnusedArgs
+    : public mlir::OpRewritePattern<mlir::scf::WhileOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(mlir::scf::WhileOp op,
+                  mlir::PatternRewriter &rewriter) const override {
+    auto &beforeBlock = op.getBefore().front();
+    auto &afterBlock = op.getAfter().front();
+
+    auto yield = mlir::cast<mlir::scf::YieldOp>(afterBlock.getTerminator());
+
+    llvm::BitVector argsToRemove;
+    llvm::SmallVector<mlir::Value> newInits;
+    llvm::SmallVector<mlir::Value> newYieldArgs;
+
+    bool changed = false;
+    for (auto [arg, init, yieldArg] : llvm::zip(
+             beforeBlock.getArguments(), op.getInits(), yield.getResults())) {
+      bool empty = arg.use_empty();
+      argsToRemove.push_back(empty);
+      if (empty) {
+        changed = true;
+        continue;
+      }
+
+      newInits.emplace_back(init);
+      newYieldArgs.emplace_back(yieldArg);
+    }
+
+    if (!changed)
+      return mlir::failure();
+
+    beforeBlock.eraseArguments(argsToRemove);
+
+    auto emptyBuilder = [](mlir::OpBuilder &, mlir::Location,
+                           mlir::ValueRange) {
+      // Nothing
+    };
+
+    auto loc = op.getLoc();
+    auto newWhileOp = rewriter.create<mlir::scf::WhileOp>(
+        loc, op->getResultTypes(), newInits, emptyBuilder, emptyBuilder);
+    auto &newBeforeBlock = newWhileOp.getBefore().front();
+    auto &newAfterBlock = newWhileOp.getAfter().front();
+
+    mlir::OpBuilder::InsertionGuard g(rewriter);
+    rewriter.setInsertionPoint(yield);
+    rewriter.replaceOpWithNewOp<mlir::scf::YieldOp>(yield, newYieldArgs);
+
+    rewriter.mergeBlocks(&beforeBlock, &newBeforeBlock,
+                         newBeforeBlock.getArguments());
+    rewriter.mergeBlocks(&afterBlock, &newAfterBlock,
+                         newAfterBlock.getArguments());
+    rewriter.replaceOp(op, newWhileOp.getResults());
+    return mlir::success();
+  }
+};
+
 struct CFGToSCFPass
     : public mlir::PassWrapper<CFGToSCFPass, mlir::OperationPass<void>> {
   MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(CFGToSCFPass)
@@ -1232,7 +1292,8 @@ struct CFGToSCFPass
         LoopRestructuringCondBr,
         TailLoopToWhile,
         WhileMoveToAfter,
-        WhileRemoveDuplicatedResults
+        WhileRemoveDuplicatedResults,
+        WhileRemoveUnusedArgs
         // clang-format on
         >(context);
 
