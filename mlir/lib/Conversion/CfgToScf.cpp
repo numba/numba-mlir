@@ -1148,6 +1148,68 @@ struct WhileMoveToAfter : public mlir::OpRewritePattern<mlir::scf::WhileOp> {
   }
 };
 
+// TODO: upstream
+struct WhileRemoveDuplicatedArgs
+    : public mlir::OpRewritePattern<mlir::scf::WhileOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(mlir::scf::WhileOp op,
+                  mlir::PatternRewriter &rewriter) const override {
+    auto &beforeBlock = op.getBefore().front();
+    auto &afterBlock = op.getAfter().front();
+
+    auto condOp =
+        mlir::cast<mlir::scf::ConditionOp>(beforeBlock.getTerminator());
+    auto condOpArgs = condOp.getArgs();
+    llvm::SmallDenseMap<mlir::Value, unsigned> argsMap;
+    llvm::SmallVector<mlir::Value> newArgs;
+    for (auto arg : condOpArgs) {
+      if (!argsMap.count(arg)) {
+        auto pos = static_cast<unsigned>(argsMap.size());
+        argsMap.insert({arg, pos});
+        newArgs.emplace_back(arg);
+      }
+    }
+
+    if (argsMap.size() == condOpArgs.size())
+      return mlir::failure();
+
+    mlir::ValueRange argsRange(newArgs);
+    auto emptyBuilder = [](mlir::OpBuilder &, mlir::Location,
+                           mlir::ValueRange) {
+      // Nothing
+    };
+
+    auto loc = op.getLoc();
+    auto newWhileOp = rewriter.create<mlir::scf::WhileOp>(
+        loc, argsRange.getTypes(), op.getInits(), emptyBuilder, emptyBuilder);
+    auto &newBeforeBlock = newWhileOp.getBefore().front();
+    auto &newAfterBlock = newWhileOp.getAfter().front();
+
+    llvm::SmallVector<mlir::Value> afterArgsMapping;
+    llvm::SmallVector<mlir::Value> resultsMapping;
+    for (auto [i, arg] : llvm::enumerate(condOpArgs)) {
+      auto it = argsMap.find(arg);
+      assert(it != argsMap.end());
+      auto pos = it->second;
+      afterArgsMapping.emplace_back(newAfterBlock.getArgument(pos));
+      resultsMapping.emplace_back(newWhileOp->getResult(pos));
+    }
+
+    mlir::OpBuilder::InsertionGuard g(rewriter);
+    rewriter.setInsertionPoint(condOp);
+    rewriter.replaceOpWithNewOp<mlir::scf::ConditionOp>(
+        condOp, condOp.getCondition(), argsRange);
+
+    rewriter.mergeBlocks(&beforeBlock, &newBeforeBlock,
+                         newBeforeBlock.getArguments());
+    rewriter.mergeBlocks(&afterBlock, &newAfterBlock, afterArgsMapping);
+    rewriter.replaceOp(op, resultsMapping);
+    return mlir::success();
+  }
+};
+
 struct CFGToSCFPass
     : public mlir::PassWrapper<CFGToSCFPass, mlir::OperationPass<void>> {
   MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(CFGToSCFPass)
@@ -1169,7 +1231,8 @@ struct CFGToSCFPass
         LoopRestructuringBr,
         LoopRestructuringCondBr,
         TailLoopToWhile,
-        WhileMoveToAfter
+        WhileMoveToAfter,
+        WhileRemoveDuplicatedArgs
         // clang-format on
         >(context);
 
