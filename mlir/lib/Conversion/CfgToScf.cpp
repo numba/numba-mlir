@@ -471,6 +471,166 @@ static bool isStructuredLoop(llvm::ArrayRef<Edge> inEdges,
          (succeccor2 == inBlock && succeccor1 != inBlock);
 }
 
+static void visitBlock(mlir::Block *block, mlir::Block *begin, mlir::Block *end,
+                       llvm::SmallSetVector<mlir::Block *, 8> &blocks) {
+  assert(block);
+  assert(begin);
+  assert(end);
+  if (block == begin || block == end)
+    return;
+
+  if (blocks.count(block))
+    return;
+
+  blocks.insert(block);
+  for (auto successor : block->getSuccessors())
+    visitBlock(successor, begin, end, blocks);
+}
+
+static auto collectBlocks(mlir::Block *begin, mlir::Block *end) {
+  assert(begin);
+  assert(end);
+
+  llvm::SmallSetVector<mlir::Block *, 8> blocks;
+  for (auto successor : begin->getSuccessors())
+    visitBlock(successor, begin, end, blocks);
+
+  return blocks.takeVector();
+}
+
+static llvm::SmallVector<mlir::Value>
+getDefinedValues(llvm::ArrayRef<mlir::Block *> blocks) {
+  llvm::SmallVector<mlir::Value> ret;
+  auto checkVal = [&](mlir::Value val) {
+    for (auto block : blocks) {
+      if (val.isUsedOutsideOfBlock(block)) {
+        ret.emplace_back(val);
+        return;
+      }
+    }
+  };
+
+  for (auto block : blocks) {
+    for (auto arg : block->getArguments())
+      checkVal(arg);
+
+    for (auto &op : block->without_terminator())
+      for (auto res : op.getResults())
+        checkVal(res);
+  }
+  return ret;
+}
+
+static void wrapIntoRegion(mlir::PatternRewriter &rewriter,
+                           mlir::Block *entryBlock, mlir::Block *exitBlock) {
+  assert(entryBlock);
+  assert(exitBlock);
+  assert(entryBlock->getParent() == exitBlock->getParent());
+  mlir::OpBuilder::InsertionGuard g(rewriter);
+
+  auto loc = rewriter.getUnknownLoc();
+  llvm::SmallVector<mlir::Location> locs(entryBlock->getNumArguments(), loc);
+  auto newBlock = rewriter.createBlock(entryBlock->getParent(), {},
+                                       entryBlock->getArgumentTypes(), locs);
+
+  auto blocks = collectBlocks(entryBlock, exitBlock);
+  blocks.emplace_back(entryBlock);
+  blocks.emplace_back(exitBlock);
+
+  auto definedValues = getDefinedValues(blocks);
+  blocks.pop_back_n(2);
+  mlir::ValueRange definedValuesRange(definedValues);
+  auto definedValuesTypes = definedValuesRange.getTypes();
+
+  auto exitArgs = exitBlock->getArgumentTypes();
+  llvm::SmallVector<mlir::Type> regionTypes(exitArgs.begin(), exitArgs.end());
+  regionTypes.append(definedValuesTypes.begin(), definedValuesTypes.end());
+
+  auto regionOp = rewriter.create<mlir::scf::ExecuteRegionOp>(loc, regionTypes);
+  auto &newRegion = regionOp.getRegion();
+  auto regionOpResults = regionOp.getResults();
+
+  auto regionEntryBlock = rewriter.createBlock(&newRegion);
+
+  mlir::IRMapping mapping;
+
+  auto updatePredecessors = [&](mlir::Block *block) {
+    for (auto predecessor :
+         llvm::make_early_inc_range(block->getPredecessors())) {
+      auto term = predecessor->getTerminator();
+      rewriter.setInsertionPoint(term);
+      rewriter.clone(*term, mapping);
+      rewriter.eraseOp(term);
+    }
+  };
+
+  mapping.map(entryBlock, newBlock);
+  mapping.map(entryBlock->getArguments(), newBlock->getArguments());
+
+  llvm::SmallVector<mlir::Block *> newBlocks;
+  for (auto block : blocks) {
+    locs.resize(block->getNumArguments(), loc);
+    auto newBlock =
+        rewriter.createBlock(&newRegion, {}, block->getArgumentTypes(), locs);
+    mapping.map(block, newBlock);
+    mapping.map(block->getArguments(), newBlock->getArguments());
+    updatePredecessors(block);
+    newBlocks.emplace_back(newBlock);
+  }
+
+  locs.resize(exitBlock->getNumArguments(), loc);
+  auto regionExitBlock =
+      rewriter.createBlock(&newRegion, {}, exitBlock->getArgumentTypes(), locs);
+
+  mapping.map(exitBlock, regionExitBlock);
+  mapping.map(exitBlock->getArguments(), regionExitBlock->getArguments());
+
+  auto regionExitArgs = regionExitBlock->getArguments();
+  llvm::SmallVector<mlir::Value> yieldArgs(regionExitArgs.begin(),
+                                           regionExitArgs.end());
+  for (auto val : definedValues) {
+    auto newVal = mapping.lookupOrDefault(val);
+    yieldArgs.emplace_back(newVal);
+  }
+
+  for (auto [oldVal, newVal] : llvm::zip(
+           definedValues, regionOpResults.take_back(definedValues.size()))) {
+    for (auto &use : oldVal.getUses()) {
+      auto owner = use.getOwner();
+      if (regionOp->isAncestor(owner))
+        continue;
+
+      auto ownerBlock = owner->getBlock();
+      if (llvm::find(blocks, ownerBlock) != blocks.end())
+        continue;
+
+      mlir::Value val = newVal;
+      rewriter.updateRootInPlace(owner, [&]() { use.set(val); });
+    }
+  }
+
+  for (auto [oldBlock, newBlock] : llvm::zip(blocks, newBlocks))
+    rewriter.mergeBlocks(oldBlock, newBlock, newBlock->getArguments());
+
+  rewriter.setInsertionPointToEnd(regionExitBlock);
+  rewriter.create<mlir::scf::YieldOp>(loc, yieldArgs);
+
+  rewriter.setInsertionPointToStart(regionEntryBlock);
+  rewriter.clone(*entryBlock->getTerminator(), mapping);
+
+  mapping.map(exitBlock->getArguments(),
+              regionOpResults.drop_back(definedValues.size()));
+
+  updatePredecessors(entryBlock);
+  updatePredecessors(exitBlock);
+
+  rewriter.setInsertionPointToEnd(newBlock);
+  auto exitTerm = exitBlock->getTerminator();
+  rewriter.clone(*exitTerm, mapping);
+
+  eraseBlocks(rewriter, {entryBlock, exitBlock});
+}
+
 /// Restructure loop into tail-controlled form according to algorithm described
 /// in https://dl.acm.org/doi/pdf/10.1145/2693261
 ///
@@ -567,6 +727,7 @@ static bool restructureLoop(mlir::PatternRewriter &rewriter, SCC::Node &node) {
 
   mlir::ValueRange repMultiplexVars;
   mlir::ValueRange exitArgs;
+  mlir::Block *repBlock = nullptr;
   mlir::Block *exitBlock = nullptr;
   auto numOutMultiplexVars = outEdges.size() - 1;
   {
@@ -577,7 +738,7 @@ static bool restructureLoop(mlir::PatternRewriter &rewriter, SCC::Node &node) {
 
     addTypesFromEdges(outEdges, repBlockTypes);
 
-    auto repBlock = createBlock(repBlockTypes);
+    repBlock = createBlock(repBlockTypes);
     exitBlock = createBlock();
 
     mlir::Value cond = repBlock->getArgument(0);
@@ -643,6 +804,8 @@ static bool restructureLoop(mlir::PatternRewriter &rewriter, SCC::Node &node) {
   generateMultiplexedBranches(rewriter, loc, exitBlock, repMultiplexVars,
                               exitArgs, outEdges);
 
+  wrapIntoRegion(rewriter, multiplexEntryBlock, repBlock);
+
   return true;
 }
 
@@ -701,23 +864,6 @@ struct LoopRestructuringCondBr
   }
 };
 
-static llvm::SmallVector<mlir::Value> getDefinedValues(mlir::Block &block) {
-  llvm::SmallVector<mlir::Value> ret;
-  auto checkVal = [&](mlir::Value val) {
-    if (val.isUsedOutsideOfBlock(&block))
-      ret.emplace_back(val);
-  };
-
-  for (auto arg : block.getArguments())
-    checkVal(arg);
-
-  for (auto &op : block.without_terminator())
-    for (auto res : op.getResults())
-      checkVal(res);
-
-  return ret;
-}
-
 struct TailLoopToWhile : public mlir::OpRewritePattern<mlir::cf::BranchOp> {
   using OpRewritePattern::OpRewritePattern;
 
@@ -745,7 +891,7 @@ struct TailLoopToWhile : public mlir::OpRewritePattern<mlir::cf::BranchOp> {
       mlir::ValueRange exitArgs = reverse ? bodyBr.getTrueDestOperands()
                                           : bodyBr.getFalseDestOperands();
 
-      llvm::SmallVector<mlir::Value> toReplace = getDefinedValues(*bodyBlock);
+      llvm::SmallVector<mlir::Value> toReplace = getDefinedValues(bodyBlock);
 
       mlir::IRMapping mapping;
       auto beforeBuilder = [&](mlir::OpBuilder &builder, mlir::Location loc,
