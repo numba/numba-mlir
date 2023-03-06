@@ -201,23 +201,22 @@ llvm::SmallVector<mlir::scf::ForOp, 2> numba::lowerWhileToFor(
   };
 
   builder.setInsertionPoint(whileOp);
-  auto stepSign = builder.createOrFold<mlir::arith::CmpIOp>(
-      loc, mlir::arith::CmpIPredicate::sge, origStep, getZeroIndex());
 
   auto loopResults = [&]() -> mlir::ValueRange {
-    auto ind = getConstVal<mlir::IntegerAttr>(stepSign);
+    auto ind = mlir::getConstantIntValue(origStep);
     auto resTypes = whileOp.getOperands().getTypes();
-    if (!ind)
-      return builder
-          .create<mlir::scf::IfOp>(loc, stepSign, getIfBodyBuilder(true),
-                                   getIfBodyBuilder(false))
-          .getResults();
+    if (!ind) {
+      mlir::Value stepSign = builder.create<mlir::arith::CmpIOp>(
+          loc, mlir::arith::CmpIPredicate::sge, origStep, getZeroIndex());
+      auto ifOp = builder.create<mlir::scf::IfOp>(
+          loc, stepSign, getIfBodyBuilder(true), getIfBodyBuilder(false));
+      return ifOp.getResults();
+    }
 
     auto reg = builder.create<mlir::scf::ExecuteRegionOp>(loc, resTypes);
-    auto &regBlock = reg.getRegion().emplaceBlock();
     mlir::OpBuilder::InsertionGuard g(builder);
-    builder.setInsertionPointToStart(&regBlock);
-    getIfBodyBuilder(ind.getValue() != 0)(builder, loc);
+    builder.createBlock(&reg.getRegion());
+    getIfBodyBuilder (*ind >= 0)(builder, loc);
     return reg.getResults();
   }();
 
@@ -232,17 +231,16 @@ llvm::SmallVector<mlir::scf::ForOp, 2> numba::lowerWhileToFor(
           auto newRes = loopResults[static_cast<unsigned>(i)];
           newRes = builder.createOrFold<plier::CastOp>(loc, oldRes.getType(),
                                                        newRes);
-          oldRes.replaceAllUsesWith(newRes);
+          builder.replaceAllUsesWith(oldRes, newRes);
           break;
         }
       }
-      if (pairfirst && skipCasts(operand) == pairfirst &&
-          !oldRes.getUsers().empty()) {
+      if (pairfirst && skipCasts(operand) == pairfirst && !oldRes.use_empty()) {
         auto val = getLastIterValue(builder, loc, origLowerBound,
                                     origUpperBound, origStep);
         auto newRes =
             builder.createOrFold<plier::CastOp>(loc, oldRes.getType(), val);
-        oldRes.replaceAllUsesWith(newRes);
+        builder.replaceAllUsesWith(oldRes, newRes);
       }
       assert(oldRes.getUsers().empty());
     }
