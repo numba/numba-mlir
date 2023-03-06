@@ -310,11 +310,14 @@ static mlir::ValueRange getTerminatorArgs(mlir::Operation *term,
 
 static mlir::ValueRange getEdgeArgs(Edge edge) {
   auto term = edge.first->getTerminator();
-  return getTerminatorArgs(term, edge.second);
+  auto args = getTerminatorArgs(term, edge.second);
+  assert(args.size() == edge.second->getNumArguments());
+  return args;
 }
 
 static void replaceEdgeDest(mlir::PatternRewriter &rewriter, Edge edge,
                             mlir::Block *newDest, mlir::ValueRange newArgs) {
+  assert(newDest->getNumArguments() == newArgs.size());
   auto term = edge.first->getTerminator();
   mlir::OpBuilder::InsertionGuard g(rewriter);
   rewriter.setInsertionPoint(term);
@@ -370,6 +373,7 @@ static void generateMultiplexedBranches(mlir::PatternRewriter &rewriter,
   if (edges.size() == 1) {
     rewriter.setInsertionPointToEnd(srcBlock);
     auto dst = edges.front().second;
+    assert(dst->getNumArguments() == srcArgs.size());
     rewriter.create<mlir::cf::BranchOp>(loc, dst, srcArgs);
     return;
   }
@@ -379,13 +383,14 @@ static void generateMultiplexedBranches(mlir::PatternRewriter &rewriter,
     auto dst = edge.second;
     auto numArgs = dst->getNumArguments();
     auto args = srcArgs.take_front(numArgs);
+    assert(dst->getNumArguments() == args.size());
     rewriter.setInsertionPointToEnd(currentBlock);
     auto cond = multiplexArgs[i];
     if (i == numMultiplexVars - 1) {
       auto lastEdge = edges.back();
       auto lastDst = lastEdge.second;
       auto falseArgs = srcArgs.drop_front(numArgs);
-      assert(falseArgs.size() == lastDst->getNumArguments());
+      assert(lastDst->getNumArguments() == falseArgs.size());
       rewriter.create<mlir::cf::CondBranchOp>(loc, cond, dst, args, lastDst,
                                               falseArgs);
     } else {
@@ -393,6 +398,7 @@ static void generateMultiplexedBranches(mlir::PatternRewriter &rewriter,
         mlir::OpBuilder::InsertionGuard g(rewriter);
         return rewriter.createBlock(region);
       }();
+      assert(nextBlock->getNumArguments() == 0);
       rewriter.create<mlir::cf::CondBranchOp>(loc, cond, dst, args, nextBlock,
                                               mlir::ValueRange{});
       currentBlock = nextBlock;
