@@ -1043,8 +1043,24 @@ struct WhileMoveToAfter : public mlir::OpRewritePattern<mlir::scf::WhileOp> {
       return mlir::failure();
     }
 
+    auto otherBlock = inverse ? ifOp.thenBlock() : ifOp.elseBlock();
+    auto otherBlockRegion = otherBlock->getParent();
+    auto otherTerm =
+        mlir::cast<mlir::scf::YieldOp>(otherBlock->getTerminator());
+
+    for (auto arg : otherTerm.getResults()) {
+      if (arg.getDefiningOp<numba::util::UndefOp>())
+        continue;
+
+      if (!otherBlockRegion->isAncestor(arg.getParentRegion()))
+        continue;
+
+      return mlir::failure();
+    }
+
     auto ifBlock = inverse ? ifOp.elseBlock() : ifOp.thenBlock();
     auto ifBlockRegion = ifBlock->getParent();
+    auto term = mlir::cast<mlir::scf::YieldOp>(ifBlock->getTerminator());
 
     llvm::SmallVector<mlir::Value> definedOutside;
     ifBlock->walk([&](mlir::Operation *innerOp) {
@@ -1073,22 +1089,28 @@ struct WhileMoveToAfter : public mlir::OpRewritePattern<mlir::scf::WhileOp> {
     for (auto &op : ifBlock->without_terminator())
       rewriter.clone(op, mapping);
 
-    auto term = mlir::cast<mlir::scf::YieldOp>(ifBlock->getTerminator());
-    for (auto [termVal, ifVal] :
-         llvm::zip(term.getResults(), ifOp.getResults())) {
-      for (auto &use : ifVal.getUses()) {
+    for (auto [res, yieldRes] :
+         llvm::zip(ifOp.getResults(), term.getResults())) {
+      for (auto &use : res.getUses()) {
         assert(use.getOwner() == condOp);
-        assert(use.getOperandNumber() < oldArgs.size());
-        rewriter.replaceAllUsesWith(oldArgs[use.getOperandNumber()],
-                                    mapping.lookupOrDefault(termVal));
+        assert(use.getOperandNumber() > 0);
+        auto idx = use.getOperandNumber() - 1; // skip condition
+        assert(idx < oldArgs.size());
+        mlir::Value newVal = mapping.lookupOrDefault(yieldRes);
+        rewriter.replaceAllUsesWith(oldArgs[idx], newVal);
       }
     }
 
     rewriter.setInsertionPoint(condOp);
-    for (auto res : ifOp.getResults()) {
-      mlir::Value undef =
-          rewriter.create<numba::util::UndefOp>(loc, res.getType());
-      rewriter.replaceAllUsesWith(res, undef);
+    for (auto [res, otherRes] :
+         llvm::zip(ifOp.getResults(), otherTerm.getResults())) {
+      if (otherRes.getDefiningOp<numba::util::UndefOp>()) {
+        mlir::Value undef =
+            rewriter.create<numba::util::UndefOp>(loc, res.getType());
+        rewriter.replaceAllUsesWith(res, undef);
+      } else {
+        rewriter.replaceAllUsesWith(res, otherRes);
+      }
     }
 
     rewriter.eraseOp(ifOp);
@@ -1121,6 +1143,7 @@ struct WhileMoveToAfter : public mlir::OpRewritePattern<mlir::scf::WhileOp> {
                          newAfterBlock.getArguments());
     rewriter.replaceOp(op, newWhile.getResults().take_front(condArgs.size()));
 
+    mlir::verify(newWhile->getParentOfType<mlir::func::FuncOp>());
     return mlir::success();
   }
 };
