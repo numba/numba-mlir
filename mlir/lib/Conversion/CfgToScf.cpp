@@ -1149,7 +1149,7 @@ struct WhileMoveToAfter : public mlir::OpRewritePattern<mlir::scf::WhileOp> {
 };
 
 // TODO: upstream
-struct WhileRemoveDuplicatedArgs
+struct WhileRemoveDuplicatedResults
     : public mlir::OpRewritePattern<mlir::scf::WhileOp> {
   using OpRewritePattern::OpRewritePattern;
 
@@ -1232,7 +1232,7 @@ struct CFGToSCFPass
         LoopRestructuringCondBr,
         TailLoopToWhile,
         WhileMoveToAfter,
-        WhileRemoveDuplicatedArgs
+        WhileRemoveDuplicatedResults
         // clang-format on
         >(context);
 
