@@ -445,6 +445,31 @@ static void initMultiplexVars(mlir::PatternRewriter &rewriter,
   }
 }
 
+static bool isStructuredLoop(llvm::ArrayRef<Edge> inEdges,
+                             llvm::ArrayRef<Edge> outEdges,
+                             llvm::ArrayRef<Edge> repEdges) {
+  if (inEdges.empty())
+    return false;
+
+  if (outEdges.size() != 1)
+    return false;
+
+  auto outBlock = outEdges.front().first;
+  auto inBlock = inEdges.front().second;
+  for (auto edge : inEdges.drop_front()) {
+    if (edge.second != inBlock)
+      return false;
+  }
+
+  if (outBlock->getNumSuccessors() != 2)
+    return false;
+
+  auto succeccor1 = outBlock->getSuccessor(0);
+  auto succeccor2 = outBlock->getSuccessor(1);
+  return (succeccor1 == inBlock && succeccor2 != inBlock) ||
+         (succeccor2 == inBlock && succeccor1 != inBlock);
+}
+
 /// Restructure loop into tail-controlled form according to algorithm described
 /// in https://dl.acm.org/doi/pdf/10.1145/2693261
 ///
@@ -503,14 +528,8 @@ static bool restructureLoop(mlir::PatternRewriter &rewriter, SCC::Node &node) {
   }
 
   // Check if we are already in structured form.
-  if (inEdges.size() == 1 && outEdges.size() == 1) {
-    if (outEdges.front().first->getNumSuccessors() == 2) {
-      auto inBlock = inEdges.front().second;
-      auto successors = outEdges.front().first->getSuccessors();
-      if (successors[0] == inBlock || successors[1] == inBlock)
-        return false;
-    }
-  }
+  if (isStructuredLoop(inEdges, outEdges, repetitionEdges))
+    return false;
 
   auto boolType = rewriter.getI1Type();
   auto numInMultiplexVars = inEdges.size() - 1;
