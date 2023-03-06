@@ -298,12 +298,16 @@ static mlir::ValueRange getTerminatorArgs(mlir::Operation *term,
                                           mlir::Block *target) {
   assert(term);
   assert(target);
-  if (auto br = mlir::dyn_cast<mlir::cf::BranchOp>(term))
+  if (auto br = mlir::dyn_cast<mlir::cf::BranchOp>(term)) {
+    assert(target == br.getDest());
     return br.getDestOperands();
+  }
 
-  if (auto condBr = mlir::dyn_cast<mlir::cf::CondBranchOp>(term))
+  if (auto condBr = mlir::dyn_cast<mlir::cf::CondBranchOp>(term)) {
+    assert(target == condBr.getTrueDest() || target == condBr.getFalseDest());
     return target == condBr.getTrueDest() ? condBr.getTrueDestOperands()
                                           : condBr.getFalseDestOperands();
+  }
 
   llvm_unreachable("getTerminatorArgs: unsupported terminator");
 }
