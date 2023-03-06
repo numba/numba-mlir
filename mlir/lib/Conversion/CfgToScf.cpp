@@ -502,8 +502,9 @@ static llvm::SmallVector<mlir::Value>
 getDefinedValues(llvm::ArrayRef<mlir::Block *> blocks) {
   llvm::SmallVector<mlir::Value> ret;
   auto checkVal = [&](mlir::Value val) {
-    for (auto block : blocks) {
-      if (val.isUsedOutsideOfBlock(block)) {
+    for (auto &use : val.getUses()) {
+      auto block = use.getOwner()->getBlock();
+      if (!llvm::is_contained(blocks, block)) {
         ret.emplace_back(val);
         return;
       }
@@ -601,7 +602,7 @@ static void wrapIntoRegion(mlir::PatternRewriter &rewriter,
         continue;
 
       auto ownerBlock = owner->getBlock();
-      if (llvm::find(blocks, ownerBlock) != blocks.end())
+      if (llvm::is_contained(blocks, ownerBlock))
         continue;
 
       mlir::Value val = newVal;
