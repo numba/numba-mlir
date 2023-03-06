@@ -456,6 +456,18 @@ static void initMultiplexVars(mlir::PatternRewriter &rewriter,
   }
 }
 
+static void initUndefMultiplexVars(mlir::PatternRewriter &rewriter,
+                                   mlir::Location loc,
+                                   llvm::ArrayRef<Edge> edges,
+                                   llvm::SmallVectorImpl<mlir::Value> &res) {
+  for (auto [j, edge] : llvm::enumerate(edges)) {
+    for (auto type : edge.second->getArgumentTypes()) {
+      mlir::Value init = rewriter.create<numba::util::UndefOp>(loc, type);
+      res.emplace_back(init);
+    }
+  }
+}
+
 static bool isStructuredLoop(llvm::ArrayRef<Edge> inEdges,
                              llvm::ArrayRef<Edge> outEdges,
                              llvm::ArrayRef<Edge> repEdges) {
@@ -699,12 +711,25 @@ static bool restructureLoop(mlir::PatternRewriter &rewriter, SCC::Node &node) {
     }
   }
 
+  for (auto &ed : {inEdges, outEdges, repetitionEdges}) {
+    llvm::errs() << "edges begin\n";
+    for (auto e : ed) {
+      llvm::errs() << " edge\n";
+      e.first->dump();
+      e.second->dump();
+    }
+    llvm::errs() << "edges end\n";
+  }
+
+  llvm::SmallVector<Edge> multiplexEdges(inEdges.begin(), inEdges.end());
+  multiplexEdges.append(repetitionEdges.begin(), repetitionEdges.end());
+
   // Check if we are already in structured form.
   if (isStructuredLoop(inEdges, outEdges, repetitionEdges))
     return false;
 
   auto boolType = rewriter.getI1Type();
-  auto numInMultiplexVars = inEdges.size() - 1;
+  auto numInMultiplexVars = multiplexEdges.size() - 1;
   mlir::Block *multiplexEntryBlock = nullptr;
   auto loc = rewriter.getUnknownLoc();
   auto createBlock = [&](mlir::TypeRange types =
@@ -715,37 +740,26 @@ static bool restructureLoop(mlir::PatternRewriter &rewriter, SCC::Node &node) {
 
   {
     llvm::SmallVector<mlir::Type> entryBlockTypes(numInMultiplexVars, boolType);
-    addTypesFromEdges(inEdges, entryBlockTypes);
+    addTypesFromEdges(multiplexEdges, entryBlockTypes);
     multiplexEntryBlock = createBlock(entryBlockTypes);
     mlir::ValueRange blockArgs = multiplexEntryBlock->getArguments();
     generateMultiplexedBranches(rewriter, loc, multiplexEntryBlock,
                                 blockArgs.take_front(numInMultiplexVars),
                                 blockArgs.drop_front(numInMultiplexVars),
-                                inEdges);
+                                multiplexEdges);
   }
 
-  llvm::SmallVector<mlir::Value> branchArgs;
-  for (auto [i, inEdge] : llvm::enumerate(inEdges)) {
-    auto entryBlock = createBlock();
-    rewriter.setInsertionPointToStart(entryBlock);
-    branchArgs.clear();
-    initMultiplexConds(rewriter, loc, i, inEdges.size(), branchArgs);
-    initMultiplexVars(rewriter, loc, i, inEdges, branchArgs);
-
-    rewriter.create<mlir::cf::BranchOp>(loc, multiplexEntryBlock, branchArgs);
-    replaceEdgeDest(rewriter, inEdge, entryBlock, {});
-  }
-
-  mlir::ValueRange repMultiplexVars;
+  mlir::ValueRange repMultiplexOutVars;
   mlir::ValueRange exitArgs;
   mlir::Block *repBlock = nullptr;
   mlir::Block *exitBlock = nullptr;
-  auto numOutMultiplexVars = outEdges.size() - 1;
+  auto numOutMultiplexVars = repetitionEdges.size() + outEdges.size() - 2;
   {
     llvm::SmallVector<mlir::Type> repBlockTypes(numOutMultiplexVars + 1,
                                                 boolType);
+    auto prevSize = repBlockTypes.size();
     addTypesFromEdges(repetitionEdges, repBlockTypes);
-    auto numRepArgs = repBlockTypes.size() - numOutMultiplexVars - 1;
+    auto numRepArgs = repBlockTypes.size() - prevSize;
 
     addTypesFromEdges(outEdges, repBlockTypes);
 
@@ -755,18 +769,56 @@ static bool restructureLoop(mlir::PatternRewriter &rewriter, SCC::Node &node) {
     mlir::Value cond = repBlock->getArgument(0);
     auto repBlockArgs =
         repBlock->getArguments().drop_front(numOutMultiplexVars + 1);
-    repMultiplexVars =
+    auto repMultiplexVars =
         repBlock->getArguments().drop_front().take_front(numOutMultiplexVars);
+    auto repMultiplexRepVars =
+        repMultiplexVars.take_front(repetitionEdges.size() - 1);
+    repMultiplexOutVars = repMultiplexVars.take_back(outEdges.size() - 1);
 
-    mlir::ValueRange repetitionArgs = repBlockArgs.take_front(numRepArgs);
+    {
+      rewriter.setInsertionPointToStart(repBlock);
+      mlir::Value falseVal =
+          rewriter.create<mlir::arith::ConstantIntOp>(loc, 0, boolType);
+      llvm::SmallVector<mlir::Value> multiplexArgs(inEdges.size(), falseVal);
+      multiplexArgs.append(repMultiplexRepVars.begin(),
+                           repMultiplexRepVars.end());
+
+      initUndefMultiplexVars(rewriter, loc, inEdges, multiplexArgs);
+      mlir::ValueRange repetitionArgs = repBlockArgs.take_front(numRepArgs);
+      multiplexArgs.append(repetitionArgs.begin(), repetitionArgs.end());
+
+      assert(multiplexEntryBlock->getNumArguments() == multiplexArgs.size());
+      rewriter.create<mlir::cf::CondBranchOp>(loc, cond, multiplexEntryBlock,
+                                              multiplexArgs, exitBlock,
+                                              mlir::ValueRange{});
+    }
+
     exitArgs = repBlockArgs.drop_front(numRepArgs);
-    assert(multiplexEntryBlock->getNumArguments() == repetitionArgs.size());
-    rewriter.setInsertionPointToStart(repBlock);
-    rewriter.create<mlir::cf::CondBranchOp>(loc, cond, multiplexEntryBlock,
-                                            repetitionArgs, exitBlock,
-                                            mlir::ValueRange{});
 
     llvm::SmallVector<mlir::Value> branchArgs;
+    llvm::SmallVector<mlir::Block*> toReplace;
+
+    llvm::errs() << "zxczxc 1\n";
+
+    toReplace.clear();
+    for (auto [i, inEdge] : llvm::enumerate(inEdges)) {
+      auto entryBlock = createBlock();
+      rewriter.setInsertionPointToStart(entryBlock);
+      branchArgs.clear();
+      initMultiplexConds(rewriter, loc, i, multiplexEdges.size(), branchArgs);
+      initMultiplexVars(rewriter, loc, i, inEdges, branchArgs);
+      initUndefMultiplexVars(rewriter, loc, repetitionEdges, branchArgs);
+
+      assert(multiplexEntryBlock->getNumArguments() == branchArgs.size());
+      rewriter.create<mlir::cf::BranchOp>(loc, multiplexEntryBlock, branchArgs);
+      toReplace.emplace_back(entryBlock);
+    }
+    for (auto [i, edge] : llvm::enumerate(inEdges))
+      replaceEdgeDest(rewriter, edge, toReplace[i], {});
+
+    llvm::errs() << "zxczxc 2\n";
+
+    toReplace.clear();
     for (auto [i, repEdge] : llvm::enumerate(repetitionEdges)) {
       auto preRepBlock = createBlock();
       rewriter.setInsertionPointToStart(preRepBlock);
@@ -776,19 +828,22 @@ static bool restructureLoop(mlir::PatternRewriter &rewriter, SCC::Node &node) {
       branchArgs.clear();
       branchArgs.emplace_back(trueVal);
 
+      initMultiplexConds(rewriter, loc, i, repetitionEdges.size(), branchArgs);
       initUndefMultiplexConds(rewriter, loc, outEdges.size(), branchArgs);
-      initMultiplexVars(rewriter, loc, i, repetitionEdges, branchArgs);
 
-      for (auto type : llvm::ArrayRef(repBlockTypes)
-                           .drop_front(numRepArgs + numOutMultiplexVars + 1)) {
-        mlir::Value val = rewriter.create<numba::util::UndefOp>(loc, type);
-        branchArgs.emplace_back(val);
-      }
+      initMultiplexVars(rewriter, loc, i, repetitionEdges, branchArgs);
+      initUndefMultiplexVars(rewriter, loc, outEdges, branchArgs);
+
       assert(branchArgs.size() == repBlock->getNumArguments());
       rewriter.create<mlir::cf::BranchOp>(loc, repBlock, branchArgs);
-      replaceEdgeDest(rewriter, repEdge, preRepBlock, {});
+      toReplace.emplace_back(preRepBlock);
     }
+    for (auto [i, edge] : llvm::enumerate(repetitionEdges))
+      replaceEdgeDest(rewriter, edge, toReplace[i], {});
 
+    llvm::errs() << "zxczxc 3\n";
+
+    toReplace.clear();
     for (auto [i, outEdge] : llvm::enumerate(outEdges)) {
       auto preRepBlock = createBlock();
       rewriter.setInsertionPointToStart(preRepBlock);
@@ -797,25 +852,32 @@ static bool restructureLoop(mlir::PatternRewriter &rewriter, SCC::Node &node) {
 
       branchArgs.clear();
       branchArgs.emplace_back(falseVal);
+
+      initUndefMultiplexConds(rewriter, loc, repetitionEdges.size(),
+                              branchArgs);
       initMultiplexConds(rewriter, loc, i, outEdges.size(), branchArgs);
 
-      for (auto type : repetitionArgs.getTypes()) {
-        mlir::Value val = rewriter.create<numba::util::UndefOp>(loc, type);
-        branchArgs.emplace_back(val);
-      }
-
+      initUndefMultiplexVars(rewriter, loc, repetitionEdges, branchArgs);
       initMultiplexVars(rewriter, loc, i, outEdges, branchArgs);
 
       assert(branchArgs.size() == repBlock->getNumArguments());
       rewriter.create<mlir::cf::BranchOp>(loc, repBlock, branchArgs);
-      replaceEdgeDest(rewriter, outEdge, preRepBlock, {});
+      toReplace.emplace_back(preRepBlock);
     }
+    for (auto [i, edge] : llvm::enumerate(outEdges))
+      replaceEdgeDest(rewriter, edge, toReplace[i], {});
+
+    llvm::errs() << "zxczxc 4\n";
   }
 
-  generateMultiplexedBranches(rewriter, loc, exitBlock, repMultiplexVars,
+  generateMultiplexedBranches(rewriter, loc, exitBlock, repMultiplexOutVars,
                               exitArgs, outEdges);
 
+  llvm::errs() << "zxczxc 5\n";
+
   wrapIntoRegion(rewriter, multiplexEntryBlock, repBlock);
+
+  llvm::errs() << "zxczxc 6\n";
 
   return true;
 }
