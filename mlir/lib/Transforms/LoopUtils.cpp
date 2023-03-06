@@ -216,7 +216,7 @@ llvm::SmallVector<mlir::scf::ForOp, 2> numba::lowerWhileToFor(
     auto reg = builder.create<mlir::scf::ExecuteRegionOp>(loc, resTypes);
     mlir::OpBuilder::InsertionGuard g(builder);
     builder.createBlock(&reg.getRegion());
-    getIfBodyBuilder(*ind >= 0)(builder, loc);
+    getIfBodyBuilder (*ind >= 0)(builder, loc);
     return reg.getResults();
   }();
 
