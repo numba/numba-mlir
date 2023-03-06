@@ -216,7 +216,7 @@ llvm::SmallVector<mlir::scf::ForOp, 2> numba::lowerWhileToFor(
     auto reg = builder.create<mlir::scf::ExecuteRegionOp>(loc, resTypes);
     mlir::OpBuilder::InsertionGuard g(builder);
     builder.createBlock(&reg.getRegion());
-    getIfBodyBuilder(*ind >= 0)(builder, loc);
+    getIfBodyBuilder (*ind >= 0)(builder, loc);
     return reg.getResults();
   }();
 
@@ -231,17 +231,16 @@ llvm::SmallVector<mlir::scf::ForOp, 2> numba::lowerWhileToFor(
           auto newRes = loopResults[static_cast<unsigned>(i)];
           newRes = builder.createOrFold<plier::CastOp>(loc, oldRes.getType(),
                                                        newRes);
-          oldRes.replaceAllUsesWith(newRes);
+          builder.replaceAllUsesWith(oldRes, newRes);
           break;
         }
       }
-      if (pairfirst && skipCasts(operand) == pairfirst &&
-          !oldRes.getUsers().empty()) {
+      if (pairfirst && skipCasts(operand) == pairfirst && !oldRes.use_empty()) {
         auto val = getLastIterValue(builder, loc, origLowerBound,
                                     origUpperBound, origStep);
         auto newRes =
             builder.createOrFold<plier::CastOp>(loc, oldRes.getType(), val);
-        oldRes.replaceAllUsesWith(newRes);
+        builder.replaceAllUsesWith(oldRes, newRes);
       }
       assert(oldRes.getUsers().empty());
     }
