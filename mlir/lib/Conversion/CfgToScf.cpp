@@ -556,94 +556,78 @@ static void wrapIntoRegion(mlir::PatternRewriter &rewriter,
   assert(entryBlock->getParent() == exitBlock->getParent());
   mlir::OpBuilder::InsertionGuard g(rewriter);
 
+  auto region = entryBlock->getParent();
   auto loc = rewriter.getUnknownLoc();
   llvm::SmallVector<mlir::Location> locs(entryBlock->getNumArguments(), loc);
-  auto newBlock = rewriter.createBlock(entryBlock->getParent(), {},
-                                       entryBlock->getArgumentTypes(), locs);
-
-  auto blocks = collectBlocks(entryBlock, exitBlock);
-  blocks.emplace_back(entryBlock);
-  blocks.emplace_back(exitBlock);
-
-  auto definedValues = getDefinedValues(blocks);
-  for (auto arg : exitBlock->getTerminator()->getOperands()) {
-    if (llvm::is_contained(blocks, arg.getParentBlock()))
-      definedValues.emplace_back(arg);
-  }
-
-  blocks.pop_back_n(2);
-  mlir::ValueRange definedValuesRange(definedValues);
-  auto definedValuesTypes = definedValuesRange.getTypes();
-
-  auto exitArgs = exitBlock->getArgumentTypes();
-  llvm::SmallVector<mlir::Type> regionTypes(exitArgs.begin(), exitArgs.end());
-  regionTypes.append(definedValuesTypes.begin(), definedValuesTypes.end());
-
-  auto regionOp = rewriter.create<mlir::scf::ExecuteRegionOp>(loc, regionTypes);
-  auto &newRegion = regionOp.getRegion();
-  auto regionOpResults = regionOp.getResults();
-
-  auto regionEntryBlock = rewriter.createBlock(&newRegion);
-
-  mlir::IRMapping mapping;
+  auto createBlock = [&](mlir::TypeRange types =
+                             std::nullopt) -> mlir::Block * {
+    locs.resize(types.size(), loc);
+    return rewriter.createBlock(region, {}, types, locs);
+  };
 
   llvm::SmallVector<mlir::Block *> cachedPredecessors;
-  auto updatePredecessors = [&](mlir::Block *block) {
-    cachedPredecessors.clear();
+  mlir::IRMapping cachedMapping;
+  auto updatePredecessors = [&](mlir::Block *block, mlir::Block *newBlock) {
+    assert(block);
+    assert(newBlock);
+    assert(block->getArgumentTypes() == newBlock->getArgumentTypes());
+    cachedMapping.clear();
+    cachedMapping.map(block, newBlock);
     auto preds = block->getPredecessors();
+    cachedPredecessors.clear();
     cachedPredecessors.assign(preds.begin(), preds.end());
     for (auto predecessor : cachedPredecessors) {
       auto term = predecessor->getTerminator();
       rewriter.setInsertionPoint(term);
-      rewriter.clone(*term, mapping);
+      rewriter.clone(*term, cachedMapping);
       rewriter.eraseOp(term);
     }
   };
 
-  mapping.map(entryBlock, newBlock);
-  mapping.map(entryBlock->getArguments(), newBlock->getArguments());
+  auto newEntryBlock = createBlock();
+  auto preBlock = createBlock(entryBlock->getArgumentTypes());
+  rewriter.create<mlir::cf::BranchOp>(loc, newEntryBlock);
 
-  llvm::SmallVector<mlir::Block *> newBlocks;
-  for (auto block : blocks) {
-    locs.resize(block->getNumArguments(), loc);
-    auto newBlock =
-        rewriter.createBlock(&newRegion, {}, block->getArgumentTypes(), locs);
+  updatePredecessors(entryBlock, preBlock);
+  rewriter.mergeBlocks(entryBlock, newEntryBlock, preBlock->getArguments());
 
-    mapping.map(block, newBlock);
-    mapping.map(block->getArguments(), newBlock->getArguments());
-    updatePredecessors(block);
-    newBlocks.emplace_back(newBlock);
-  }
+  auto newExitBlock = createBlock(exitBlock->getArgumentTypes());
 
-  locs.resize(exitBlock->getNumArguments(), loc);
-  auto regionExitBlock =
-      rewriter.createBlock(&newRegion, {}, exitBlock->getArgumentTypes(), locs);
+  auto exitTerm = exitBlock->getTerminator();
+  auto postBlock = createBlock();
+  rewriter.clone(*exitTerm);
+  rewriter.eraseOp(exitTerm);
 
-  mapping.map(exitBlock, regionExitBlock);
-  mapping.map(exitBlock->getArguments(), regionExitBlock->getArguments());
+  updatePredecessors(exitBlock, newExitBlock);
+  rewriter.mergeBlocks(exitBlock, newExitBlock, newExitBlock->getArguments());
 
-  auto regionExitArgs = regionExitBlock->getArguments();
-  llvm::SmallVector<mlir::Value> yieldArgs(regionExitArgs.begin(),
-                                           regionExitArgs.end());
+  rewriter.setInsertionPointToEnd(newExitBlock);
+  rewriter.create<mlir::cf::BranchOp>(loc, postBlock);
 
-  rewriter.setInsertionPointToEnd(regionExitBlock);
-  for (auto& op : exitBlock->without_terminator())
-    rewriter.clone(op, mapping);
+  auto blocks = collectBlocks(preBlock, postBlock);
 
-  for (auto val : definedValues) {
-    auto newVal = mapping.lookupOrDefault(val);
-    yieldArgs.emplace_back(newVal);
-  }
+  auto definedValues = getDefinedValues(blocks);
 
-  for (auto [oldVal, newVal] : llvm::zip(
-           definedValues, regionOpResults.take_back(definedValues.size()))) {
-    for (auto &use : oldVal.getUses()) {
+  mlir::ValueRange definedValuesRange(definedValues);
+  auto newBlock = createBlock();
+  auto regionOp = rewriter.create<mlir::scf::ExecuteRegionOp>(
+      loc, definedValuesRange.getTypes());
+  rewriter.create<mlir::cf::BranchOp>(loc, postBlock);
+
+  rewriter.setInsertionPoint(preBlock->getTerminator());
+  rewriter.replaceOpWithNewOp<mlir::cf::BranchOp>(preBlock->getTerminator(),
+                                                  newBlock);
+
+  rewriter.setInsertionPoint(newExitBlock->getTerminator());
+  rewriter.replaceOpWithNewOp<mlir::scf::YieldOp>(newExitBlock->getTerminator(),
+                                                  definedValues);
+
+  for (auto [oldVal, newVal] :
+       llvm::zip(definedValues, regionOp->getResults())) {
+    for (auto &use : llvm::make_early_inc_range(oldVal.getUses())) {
       auto owner = use.getOwner();
-      if (regionOp->isAncestor(owner))
-        continue;
-
-      auto ownerBlock = owner->getBlock();
-      if (llvm::is_contained(blocks, ownerBlock))
+      auto block = region->findAncestorBlockInRegion(*owner->getBlock());
+      if (block && llvm::is_contained(blocks, block))
         continue;
 
       mlir::Value val = newVal;
@@ -651,26 +635,12 @@ static void wrapIntoRegion(mlir::PatternRewriter &rewriter,
     }
   }
 
-  for (auto [oldBlock, newBlock] : llvm::zip(blocks, newBlocks))
-    rewriter.mergeBlocks(oldBlock, newBlock, newBlock->getArguments());
+  auto &regionOpRegion = regionOp.getRegion();
+  auto dummyBlock = rewriter.createBlock(&regionOpRegion);
+  for (auto block : blocks)
+    block->moveBefore(dummyBlock);
 
-  rewriter.setInsertionPointToEnd(regionExitBlock);
-  rewriter.create<mlir::scf::YieldOp>(loc, yieldArgs);
-
-  rewriter.setInsertionPointToStart(regionEntryBlock);
-  rewriter.clone(*entryBlock->getTerminator(), mapping);
-
-  mapping.map(exitBlock->getArguments(),
-              regionOpResults.drop_back(definedValues.size()));
-
-  updatePredecessors(entryBlock);
-  updatePredecessors(exitBlock);
-
-  rewriter.setInsertionPointToEnd(newBlock);
-  auto exitTerm = exitBlock->getTerminator();
-  rewriter.clone(*exitTerm, mapping);
-
-  eraseBlocks(rewriter, {entryBlock, exitBlock});
+  rewriter.eraseBlock(dummyBlock);
 }
 
 /// Restructure loop into tail-controlled form according to algorithm described
