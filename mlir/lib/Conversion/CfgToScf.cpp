@@ -577,9 +577,12 @@ static void wrapIntoRegion(mlir::PatternRewriter &rewriter,
 
   mlir::IRMapping mapping;
 
+  llvm::SmallVector<mlir::Block *> cachedPredecessors;
   auto updatePredecessors = [&](mlir::Block *block) {
-    for (auto predecessor :
-         llvm::make_early_inc_range(block->getPredecessors())) {
+    cachedPredecessors.clear();
+    auto preds = block->getPredecessors();
+    cachedPredecessors.assign(preds.begin(), preds.end());
+    for (auto predecessor : cachedPredecessors) {
       auto term = predecessor->getTerminator();
       rewriter.setInsertionPoint(term);
       rewriter.clone(*term, mapping);
