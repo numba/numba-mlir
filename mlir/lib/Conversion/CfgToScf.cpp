@@ -620,6 +620,11 @@ static void wrapIntoRegion(mlir::PatternRewriter &rewriter,
   auto regionExitArgs = regionExitBlock->getArguments();
   llvm::SmallVector<mlir::Value> yieldArgs(regionExitArgs.begin(),
                                            regionExitArgs.end());
+
+  rewriter.setInsertionPointToEnd(regionExitBlock);
+  for (auto& op : exitBlock->without_terminator())
+    rewriter.clone(op, mapping);
+
   for (auto val : definedValues) {
     auto newVal = mapping.lookupOrDefault(val);
     yieldArgs.emplace_back(newVal);
