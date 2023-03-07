@@ -561,6 +561,11 @@ static void wrapIntoRegion(mlir::PatternRewriter &rewriter,
   blocks.emplace_back(exitBlock);
 
   auto definedValues = getDefinedValues(blocks);
+  for (auto arg : exitBlock->getTerminator()->getOperands()) {
+    if (llvm::is_contained(blocks, arg.getParentBlock()))
+      definedValues.emplace_back(arg);
+  }
+
   blocks.pop_back_n(2);
   mlir::ValueRange definedValuesRange(definedValues);
   auto definedValuesTypes = definedValuesRange.getTypes();
@@ -598,6 +603,7 @@ static void wrapIntoRegion(mlir::PatternRewriter &rewriter,
     locs.resize(block->getNumArguments(), loc);
     auto newBlock =
         rewriter.createBlock(&newRegion, {}, block->getArgumentTypes(), locs);
+
     mapping.map(block, newBlock);
     mapping.map(block->getArguments(), newBlock->getArguments());
     updatePredecessors(block);
