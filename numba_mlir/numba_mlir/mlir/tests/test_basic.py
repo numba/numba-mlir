@@ -338,10 +338,6 @@ def _while_py_func_nested_break(a, b):
     return a
 
 
-_is_py310 = sys.version_info.major == 3 and sys.version_info.minor == 10
-
-
-@pytest.mark.xfail(_is_py310, reason="cfg-to-scf issue")
 @parametrize_function_variants(
     "py_func",
     [
