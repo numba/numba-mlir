@@ -2112,11 +2112,31 @@ struct MergeUndefs : public mlir::OpRewritePattern<numba::util::UndefOp> {
     return mlir::success();
   }
 };
+
+struct SelectOfUndef : public mlir::OpRewritePattern<mlir::arith::SelectOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(mlir::arith::SelectOp op,
+                  mlir::PatternRewriter &rewriter) const override {
+    mlir::Value result;
+    if (op.getTrueValue().getDefiningOp<numba::util::UndefOp>()) {
+      result = op.getFalseValue();
+    } else if (op.getFalseValue().getDefiningOp<numba::util::UndefOp>()) {
+      result = op.getTrueValue();
+    } else {
+      return mlir::failure();
+    }
+
+    rewriter.replaceOp(op, result);
+    return mlir::success();
+  }
+};
 } // namespace
 
 void UndefOp::getCanonicalizationPatterns(mlir::RewritePatternSet &results,
                                           mlir::MLIRContext *context) {
-  results.insert<MergeUndefs>(context);
+  results.insert<MergeUndefs, SelectOfUndef>(context);
 }
 
 } // namespace util
