@@ -988,12 +988,16 @@ static bool restructureLoop(mlir::PatternRewriter &rewriter, SCC::Node &node) {
 
   llvm::errs() << "zxczxc 6\n";
 
+  auto p = resultingBlock->getParentOp();
+  p->dump();
+
   // Invoke TailLoopToWhile directly, so it will run before region inlining.
   for (auto predBlock : resultingBlock->getPredecessors()) {
     auto root = mlir::dyn_cast<mlir::cf::BranchOp>(predBlock->getTerminator());
     if (!root)
       continue;
 
+    rewriter.setInsertionPoint(root);
     auto res =
         TailLoopToWhile(rewriter.getContext()).matchAndRewrite(root, rewriter);
     if (mlir::succeeded(res))
@@ -1001,6 +1005,7 @@ static bool restructureLoop(mlir::PatternRewriter &rewriter, SCC::Node &node) {
   }
 
   llvm::errs() << "zxczxc 7\n";
+  p->dump();
   return true;
 }
 
