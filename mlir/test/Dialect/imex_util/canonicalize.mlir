@@ -163,3 +163,25 @@ func.func @test() -> (i64, i64) {
   %1 = numba_util.undef : i64
   return %0, %1 : i64, i64
 }
+
+// -----
+
+// CHECK-LABEL: func @test
+//  CHECK-SAME:   (%[[ARG1:.*]]: i1, %[[ARG2:.*]]: i64)
+//       CHECK:   return %[[ARG2]]
+func.func @test(%arg1: i1, %arg2: i64) -> i64 {
+  %0 = numba_util.undef : i64
+  %1 = arith.select %arg1, %0, %arg2 : i64
+  return %1 : i64
+}
+
+// -----
+
+// CHECK-LABEL: func @test
+//  CHECK-SAME:   (%[[ARG1:.*]]: i1, %[[ARG2:.*]]: i64)
+//       CHECK:   return %[[ARG2]]
+func.func @test(%arg1: i1, %arg2: i64) -> i64 {
+  %0 = numba_util.undef : i64
+  %1 = arith.select %arg1, %arg2, %0 : i64
+  return %1 : i64
+}
