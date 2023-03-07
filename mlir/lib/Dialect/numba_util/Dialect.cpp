@@ -2070,6 +2070,49 @@ mlir::OpFoldResult MemrefBitcastOp::fold(FoldAdaptor) {
   return nullptr;
 }
 
+namespace {
+struct MergeUndefs : public mlir::OpRewritePattern<numba::util::UndefOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(numba::util::UndefOp op,
+                  mlir::PatternRewriter &rewriter) const override {
+    auto parent = op->getParentOfType<mlir::FunctionOpInterface>();
+    if (!parent)
+      return mlir::failure();
+
+    auto &block = parent.front();
+
+    auto type = op.getType();
+    auto existingUndef = [&]() -> numba::util::UndefOp {
+      for (auto &op : block.without_terminator()) {
+        auto undef = mlir::dyn_cast<numba::util::UndefOp>(op);
+        if (undef && undef.getType() == type)
+          return undef;
+      }
+      return {};
+    }();
+
+    if (existingUndef == op)
+      return mlir::failure();
+
+    if (!existingUndef) {
+      mlir::OpBuilder::InsertionGuard g(rewriter);
+      rewriter.setInsertionPointToStart(&block);
+      existingUndef = rewriter.create<numba::util::UndefOp>(op.getLoc(), type);
+    }
+
+    rewriter.replaceOp(op, existingUndef.getResult());
+    return mlir::success();
+  }
+};
+} // namespace
+
+void UndefOp::getCanonicalizationPatterns(mlir::RewritePatternSet &results,
+                                          mlir::MLIRContext *context) {
+  results.insert<MergeUndefs>(context);
+}
+
 } // namespace util
 } // namespace numba
 

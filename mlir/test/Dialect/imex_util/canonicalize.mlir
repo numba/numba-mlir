@@ -152,3 +152,14 @@ func.func @test(%arg1: !ntensor.ntensor<?x?xf32>, %arg2: index, %arg3: index) ->
   %1 = ntensor.dim %0, %cst : !ntensor.ntensor<?x?xf32>
   return %1: index
 }
+
+// -----
+
+// CHECK-LABEL: func @test
+//       CHECK:   %[[VAL:.*]] = numba_util.undef : i64
+//       CHECK:   return %[[VAL]], %[[VAL]]
+func.func @test() -> (i64, i64) {
+  %0 = numba_util.undef : i64
+  %1 = numba_util.undef : i64
+  return %0, %1 : i64, i64
+}
