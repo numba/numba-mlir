@@ -2089,6 +2089,10 @@ struct MergeUndefs : public mlir::OpRewritePattern<numba::util::UndefOp> {
         if (op.hasTrait<mlir::OpTrait::ConstantLike>())
           continue;
 
+        auto undef = mlir::dyn_cast<numba::util::UndefOp>(op);
+        if (undef && undef.getType() != type)
+          continue;
+
         return &op;
       }
       return block.getTerminator();
