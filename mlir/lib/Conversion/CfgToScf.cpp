@@ -1500,6 +1500,8 @@ struct CFGToSCFPass
     mlir::scf::IfOp::getCanonicalizationPatterns(patterns, context);
     mlir::scf::WhileOp::getCanonicalizationPatterns(patterns, context);
 
+    numba::util::UndefOp::getCanonicalizationPatterns(patterns, context);
+
     auto op = getOperation();
     if (mlir::failed(
             mlir::applyPatternsAndFoldGreedily(op, std::move(patterns))))
