@@ -1357,6 +1357,40 @@ struct WhileRemoveUnusedArgs
   }
 };
 
+// TODO: upstream
+struct CondBrSameTarget
+    : public mlir::OpRewritePattern<mlir::cf::CondBranchOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(mlir::cf::CondBranchOp op,
+                  mlir::PatternRewriter &rewriter) const override {
+    auto target = op.getTrueDest();
+    if (op.getFalseDest() != target)
+      return mlir::failure();
+
+    llvm::SmallVector<mlir::Value> args;
+    args.reserve(target->getNumArguments());
+
+    auto loc = op.getLoc();
+    auto cond = op.getCondition();
+    for (auto [trueArg, falseArg] :
+         llvm::zip(op.getTrueDestOperands(), op.getFalseDestOperands())) {
+      if (trueArg == falseArg) {
+        args.emplace_back(trueArg);
+        continue;
+      }
+
+      mlir::Value arg =
+          rewriter.create<mlir::arith::SelectOp>(loc, cond, trueArg, falseArg);
+      args.emplace_back(arg);
+    }
+
+    rewriter.replaceOpWithNewOp<mlir::cf::BranchOp>(op, target, args);
+    return mlir::success();
+  }
+};
+
 struct CFGToSCFPass
     : public mlir::PassWrapper<CFGToSCFPass, mlir::OperationPass<void>> {
   MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(CFGToSCFPass)
@@ -1380,7 +1414,8 @@ struct CFGToSCFPass
         TailLoopToWhile,
         WhileMoveToAfter,
         WhileRemoveDuplicatedResults,
-        WhileRemoveUnusedArgs
+        WhileRemoveUnusedArgs,
+        CondBrSameTarget
         // clang-format on
         >(context);
 
