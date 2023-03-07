@@ -1132,24 +1132,26 @@ struct WhileMoveToAfter : public mlir::OpRewritePattern<mlir::scf::WhileOp> {
     }
 
     auto otherBlock = inverse ? ifOp.thenBlock() : ifOp.elseBlock();
-    if (!otherBlock)
-      return mlir::failure();
+    mlir::scf::YieldOp otherTerm;
+    if (otherBlock) {
+      auto otherBlockRegion = otherBlock->getParent();
+      otherTerm = mlir::cast<mlir::scf::YieldOp>(otherBlock->getTerminator());
 
-    auto otherBlockRegion = otherBlock->getParent();
-    auto otherTerm =
-        mlir::cast<mlir::scf::YieldOp>(otherBlock->getTerminator());
+      for (auto arg : otherTerm.getResults()) {
+        if (arg.getDefiningOp<numba::util::UndefOp>())
+          continue;
 
-    for (auto arg : otherTerm.getResults()) {
-      if (arg.getDefiningOp<numba::util::UndefOp>())
-        continue;
+        if (!otherBlockRegion->isAncestor(arg.getParentRegion()))
+          continue;
 
-      if (!otherBlockRegion->isAncestor(arg.getParentRegion()))
-        continue;
-
-      return mlir::failure();
+        return mlir::failure();
+      }
     }
 
     auto ifBlock = inverse ? ifOp.elseBlock() : ifOp.thenBlock();
+    if (!ifBlock)
+      return mlir::failure();
+
     auto ifBlockRegion = ifBlock->getParent();
     auto term = mlir::cast<mlir::scf::YieldOp>(ifBlock->getTerminator());
 
@@ -1193,14 +1195,16 @@ struct WhileMoveToAfter : public mlir::OpRewritePattern<mlir::scf::WhileOp> {
     }
 
     rewriter.setInsertionPoint(condOp);
-    for (auto [res, otherRes] :
-         llvm::zip(ifOp.getResults(), otherTerm.getResults())) {
-      if (otherRes.getDefiningOp<numba::util::UndefOp>()) {
-        mlir::Value undef =
-            rewriter.create<numba::util::UndefOp>(loc, res.getType());
-        rewriter.replaceAllUsesWith(res, undef);
-      } else {
-        rewriter.replaceAllUsesWith(res, otherRes);
+    if (otherTerm) {
+      for (auto [res, otherRes] :
+           llvm::zip(ifOp.getResults(), otherTerm.getResults())) {
+        if (otherRes.getDefiningOp<numba::util::UndefOp>()) {
+          mlir::Value undef =
+              rewriter.create<numba::util::UndefOp>(loc, res.getType());
+          rewriter.replaceAllUsesWith(res, undef);
+        } else {
+          rewriter.replaceAllUsesWith(res, otherRes);
+        }
       }
     }
 
