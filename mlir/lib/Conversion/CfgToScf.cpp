@@ -9,6 +9,7 @@
 #include <mlir/Dialect/ControlFlow/IR/ControlFlowOps.h>
 #include <mlir/Dialect/Func/IR/FuncOps.h>
 #include <mlir/Dialect/SCF/IR/SCF.h>
+#include <mlir/IR/Dominance.h>
 #include <mlir/IR/IRMapping.h>
 #include <mlir/IR/Verifier.h>
 #include <mlir/Interfaces/CallInterfaces.h>
@@ -1235,6 +1236,52 @@ struct WhileMoveToAfter : public mlir::OpRewritePattern<mlir::scf::WhileOp> {
   }
 };
 
+struct WhileReductionSelect
+    : public mlir::OpRewritePattern<mlir::arith::SelectOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(mlir::arith::SelectOp op,
+                  mlir::PatternRewriter &rewriter) const override {
+    auto condArg = mlir::dyn_cast<mlir::BlockArgument>(op.getCondition());
+    if (!condArg)
+      return mlir::failure();
+
+    auto region = condArg.getParentRegion();
+    auto whileOp = mlir::dyn_cast<mlir::scf::WhileOp>(region->getParentOp());
+    if (!whileOp)
+      return mlir::failure();
+
+    auto &afterBlock = whileOp.getAfter().front();
+    auto yield = mlir::cast<mlir::scf::YieldOp>(afterBlock.getTerminator());
+
+    auto inits = whileOp.getInits();
+    auto initArg = inits[condArg.getArgNumber()];
+    auto yieldArg = yield.getResults()[condArg.getArgNumber()];
+    if (!mlir::isConstantIntValue(initArg, -1) ||
+        !mlir::isConstantIntValue(yieldArg, 0))
+      return mlir::failure();
+
+    auto trueArg = op.getTrueValue();
+    if (!mlir::DominanceInfo().dominates(trueArg, whileOp))
+      return mlir::failure();
+
+    auto falseArg = mlir::dyn_cast<mlir::BlockArgument>(op.getFalseValue());
+    if (!falseArg || falseArg.getParentRegion() != region)
+      return mlir::failure();
+
+    if (!inits[falseArg.getArgNumber()].getDefiningOp<numba::util::UndefOp>())
+      return mlir::failure();
+
+    mlir::SmallVector<mlir::Value> newInits(inits.begin(), inits.end());
+    newInits[falseArg.getArgNumber()] = trueArg;
+    rewriter.updateRootInPlace(
+        whileOp, [&]() { whileOp.getInitsMutable().assign(newInits); });
+    rewriter.replaceOp(op, falseArg);
+    return mlir::success();
+  }
+};
+
 struct WhileUndefArgs : public mlir::OpRewritePattern<mlir::scf::WhileOp> {
   using OpRewritePattern::OpRewritePattern;
 
@@ -1515,6 +1562,7 @@ struct CFGToSCFPass
         LoopRestructuringBr,
         LoopRestructuringCondBr,
         TailLoopToWhile,
+        WhileReductionSelect,
         WhileUndefArgs,
         WhileMoveToAfter,
         WhileRemoveDuplicatedResults,
