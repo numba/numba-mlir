@@ -1132,6 +1132,9 @@ struct WhileMoveToAfter : public mlir::OpRewritePattern<mlir::scf::WhileOp> {
     }
 
     auto otherBlock = inverse ? ifOp.thenBlock() : ifOp.elseBlock();
+    if (!otherBlock)
+      return mlir::failure();
+
     auto otherBlockRegion = otherBlock->getParent();
     auto otherTerm =
         mlir::cast<mlir::scf::YieldOp>(otherBlock->getTerminator());
