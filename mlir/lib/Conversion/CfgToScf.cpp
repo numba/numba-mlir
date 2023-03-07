@@ -929,7 +929,10 @@ struct LoopRestructuringCondBr
 };
 
 struct TailLoopToWhile : public mlir::OpRewritePattern<mlir::cf::BranchOp> {
-  using OpRewritePattern::OpRewritePattern;
+  // Set benefit higher than execute_region _passes
+  TailLoopToWhile(mlir::MLIRContext *context)
+      : mlir::OpRewritePattern<mlir::cf::BranchOp>(context,
+                                                   /*benefit*/ 10) {}
 
   mlir::LogicalResult
   matchAndRewrite(mlir::cf::BranchOp op,
