@@ -1298,6 +1298,77 @@ struct WhileRemoveDuplicatedResults
 };
 
 // TODO: upstream
+struct WhileRemoveUnusedResults
+    : public mlir::OpRewritePattern<mlir::scf::WhileOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(mlir::scf::WhileOp op,
+                  mlir::PatternRewriter &rewriter) const override {
+    auto &beforeBlock = op.getBefore().front();
+    auto &afterBlock = op.getAfter().front();
+
+    auto condOp =
+        mlir::cast<mlir::scf::ConditionOp>(beforeBlock.getTerminator());
+
+    llvm::BitVector argsToRemove;
+    llvm::SmallVector<mlir::Value> newCondArgs;
+    llvm::SmallVector<unsigned> argMapping;
+    llvm::SmallVector<mlir::Type> newResultTypes;
+
+    bool changed = false;
+    for (auto [res, arg, condArg] : llvm::zip(
+             op.getResults(), afterBlock.getArguments(), condOp.getArgs())) {
+      bool empty = res.use_empty() && arg.use_empty();
+      auto idx = static_cast<unsigned>(argsToRemove.size());
+      argsToRemove.push_back(empty);
+      if (empty) {
+        changed = true;
+        continue;
+      }
+
+      argMapping.emplace_back(idx);
+      newCondArgs.emplace_back(condArg);
+      newResultTypes.emplace_back(condArg.getType());
+    }
+
+    if (!changed)
+      return mlir::failure();
+
+    afterBlock.eraseArguments(argsToRemove);
+
+    auto emptyBuilder = [](mlir::OpBuilder &, mlir::Location,
+                           mlir::ValueRange) {
+      // Nothing
+    };
+
+    auto loc = op.getLoc();
+    auto newWhileOp = rewriter.create<mlir::scf::WhileOp>(
+        loc, newResultTypes, op.getInits(), emptyBuilder, emptyBuilder);
+    auto &newBeforeBlock = newWhileOp.getBefore().front();
+    auto &newAfterBlock = newWhileOp.getAfter().front();
+
+    mlir::OpBuilder::InsertionGuard g(rewriter);
+    rewriter.setInsertionPoint(condOp);
+    rewriter.replaceOpWithNewOp<mlir::scf::ConditionOp>(
+        condOp, condOp.getCondition(), newCondArgs);
+
+    rewriter.mergeBlocks(&beforeBlock, &newBeforeBlock,
+                         newBeforeBlock.getArguments());
+    rewriter.mergeBlocks(&afterBlock, &newAfterBlock,
+                         newAfterBlock.getArguments());
+
+    for (auto [id, newVal] : llvm::zip(argMapping, newWhileOp.getResults())) {
+      assert(id < op->getNumResults());
+      auto oldVal = op.getResult(id);
+      rewriter.replaceAllUsesWith(oldVal, newVal);
+    }
+    rewriter.eraseOp(op);
+    return mlir::success();
+  }
+};
+
+// TODO: upstream
 struct WhileRemoveUnusedArgs
     : public mlir::OpRewritePattern<mlir::scf::WhileOp> {
   using OpRewritePattern::OpRewritePattern;
@@ -1414,6 +1485,7 @@ struct CFGToSCFPass
         TailLoopToWhile,
         WhileMoveToAfter,
         WhileRemoveDuplicatedResults,
+        WhileRemoveUnusedResults,
         WhileRemoveUnusedArgs,
         CondBrSameTarget
         // clang-format on
