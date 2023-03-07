@@ -2084,21 +2084,23 @@ struct MergeUndefs : public mlir::OpRewritePattern<numba::util::UndefOp> {
     auto &block = parent.front();
 
     auto type = op.getType();
-    auto existingUndef = [&]() -> numba::util::UndefOp {
+    auto insertionPoint = [&]() -> mlir::Operation * {
       for (auto &op : block.without_terminator()) {
-        auto undef = mlir::dyn_cast<numba::util::UndefOp>(op);
-        if (undef && undef.getType() == type)
-          return undef;
+        if (op.hasTrait<mlir::OpTrait::ConstantLike>())
+          continue;
+
+        return &op;
       }
-      return {};
+      return block.getTerminator();
     }();
 
-    if (existingUndef == op)
+    if (insertionPoint == op)
       return mlir::failure();
 
+    auto existingUndef = mlir::dyn_cast<numba::util::UndefOp>(insertionPoint);
     if (!existingUndef) {
       mlir::OpBuilder::InsertionGuard g(rewriter);
-      rewriter.setInsertionPointToStart(&block);
+      rewriter.setInsertionPoint(insertionPoint);
       existingUndef = rewriter.create<numba::util::UndefOp>(op.getLoc(), type);
     }
 
