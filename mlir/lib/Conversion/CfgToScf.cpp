@@ -15,6 +15,7 @@
 #include <mlir/Interfaces/SideEffectInterfaces.h>
 #include <mlir/Transforms/GreedyPatternRewriteDriver.h>
 #include <mlir/Transforms/Passes.h>
+#include <mlir/Transforms/RegionUtils.h>
 
 namespace {
 static mlir::Block *getNextBlock(mlir::Block *block) {
@@ -612,11 +613,6 @@ static void wrapIntoRegion(mlir::PatternRewriter &rewriter,
   auto newBlock = createBlock();
   auto regionOp = rewriter.create<mlir::scf::ExecuteRegionOp>(
       loc, definedValuesRange.getTypes());
-  rewriter.create<mlir::cf::BranchOp>(loc, postBlock);
-
-  rewriter.setInsertionPoint(preBlock->getTerminator());
-  rewriter.replaceOpWithNewOp<mlir::cf::BranchOp>(preBlock->getTerminator(),
-                                                  newBlock);
 
   rewriter.setInsertionPoint(newExitBlock->getTerminator());
   rewriter.replaceOpWithNewOp<mlir::scf::YieldOp>(newExitBlock->getTerminator(),
@@ -641,6 +637,12 @@ static void wrapIntoRegion(mlir::PatternRewriter &rewriter,
     block->moveBefore(dummyBlock);
 
   rewriter.eraseBlock(dummyBlock);
+
+  rewriter.mergeBlocks(postBlock, newBlock);
+
+  rewriter.eraseOp(preBlock->getTerminator());
+  rewriter.mergeBlocks(newBlock, preBlock);
+  (void)mlir::simplifyRegions(rewriter, *region);
 }
 
 /// Restructure loop into tail-controlled form according to algorithm described
