@@ -1235,6 +1235,38 @@ struct WhileMoveToAfter : public mlir::OpRewritePattern<mlir::scf::WhileOp> {
   }
 };
 
+struct WhileUndefArgs : public mlir::OpRewritePattern<mlir::scf::WhileOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(mlir::scf::WhileOp op,
+                  mlir::PatternRewriter &rewriter) const override {
+    auto &afterBlock = op.getAfter().front();
+    auto yield = mlir::cast<mlir::scf::YieldOp>(afterBlock.getTerminator());
+
+    bool changed = false;
+
+    llvm::SmallVector<mlir::Value> newArgs;
+    for (auto [yieldArg, init] : llvm::zip(yield.getResults(), op.getInits())) {
+      if (!yieldArg.getDefiningOp<numba::util::UndefOp>()) {
+        newArgs.emplace_back(yieldArg);
+        continue;
+      }
+
+      changed = true;
+      newArgs.emplace_back(init);
+    }
+
+    if (!changed)
+      return mlir::failure();
+
+    mlir::OpBuilder::InsertionGuard g(rewriter);
+    rewriter.setInsertionPoint(yield);
+    rewriter.replaceOpWithNewOp<mlir::scf::YieldOp>(yield, newArgs);
+    return mlir::success();
+  }
+};
+
 // TODO: upstream
 struct WhileRemoveDuplicatedResults
     : public mlir::OpRewritePattern<mlir::scf::WhileOp> {
@@ -1483,6 +1515,7 @@ struct CFGToSCFPass
         LoopRestructuringBr,
         LoopRestructuringCondBr,
         TailLoopToWhile,
+        WhileUndefArgs,
         WhileMoveToAfter,
         WhileRemoveDuplicatedResults,
         WhileRemoveUnusedResults,
