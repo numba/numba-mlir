@@ -523,10 +523,15 @@ static auto collectBlocks(mlir::Block *begin, mlir::Block *end) {
 static llvm::SmallVector<mlir::Value>
 getDefinedValues(llvm::ArrayRef<mlir::Block *> blocks) {
   llvm::SmallVector<mlir::Value> ret;
+  if (blocks.empty())
+    return ret;
+
+  auto region = blocks.front()->getParent();
   auto checkVal = [&](mlir::Value val) {
     for (auto &use : val.getUses()) {
-      auto block = use.getOwner()->getBlock();
-      if (!llvm::is_contained(blocks, block)) {
+      auto block =
+          region->findAncestorBlockInRegion(*use.getOwner()->getBlock());
+      if (!block || !llvm::is_contained(blocks, block)) {
         ret.emplace_back(val);
         return;
       }
