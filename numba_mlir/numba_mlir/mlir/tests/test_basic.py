@@ -347,7 +347,7 @@ def _while_py_func_nested_break(a, b):
         "_while_py_func_multiple_conds3",
         "_while_py_func_multiple_conds4",
         "_while_py_func_break_middle",
-        # '_while_py_func_nested_break',
+        "_while_py_func_nested_break",
     ],
 )
 def test_while(py_func):
