@@ -33,12 +33,18 @@ IfOpConstCond::matchAndRewrite(mlir::scf::IfOp op,
     return false;
   };
 
+  bool updated = false;
   auto replace = [&](mlir::Block &block, mlir::Value toReplace,
                      mlir::Value newVal) {
+    if (toReplace == newVal)
+      return;
+
     for (auto &use : llvm::make_early_inc_range(toReplace.getUses())) {
       auto owner = use.getOwner();
-      if (block.findAncestorOpInBlock(*owner))
+      if (block.findAncestorOpInBlock(*owner)) {
+        updated = true;
         rewriter.updateRootInPlace(owner, [&]() { use.set(newVal); });
+      }
     }
   };
 
@@ -65,7 +71,7 @@ IfOpConstCond::matchAndRewrite(mlir::scf::IfOp op,
     return mlir::failure();
   }
 
-  return mlir::success();
+  return mlir::success(updated);
 }
 
 void numba::populateIfRewritesPatterns(mlir::RewritePatternSet &patterns) {
