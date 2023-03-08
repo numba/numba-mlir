@@ -1141,8 +1141,8 @@ static bool isInverse(mlir::Value cond1, mlir::Value cond2) {
   if (!op)
     return false;
 
-  if ((op.getLhs() == cond2 && mlir::isConstantIntValue(op.getRhs(), 1)) ||
-      (op.getRhs() == cond2 && mlir::isConstantIntValue(op.getLhs(), 1)))
+  if ((op.getLhs() == cond2 && mlir::isConstantIntValue(op.getRhs(), -1)) ||
+      (op.getRhs() == cond2 && mlir::isConstantIntValue(op.getLhs(), -1)))
     return true;
 
   return false;
@@ -1651,6 +1651,7 @@ struct CFGToSCFPass
     mlir::scf::ExecuteRegionOp::getCanonicalizationPatterns(patterns, context);
     mlir::scf::IfOp::getCanonicalizationPatterns(patterns, context);
     mlir::scf::WhileOp::getCanonicalizationPatterns(patterns, context);
+    mlir::arith::SelectOp::getCanonicalizationPatterns(patterns, context);
 
     numba::util::UndefOp::getCanonicalizationPatterns(patterns, context);
 
