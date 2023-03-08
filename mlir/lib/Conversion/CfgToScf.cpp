@@ -360,6 +360,35 @@ struct TailLoopToWhile : public mlir::OpRewritePattern<mlir::cf::BranchOp> {
   }
 };
 
+struct TailLoopToWhileCond
+    : public mlir::OpRewritePattern<mlir::cf::CondBranchOp> {
+  // Set benefit higher than execute_region _passes
+  TailLoopToWhileCond(mlir::MLIRContext *context)
+      : mlir::OpRewritePattern<mlir::cf::CondBranchOp>(context,
+                                                       /*benefit*/ 10) {}
+
+  mlir::LogicalResult
+  matchAndRewrite(mlir::cf::CondBranchOp op,
+                  mlir::PatternRewriter &rewriter) const override {
+    for (bool reverse : {false, true}) {
+      auto bodyBlock = reverse ? op.getFalseDest() : op.getTrueDest();
+      auto args =
+          reverse ? op.getFalseDestOperands() : op.getTrueDestOperands();
+      auto res = tailLoopToWhile(rewriter, op.getLoc(), bodyBlock, args);
+      if (!res)
+        continue;
+
+      auto newTrueDest = reverse ? op.getTrueDest() : *res;
+      auto newFalseDest = reverse ? *res : op.getFalseDest();
+      rewriter.replaceOpWithNewOp<mlir::cf::CondBranchOp>(
+          op, op.getCondition(), newTrueDest, op.getTrueDestOperands(),
+          newFalseDest, op.getFalseDestOperands());
+      return mlir::success();
+    }
+    return mlir::failure();
+  }
+};
+
 namespace {
 struct SCC {
   struct Node {
@@ -1583,6 +1612,7 @@ struct CFGToSCFPass
         LoopRestructuringBr,
         LoopRestructuringCondBr,
         TailLoopToWhile,
+        TailLoopToWhileCond,
         WhileReductionSelect,
         WhileUndefArgs,
         WhileMoveToAfter,
