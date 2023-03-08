@@ -216,16 +216,16 @@ func.func @while_test3() -> i64{
 
 // CHECK-LABEL: func @while_test3
 // CHECK: %[[VAL1:.*]] = "test.test1"() : () -> index
-// CHECK: %[[RES:.*]]:2 = scf.while (%[[ARG0:.*]] = %[[VAL1]]) : (index) -> (index, i64) {
+// CHECK: %[[RES:.*]] = scf.while : () -> i64 {
 // CHECK: %[[COND:.*]]:2 = "test.test2"() : () -> (i1, i64)
-// CHECK: scf.condition(%[[COND]]#0) %[[ARG0]], %[[COND]]#1 : index, i64
+// CHECK: scf.condition(%[[COND]]#0) %[[COND]]#1 : i64
 // CHECK: } do {
-// CHECK: ^bb{{.+}}(%[[ARG1:.*]]: index, %[[ARG2:.*]]: i64):
+// CHECK: ^bb{{.+}}(%[[ARG2:.*]]: i64):
 // CHECK: %[[VAL2:.*]] = "test.test3"(%[[ARG2]]) : (i64) -> index
-// CHECK: scf.yield %[[VAL2]] : index
+// CHECK: scf.yield
 // CHECK: }
 // CHECK: "test.test4"() : () -> ()
-// CHECK: return %[[RES]]#1 : i64
+// CHECK: return %[[RES]] : i64
 
 // -----
 
