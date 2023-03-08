@@ -231,6 +231,115 @@ getDefinedValues(llvm::ArrayRef<mlir::Block *> blocks) {
   return ret;
 }
 
+static std::optional<mlir::Block *>
+tailLoopToWhile(mlir::PatternRewriter &rewriter, mlir::Location loc,
+                mlir::Block *bodyBlock, mlir::ValueRange initArgs) {
+  assert(bodyBlock);
+  auto bodyBr =
+      mlir::dyn_cast<mlir::cf::CondBranchOp>(bodyBlock->getTerminator());
+  if (!bodyBr)
+    return std::nullopt;
+
+  if (bodyBr.getTrueDest() == bodyBr.getFalseDest())
+    return std::nullopt;
+
+  for (bool reverse : {false, true}) {
+    auto bodyBlock1 = reverse ? bodyBr.getFalseDest() : bodyBr.getTrueDest();
+    auto exitBlock = reverse ? bodyBr.getTrueDest() : bodyBr.getFalseDest();
+
+    if (bodyBlock1 != bodyBlock)
+      continue;
+
+    mlir::ValueRange bodyArgs =
+        reverse ? bodyBr.getFalseDestOperands() : bodyBr.getTrueDestOperands();
+    mlir::ValueRange exitArgs =
+        reverse ? bodyBr.getTrueDestOperands() : bodyBr.getFalseDestOperands();
+
+    llvm::SmallVector<mlir::Value> toReplace = getDefinedValues(bodyBlock);
+
+    mlir::IRMapping mapping;
+    auto beforeBuilder = [&](mlir::OpBuilder &builder, mlir::Location loc,
+                             mlir::ValueRange args) {
+      assert(bodyArgs.size() + exitArgs.size() + toReplace.size() ==
+             args.size());
+      mapping.map(bodyArgs, args.take_front(bodyArgs.size()));
+      mapping.map(exitArgs, args.take_back(exitArgs.size()));
+      mapping.map(bodyBlock->getArguments(), args.take_front(bodyArgs.size()));
+
+      for (auto &op : bodyBlock->without_terminator())
+        builder.clone(op, mapping);
+
+      llvm::SmallVector<mlir::Value> results;
+      results.reserve(bodyArgs.size() + exitArgs.size());
+      for (mlir::ValueRange ranges : {bodyArgs, exitArgs})
+        for (mlir::Value val : ranges)
+          results.emplace_back(mapping.lookupOrDefault(val));
+
+      for (auto val : toReplace)
+        results.emplace_back(mapping.lookupOrDefault(val));
+
+      mlir::Value cond = mapping.lookupOrDefault(bodyBr.getCondition());
+      if (reverse) {
+        mlir::Value one =
+            builder.create<mlir::arith::ConstantIntOp>(loc, 1, /*width*/ 1);
+        cond = builder.create<mlir::arith::XOrIOp>(loc, cond, one);
+      }
+      builder.create<mlir::scf::ConditionOp>(loc, cond, results);
+    };
+
+    auto afterBuilder = [](mlir::OpBuilder &builder, mlir::Location loc,
+                           mlir::ValueRange args) {
+      builder.create<mlir::scf::YieldOp>(loc, args);
+    };
+
+    auto bodyArgsTypes = bodyArgs.getTypes();
+    auto exitTypes = exitArgs.getTypes();
+    mlir::ValueRange toReplaceRange(toReplace);
+    auto definedTypes = toReplaceRange.getTypes();
+    llvm::SmallVector<mlir::Type> whileTypes(bodyArgsTypes.begin(),
+                                             bodyArgsTypes.end());
+    whileTypes.append(exitTypes.begin(), exitTypes.end());
+    whileTypes.append(definedTypes.begin(), definedTypes.end());
+
+    llvm::SmallVector<mlir::Value> whileArgs(initArgs.begin(), initArgs.end());
+
+    mlir::OpBuilder::InsertionGuard g(rewriter);
+    llvm::SmallVector<mlir::Location> locs(bodyBlock->getNumArguments(),
+                                           rewriter.getUnknownLoc());
+    auto newBlock = rewriter.createBlock(bodyBlock->getParent(), {},
+                                         bodyBlock->getArgumentTypes(), locs);
+    for (auto types : {exitTypes, definedTypes}) {
+      for (auto type : types) {
+        mlir::Value val = rewriter.create<numba::util::UndefOp>(loc, type);
+        whileArgs.emplace_back(val);
+      }
+    }
+
+    auto whileOp = rewriter.create<mlir::scf::WhileOp>(
+        loc, whileTypes, whileArgs, beforeBuilder, afterBuilder);
+
+    auto results = whileOp.getResults();
+    auto bodyResults = results.take_front(bodyArgsTypes.size());
+    auto exitResults =
+        results.drop_front(bodyArgsTypes.size()).take_front(exitTypes.size());
+    auto definedResults = results.take_back(toReplace.size());
+    assert(bodyResults.size() == bodyArgs.size());
+    assert(exitResults.size() == exitBlock->getNumArguments());
+
+    rewriter.create<mlir::cf::BranchOp>(loc, exitBlock, exitResults);
+
+    for (auto [oldVal, newVal] : llvm::zip(toReplace, definedResults))
+      rewriter.replaceAllUsesWith(oldVal, newVal);
+
+    if (llvm::hasSingleElement(bodyBlock->getUses()))
+      eraseBlocks(rewriter, bodyBlock);
+
+    return newBlock;
+  }
+
+  return std::nullopt;
+}
+
 struct TailLoopToWhile : public mlir::OpRewritePattern<mlir::cf::BranchOp> {
   // Set benefit higher than execute_region _passes
   TailLoopToWhile(mlir::MLIRContext *context)
@@ -241,108 +350,13 @@ struct TailLoopToWhile : public mlir::OpRewritePattern<mlir::cf::BranchOp> {
   matchAndRewrite(mlir::cf::BranchOp op,
                   mlir::PatternRewriter &rewriter) const override {
     auto bodyBlock = op.getDest();
-    auto bodyBr =
-        mlir::dyn_cast<mlir::cf::CondBranchOp>(bodyBlock->getTerminator());
-    if (!bodyBr)
+    auto res =
+        tailLoopToWhile(rewriter, op.getLoc(), bodyBlock, op.getDestOperands());
+    if (!res)
       return mlir::failure();
 
-    if (bodyBr.getTrueDest() == bodyBr.getFalseDest())
-      return mlir::failure();
-
-    for (bool reverse : {false, true}) {
-      auto bodyBlock1 = reverse ? bodyBr.getFalseDest() : bodyBr.getTrueDest();
-      auto exitBlock = reverse ? bodyBr.getTrueDest() : bodyBr.getFalseDest();
-
-      if (bodyBlock1 != bodyBlock)
-        continue;
-
-      mlir::ValueRange bodyArgs = reverse ? bodyBr.getFalseDestOperands()
-                                          : bodyBr.getTrueDestOperands();
-      mlir::ValueRange exitArgs = reverse ? bodyBr.getTrueDestOperands()
-                                          : bodyBr.getFalseDestOperands();
-
-      llvm::SmallVector<mlir::Value> toReplace = getDefinedValues(bodyBlock);
-
-      mlir::IRMapping mapping;
-      auto beforeBuilder = [&](mlir::OpBuilder &builder, mlir::Location loc,
-                               mlir::ValueRange args) {
-        assert(bodyArgs.size() + exitArgs.size() + toReplace.size() ==
-               args.size());
-        mapping.map(bodyArgs, args.take_front(bodyArgs.size()));
-        mapping.map(exitArgs, args.take_back(exitArgs.size()));
-        mapping.map(bodyBlock->getArguments(),
-                    args.take_front(bodyArgs.size()));
-
-        for (auto &op : bodyBlock->without_terminator())
-          builder.clone(op, mapping);
-
-        llvm::SmallVector<mlir::Value> results;
-        results.reserve(bodyArgs.size() + exitArgs.size());
-        for (mlir::ValueRange ranges : {bodyArgs, exitArgs})
-          for (mlir::Value val : ranges)
-            results.emplace_back(mapping.lookupOrDefault(val));
-
-        for (auto val : toReplace)
-          results.emplace_back(mapping.lookupOrDefault(val));
-
-        mlir::Value cond = mapping.lookupOrDefault(bodyBr.getCondition());
-        if (reverse) {
-          mlir::Value one =
-              builder.create<mlir::arith::ConstantIntOp>(loc, 1, /*width*/ 1);
-          cond = builder.create<mlir::arith::XOrIOp>(loc, cond, one);
-        }
-        builder.create<mlir::scf::ConditionOp>(loc, cond, results);
-      };
-
-      auto afterBuilder = [](mlir::OpBuilder &builder, mlir::Location loc,
-                             mlir::ValueRange args) {
-        builder.create<mlir::scf::YieldOp>(loc, args);
-      };
-
-      auto bodyArgsTypes = bodyArgs.getTypes();
-      auto exitTypes = exitArgs.getTypes();
-      mlir::ValueRange toReplaceRange(toReplace);
-      auto definedTypes = toReplaceRange.getTypes();
-      llvm::SmallVector<mlir::Type> whileTypes(bodyArgsTypes.begin(),
-                                               bodyArgsTypes.end());
-      whileTypes.append(exitTypes.begin(), exitTypes.end());
-      whileTypes.append(definedTypes.begin(), definedTypes.end());
-
-      auto loc = op.getLoc();
-      auto initArgs = op.getDestOperands();
-      llvm::SmallVector<mlir::Value> whileArgs(initArgs.begin(),
-                                               initArgs.end());
-
-      for (auto types : {exitTypes, definedTypes}) {
-        for (auto type : types) {
-          mlir::Value val = rewriter.create<numba::util::UndefOp>(loc, type);
-          whileArgs.emplace_back(val);
-        }
-      }
-
-      auto whileOp = rewriter.create<mlir::scf::WhileOp>(
-          loc, whileTypes, whileArgs, beforeBuilder, afterBuilder);
-
-      auto results = whileOp.getResults();
-      auto bodyResults = results.take_front(bodyArgsTypes.size());
-      auto exitResults =
-          results.drop_front(bodyArgsTypes.size()).take_front(exitTypes.size());
-      auto definedResults = results.take_back(toReplace.size());
-      assert(bodyResults.size() == bodyArgs.size());
-      assert(exitResults.size() == exitBlock->getNumArguments());
-      rewriter.replaceOpWithNewOp<mlir::cf::BranchOp>(op, exitBlock,
-                                                      exitResults);
-
-      for (auto [oldVal, newVal] : llvm::zip(toReplace, definedResults))
-        rewriter.replaceAllUsesWith(oldVal, newVal);
-
-      if (llvm::hasSingleElement(bodyBlock->getUses()))
-        eraseBlocks(rewriter, bodyBlock);
-
-      return mlir::success();
-    }
-
-    return mlir::failure();
+    rewriter.updateRootInPlace(op, [&]() { op.setDest(*res); });
+    return mlir::success();
   }
 };
 
