@@ -2114,7 +2114,10 @@ struct MergeUndefs : public mlir::OpRewritePattern<numba::util::UndefOp> {
 };
 
 struct SelectOfUndef : public mlir::OpRewritePattern<mlir::arith::SelectOp> {
-  using OpRewritePattern::OpRewritePattern;
+  // Higher benefit than upstream select patterns
+  SelectOfUndef(mlir::MLIRContext *context)
+      : mlir::OpRewritePattern<mlir::arith::SelectOp>(context, /*benefit*/ 10) {
+  }
 
   mlir::LogicalResult
   matchAndRewrite(mlir::arith::SelectOp op,
