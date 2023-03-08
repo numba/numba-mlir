@@ -18,6 +18,8 @@
 #include <mlir/Transforms/Passes.h>
 
 namespace {
+static const constexpr bool debugLooRestructuring = true;
+
 static mlir::Block *getNextBlock(mlir::Block *block) {
   assert(nullptr != block);
   if (auto br =
@@ -805,29 +807,18 @@ static mlir::Block *wrapIntoRegion(mlir::PatternRewriter &rewriter,
   return preBlock;
 }
 
-/// Restructure loop into tail-controlled form according to algorithm described
-/// in https://dl.acm.org/doi/pdf/10.1145/2693261
-///
-/// Returns true if any modifications to IR were made.
-static bool restructureLoop(mlir::PatternRewriter &rewriter, SCC::Node &node) {
-  assert(!node.blocks.empty());
-
-  if (node.blocks.size() == 1)
-    return false;
-
-  auto &blocks = node.blocks;
-  auto region = blocks.front()->getParent();
-
+static void buildEdges(llvm::ArrayRef<mlir::Block *> blocks,
+                       llvm::SmallVectorImpl<Edge> &inEdges,
+                       llvm::SmallVectorImpl<Edge> &outEdges,
+                       llvm::SmallVectorImpl<Edge> &repetitionEdges) {
   llvm::SmallDenseSet<mlir::Block *> blocksSet(blocks.begin(), blocks.end());
+
+  auto region = blocks.front()->getParent();
 
   auto isInSCC = [&](mlir::Block *block) {
     assert(block);
     return blocksSet.count(block) != 0;
   };
-
-  llvm::SmallVector<Edge> inEdges;
-  llvm::SmallVector<Edge> outEdges;
-  llvm::SmallVector<Edge> repetitionEdges;
 
   for (auto block : blocks) {
     bool isInput = false;
@@ -862,18 +853,40 @@ static bool restructureLoop(mlir::PatternRewriter &rewriter, SCC::Node &node) {
     }
   }
 
-  for (auto &ed : {inEdges, outEdges, repetitionEdges}) {
-    llvm::errs() << "edges begin\n";
-    for (auto e : ed) {
-      llvm::errs() << " edge\n";
-      e.first->dump();
-      e.second->dump();
+  if (debugLooRestructuring) {
+    for (auto ed : {&inEdges, &outEdges, &repetitionEdges}) {
+      llvm::errs() << "edges begin\n";
+      for (auto e : *ed) {
+        llvm::errs() << " edge\n";
+        e.first->dump();
+        e.second->dump();
+      }
+      llvm::errs() << "edges end\n";
     }
-    llvm::errs() << "edges end\n";
   }
+}
+
+/// Restructure loop into tail-controlled form according to algorithm described
+/// in https://dl.acm.org/doi/pdf/10.1145/2693261
+///
+/// Returns true if any modifications to IR were made.
+static bool restructureLoop(mlir::PatternRewriter &rewriter, SCC::Node &node) {
+  assert(!node.blocks.empty());
+
+  if (node.blocks.size() == 1)
+    return false;
+
+  auto &blocks = node.blocks;
+  auto region = blocks.front()->getParent();
+
+  llvm::SmallVector<Edge> inEdges;
+  llvm::SmallVector<Edge> outEdges;
+  llvm::SmallVector<Edge> repetitionEdges;
+  buildEdges(blocks, inEdges, outEdges, repetitionEdges);
 
   llvm::SmallVector<Edge> multiplexEdges(inEdges.begin(), inEdges.end());
   multiplexEdges.append(repetitionEdges.begin(), repetitionEdges.end());
+  assert(!multiplexEdges.empty());
 
   // Check if we are already in structured form.
   if (isStructuredLoop(inEdges, outEdges, repetitionEdges))
@@ -1063,7 +1076,8 @@ static mlir::LogicalResult runLoopRestructuring(mlir::PatternRewriter &rewriter,
   llvm::errs() << "Build scc\n";
   auto scc = buildSCC(region);
 
-  scc.dump();
+  if (debugLooRestructuring)
+    scc.dump();
 
   bool changed = false;
   for (auto &node : scc.nodes)
