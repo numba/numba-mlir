@@ -11,14 +11,13 @@
 #include <mlir/Dialect/SCF/IR/SCF.h>
 #include <mlir/IR/Dominance.h>
 #include <mlir/IR/IRMapping.h>
-#include <mlir/IR/Verifier.h>
 #include <mlir/Interfaces/CallInterfaces.h>
 #include <mlir/Interfaces/SideEffectInterfaces.h>
 #include <mlir/Transforms/GreedyPatternRewriteDriver.h>
 #include <mlir/Transforms/Passes.h>
 
 namespace {
-static const constexpr bool debugLoopRestructuring = true;
+static const constexpr bool debugLoopRestructuring = false;
 
 static mlir::Block *getNextBlock(mlir::Block *block) {
   assert(nullptr != block);
@@ -968,8 +967,6 @@ static bool restructureLoop(mlir::PatternRewriter &rewriter, SCC::Node &node) {
     llvm::SmallVector<mlir::Value> branchArgs;
     llvm::SmallVector<mlir::Block *> toReplace;
 
-    llvm::errs() << "zxczxc 1\n";
-
     toReplace.clear();
     for (auto [i, inEdge] : llvm::enumerate(inEdges)) {
       auto entryBlock = createBlock();
@@ -985,8 +982,6 @@ static bool restructureLoop(mlir::PatternRewriter &rewriter, SCC::Node &node) {
     }
     for (auto [i, edge] : llvm::enumerate(inEdges))
       replaceEdgeDest(rewriter, edge, toReplace[i], {});
-
-    llvm::errs() << "zxczxc 2\n";
 
     toReplace.clear();
     for (auto [i, repEdge] : llvm::enumerate(repetitionEdges)) {
@@ -1011,8 +1006,6 @@ static bool restructureLoop(mlir::PatternRewriter &rewriter, SCC::Node &node) {
     for (auto [i, edge] : llvm::enumerate(repetitionEdges))
       replaceEdgeDest(rewriter, edge, toReplace[i], {});
 
-    llvm::errs() << "zxczxc 3\n";
-
     toReplace.clear();
     for (auto [i, outEdge] : llvm::enumerate(outEdges)) {
       auto preRepBlock = createBlock();
@@ -1036,23 +1029,12 @@ static bool restructureLoop(mlir::PatternRewriter &rewriter, SCC::Node &node) {
     }
     for (auto [i, edge] : llvm::enumerate(outEdges))
       replaceEdgeDest(rewriter, edge, toReplace[i], {});
-
-    llvm::errs() << "zxczxc 4\n";
   }
 
   generateMultiplexedBranches(rewriter, loc, exitBlock, repMultiplexOutVars,
                               exitArgs, outEdges);
 
-  llvm::errs() << "zxczxc 5\n";
-  mlir::verify(multiplexEntryBlock->getParentOp());
-  multiplexEntryBlock->getParentOp()->dump();
-
   auto resultingBlock = wrapIntoRegion(rewriter, multiplexEntryBlock, repBlock);
-
-  llvm::errs() << "zxczxc 6\n";
-
-  auto p = resultingBlock->getParentOp();
-  p->dump();
 
   // Invoke TailLoopToWhile directly, so it will run before region inlining.
   for (auto predBlock : resultingBlock->getPredecessors()) {
@@ -1067,8 +1049,6 @@ static bool restructureLoop(mlir::PatternRewriter &rewriter, SCC::Node &node) {
       break;
   }
 
-  llvm::errs() << "zxczxc 7\n";
-  p->dump();
   return true;
 }
 
@@ -1079,7 +1059,6 @@ static bool isEntryBlock(mlir::Block &block) {
 
 static mlir::LogicalResult runLoopRestructuring(mlir::PatternRewriter &rewriter,
                                                 mlir::Region &region) {
-  llvm::errs() << "Build scc\n";
   auto scc = buildSCC(region);
 
   if (debugLoopRestructuring)
@@ -1089,7 +1068,6 @@ static mlir::LogicalResult runLoopRestructuring(mlir::PatternRewriter &rewriter,
   for (auto &node : scc.nodes)
     changed = restructureLoop(rewriter, node) || changed;
 
-  mlir::verify(region.getParentOp());
   return mlir::success(changed);
 }
 
@@ -1301,7 +1279,6 @@ struct WhileMoveToAfter : public mlir::OpRewritePattern<mlir::scf::WhileOp> {
                          newAfterBlock.getArguments());
     rewriter.replaceOp(op, newWhile.getResults().take_front(condArgs.size()));
 
-    mlir::verify(newWhile->getParentOfType<mlir::func::FuncOp>());
     return mlir::success();
   }
 };
