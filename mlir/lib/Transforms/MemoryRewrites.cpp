@@ -309,7 +309,10 @@ struct MemoryOptPass
     mlir::FrozenRewritePatternSet fPatterns(std::move(patterns));
     auto am = getAnalysisManager();
     while (true) {
-      (void)mlir::applyPatternsAndFoldGreedily(getOperation(), fPatterns);
+      if (mlir::failed(
+              mlir::applyPatternsAndFoldGreedily(getOperation(), fPatterns)))
+        return signalPassFailure();
+
       am.invalidate({});
       auto res = numba::optimizeMemoryOps(am);
       if (!res) {

@@ -653,8 +653,9 @@ struct UnstrideMemrefsPass
 
     patterns.insert<FlattenLoad, FlattenStore, FlattenSubview>(ctx);
 
-    (void)mlir::applyPatternsAndFoldGreedily(getOperation(),
-                                             std::move(patterns));
+    if (mlir::failed(mlir::applyPatternsAndFoldGreedily(getOperation(),
+                                                        std::move(patterns))))
+      return signalPassFailure();
   }
 };
 
@@ -1585,8 +1586,9 @@ struct GPUExPass
     patterns.insert<ExpandLaunchOp, ExpandAllocOp, ExpandDeallocOp,
                     ExpandSuggestBlockSizeOp>(ctx);
 
-    (void)mlir::applyPatternsAndFoldGreedily(getOperation(),
-                                             std::move(patterns));
+    if (mlir::failed(mlir::applyPatternsAndFoldGreedily(getOperation(),
+                                                        std::move(patterns))))
+      return signalPassFailure();
   }
 };
 
@@ -1668,8 +1670,9 @@ struct GenDeviceFuncsPass
 
     patterns.insert<ExpandDeviceFuncCallOp>(ctx);
 
-    (void)mlir::applyPatternsAndFoldGreedily(getOperation(),
-                                             std::move(patterns));
+    if (mlir::failed(mlir::applyPatternsAndFoldGreedily(getOperation(),
+                                                        std::move(patterns))))
+      return signalPassFailure();
   }
 };
 
@@ -1894,8 +1897,9 @@ struct TileParallelLoopsForGPUPass
 
     patterns.insert<TileParallelOp>(ctx);
 
-    (void)mlir::applyPatternsAndFoldGreedily(getOperation(),
-                                             std::move(patterns));
+    if (mlir::failed(mlir::applyPatternsAndFoldGreedily(getOperation(),
+                                                        std::move(patterns))))
+      return signalPassFailure();
   }
 };
 
@@ -2370,8 +2374,9 @@ struct InsertGPUGlobalReducePass
 
     patterns.insert<InsertGPUGlobalReduce>(ctx);
 
-    (void)mlir::applyPatternsAndFoldGreedily(getOperation(),
-                                             std::move(patterns));
+    if (mlir::failed(mlir::applyPatternsAndFoldGreedily(getOperation(),
+                                                        std::move(patterns))))
+      return signalPassFailure();
   }
 };
 
@@ -2599,8 +2604,9 @@ struct LowerGPUGlobalReducePass
 
     patterns.insert<LowerGPUGlobalReduce, AllReduceRemoveRegion>(ctx);
 
-    (void)mlir::applyPatternsAndFoldGreedily(getOperation(),
-                                             std::move(patterns));
+    if (mlir::failed(mlir::applyPatternsAndFoldGreedily(getOperation(),
+                                                        std::move(patterns))))
+      return signalPassFailure();
   }
 };
 } // namespace

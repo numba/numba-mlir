@@ -619,7 +619,9 @@ struct ShapeIntegerRangePropagationPass
 
     mlir::arith::populateIntRangeOptimizationsPatterns(patterns, solver);
 
-    (void)mlir::applyPatternsAndFoldGreedily(op, std::move(patterns));
+    if (mlir::failed(
+            mlir::applyPatternsAndFoldGreedily(op, std::move(patterns))))
+      return signalPassFailure();
   }
 };
 } // namespace

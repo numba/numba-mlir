@@ -48,8 +48,9 @@ public:
   }
 
   void runOnOperation() override {
-    (void)mlir::applyPatternsAndFoldGreedily(this->getOperation(),
-                                             this->patterns);
+    if (mlir::failed(mlir::applyPatternsAndFoldGreedily(this->getOperation(),
+                                                        this->patterns)))
+      this->signalPassFailure();
   }
 
 private:

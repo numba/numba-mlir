@@ -750,8 +750,9 @@ struct OptimizeStridedLayoutPass
 
     patterns.insert<ChangeLayoutReturn>(context);
 
-    (void)mlir::applyPatternsAndFoldGreedily(getOperation(),
-                                             std::move(patterns));
+    if (mlir::failed(mlir::applyPatternsAndFoldGreedily(getOperation(),
+                                                        std::move(patterns))))
+      return signalPassFailure();
   }
 };
 
@@ -771,7 +772,8 @@ void FinalizeStridedLayoutPass::runOnOperation() {
   patterns.insert<ReshapeChangeLayout, ReshapeToReinterpret, CleanupLoads>(
       context);
 
-  (void)mlir::applyPatternsAndFoldGreedily(op, std::move(patterns));
+  if (mlir::failed(mlir::applyPatternsAndFoldGreedily(op, std::move(patterns))))
+    return signalPassFailure();
 
   op->walk([&](numba::util::ChangeLayoutOp cl) {
     cl.emitError("Layout change failed");
@@ -1752,8 +1754,9 @@ struct ResolveNtensorPass
                     NtensorViewPrimitiveCallsLowering, BuiltinCallsLowering>(
         &ctx);
 
-    (void)mlir::applyPatternsAndFoldGreedily(getOperation(),
-                                             std::move(patterns));
+    if (mlir::failed(mlir::applyPatternsAndFoldGreedily(getOperation(),
+                                                        std::move(patterns))))
+      return signalPassFailure();
   }
 };
 
@@ -1923,8 +1926,9 @@ struct ResolveNumpyFuncsPass
         .insert<GetitemArrayOpLowering, SetitemArrayOpLowering, BinOpsLowering>(
             &ctx);
 
-    (void)mlir::applyPatternsAndFoldGreedily(getOperation(),
-                                             std::move(patterns));
+    if (mlir::failed(mlir::applyPatternsAndFoldGreedily(getOperation(),
+                                                        std::move(patterns))))
+      return signalPassFailure();
   }
 
 private:
@@ -2449,7 +2453,9 @@ void PostPlierToLinalgInnerPass::runOnOperation() {
 
   patterns.insert<SimplifyExpandDims>(&context);
 
-  (void)mlir::applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
+  if (mlir::failed(mlir::applyPatternsAndFoldGreedily(getOperation(),
+                                                      std::move(patterns))))
+    return signalPassFailure();
 }
 
 template <typename F>
@@ -2544,7 +2550,9 @@ void LinalgOptInnerPass::runOnOperation() {
                                                      defaultControlFusionFn);
   mlir::linalg::populateEraseUnusedOperandsAndResultsPatterns(patterns);
 
-  (void)mlir::applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
+  if (mlir::failed(mlir::applyPatternsAndFoldGreedily(getOperation(),
+                                                      std::move(patterns))))
+    return signalPassFailure();
 }
 
 struct BufferizeReshape

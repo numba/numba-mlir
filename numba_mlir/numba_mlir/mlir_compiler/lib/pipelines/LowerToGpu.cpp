@@ -487,8 +487,9 @@ struct GPUExDeallocPass
                     CreateDeallocOp<gpu_runtime::GetGpuKernelOp,
                                     gpu_runtime::DestroyGpuKernelOp>>(ctx);
 
-    (void)mlir::applyPatternsAndFoldGreedily(getOperation(),
-                                             std::move(patterns));
+    if (mlir::failed(mlir::applyPatternsAndFoldGreedily(getOperation(),
+                                                        std::move(patterns))))
+      return signalPassFailure();
   }
 };
 
@@ -890,8 +891,9 @@ struct LowerGpuRangePass
     numba::util::EnvironmentRegionOp::getCanonicalizationPatterns(patterns,
                                                                   context);
 
-    auto op = getOperation();
-    (void)mlir::applyPatternsAndFoldGreedily(op, std::move(patterns));
+    if (mlir::failed(mlir::applyPatternsAndFoldGreedily(getOperation(),
+                                                        std::move(patterns))))
+      return signalPassFailure();
   }
 };
 
