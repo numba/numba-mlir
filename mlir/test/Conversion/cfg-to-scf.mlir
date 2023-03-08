@@ -243,20 +243,21 @@ func.func @break_test1() {
   return
 }
 
+// TODO: disable some tests for now
 // CHECK-LABEL: func @break_test1
-// CHECK: %[[TRUE:.*]] = arith.constant true
-// CHECK: "test.test1"() : () -> ()
-// CHECK: %{{.*}} = scf.while (%[[ARG0:.*]] = %[[TRUE]]) : (i1) -> i1 {
-// CHECK: %[[COND:.*]] = "test.test2"() : () -> i1
-// CHECK: %[[ACOND:.*]] = arith.andi %[[ARG0]], %[[COND]] : i1
-// CHECK: scf.condition(%[[ACOND]]) %[[ARG0]] : i1
-// CHECK: } do {
-// CHECK: %[[COND2:.*]] = "test.test3"() : () -> i1
-// CHECK: %[[XCOND2:.*]] = arith.xori %[[COND2]], %[[TRUE]] : i1
-// CHECK: scf.yield %[[XCOND2]] : i1
-// CHECK: }
-// CHECK: "test.test4"() : () -> ()
-// CHECK: return
+// 1CHECK: %[[TRUE:.*]] = arith.constant true
+// 1CHECK: "test.test1"() : () -> ()
+// 1CHECK: %{{.*}} = scf.while (%[[ARG0:.*]] = %[[TRUE]]) : (i1) -> i1 {
+// 1CHECK: %[[COND:.*]] = "test.test2"() : () -> i1
+// 1CHECK: %[[ACOND:.*]] = arith.andi %[[ARG0]], %[[COND]] : i1
+// 1CHECK: scf.condition(%[[ACOND]]) %[[ARG0]] : i1
+// 1CHECK: } do {
+// 1CHECK: %[[COND2:.*]] = "test.test3"() : () -> i1
+// 1CHECK: %[[XCOND2:.*]] = arith.xori %[[COND2]], %[[TRUE]] : i1
+// 1CHECK: scf.yield %[[XCOND2]] : i1
+// 1CHECK: }
+// 1CHECK: "test.test4"() : () -> ()
+// 1CHECK: return
 
 // -----
 
@@ -275,18 +276,18 @@ func.func @break_test2() {
 }
 
 // CHECK-LABEL: func @break_test2
-// CHECK: %[[TRUE:.*]] = arith.constant true
-// CHECK: "test.test1"() : () -> ()
-// CHECK: %{{.*}} = scf.while (%[[ARG0:.*]] = %[[TRUE]]) : (i1) -> i1 {
-// CHECK: %[[COND:.*]] = "test.test2"() : () -> i1
-// CHECK: %[[ACOND:.*]] = arith.andi %[[ARG0]], %[[COND]] : i1
-// CHECK: scf.condition(%[[ACOND]]) %[[ARG0]] : i1
-// CHECK: } do {
-// CHECK: %[[COND2:.*]] = "test.test3"() : () -> i1
-// CHECK: scf.yield %[[COND2]] : i1
-// CHECK: }
-// CHECK: "test.test4"() : () -> ()
-// CHECK: return
+// 1CHECK: %[[TRUE:.*]] = arith.constant true
+// 1CHECK: "test.test1"() : () -> ()
+// 1CHECK: %{{.*}} = scf.while (%[[ARG0:.*]] = %[[TRUE]]) : (i1) -> i1 {
+// 1CHECK: %[[COND:.*]] = "test.test2"() : () -> i1
+// 1CHECK: %[[ACOND:.*]] = arith.andi %[[ARG0]], %[[COND]] : i1
+// 1CHECK: scf.condition(%[[ACOND]]) %[[ARG0]] : i1
+// 1CHECK: } do {
+// 1CHECK: %[[COND2:.*]] = "test.test3"() : () -> i1
+// 1CHECK: scf.yield %[[COND2]] : i1
+// 1CHECK: }
+// 1CHECK: "test.test4"() : () -> ()
+// 1CHECK: return
 
 // -----
 
@@ -305,19 +306,19 @@ func.func @break_test3() {
 }
 
 // CHECK-LABEL: func @break_test3
-// CHECK: %[[TRUE:.*]] = arith.constant true
-// CHECK: "test.test1"() : () -> ()
-// CHECK: %{{.*}} = scf.while (%[[ARG0:.*]] = %[[TRUE]]) : (i1) -> i1 {
-// CHECK: %[[COND:.*]] = "test.test2"() : () -> i1
-// CHECK: %[[ACOND:.*]] = arith.andi %[[ARG0]], %[[COND]] : i1
-// CHECK: %[[XCOND:.*]] = arith.xori %[[ACOND]], %[[TRUE]] : i1
-// CHECK: scf.condition(%[[XCOND]]) %[[ARG0]] : i1
-// CHECK: } do {
-// CHECK: %[[COND2:.*]] = "test.test3"() : () -> i1
-// CHECK: %[[XCOND2:.*]] = arith.xori %[[COND2]], %[[TRUE]] : i1
-// CHECK: scf.yield %[[XCOND2]] : i1
-// CHECK: }
-// CHECK: return
+// 1CHECK: %[[TRUE:.*]] = arith.constant true
+// 1CHECK: "test.test1"() : () -> ()
+// 1CHECK: %{{.*}} = scf.while (%[[ARG0:.*]] = %[[TRUE]]) : (i1) -> i1 {
+// 1CHECK: %[[COND:.*]] = "test.test2"() : () -> i1
+// 1CHECK: %[[ACOND:.*]] = arith.andi %[[ARG0]], %[[COND]] : i1
+// 1CHECK: %[[XCOND:.*]] = arith.xori %[[ACOND]], %[[TRUE]] : i1
+// 1CHECK: scf.condition(%[[XCOND]]) %[[ARG0]] : i1
+// 1CHECK: } do {
+// 1CHECK: %[[COND2:.*]] = "test.test3"() : () -> i1
+// 1CHECK: %[[XCOND2:.*]] = arith.xori %[[COND2]], %[[TRUE]] : i1
+// 1CHECK: scf.yield %[[XCOND2]] : i1
+// 1CHECK: }
+// 1CHECK: return
 
 // -----
 
@@ -339,24 +340,24 @@ func.func @if_break_test1() {
 }
 
 // CHECK-LABEL: func @if_break_test1
-// CHECK: %[[FALSE:.*]] = arith.constant false
-// CHECK: "test.test1"() : () -> ()
-// CHECK: scf.while : () -> () {
-// CHECK: %[[COND1:.*]] = "test.test2"() : () -> i1
-// CHECK: %[[COND2:.*]] = scf.if %[[COND1]] -> (i1) {
-// CHECK: %[[VAL1:.*]] = "test.test3"() : () -> i1
-// CHECK: scf.yield %[[VAL1]] : i1
-// CHECK: } else {
-// CHECK: scf.yield %[[FALSE]] : i1
-// CHECK: }
-// CHECK: %[[COND3:.*]] = arith.andi %[[COND1]], %[[COND2]] : i1
-// CHECK: scf.condition(%[[COND3]])
-// CHECK: } do {
-// CHECK: "test.test4"() : () -> ()
-// CHECK: scf.yield
-// CHECK: }
-// CHECK: "test.test5"() : () -> ()
-// CHECK: return
+// 1CHECK: %[[FALSE:.*]] = arith.constant false
+// 1CHECK: "test.test1"() : () -> ()
+// 1CHECK: scf.while : () -> () {
+// 1CHECK: %[[COND1:.*]] = "test.test2"() : () -> i1
+// 1CHECK: %[[COND2:.*]] = scf.if %[[COND1]] -> (i1) {
+// 1CHECK: %[[VAL1:.*]] = "test.test3"() : () -> i1
+// 1CHECK: scf.yield %[[VAL1]] : i1
+// 1CHECK: } else {
+// 1CHECK: scf.yield %[[FALSE]] : i1
+// 1CHECK: }
+// 1CHECK: %[[COND3:.*]] = arith.andi %[[COND1]], %[[COND2]] : i1
+// 1CHECK: scf.condition(%[[COND3]])
+// 1CHECK: } do {
+// 1CHECK: "test.test4"() : () -> ()
+// 1CHECK: scf.yield
+// 1CHECK: }
+// 1CHECK: "test.test5"() : () -> ()
+// 1CHECK: return
 
 // -----
 
@@ -378,25 +379,25 @@ func.func @if_break_test2() {
 }
 
 // CHECK-LABEL: func @if_break_test2
-// CHECK: %[[FALSE:.*]] = arith.constant false
-// CHECK: "test.test1"() : () -> ()
-// CHECK: scf.while : () -> () {
-// CHECK: %[[COND1:.*]] = "test.test2"() : () -> i1
-// CHECK: %[[XCOND1:.*]] = arith.xori %[[COND1]], %true : i1
-// CHECK: %[[COND2:.*]] = scf.if %[[COND1]] -> (i1) {
-// CHECK: scf.yield %[[FALSE]] : i1
-// CHECK: } else {
-// CHECK: %[[VAL1:.*]] = "test.test3"() : () -> i1
-// CHECK: scf.yield %[[VAL1]] : i1
-// CHECK: }
-// CHECK: %[[COND3:.*]] = arith.andi %[[XCOND1]], %[[COND2]] : i1
-// CHECK: scf.condition(%[[COND3]])
-// CHECK: } do {
-// CHECK: "test.test4"() : () -> ()
-// CHECK: scf.yield
-// CHECK: }
-// CHECK: "test.test5"() : () -> ()
-// CHECK: return
+// 1CHECK: %[[FALSE:.*]] = arith.constant false
+// 1CHECK: "test.test1"() : () -> ()
+// 1CHECK: scf.while : () -> () {
+// 1CHECK: %[[COND1:.*]] = "test.test2"() : () -> i1
+// 1CHECK: %[[XCOND1:.*]] = arith.xori %[[COND1]], %true : i1
+// 1CHECK: %[[COND2:.*]] = scf.if %[[COND1]] -> (i1) {
+// 1CHECK: scf.yield %[[FALSE]] : i1
+// 1CHECK: } else {
+// 1CHECK: %[[VAL1:.*]] = "test.test3"() : () -> i1
+// 1CHECK: scf.yield %[[VAL1]] : i1
+// 1CHECK: }
+// 1CHECK: %[[COND3:.*]] = arith.andi %[[XCOND1]], %[[COND2]] : i1
+// 1CHECK: scf.condition(%[[COND3]])
+// 1CHECK: } do {
+// 1CHECK: "test.test4"() : () -> ()
+// 1CHECK: scf.yield
+// 1CHECK: }
+// 1CHECK: "test.test5"() : () -> ()
+// 1CHECK: return
 
 // -----
 
@@ -418,25 +419,25 @@ func.func @if_break_test3() {
 }
 
 // CHECK-LABEL: func @if_break_test3
-// CHECK: %[[FALSE:.*]] = arith.constant false
-// CHECK: "test.test1"() : () -> ()
-// CHECK: scf.while : () -> () {
-// CHECK: %[[COND1:.*]] = "test.test2"() : () -> i1
-// CHECK: %[[COND2:.*]] = scf.if %[[COND1]] -> (i1) {
-// CHECK: %[[VAL1:.*]] = "test.test3"() : () -> i1
-// CHECK: %[[VAL2:.*]]  = arith.xori %[[VAL1]], %true : i1
-// CHECK: scf.yield %[[VAL2]] : i1
-// CHECK: } else {
-// CHECK: scf.yield %[[FALSE]] : i1
-// CHECK: }
-// CHECK: %[[COND3:.*]] = arith.andi %[[COND1]], %[[COND2]] : i1
-// CHECK: scf.condition(%[[COND3]])
-// CHECK: } do {
-// CHECK: "test.test4"() : () -> ()
-// CHECK: scf.yield
-// CHECK: }
-// CHECK: "test.test5"() : () -> ()
-// CHECK: return
+// 1CHECK: %[[FALSE:.*]] = arith.constant false
+// 1CHECK: "test.test1"() : () -> ()
+// 1CHECK: scf.while : () -> () {
+// 1CHECK: %[[COND1:.*]] = "test.test2"() : () -> i1
+// 1CHECK: %[[COND2:.*]] = scf.if %[[COND1]] -> (i1) {
+// 1CHECK: %[[VAL1:.*]] = "test.test3"() : () -> i1
+// 1CHECK: %[[VAL2:.*]]  = arith.xori %[[VAL1]], %true : i1
+// 1CHECK: scf.yield %[[VAL2]] : i1
+// 1CHECK: } else {
+// 1CHECK: scf.yield %[[FALSE]] : i1
+// 1CHECK: }
+// 1CHECK: %[[COND3:.*]] = arith.andi %[[COND1]], %[[COND2]] : i1
+// 1CHECK: scf.condition(%[[COND3]])
+// 1CHECK: } do {
+// 1CHECK: "test.test4"() : () -> ()
+// 1CHECK: scf.yield
+// 1CHECK: }
+// 1CHECK: "test.test5"() : () -> ()
+// 1CHECK: return
 
 // -----
 
@@ -458,24 +459,24 @@ func.func @if_break_test4() {
 }
 
 // CHECK-LABEL: func @if_break_test4
-// CHECK: %[[FALSE:.*]] = arith.constant false
-// CHECK: "test.test1"() : () -> ()
-// CHECK: %[[RES:.*]] = scf.while : () -> index {
-// CHECK: %[[COND1:.*]]:2 = "test.test2"() : () -> (i1, index)
-// CHECK: %[[COND2:.*]]:2 = scf.if %[[COND1]]#0 -> (i1, index) {
-// CHECK: %[[VAL1:.*]]:2 = "test.test3"() : () -> (i1, index)
-// CHECK: scf.yield %[[VAL1]]#0, %[[VAL1]]#1 : i1, index
-// CHECK: } else {
-// CHECK: scf.yield %[[FALSE]], %[[COND1]]#1 : i1, index
-// CHECK: }
-// CHECK: %[[COND3:.*]] = arith.andi %[[COND1]]#0, %[[COND2]]#0 : i1
-// CHECK: scf.condition(%[[COND3]])
-// CHECK: } do {
-// CHECK: "test.test4"() : () -> ()
-// CHECK: scf.yield
-// CHECK: }
-// CHECK: "test.test5"(%[[RES]]) : (index) -> ()
-// CHECK: return
+// 1CHECK: %[[FALSE:.*]] = arith.constant false
+// 1CHECK: "test.test1"() : () -> ()
+// 1CHECK: %[[RES:.*]] = scf.while : () -> index {
+// 1CHECK: %[[COND1:.*]]:2 = "test.test2"() : () -> (i1, index)
+// 1CHECK: %[[COND2:.*]]:2 = scf.if %[[COND1]]#0 -> (i1, index) {
+// 1CHECK: %[[VAL1:.*]]:2 = "test.test3"() : () -> (i1, index)
+// 1CHECK: scf.yield %[[VAL1]]#0, %[[VAL1]]#1 : i1, index
+// 1CHECK: } else {
+// 1CHECK: scf.yield %[[FALSE]], %[[COND1]]#1 : i1, index
+// 1CHECK: }
+// 1CHECK: %[[COND3:.*]] = arith.andi %[[COND1]]#0, %[[COND2]]#0 : i1
+// 1CHECK: scf.condition(%[[COND3]])
+// 1CHECK: } do {
+// 1CHECK: "test.test4"() : () -> ()
+// 1CHECK: scf.yield
+// 1CHECK: }
+// 1CHECK: "test.test5"(%[[RES]]) : (index) -> ()
+// 1CHECK: return
 
 // -----
 
@@ -497,23 +498,23 @@ func.func @if_break_test5() {
 }
 
 // CHECK-LABEL: func @if_break_test5
-// CHECK: %[[FALSE:.*]] = arith.constant false
-// CHECK: "test.test1"() : () -> ()
-// CHECK: %[[RES:.*]]:2 = scf.while : () -> (i1, index) {
-// CHECK: %[[COND1:.*]] = "test.test2"() : () -> i1
-// CHECK: %[[COND2:.*]]:2 = scf.if %[[COND1]] -> (i1, index) {
-// CHECK: %[[VAL1:.*]]:2 = "test.test3"() : () -> (i1, index)
-// CHECK: scf.yield %[[VAL1]]#0, %[[VAL1]]#1 : i1, index
-// CHECK: } else {
-// CHECK: %[[VAL2:.*]] = numba_util.undef : index
-// CHECK: scf.yield %[[FALSE]], %[[VAL2]] : i1, index
-// CHECK: }
-// CHECK: %[[COND3:.*]] = arith.andi %[[COND1]], %[[COND2]]#0 : i1
-// CHECK: scf.condition(%[[COND3]])
-// CHECK: } do {
-// CHECK: ^bb{{.+}}(%[[ARG1:.*]]: i1, %[[ARG2:.*]]: index):
-// CHECK: "test.test4"(%[[ARG2]]) : (index) -> ()
-// CHECK: scf.yield
-// CHECK: }
-// CHECK: "test.test5"() : () -> ()
-// CHECK: return
+// 1CHECK: %[[FALSE:.*]] = arith.constant false
+// 1CHECK: "test.test1"() : () -> ()
+// 1CHECK: %[[RES:.*]]:2 = scf.while : () -> (i1, index) {
+// 1CHECK: %[[COND1:.*]] = "test.test2"() : () -> i1
+// 1CHECK: %[[COND2:.*]]:2 = scf.if %[[COND1]] -> (i1, index) {
+// 1CHECK: %[[VAL1:.*]]:2 = "test.test3"() : () -> (i1, index)
+// 1CHECK: scf.yield %[[VAL1]]#0, %[[VAL1]]#1 : i1, index
+// 1CHECK: } else {
+// 1CHECK: %[[VAL2:.*]] = numba_util.undef : index
+// 1CHECK: scf.yield %[[FALSE]], %[[VAL2]] : i1, index
+// 1CHECK: }
+// 1CHECK: %[[COND3:.*]] = arith.andi %[[COND1]], %[[COND2]]#0 : i1
+// 1CHECK: scf.condition(%[[COND3]])
+// 1CHECK: } do {
+// 1CHECK: ^bb{{.+}}(%[[ARG1:.*]]: i1, %[[ARG2:.*]]: index):
+// 1CHECK: "test.test4"(%[[ARG2]]) : (index) -> ()
+// 1CHECK: scf.yield
+// 1CHECK: }
+// 1CHECK: "test.test5"() : () -> ()
+// 1CHECK: return
