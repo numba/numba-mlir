@@ -887,6 +887,9 @@ static bool restructureLoop(mlir::PatternRewriter &rewriter, SCC::Node &node) {
   llvm::SmallVector<Edge> repetitionEdges;
   buildEdges(blocks, inEdges, outEdges, repetitionEdges);
 
+  if (inEdges.empty())
+    return false;
+
   llvm::SmallVector<Edge> multiplexEdges(inEdges.begin(), inEdges.end());
   multiplexEdges.append(repetitionEdges.begin(), repetitionEdges.end());
   assert(!multiplexEdges.empty());
