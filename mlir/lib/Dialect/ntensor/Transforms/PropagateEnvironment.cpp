@@ -373,7 +373,9 @@ struct PropagateEnvironmentPass
     mlir::RewritePatternSet patterns(&getContext());
     numba::ntensor::CastOp::getCanonicalizationPatterns(patterns,
                                                         &getContext());
-    (void)mlir::applyPatternsAndFoldGreedily(root, std::move(patterns));
+    if (mlir::failed(
+            mlir::applyPatternsAndFoldGreedily(root, std::move(patterns))))
+      return signalPassFailure();
   }
 };
 } // namespace

@@ -155,8 +155,9 @@ struct MakeBarriersUniformPass
 
     mlir::GreedyRewriteConfig config;
     config.useTopDownTraversal = true; // We need to visit top barriers first
-    (void)mlir::applyPatternsAndFoldGreedily(getOperation(),
-                                             std::move(patterns), config);
+    if (mlir::failed(mlir::applyPatternsAndFoldGreedily(
+            getOperation(), std::move(patterns), config)))
+      return signalPassFailure();
   }
 };
 } // namespace

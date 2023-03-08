@@ -233,8 +233,9 @@ struct UpliftMathPass
   void runOnOperation() override {
     mlir::RewritePatternSet patterns(&getContext());
     numba::populateUpliftMathPatterns(patterns);
-    (void)mlir::applyPatternsAndFoldGreedily(getOperation(),
-                                             std::move(patterns));
+    if (mlir::failed(mlir::applyPatternsAndFoldGreedily(getOperation(),
+                                                        std::move(patterns))))
+      return signalPassFailure();
   }
 };
 
@@ -251,8 +252,9 @@ struct UpliftFMAPass
   void runOnOperation() override {
     mlir::RewritePatternSet patterns(&getContext());
     numba::populateUpliftFMAPatterns(patterns);
-    (void)mlir::applyPatternsAndFoldGreedily(getOperation(),
-                                             std::move(patterns));
+    if (mlir::failed(mlir::applyPatternsAndFoldGreedily(getOperation(),
+                                                        std::move(patterns))))
+      return signalPassFailure();
   }
 };
 } // namespace

@@ -86,7 +86,8 @@ struct ForceInlinePass
 
   virtual void runOnOperation() override {
     auto mod = getOperation();
-    (void)mlir::applyPatternsAndFoldGreedily(mod, patterns);
+    if (mlir::failed(mlir::applyPatternsAndFoldGreedily(mod, patterns)))
+      return signalPassFailure();
 
     mod->walk([&](mlir::func::CallOp call) {
       auto func = mod.lookupSymbol<mlir::func::FuncOp>(call.getCallee());

@@ -747,8 +747,9 @@ struct NtensorToLinalgPass
 
     numba::populateNtensorToLinalgPatterns(patterns);
 
-    (void)mlir::applyPatternsAndFoldGreedily(getOperation(),
-                                             std::move(patterns));
+    if (mlir::failed(mlir::applyPatternsAndFoldGreedily(getOperation(),
+                                                        std::move(patterns))))
+      return signalPassFailure();
   }
 };
 } // namespace

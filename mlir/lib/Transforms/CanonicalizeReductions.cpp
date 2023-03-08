@@ -222,8 +222,10 @@ struct CanonicalizeReductionsPass
 
     mlir::RewritePatternSet patterns(context);
     patterns.insert<CanonicalizeReduction>(context, aliasAnalysis);
-    auto op = getOperation();
-    (void)mlir::applyPatternsAndFoldGreedily(op, std::move(patterns));
+
+    if (mlir::failed(mlir::applyPatternsAndFoldGreedily(getOperation(),
+                                                        std::move(patterns))))
+      return signalPassFailure();
   }
 };
 } // namespace
