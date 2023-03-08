@@ -1309,8 +1309,9 @@ struct LowerParallelToCFGPass
     mlir::RewritePatternSet patterns(&context);
     patterns.insert<LowerParallel>(&getContext());
 
-    (void)mlir::applyPatternsAndFoldGreedily(getOperation(),
-                                             std::move(patterns));
+    if (mlir::failed(mlir::applyPatternsAndFoldGreedily(getOperation(),
+                                                        std::move(patterns))))
+      return signalPassFailure();
   }
 };
 
@@ -1339,8 +1340,9 @@ struct PreLLVMLowering
     patterns.insert<ReturnOpLowering>(&context,
                                       type_helper.get_type_converter());
 
-    (void)mlir::applyPatternsAndFoldGreedily(getOperation(),
-                                             std::move(patterns));
+    if (mlir::failed(mlir::applyPatternsAndFoldGreedily(getOperation(),
+                                                        std::move(patterns))))
+      return signalPassFailure();
   }
 };
 
@@ -1457,8 +1459,9 @@ struct PostLLVMLowering
                     ApplyFastmathFlags<mlir::LLVM::FCmpOp>,
                     ApplyFastmathFlags<mlir::LLVM::CallOp>>(&context);
 
-    (void)mlir::applyPatternsAndFoldGreedily(getOperation(),
-                                             std::move(patterns));
+    if (mlir::failed(mlir::applyPatternsAndFoldGreedily(getOperation(),
+                                                        std::move(patterns))))
+      return signalPassFailure();
   }
 };
 
