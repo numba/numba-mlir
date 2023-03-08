@@ -854,14 +854,14 @@ static void buildEdges(llvm::ArrayRef<mlir::Block *> blocks,
   }
 
   if (debugLoopRestructuring) {
-    auto prentEdges = [](auto& edges, llvm::StringRef name) {
+    auto prentEdges = [](auto &edges, llvm::StringRef name) {
       llvm::errs() << name << " edges begin\n";
       for (auto e : edges) {
         llvm::errs() << " edge\n";
         e.first->dump();
         e.second->dump();
       }
-      llvm::errs() << name <<" edges end\n";
+      llvm::errs() << name << " edges end\n";
     };
     prentEdges(inEdges, "inEdges");
     prentEdges(outEdges, "outEdges");
