@@ -18,7 +18,7 @@
 #include <mlir/Transforms/Passes.h>
 
 namespace {
-static const constexpr bool debugLooRestructuring = true;
+static const constexpr bool debugLoopRestructuring = true;
 
 static mlir::Block *getNextBlock(mlir::Block *block) {
   assert(nullptr != block);
@@ -853,16 +853,19 @@ static void buildEdges(llvm::ArrayRef<mlir::Block *> blocks,
     }
   }
 
-  if (debugLooRestructuring) {
-    for (auto ed : {&inEdges, &outEdges, &repetitionEdges}) {
-      llvm::errs() << "edges begin\n";
-      for (auto e : *ed) {
+  if (debugLoopRestructuring) {
+    auto prentEdges = [](auto& edges, llvm::StringRef name) {
+      llvm::errs() << name << " edges begin\n";
+      for (auto e : edges) {
         llvm::errs() << " edge\n";
         e.first->dump();
         e.second->dump();
       }
-      llvm::errs() << "edges end\n";
-    }
+      llvm::errs() << name <<" edges end\n";
+    };
+    prentEdges(inEdges, "inEdges");
+    prentEdges(outEdges, "outEdges");
+    prentEdges(repetitionEdges, "repetitionEdges");
   }
 }
 
@@ -1076,7 +1079,7 @@ static mlir::LogicalResult runLoopRestructuring(mlir::PatternRewriter &rewriter,
   llvm::errs() << "Build scc\n";
   auto scc = buildSCC(region);
 
-  if (debugLooRestructuring)
+  if (debugLoopRestructuring)
     scc.dump();
 
   bool changed = false;
