@@ -1633,9 +1633,22 @@ struct CFGToSCFPass
     numba::util::UndefOp::getCanonicalizationPatterns(patterns, context);
 
     auto op = getOperation();
-    if (mlir::failed(
-            mlir::applyPatternsAndFoldGreedily(op, std::move(patterns))))
-      return signalPassFailure();
+
+    mlir::OperationFingerPrint fp(op);
+    int maxIters = 10;
+    mlir::FrozenRewritePatternSet frozenPatterns(std::move(patterns));
+
+    // Repeat transformations multiple times until they converge.
+    // TODO Not clear why it's needed, investigate later.
+    for (auto i : llvm::seq(0, maxIters)) {
+      (void)i;
+      (void)mlir::applyPatternsAndFoldGreedily(op, frozenPatterns);
+      mlir::OperationFingerPrint newFp(op);
+      if (newFp == fp)
+        break;
+
+      fp = newFp;
+    }
 
     op->walk([&](mlir::Operation *o) -> mlir::WalkResult {
       if (mlir::isa<mlir::cf::BranchOp, mlir::cf::CondBranchOp>(o)) {
