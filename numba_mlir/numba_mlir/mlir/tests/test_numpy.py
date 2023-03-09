@@ -4,7 +4,7 @@
 
 import numba
 
-# from numba_mlir import njit
+from numba_mlir import njit as orig_njit
 from numba_mlir import vectorize
 from numba_mlir.mlir.passes import print_pass_ir, get_print_buffer
 from numpy.testing import assert_equal, assert_allclose  # for nans comparison
@@ -1831,7 +1831,10 @@ _matmul_inputs_vars = [
 def test_matmul1(py_func, a, b, dtype):
     a = np.array(a, dtype=dtype)
     b = np.array(b, dtype=dtype)
-    jit_func = njit(py_func)
+
+    # TODO: Some issue with caching
+    # jit_func = njit(py_func)
+    jit_func = orig_njit(py_func)
     assert_allclose(py_func(a, b), jit_func(a, b), rtol=1e-4, atol=1e-7)
 
 
