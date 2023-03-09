@@ -1827,7 +1827,7 @@ _matmul_inputs_vars = [
 @pytest.mark.parametrize(
     "a,b", _matmul_inputs_vars
 )  # ids=list(map(str, _matmul_inputs_vars))
-@pytest.mark.parametrize("dtype", [np.float32, np.float64])
+@pytest.mark.parametrize("dtype", [np.float32, np.float64, np.complex64, np.complex128])
 def test_matmul1(py_func, a, b, dtype):
     a = np.array(a, dtype=dtype)
     b = np.array(b, dtype=dtype)
