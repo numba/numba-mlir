@@ -4,7 +4,7 @@
 
 import numba
 
-# from numba_mlir import njit
+from numba_mlir import njit as orig_njit
 import math
 import sys
 from numpy.testing import assert_equal  # for nans comparison
@@ -863,17 +863,16 @@ def test_builtin_funcs3(func, a, b, c):
     assert_equal(py_func(a, b, c), jit_func(a, b, c))
 
 
-@pytest.mark.skip()
 def test_fastmath_indirect():
     def py_func1(a, b, c):
         return a + b * c
 
-    jit_func1 = njit(py_func1, fastmath=True)
+    jit_func1 = orig_njit(py_func1, fastmath=True)
 
     def py_func2(a, b, c):
         return jit_func1(a, b, c)
 
-    jit_func2 = njit(py_func2)
+    jit_func2 = orig_njit(py_func2)
 
     a, b, c = (2.0, 3.5, 4.7)
     with print_pass_ir([], ["UpliftFMAPass"]):
@@ -891,12 +890,12 @@ def test_named_args_indirect():
     def py_func1(a, b, c, d):
         return a + b * 10 + c * 100 + d * 1000
 
-    jit_func1 = njit(py_func1)
+    jit_func1 = orig_njit(py_func1)
 
     def py_func2(a, b, c, d):
         return jit_func1(d, a, d=c, c=b)
 
-    jit_func2 = njit(py_func2)
+    jit_func2 = orig_njit(py_func2)
 
     a, b, c, d = (2.0, 3.5, 4.7, 5.9)
     assert_equal(py_func2(a, b, c, d), jit_func2(a, b, c, d))

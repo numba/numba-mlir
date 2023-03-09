@@ -625,7 +625,6 @@ def test_prange_lowering():
         assert ir.count("numba_util.parallel") == 1, ir
 
 
-@pytest.mark.skip()
 def test_prange_lowering_indirect():
     def py_func1(arr):
         res = 0
@@ -634,12 +633,12 @@ def test_prange_lowering_indirect():
 
         return res
 
-    jit_func1 = njit(py_func1, parallel=True)
+    jit_func1 = orig_njit(py_func1, parallel=True)
 
     def py_func2(arr):
         return jit_func1(arr)
 
-    jit_func2 = njit(py_func2)
+    jit_func2 = orig_njit(py_func2)
 
     with print_pass_ir([], ["ParallelToTbbPass"]):
         arr = np.arange(10000, dtype=np.float32)
