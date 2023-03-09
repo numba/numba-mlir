@@ -434,6 +434,7 @@ void numba::populateTupleTypeConversionRewritesAndTarget(
         if (!tupleType)
           return std::nullopt;
 
+        auto dstType = op.getType();
         auto srcType = [&]() -> mlir::Type {
           if (auto index = mlir::getConstantIntValue(op.getIndex())) {
             auto i = *index;
@@ -443,12 +444,11 @@ void numba::populateTupleTypeConversionRewritesAndTarget(
           } else if (isUniTuple(tupleType)) {
             return tupleType.getType(0);
           }
-          return {};
+          return dstType;
         }();
         if (!srcType)
           return std::nullopt;
 
-        auto dstType = op.getType();
         return inputType == tupleType && srcType == dstType &&
                dstType == typeConverter.convertType(dstType);
       });

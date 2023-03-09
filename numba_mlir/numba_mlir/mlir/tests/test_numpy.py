@@ -4,7 +4,7 @@
 
 import numba
 
-# from numba_mlir import njit
+from numba_mlir import njit as orig_njit
 from numba_mlir import vectorize
 from numba_mlir.mlir.passes import print_pass_ir, get_print_buffer
 from numpy.testing import assert_equal, assert_allclose  # for nans comparison
@@ -329,22 +329,48 @@ def test_getitem3():
     assert_equal(py_func(arr, 0, 0), jit_func(arr, 0, 0))
 
 
-def test_unituple_getitem1():
+_unituple_indices = [-2, -1, 0, 1, 2]
+
+
+@pytest.mark.parametrize("index", _unituple_indices)
+def test_unituple_getitem1(index):
     def py_func(a, b, c, i):
         t = (a, b, c)
         return t[i]
 
     jit_func = njit(py_func)
-    assert_equal(py_func(1, 2, 3, 1), jit_func(1, 2, 3, 1))
+    assert_equal(py_func(1, 2, 3, index), jit_func(1, 2, 3, index))
 
 
-def test_unituple_getitem2():
+@pytest.mark.parametrize("index", _unituple_indices)
+def test_unituple_getitem2(index):
     def py_func(t, i):
         return t[i]
 
     jit_func = njit(py_func)
     t = (1, 2, 3)
-    assert_equal(py_func(t, 1), jit_func(t, 1))
+    assert_equal(py_func(t, index), jit_func(t, index))
+
+
+@pytest.mark.parametrize("index", _unituple_indices)
+def test_unituple_getitem3(index):
+    def py_func(a, i):
+        s = a.shape
+        return s[i]
+
+    jit_func = njit(py_func)
+    a = np.empty((1, 2, 3))
+    assert_equal(py_func(a, index), jit_func(a, index))
+
+
+@pytest.mark.parametrize("index", _unituple_indices)
+def test_unituple_getitem4(index):
+    def py_func(t):
+        return t[index]
+
+    jit_func = njit(py_func)
+    t = (1, 2, 3)
+    assert_equal(py_func(t), jit_func(t))
 
 
 @pytest.mark.parametrize("arr", _test_arrays, ids=_test_arrays_ids)
@@ -1801,11 +1827,14 @@ _matmul_inputs_vars = [
 @pytest.mark.parametrize(
     "a,b", _matmul_inputs_vars
 )  # ids=list(map(str, _matmul_inputs_vars))
-@pytest.mark.parametrize("dtype", [np.float32, np.float64])
+@pytest.mark.parametrize("dtype", [np.float32, np.float64, np.complex64, np.complex128])
 def test_matmul1(py_func, a, b, dtype):
     a = np.array(a, dtype=dtype)
     b = np.array(b, dtype=dtype)
-    jit_func = njit(py_func)
+
+    # TODO: Some issue with caching
+    # jit_func = njit(py_func)
+    jit_func = orig_njit(py_func)
     assert_allclose(py_func(a, b), jit_func(a, b), rtol=1e-4, atol=1e-7)
 
 

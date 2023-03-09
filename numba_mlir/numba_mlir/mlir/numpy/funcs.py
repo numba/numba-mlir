@@ -587,7 +587,11 @@ def _linalg_matmul2d(builder, a, b, shape1, shape2):
 
 
 def _matmul2d(builder, a, b, shape1, shape2):
-    if MKL_AVAILABLE:
+    if (
+        MKL_AVAILABLE
+        and not is_complex(a.dtype, builder)
+        and not is_complex(b.dtype, builder)
+    ):
         return _mkl_gemm(builder, a, b, 1, 0, shape1, shape2)
     else:
         return _linalg_matmul2d(builder, a, b, shape1, shape2)
