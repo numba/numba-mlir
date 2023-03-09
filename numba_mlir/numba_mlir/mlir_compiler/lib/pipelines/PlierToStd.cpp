@@ -808,8 +808,6 @@ protected:
   matchAndRewrite(plier::PyCallOp op,
                   mlir::PatternRewriter &rewriter) const override {
     auto name = op.getFuncName();
-    mlir::ValueRange args = op.getArgs();
-
     auto kwn = op.getKwNames();
     llvm::SmallVector<llvm::StringRef> kwNames;
     kwNames.reserve(kwn.size());
@@ -918,7 +916,7 @@ struct GetItemTupleConversionPattern
     if (!retType)
       return mlir::failure();
 
-    auto index = numba::indexCast(rewriter, op->getLoc(), adaptor.getIndex());
+    auto index = numba::indexCast(rewriter, op.getLoc(), adaptor.getIndex());
 
     rewriter.replaceOpWithNewOp<numba::util::TupleExtractOp>(op, retType,
                                                              container, index);

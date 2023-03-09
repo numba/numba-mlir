@@ -329,22 +329,48 @@ def test_getitem3():
     assert_equal(py_func(arr, 0, 0), jit_func(arr, 0, 0))
 
 
-def test_unituple_getitem1():
+_unituple_indices = [-2, -1, 0, 1, 2]
+
+
+@pytest.mark.parametrize("index", _unituple_indices)
+def test_unituple_getitem1(index):
     def py_func(a, b, c, i):
         t = (a, b, c)
         return t[i]
 
     jit_func = njit(py_func)
-    assert_equal(py_func(1, 2, 3, 1), jit_func(1, 2, 3, 1))
+    assert_equal(py_func(1, 2, 3, index), jit_func(1, 2, 3, index))
 
 
-def test_unituple_getitem2():
+@pytest.mark.parametrize("index", _unituple_indices)
+def test_unituple_getitem2(index):
     def py_func(t, i):
         return t[i]
 
     jit_func = njit(py_func)
     t = (1, 2, 3)
-    assert_equal(py_func(t, 1), jit_func(t, 1))
+    assert_equal(py_func(t, index), jit_func(t, index))
+
+
+@pytest.mark.parametrize("index", _unituple_indices)
+def test_unituple_getitem3(index):
+    def py_func(a, i):
+        s = a.shape
+        return s[i]
+
+    jit_func = njit(py_func)
+    a = np.empty((1, 2, 3))
+    assert_equal(py_func(a, index), jit_func(a, index))
+
+
+@pytest.mark.parametrize("index", _unituple_indices)
+def test_unituple_getitem4(index):
+    def py_func(t):
+        return t[index]
+
+    jit_func = njit(py_func)
+    t = (1, 2, 3)
+    assert_equal(py_func(t), jit_func(t))
 
 
 @pytest.mark.parametrize("arr", _test_arrays, ids=_test_arrays_ids)
