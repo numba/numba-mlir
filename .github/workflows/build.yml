@@ -711,15 +711,8 @@ jobs:
           run-post: false
           auto-activate-base: true
           activate-environment: ""
-      - name: Install anaconda-client
-        run: conda install anaconda-client
 
       - name: Add conda to system path
-        if: matrix.os == 'ubuntu-latest'
-        run: echo $CONDA/bin >> $GITHUB_PATH
-
-      - name: Add conda to system path
-        if: matrix.os == 'ubuntu-latest'
         run: echo $CONDA/bin >> $GITHUB_PATH
 
       - name: Install anaconda-client
