@@ -698,11 +698,41 @@ jobs:
           path: numba_mlir_conda/linux-64/*.tar.bz2
           retention-days: 30
 
+  upload_packages_preprocess:
+    name: Upload packages preprocess
+    timeout-minutes: 450
+    needs: [build_linux_python, build_win_python]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: conda-incubator/setup-miniconda@v2
+        with:
+          auto-update-conda: true
+          use-only-tar-bz2: true
+          run-post: false
+          auto-activate-base: true
+          activate-environment: ""
+      - name: Install anaconda-client
+        run: conda install anaconda-client
+
+      - name: Add conda to system path
+        if: matrix.os == 'ubuntu-latest'
+        run: echo $CONDA/bin >> $GITHUB_PATH
+
+      - name: Add conda to system path
+        if: matrix.os == 'ubuntu-latest'
+        run: echo $CONDA/bin >> $GITHUB_PATH
+
+      - name: Install anaconda-client
+        run: conda install anaconda-client
+
+      - name: Cleanup old packages
+        run: python scripts/cleanup-old-packages.py --package="dppy/numba-mlir" --keep_count=18 --verbose --dry_run
+
   upload_packages:
     name: Upload conda packages
     if: ${{ github.ref == 'refs/heads/main' }}
     timeout-minutes: 450
-    needs: [build_linux_python, build_win_python]
+    needs: [upload_packages_preprocess]
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest]
