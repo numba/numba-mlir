@@ -79,6 +79,8 @@ _test_arrays_ids = [
 @parametrize_function_variants(
     "py_func",
     [
+        "lambda a: +a",
+        "lambda a: -a",
         "lambda a: a.sum()",
         "lambda a: a.min()",
         "lambda a: a.max()",
@@ -98,6 +100,7 @@ _test_arrays_ids = [
         "lambda a: np.abs(a)",
         "lambda a: np.absolute(a)",
         "lambda a: np.negative(a)",
+        "lambda a: np.positive(a)",
         "lambda a: a.size",
         "lambda a: a.T",
         "lambda a: a.T.T",
