@@ -263,7 +263,7 @@ def _gen_unary_ops():
     def bool_type(builder, t):
         return builder.bool
 
-    def reg_func(name, func):
+    def reg_func(name, func=None):
         return register_func(name, func, out="out")
 
     unary_ops = [
@@ -276,6 +276,9 @@ def _gen_unary_ops():
         (reg_func("numpy.tanh", numpy.tanh), f64_type, lambda a, b: math.tanh(a)),
         (reg_func("numpy.abs", numpy.abs), complex_to_real, lambda a, b: abs(a)),
         (reg_func("numpy.negative", numpy.negative), None, lambda a, b: -a),
+        (reg_func("numpy.positive", numpy.positive), None, lambda a, b: +a),
+        (reg_func("operator.neg"), None, lambda a, b: -a),
+        (reg_func("operator.pos"), None, lambda a, b: +a),
         (
             reg_func("numpy.logical_not", numpy.logical_not),
             bool_type,
