@@ -7,6 +7,7 @@ import subprocess
 from setuptools import find_packages, setup
 import versioneer
 import numpy
+from pathlib import Path
 
 root_dir = os.path.dirname(os.path.abspath(__file__))
 
@@ -18,7 +19,9 @@ if int(os.environ.get("NUMBA_MLIR_SETUP_RUN_CMAKE", 1)):
     MLIR_DIR = os.path.join(LLVM_PATH, "lib", "cmake", "mlir")
     TBB_DIR = os.path.join(os.environ["TBB_PATH"], "lib", "cmake", "tbb")
     NUMBA_MLIR_USE_MKL = os.environ.get("NUMBA_MLIR_USE_MKL")
-    CMAKE_INSTALL_PREFIX = os.path.join(root_dir, "..")
+    CMAKE_INSTALL_PREFIX = os.path.join(str(Path(root_dir).parent))
+    NUMBA_MLIR_USE_DPNP = os.environ.get("NUMBA_MLIR_USE_DPNP")
+    NUMBA_MLIR_ENABLE_IGPU_DIALECT = os.environ.get("NUMBA_MLIR_ENABLE_IGPU_DIALECT")
 
     cmake_build_dir = os.path.join(CMAKE_INSTALL_PREFIX, "numba_mlir_cmake_build")
     cmake_cmd = [
@@ -50,17 +53,23 @@ if int(os.environ.get("NUMBA_MLIR_SETUP_RUN_CMAKE", 1)):
     # DPNP
     try:
         from dpnp import get_include as dpnp_get_include
+        from dpctl import get_include as dpctl_get_include
 
-        DPNP_LIBRARY_DIR = os.path.join(dpnp_get_include(), "..", "..")
         DPNP_INCLUDE_DIR = dpnp_get_include()
+        DPNP_LIBRARY_DIR = str(Path(DPNP_INCLUDE_DIR).parent.parent)
+        DPCTL_INCLUDE_DIR = dpctl_get_include()
+        DPCTL_LIBRARY_DIR = str(Path(DPCTL_INCLUDE_DIR).parent)
         cmake_cmd += [
+            "-DDPNP_INCLUDE_DIR=" + DPNP_INCLUDE_DIR,            
             "-DDPNP_LIBRARY_DIR=" + DPNP_LIBRARY_DIR,
-            "-DDPNP_INCLUDE_DIR=" + DPNP_INCLUDE_DIR,
-            "-DNUMBA_MLIR_USE_DPNP=ON",
+            "-DDPCTL_INCLUDE_DIR=" + DPCTL_INCLUDE_DIR,
+            "-DDPCTL_LIBRARY_DIR=" + DPCTL_LIBRARY_DIR,
+            "-DNUMBA_MLIR_USE_DPNP=" + ("ON" if NUMBA_MLIR_USE_DPNP == '1' else "OFF"),
         ]
         print("Found DPNP at", DPNP_LIBRARY_DIR)
+        print("Found DPCTL at", DPCTL_LIBRARY_DIR)
     except ImportError:
-        print("DPNP not found")
+        print("DPNP or DPCTL not found")
 
     # GPU/L0
     LEVEL_ZERO_DIR = os.getenv("LEVEL_ZERO_DIR", None)
@@ -69,7 +78,13 @@ if int(os.environ.get("NUMBA_MLIR_SETUP_RUN_CMAKE", 1)):
     else:
         print("LEVEL_ZERO_DIR is", LEVEL_ZERO_DIR)
         cmake_cmd += [
-            "-DNUMBA_MLIR_ENABLE_IGPU_DIALECT=ON",
+                "-DNUMBA_MLIR_ENABLE_IGPU_DIALECT=ON",
+        ]
+    
+    # If L0 is already on the system
+    if NUMBA_MLIR_ENABLE_IGPU_DIALECT == '1':
+        cmake_cmd += [
+                "-DNUMBA_MLIR_ENABLE_IGPU_DIALECT=ON",
         ]
 
     try:
