@@ -725,6 +725,11 @@ jobs:
       - name: Install anaconda-client
         run: conda install anaconda-client
 
+      - name: Checkout repo
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+
       - name: Cleanup old packages
         run: python scripts/cleanup-old-packages.py --package="dppy/numba-mlir" --keep_count=18 --verbose --dry_run
 
