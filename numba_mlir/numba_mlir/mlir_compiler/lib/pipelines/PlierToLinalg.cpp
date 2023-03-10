@@ -1744,6 +1744,36 @@ struct BuiltinCallsLowering : public mlir::OpRewritePattern<plier::PyCallOp> {
   }
 };
 
+struct UnaryOpsLowering
+    : public mlir::OpRewritePattern<numba::ntensor::UnaryOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(numba::ntensor::UnaryOp op,
+                  mlir::PatternRewriter &rewriter) const override {
+    auto opName = op.getOp();
+    const std::pair<llvm::StringRef, llvm::StringRef> mapping[] = {
+        {"-", "neg"},
+        {"+", "pos"},
+        {"~", "invert"},
+        {"not", "not"},
+    };
+
+    for (auto [srcName, dstName] : mapping) {
+      if (opName != srcName)
+        continue;
+
+      llvm::SmallVector<char> tmp;
+      auto newName = ("operator." + dstName).toStringRef(tmp);
+      rewriter.replaceOpWithNewOp<numba::ntensor::PrimitiveOp>(
+          op, op->getResultTypes(), op.getValue(), newName);
+      return mlir::success();
+    }
+
+    return mlir::failure();
+  }
+};
+
 struct BinOpsLowering
     : public mlir::OpRewritePattern<numba::ntensor::BinaryOp> {
   using OpRewritePattern::OpRewritePattern;
@@ -1955,9 +1985,8 @@ struct ResolveNumpyFuncsPass
 
     patterns.insert<NumpyCallsResolver>(&ctx, *resolver);
 
-    patterns
-        .insert<GetitemArrayOpLowering, SetitemArrayOpLowering, BinOpsLowering>(
-            &ctx);
+    patterns.insert<GetitemArrayOpLowering, SetitemArrayOpLowering,
+                    UnaryOpsLowering, BinOpsLowering>(&ctx);
 
     if (mlir::failed(mlir::applyPatternsAndFoldGreedily(getOperation(),
                                                         std::move(patterns))))
