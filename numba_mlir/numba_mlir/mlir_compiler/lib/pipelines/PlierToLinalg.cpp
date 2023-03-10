@@ -871,6 +871,29 @@ struct NtensorSetitemToNtensor
   }
 };
 
+struct UnaryToNtensor : public mlir::OpConversionPattern<plier::UnaryOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(plier::UnaryOp op, plier::UnaryOp::Adaptor adaptor,
+                  mlir::ConversionPatternRewriter &rewriter) const override {
+    auto val = adaptor.getValue();
+    if (!val.getType().isa<numba::ntensor::NTensorType>())
+      return mlir::failure();
+
+    auto converter = getTypeConverter();
+    assert(converter);
+    auto resultType = converter->convertType(op.getType());
+    if (!resultType)
+      return mlir::failure();
+
+    auto opName = op.getOp();
+    rewriter.replaceOpWithNewOp<numba::ntensor::UnaryOp>(op, resultType, val,
+                                                         opName);
+    return mlir::success();
+  }
+};
+
 struct BinopToNtensor : public mlir::OpConversionPattern<plier::BinOp> {
   using OpConversionPattern::OpConversionPattern;
 
@@ -1342,6 +1365,15 @@ struct PlierToNtensorPass
           return typeConverter.isLegal(op);
         });
 
+    target.addDynamicallyLegalOp<plier::UnaryOp>(
+        [&typeConverter](plier::UnaryOp op) -> std::optional<bool> {
+          auto val = op.getValue().getType();
+          if (isNtensor(typeConverter, val))
+            return false;
+
+          return std::nullopt;
+        });
+
     target.addDynamicallyLegalOp<plier::BinOp>(
         [&typeConverter](plier::BinOp op) -> std::optional<bool> {
           auto lhs = op.getLhs().getType();
@@ -1404,6 +1436,7 @@ struct PlierToNtensorPass
         SetitemToNtensor,
         NtensorGetitemToNtensor,
         NtensorSetitemToNtensor,
+        UnaryToNtensor,
         BinopToNtensor,
         BuildSliceToNtensor,
         BuiltinCallsToNtensor,
