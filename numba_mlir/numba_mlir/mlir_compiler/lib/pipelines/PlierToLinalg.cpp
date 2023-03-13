@@ -3014,6 +3014,204 @@ struct MoveArithIntoRegionPass
   }
 };
 
+static int64_t mergeDims(int64_t dim1, int64_t dim2, bool isDst) {
+  if (dim1 == dim2)
+    return dim1;
+
+  if (isDst) {
+    if (!mlir::ShapedType::isDynamic(dim2))
+      return dim2;
+
+    if (!mlir::ShapedType::isDynamic(dim1))
+      return dim1;
+  }
+
+  return mlir::ShapedType::kDynamic;
+}
+
+static std::optional<mlir::MemRefLayoutAttrInterface>
+mergeLayouts(mlir::MemRefLayoutAttrInterface layout1,
+             mlir::MemRefLayoutAttrInterface layout2, bool isDst) {
+  if (layout1 == layout2)
+    return layout1;
+
+  auto strided1 = mlir::dyn_cast<mlir::StridedLayoutAttr>(layout1);
+  auto strided2 = mlir::dyn_cast<mlir::StridedLayoutAttr>(layout1);
+  if (!strided1 || !strided2)
+    return std::nullopt;
+
+  assert(strided1.getStrides().size() == strided2.getStrides().size());
+  auto offset = mergeDims(strided1.getOffset(), strided2.getOffset(), isDst);
+
+  llvm::SmallVector<int64_t> strides;
+  for (auto [stride1, stride2] :
+       llvm::zip(strided1.getStrides(), strided2.getStrides()))
+    strides.emplace_back(mergeDims(stride1, stride2, isDst));
+
+  return mlir::StridedLayoutAttr::get(layout1.getContext(), offset, strides);
+}
+
+static std::optional<mlir::MemRefType>
+mergeMemrefTypes(mlir::MemRefType type1, mlir::MemRefType type2, bool isDst) {
+  if (type1.getElementType() != type2.getElementType() ||
+      type1.getMemorySpace() != type2.getMemorySpace())
+    return std::nullopt;
+
+  auto layout = mergeLayouts(type1.getLayout(), type2.getLayout(), isDst);
+  if (!layout)
+    return std::nullopt;
+
+  assert(type1.getRank() == type2.getRank());
+  llvm::SmallVector<int64_t> shape;
+  for (auto [dim1, dim2] : llvm::zip(type1.getShape(), type2.getShape()))
+    shape.emplace_back(mergeDims(dim1, dim2, isDst));
+
+  return mlir::MemRefType::get(shape, type1.getElementType(), *layout,
+                               type1.getMemorySpace());
+}
+
+struct NormalizeMemrefArgs
+    : public mlir::PassWrapper<NormalizeMemrefArgs,
+                               mlir::OperationPass<mlir::ModuleOp>> {
+  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(NormalizeMemrefArgs)
+
+  virtual void
+  getDependentDialects(mlir::DialectRegistry &registry) const override {
+    registry.insert<mlir::memref::MemRefDialect>();
+  }
+
+  void runOnOperation() override {
+    auto mod = getOperation();
+
+    bool changed = false;
+
+    mlir::OpBuilder builder(&getContext());
+    llvm::SmallVector<mlir::CallOpInterface> calls;
+    llvm::SmallVector<mlir::Type> newTypes;
+    mlir::IRMapping mapping;
+    for (auto func : mod.getOps<mlir::FunctionOpInterface>()) {
+      if (func.isDeclaration() || func.isPublic())
+        continue;
+
+      if (!mlir::isa<mlir::FunctionType>(func.getFunctionType()))
+        continue;
+
+      auto args = func.getArgumentTypes();
+
+      bool hasMemrefArgs = false;
+      for (auto arg : args)
+        hasMemrefArgs = hasMemrefArgs || mlir::isa<mlir::MemRefType>(arg);
+
+      if (!hasMemrefArgs)
+        continue;
+
+      auto funcUses = mlir::SymbolTable::getSymbolUses(func, mod);
+      if (!funcUses)
+        continue;
+
+      calls.clear();
+      bool unknownUser = false;
+      for (auto use : *funcUses) {
+        auto user = use.getUser();
+        auto callOp = mlir::dyn_cast<mlir::CallOpInterface>(user);
+        if (!callOp) {
+          unknownUser = true;
+          break;
+        }
+
+        calls.emplace_back(callOp);
+      }
+
+      if (unknownUser)
+        continue;
+
+      bool typesChanged = false;
+      newTypes.clear();
+      for (auto [i, arg] : llvm::enumerate(args)) {
+        if (!mlir::isa<mlir::MemRefType>(arg)) {
+          newTypes.emplace_back(arg);
+          continue;
+        }
+
+        mlir::MemRefType newType;
+        for (auto call : calls) {
+          auto arg = call.getArgOperands()[i];
+          if (auto cast = arg.getDefiningOp<mlir::memref::CastOp>())
+            arg = cast.getSource();
+
+          auto type = arg.getType().cast<mlir::MemRefType>();
+          if (!newType) {
+            newType = type;
+            continue;
+          }
+
+          auto result = mergeMemrefTypes(newType, type, false);
+          if (!result) {
+            newType = nullptr;
+            break;
+          }
+        }
+        if (newType) {
+          if (auto result =
+                  mergeMemrefTypes(newType, arg.cast<mlir::MemRefType>(), true))
+            newType = *result;
+        }
+
+        if (newType && newType != arg) {
+          typesChanged = true;
+          newTypes.emplace_back(newType);
+        } else {
+          newTypes.emplace_back(arg);
+        }
+      }
+
+      if (!typesChanged)
+        continue;
+
+      changed = true;
+      for (auto call : calls) {
+        mapping.clear();
+        builder.setInsertionPoint(call);
+        auto loc = call.getLoc();
+        for (auto [srcType, dstType, srcArg] :
+             llvm::zip(args, newTypes, call.getArgOperands())) {
+          assert(dstType);
+          if (dstType == srcType)
+            continue;
+
+          auto arg =
+              builder.createOrFold<mlir::memref::CastOp>(loc, dstType, srcArg);
+          mapping.map(srcArg, arg);
+        }
+        auto newOp = builder.clone(*call, mapping);
+        call->replaceAllUsesWith(newOp->getResults());
+        call->erase();
+      }
+
+      auto funcType = func.getFunctionType().cast<mlir::FunctionType>();
+      auto newFuncType = funcType.clone(newTypes, funcType.getResults());
+      func.setFunctionTypeAttr(mlir::TypeAttr::get(newFuncType));
+      auto &entryBlock = func.getFunctionBody().front();
+      assert(entryBlock.getNumArguments() == newTypes.size());
+      builder.setInsertionPointToStart(&entryBlock);
+      auto loc = builder.getUnknownLoc();
+      for (auto [srcArg, dstType] :
+           llvm::zip(entryBlock.getArguments(), newTypes)) {
+        auto srcType = srcArg.getType();
+        if (srcType == dstType)
+          continue;
+
+        auto cast = builder.create<mlir::memref::CastOp>(loc, srcType, srcArg);
+        srcArg.replaceAllUsesExcept(cast.getResult(), cast);
+        srcArg.setType(dstType);
+      }
+    }
+
+    if (!changed)
+      markAllAnalysesPreserved();
+  }
+};
+
 struct FixDeallocPlacementPass
     : public numba::RewriteWrapperPass<FixDeallocPlacementPass,
                                        mlir::func::FuncOp, void,
@@ -3204,6 +3402,7 @@ static void populatePlierToLinalgOptPipeline(mlir::OpPassManager &pm) {
   pm.addPass(std::make_unique<MarkArgsRestrictPass>());
   pm.addPass(numba::createCompositePass(
       "PostLinalgOptPass", [](mlir::OpPassManager &p) {
+        p.addPass(std::make_unique<NormalizeMemrefArgs>());
         p.addNestedPass<mlir::func::FuncOp>(
             std::make_unique<MoveArithIntoRegionPass>());
         p.addNestedPass<mlir::func::FuncOp>(mlir::createCSEPass());
