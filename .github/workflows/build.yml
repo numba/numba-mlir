@@ -53,7 +53,7 @@ jobs:
 
       - name: Setup Environment
         run: |
-          conda env create -n test-env --file $env:CORE_ENV_FILE
+          conda env update -n test -f $env:CORE_ENV_FILE --prune
           conda list
 
       - name: Setup Cache Vars
@@ -114,7 +114,6 @@ jobs:
       - name: Download and Build Level-Zero
         if: steps.cache-level-zero.outputs.cache-hit != 'true'
         run: |
-          conda activate test-env
           cd $env:WORKSPACE
           mkdir -ea 0 -p level-zero
           pushd level-zero
@@ -145,7 +144,6 @@ jobs:
         if: steps.cache-llvm-mlir.outputs.cache-hit != 'true'
         timeout-minutes: 420
         run: |
-          conda activate test-env
           conda list
           cd $env:WORKSPACE
           mkdir -ea 0 -p llvm-mlir
