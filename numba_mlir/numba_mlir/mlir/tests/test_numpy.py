@@ -1046,6 +1046,9 @@ def test_array_itemsize(dtype):
     assert_equal(py_func(arr), jit_func(arr))
 
 
+_strides_test_array = np.arange(3 * 4 * 5, dtype=np.int32).reshape(3, 4, 5)
+
+
 @pytest.mark.parametrize(
     "arr",
     [
@@ -1055,17 +1058,17 @@ def test_array_itemsize(dtype):
         np.array([1, 2, 3, 4, 5, 6], dtype=np.int32)[::-1],
         np.array([1, 2, 3, 4, 5, 6], dtype=np.int32)[::-2],
         np.array([[1, 2, 3], [4, 5, 6]], dtype=np.int32),
-        np.array([[[1, 2, 3], [4, 5, 6]]], dtype=np.int32),
-        np.array([[[1, 2, 3], [4, 5, 6]]], dtype=np.int32)[::2, ::, ::],
-        np.array([[[1, 2, 3], [4, 5, 6]]], dtype=np.int32)[::-2, ::, ::],
-        np.array([[[1, 2, 3], [4, 5, 6]]], dtype=np.int32)[::, ::2, ::],
-        np.array([[[1, 2, 3], [4, 5, 6]]], dtype=np.int32)[::, ::-2, ::],
-        np.array([[[1, 2, 3], [4, 5, 6]]], dtype=np.int32)[::, ::, ::2],
-        np.array([[[1, 2, 3], [4, 5, 6]]], dtype=np.int32)[::, ::, ::-2],
-        np.flip(np.array([[[1, 2, 3], [4, 5, 6]]], dtype=np.int32)),
-        np.flip(np.array([[[1, 2, 3], [4, 5, 6]]], dtype=np.int32), axis=0),
-        np.flip(np.array([[[1, 2, 3], [4, 5, 6]]], dtype=np.int32), axis=1),
-        np.flip(np.array([[[1, 2, 3], [4, 5, 6]]], dtype=np.int32), axis=2),
+        _strides_test_array,
+        _strides_test_array[::2, ::, ::],
+        _strides_test_array[::-2, ::, ::],
+        _strides_test_array[::, ::2, ::],
+        _strides_test_array[::, ::-2, ::],
+        _strides_test_array[::, ::, ::2],
+        _strides_test_array[::, ::, ::-2],
+        np.flip(_strides_test_array),
+        np.flip(_strides_test_array, axis=0),
+        np.flip(_strides_test_array, axis=1),
+        np.flip(_strides_test_array, axis=2),
     ],
 )
 def test_array_strides(arr):
