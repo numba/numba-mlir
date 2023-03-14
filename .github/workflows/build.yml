@@ -700,6 +700,7 @@ jobs:
 
   upload_packages_preprocess:
     name: Upload packages preprocess
+    if: ${{ github.ref == 'refs/heads/main' }}
     timeout-minutes: 450
     needs: [build_linux_python, build_win_python]
     runs-on: ubuntu-latest
