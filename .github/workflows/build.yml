@@ -146,6 +146,7 @@ jobs:
         timeout-minutes: 420
         run: |
           conda activate test-env
+          conda list
           cd $env:WORKSPACE
           mkdir -ea 0 -p llvm-mlir
           pushd llvm-mlir
@@ -155,9 +156,6 @@ jobs:
           git checkout $env:LLVM_SHA
           mkdir _build
           cd _build
-          conda deactivate
-          conda activate test
-          conda list
           $env:CXX="cl.exe"
           $env:CC="cl.exe"
           cmake ../llvm                                                    `
