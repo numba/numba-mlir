@@ -51,9 +51,9 @@ jobs:
           use-only-tar-bz2: true
           run-post: false
 
-      - name: Install CMake and Ninja
+      - name: Setup Environment
         run: |
-          conda env update -n test -f $env:CORE_ENV_FILE --prune
+          conda env create -n test-env --file $env:CORE_ENV_FILE
           conda list
 
       - name: Setup Cache Vars
@@ -114,6 +114,7 @@ jobs:
       - name: Download and Build Level-Zero
         if: steps.cache-level-zero.outputs.cache-hit != 'true'
         run: |
+          conda activate test-env
           cd $env:WORKSPACE
           mkdir -ea 0 -p level-zero
           pushd level-zero
@@ -144,6 +145,7 @@ jobs:
         if: steps.cache-llvm-mlir.outputs.cache-hit != 'true'
         timeout-minutes: 420
         run: |
+          conda activate test-env
           cd $env:WORKSPACE
           mkdir -ea 0 -p llvm-mlir
           pushd llvm-mlir
@@ -391,7 +393,7 @@ jobs:
       - name: Add conda to system path
         run: echo $CONDA/bin >> $GITHUB_PATH
 
-      - name: Install CMake and Ninja
+      - name: Setup Environment
         run: |
           conda env update -n base -f $CORE_ENV_FILE --prune
           conda list
