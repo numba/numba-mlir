@@ -7,6 +7,7 @@
 #include <mlir/Conversion/ReconcileUnrealizedCasts/ReconcileUnrealizedCasts.h>
 #include <mlir/Dialect/Arith/IR/Arith.h>
 #include <mlir/Dialect/Arith/Transforms/Passes.h>
+#include <mlir/Dialect/Arith/Utils/Utils.h>
 #include <mlir/Dialect/Bufferization/IR/Bufferization.h>
 #include <mlir/Dialect/Bufferization/Transforms/BufferViewFlowAnalysis.h>
 #include <mlir/Dialect/Bufferization/Transforms/Bufferize.h>
@@ -270,6 +271,7 @@ static auto getSizes(mlir::OpBuilder &builder, mlir::Location loc,
                      mlir::Value src) {
   auto shape = src.getType().cast<mlir::ShapedType>().getShape();
 
+  assert(mlir::isa<mlir::MemRefType>(src.getType()));
   llvm::SmallVector<mlir::OpFoldResult> sizes(shape.size());
   for (auto [i, dim] : llvm::enumerate(shape)) {
     if (mlir::ShapedType::isDynamic(dim)) {
@@ -306,7 +308,8 @@ computeIdentityStrides(mlir::OpBuilder &builder, mlir::Location loc,
     if (stride != mlir::ShapedType::kDynamic)
       stride *= size;
 
-    auto sizeVal = dynamicSizes[i].get<mlir::Value>();
+    auto sizeVal =
+        mlir::getValueOrCreateConstantIndexOp(builder, loc, dynamicSizes[i]);
     if (useSizeAsStride)
       runningStride = sizeVal;
     else if (stride == mlir::ShapedType::kDynamic)
@@ -2499,6 +2502,37 @@ struct OptimizeSingleElemCopy
   }
 };
 
+struct OptimizeIdentityLayoutStrides
+    : public mlir::OpRewritePattern<mlir::memref::ExtractStridedMetadataOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(mlir::memref::ExtractStridedMetadataOp op,
+                  mlir::PatternRewriter &rewriter) const override {
+    auto memref = op.getSource();
+    mlir::MemRefType memrefType = memref.getType();
+    if (!memrefType.getLayout().isIdentity())
+      return mlir::failure();
+
+    if (llvm::all_of(op.getStrides(),
+                     [](auto stride) { return stride.use_empty(); }))
+      return mlir::failure();
+
+    auto loc = op.getLoc();
+    auto sizesVals = getSizes(rewriter, loc, memref);
+    auto newStrides =
+        computeIdentityStrides(rewriter, loc, memrefType.getShape(), sizesVals);
+
+    for (auto [oldStride, newStride] : llvm::zip(op.getStrides(), newStrides)) {
+      mlir::Value newStrideVal =
+          mlir::getValueOrCreateConstantIndexOp(rewriter, loc, newStride);
+      rewriter.replaceAllUsesWith(oldStride, newStrideVal);
+    }
+
+    return mlir::success();
+  }
+};
+
 struct PostPlierToLinalgInnerPass
     : public mlir::PassWrapper<PostPlierToLinalgInnerPass,
                                mlir::OperationPass<void>> {
@@ -2948,7 +2982,8 @@ void PostLinalgOptInnerPass::runOnOperation() {
 
   numba::populateCommonOptsPatterns(patterns);
 
-  patterns.insert<OptimizeGlobalsConstsLoad, OptimizeSingleElemCopy>(&context);
+  patterns.insert<OptimizeGlobalsConstsLoad, OptimizeSingleElemCopy,
+                  OptimizeIdentityLayoutStrides>(&context);
 
   auto additionalOpt = [](mlir::func::FuncOp op) {
     (void)numba::prepareForFusion(op.getRegion());
@@ -3204,6 +3239,7 @@ static void populatePlierToLinalgOptPipeline(mlir::OpPassManager &pm) {
   pm.addPass(std::make_unique<MarkArgsRestrictPass>());
   pm.addPass(numba::createCompositePass(
       "PostLinalgOptPass", [](mlir::OpPassManager &p) {
+        p.addPass(numba::createNormalizeMemrefArgsPass());
         p.addNestedPass<mlir::func::FuncOp>(
             std::make_unique<MoveArithIntoRegionPass>());
         p.addNestedPass<mlir::func::FuncOp>(mlir::createCSEPass());
