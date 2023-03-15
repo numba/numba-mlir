@@ -56,8 +56,9 @@ jobs:
       - name: Setup Environment
         run: |
           # conda env update -n test -f $env:CORE_ENV_FILE --prune
-          conda init powershell
           conda list
+          cd "$env:CONDA_PREFIX\etc\conda\activate.d"
+          ls
 
       - name: Setup Cache Vars
         run: |
