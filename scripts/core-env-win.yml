@@ -8,4 +8,4 @@ dependencies:
   - ninja
   - lit
   - zlib
-  - vs2017_win-64
+  - vs2019_win-64
