@@ -25,6 +25,10 @@ jobs:
     timeout-minutes: 450
 
     steps:
+      - uses: ilammy/msvc-dev-cmd@v1
+        with:
+          vsversion : 2017
+
       - name: Cancel Previous Runs
         uses: styfle/cancel-workflow-action@0.6.0
         with:
