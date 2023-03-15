@@ -58,11 +58,6 @@ jobs:
           activate-environment: test-env
           environment-file: ${{ env.CORE_ENV_FILE }}
 
-      - name: Setup Environment
-        run: |
-          # conda env update -n test -f $env:CORE_ENV_FILE --prune
-          conda list
-
       - name: Setup Cache Vars
         run: |
           $sha = (cat "$env:GITHUB_WORKSPACE\$env:LLVM_SHA_FILE")
