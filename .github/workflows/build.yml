@@ -57,6 +57,8 @@ jobs:
         run: |
           # conda env update -n test -f $env:CORE_ENV_FILE --prune
           conda list
+          cd "$env:CONDA_PREFIX\etc\conda\"
+          ls
 
       - name: Setup Cache Vars
         run: |
