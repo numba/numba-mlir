@@ -21,14 +21,10 @@ jobs:
     env:
       CORE_ENV_FILE: scripts/core-env-win.yml
     name: Builds Numba-MLIR core on Windows
-    runs-on: windows-latest
+    runs-on: windows-2016
     timeout-minutes: 450
 
     steps:
-      - uses: ilammy/msvc-dev-cmd@v1
-        with:
-          vsversion : "2017"
-
       - name: Cancel Previous Runs
         uses: styfle/cancel-workflow-action@0.6.0
         with:
@@ -209,7 +205,7 @@ jobs:
 
   build_win_python:
     name: Builds Numba-MLIR on Windows
-    runs-on: windows-latest
+    runs-on: windows-2016
     timeout-minutes: 450
     needs: build_win
 
