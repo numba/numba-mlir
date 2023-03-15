@@ -58,6 +58,9 @@ jobs:
         run: |
           # conda env update -n test -f $env:CORE_ENV_FILE --prune
           conda list
+          conda deactivate
+          conda activate test-env
+          conda list
 
       - name: Setup Cache Vars
         run: |
