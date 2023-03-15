@@ -117,7 +117,6 @@ jobs:
       - name: Download and Build Level-Zero
         if: steps.cache-level-zero.outputs.cache-hit != 'true'
         run: |
-          "$env:CONDA_PREFIX\etc\conda\activate.d\vs2017_compiler_vars.bat"
           cd $env:WORKSPACE
           mkdir -ea 0 -p level-zero
           pushd level-zero
@@ -148,7 +147,6 @@ jobs:
         if: steps.cache-llvm-mlir.outputs.cache-hit != 'true'
         timeout-minutes: 420
         run: |
-          "$env:CONDA_PREFIX\etc\conda\activate.d\vs2017_compiler_vars.bat"
           conda list
           cd $env:WORKSPACE
           mkdir -ea 0 -p llvm-mlir
@@ -181,7 +179,6 @@ jobs:
 
       - name: Build Numba-MLIR
         run: |
-          "$env:CONDA_PREFIX\etc\conda\activate.d\vs2017_compiler_vars.bat"
           $external_lit="$env:GITHUB_WORKSPACE\scripts\runlit.py"
           mkdir -p _build
           cd _build
