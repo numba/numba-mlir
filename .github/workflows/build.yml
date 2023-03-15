@@ -21,7 +21,7 @@ jobs:
     env:
       CORE_ENV_FILE: scripts/core-env-win.yml
     name: Builds Numba-MLIR core on Windows
-    runs-on: windows-2016
+    runs-on: windows-2019
     timeout-minutes: 450
 
     steps:
@@ -205,7 +205,7 @@ jobs:
 
   build_win_python:
     name: Builds Numba-MLIR on Windows
-    runs-on: windows-2016
+    runs-on: windows-2019
     timeout-minutes: 450
     needs: build_win
 
