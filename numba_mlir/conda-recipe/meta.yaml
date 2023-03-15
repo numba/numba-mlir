@@ -12,6 +12,7 @@ build:
         - LLVM_PATH
         - LEVEL_ZERO_DIR
         - LEVEL_ZERO_VERSION_CHECK_OFF
+        - ClearDevCommandPromptEnvVars=false # [win]
 
 requirements:
     build:
