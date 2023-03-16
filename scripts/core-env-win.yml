@@ -1,0 +1,11 @@
+name: dev
+channels:
+  - conda-forge
+  - nodefaults
+dependencies:
+  - python=3.10
+  - cmake
+  - ninja
+  - lit
+  - zlib
+  - vs2019_win-64

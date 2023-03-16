@@ -15,16 +15,19 @@ env:
   LEVEL_ZERO_VER: v1.6.2
   TBB_URL_PREFIX: https://github.com/oneapi-src/oneTBB/releases/download/
   LLVM_SHA_FILE: llvm-sha.txt
-  CORE_ENV_FILE: scripts/core-env.yml
 
 jobs:
   build_win:
+    env:
+      CORE_ENV_FILE: scripts/core-env-win.yml
     name: Builds Numba-MLIR core on Windows
-    runs-on: windows-latest
+    runs-on: windows-2019
     timeout-minutes: 450
 
     steps:
       - uses: ilammy/msvc-dev-cmd@v1
+        with:
+          vsversion : "2019"
 
       - name: Cancel Previous Runs
         uses: styfle/cancel-workflow-action@0.6.0
@@ -48,14 +51,12 @@ jobs:
       - name: Setup conda
         uses: conda-incubator/setup-miniconda@v2
         with:
+          miniconda-version: "latest"
           auto-update-conda: true
           use-only-tar-bz2: true
           run-post: false
-
-      - name: Install CMake and Ninja
-        run: |
-          conda env update -n test -f $env:CORE_ENV_FILE --prune
-          conda list
+          activate-environment: test-env
+          environment-file: ${{ env.CORE_ENV_FILE }}
 
       - name: Setup Cache Vars
         run: |
@@ -85,7 +86,7 @@ jobs:
         id: cache-llvm-mlir
         uses: actions/cache@v3
         env:
-          LLVM_CACHE_NUMBER: 1  # Increase to reset cache
+          LLVM_CACHE_NUMBER: 2  # Increase to reset cache
         with:
           path: |
             D:\a\numba-mlir\llvm-mlir\_mlir_install\**
@@ -145,6 +146,7 @@ jobs:
         if: steps.cache-llvm-mlir.outputs.cache-hit != 'true'
         timeout-minutes: 420
         run: |
+          conda list
           cd $env:WORKSPACE
           mkdir -ea 0 -p llvm-mlir
           pushd llvm-mlir
@@ -154,13 +156,14 @@ jobs:
           git checkout $env:LLVM_SHA
           mkdir _build
           cd _build
+          $env:CXX="cl.exe"
+          $env:CC="cl.exe"
           cmake ../llvm                                                    `
             -GNinja                                                        `
             -DCMAKE_BUILD_TYPE=Release                                     `
             -DLLVM_ENABLE_PROJECTS=mlir                                    `
             -DLLVM_ENABLE_ASSERTIONS=ON                                    `
             -DLLVM_ENABLE_RTTI=ON                                          `
-            -DLLVM_USE_LINKER=gold                                         `
             -DLLVM_INSTALL_UTILS=ON                                        `
             -DLLVM_TARGETS_TO_BUILD=X86                                    `
             -DLLVM_ENABLE_BINDINGS=OFF                                     `
@@ -201,7 +204,7 @@ jobs:
 
   build_win_python:
     name: Builds Numba-MLIR on Windows
-    runs-on: windows-latest
+    runs-on: windows-2019
     timeout-minutes: 450
     needs: build_win
 
@@ -218,6 +221,8 @@ jobs:
 
     steps:
       - uses: ilammy/msvc-dev-cmd@v1
+        with:
+          vsversion : "2019"
 
       - name: Cancel Previous Runs
         uses: styfle/cancel-workflow-action@0.6.0
@@ -264,7 +269,7 @@ jobs:
         id: cache-llvm-mlir
         uses: actions/cache@v3
         env:
-          LLVM_CACHE_NUMBER: 1  # Increase to reset cache
+          LLVM_CACHE_NUMBER: 2  # Increase to reset cache
         with:
           path: |
             D:\a\numba-mlir\llvm-mlir\_mlir_install\**
@@ -326,6 +331,7 @@ jobs:
           mkdir numba_mlir_conda
           pushd numba_mlir_conda
           conda activate test-env
+          Rename-Item -Path "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\Common7\Tools\vsdevcmd\ext\vsicvars.bat" -NewName "vsicvars.bat.bak"
           $env:TBB_PATH=(Resolve-Path "$env:WORKSPACE/tbb/oneapi-tbb-$env:TBB_VER")
           $env:LEVEL_ZERO_DIR=(Resolve-Path "$env:WORKSPACE/level-zero/level-zero/level_zero_install")
           $env:LEVEL_ZERO_VERSION_CHECK_OFF="1"
@@ -357,6 +363,8 @@ jobs:
 
 
   build_linux:
+    env:
+      CORE_ENV_FILE: scripts/core-env-linux.yml
     name: Builds Numba-MLIR core on Linux
     runs-on: ubuntu-latest
     timeout-minutes: 450
@@ -388,7 +396,7 @@ jobs:
       - name: Add conda to system path
         run: echo $CONDA/bin >> $GITHUB_PATH
 
-      - name: Install CMake and Ninja
+      - name: Setup Environment
         run: |
           conda env update -n base -f $CORE_ENV_FILE --prune
           conda list
@@ -419,7 +427,7 @@ jobs:
         id: cache-llvm-mlir
         uses: actions/cache@v3
         env:
-          LLVM_CACHE_NUMBER: 1  # Increase to reset cache
+          LLVM_CACHE_NUMBER: 2  # Increase to reset cache
         with:
           path: |
             /home/runner/work/llvm-mlir/_mlir_install/**
@@ -488,13 +496,15 @@ jobs:
           git checkout $LLVM_SHA || exit 1
           mkdir _build || exit 1
           cd _build || exit 1
+          source activate base
+          export CC=$CONDA_PREFIX/bin/x86_64-conda-linux-gnu-cc
+          export CXX=$CONDA_PREFIX/bin/x86_64-conda-linux-gnu-c++
           cmake ../llvm                                                    \
             -GNinja                                                        \
             -DCMAKE_BUILD_TYPE=Release                                     \
             -DLLVM_ENABLE_PROJECTS=mlir                                    \
             -DLLVM_ENABLE_ASSERTIONS=ON                                    \
             -DLLVM_ENABLE_RTTI=ON                                          \
-            -DLLVM_USE_LINKER=gold                                         \
             -DLLVM_INSTALL_UTILS=ON                                        \
             -DLLVM_TARGETS_TO_BUILD=X86                                    \
             -DLLVM_ENABLE_BINDINGS=OFF                                     \
@@ -600,7 +610,7 @@ jobs:
         id: cache-llvm-mlir
         uses: actions/cache@v3
         env:
-          LLVM_CACHE_NUMBER: 1  # Increase to reset cache
+          LLVM_CACHE_NUMBER: 2  # Increase to reset cache
         with:
           path: |
             /home/runner/work/llvm-mlir/_mlir_install/**
