@@ -331,6 +331,7 @@ jobs:
           mkdir numba_mlir_conda
           pushd numba_mlir_conda
           conda activate test-env
+          Rename-Item -Path "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\Common7\Tools\vsdevcmd\ext\vsicvars.bat" -NewName "vsicvars.bat.bak"
           $env:TBB_PATH=(Resolve-Path "$env:WORKSPACE/tbb/oneapi-tbb-$env:TBB_VER")
           $env:LEVEL_ZERO_DIR=(Resolve-Path "$env:WORKSPACE/level-zero/level-zero/level_zero_install")
           $env:LEVEL_ZERO_VERSION_CHECK_OFF="1"
