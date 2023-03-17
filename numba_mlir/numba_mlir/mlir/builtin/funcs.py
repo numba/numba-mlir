@@ -4,6 +4,7 @@
 
 from ..linalg_builder import FuncRegistry, is_int, is_float, is_complex, broadcast_type
 from ..func_registry import add_func
+from . import helper_funcs
 
 import math
 
@@ -133,25 +134,66 @@ _gen_math_funcs()
 del _gen_math_funcs
 
 
+def _get_math_func_name(builder, name, t):
+    if is_float(t, builder):
+        fname = name
+        if t == builder.float32:
+            fname = fname + "f"
+        return fname
+
+    if is_complex(t, builder):
+        fname = "c" + name
+        if t == builder.complex64:
+            fname = fname + "f"
+        return fname
+
+    assert False, "Unsupported type"
+
+
+def _get_complex_elem_type(builder, t):
+    if t == builder.complex64:
+        return builder.float32
+    if t == builder.complex128:
+        return builder.float64
+
+    return t
+
+
 @register_func("abs", abs)
 def abs_impl(builder, arg):
     t = arg.type
     if is_int(t, builder):
         c = arg < 0
         return builder.select(c, -arg, arg)
-    if is_float(t, builder):
-        fname = "fabs"
-        if t == builder.float32:
-            fname = fname + "f"
 
-        res = builder.cast(0, t)
-        return builder.external_call(fname, arg, res, decorate=False)
-    if is_complex(t, builder):
-        fname = "cabs"
-        rest = builder.float64
-        if t == builder.complex64:
-            rest = builder.float32
-            fname = fname + "f"
+    fname = _get_math_func_name(builder, "abs", t)
+    res_type = _get_complex_elem_type(builder, t)
 
-        res = builder.cast(0, rest)
-        return builder.external_call(fname, arg, res, decorate=False)
+    res = builder.cast(0, res_type)
+    return builder.external_call(fname, arg, res, decorate=False)
+
+
+@register_func("mlir.helper_funcs.exp", helper_funcs.exp)
+def abs_impl(builder, arg):
+    t = arg.type
+    if is_int(t, builder):
+        t = builder.float64
+        arg = builder.cast(arg, t)
+
+    fname = _get_math_func_name(builder, "exp", t)
+
+    res = builder.cast(0, t)
+    return builder.external_call(fname, arg, res, decorate=False)
+
+
+@register_func("mlir.helper_funcs.sqrt", helper_funcs.sqrt)
+def abs_impl(builder, arg):
+    t = arg.type
+    if is_int(t, builder):
+        t = builder.float64
+        arg = builder.cast(arg, t)
+
+    fname = _get_math_func_name(builder, "sqrt", t)
+
+    res = builder.cast(0, t)
+    return builder.external_call(fname, arg, res, decorate=False)
