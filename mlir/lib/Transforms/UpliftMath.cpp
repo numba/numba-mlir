@@ -139,6 +139,52 @@ struct UpliftCabsCalls : public mlir::OpRewritePattern<mlir::func::CallOp> {
   }
 };
 
+struct UpliftComplexCalls : public mlir::OpRewritePattern<mlir::func::CallOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(mlir::func::CallOp op,
+                  mlir::PatternRewriter &rewriter) const override {
+    auto funcName = op.getCallee();
+    if (funcName.empty())
+      return mlir::failure();
+
+    if (op.getNumResults() != 1 || op.getNumOperands() != 1)
+      return mlir::failure();
+
+    auto val = op.getOperands().front();
+    auto srcType = val.getType().dyn_cast<mlir::ComplexType>();
+
+    if (!srcType || srcType != op.getResult(0).getType())
+      return mlir::failure();
+
+    llvm::StringRef funcNameF =
+        (funcName.front() == 'f' ? funcName.drop_front() : llvm::StringRef{});
+
+    using func_t = mlir::Operation *(*)(mlir::OpBuilder &, mlir::Location,
+                                        mlir::ValueRange);
+    const std::pair<llvm::StringRef, func_t> handlers[] = {
+        {"cexp", &replaceOp1<mlir::complex::ExpOp>},
+        {"csqrt", &replaceOp1<mlir::complex::SqrtOp>},
+    };
+
+    for (auto &handler : handlers) {
+      auto name = handler.first;
+      if (name == funcName || name == funcNameF) {
+        auto res = handler.second(rewriter, op.getLoc(), op.getOperands());
+        if (!res)
+          return mlir::failure();
+
+        assert(res->getNumResults() == op->getNumResults());
+        rewriter.replaceOp(op, res->getResults());
+        return mlir::success();
+      }
+    }
+
+    return mlir::success();
+  }
+};
+
 struct UpliftMinMax : public mlir::OpRewritePattern<mlir::arith::SelectOp> {
   using OpRewritePattern::OpRewritePattern;
 
@@ -260,9 +306,8 @@ struct UpliftFMAPass
 } // namespace
 
 void numba::populateUpliftMathPatterns(mlir::RewritePatternSet &patterns) {
-  patterns
-      .insert<UpliftMathCalls, UpliftFabsCalls, UpliftCabsCalls, UpliftMinMax>(
-          patterns.getContext());
+  patterns.insert<UpliftMathCalls, UpliftFabsCalls, UpliftCabsCalls,
+                  UpliftMinMax, UpliftComplexCalls>(patterns.getContext());
 }
 
 void numba::populateUpliftFMAPatterns(mlir::RewritePatternSet &patterns) {
