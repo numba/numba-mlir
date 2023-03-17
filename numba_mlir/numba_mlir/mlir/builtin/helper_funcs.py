@@ -9,6 +9,7 @@ from numba.core.typing.templates import (
     infer_global,
 )
 
+
 def _stub_error():
     raise NotImplementedError("This is a stub")
 
@@ -16,12 +17,14 @@ def _stub_error():
 # Python defines separate modules math/cmath, but we want to have single
 # function which dispatch either to normal or complex function
 
+
 def exp():
     _stub_error()
 
 
 def sqrt():
     _stub_error()
+
 
 @infer_global(exp)
 @infer_global(sqrt)
@@ -35,10 +38,8 @@ class _UnaryFuncId(ConcreteTemplate):
         signature(types.float64, types.uint32),
         signature(types.float64, types.int64),
         signature(types.float64, types.uint64),
-
         signature(types.float32, types.float32),
         signature(types.float64, types.float64),
-
         signature(types.complex64, types.complex64),
         signature(types.complex128, types.complex128),
     ]
