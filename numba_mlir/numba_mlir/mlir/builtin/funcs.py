@@ -134,9 +134,11 @@ _gen_math_funcs()
 del _gen_math_funcs
 
 
-def _get_math_func_name(builder, name, t):
+def _get_math_func_name(builder, name, t, append_f=False):
     if is_float(t, builder):
         fname = name
+        if append_f:
+            fname = "f" + fname
         if t == builder.float32:
             fname = fname + "f"
         return fname
@@ -166,7 +168,7 @@ def abs_impl(builder, arg):
         c = arg < 0
         return builder.select(c, -arg, arg)
 
-    fname = _get_math_func_name(builder, "abs", t)
+    fname = _get_math_func_name(builder, "abs", t, append_f=True)
     res_type = _get_complex_elem_type(builder, t)
 
     res = builder.cast(0, res_type)
