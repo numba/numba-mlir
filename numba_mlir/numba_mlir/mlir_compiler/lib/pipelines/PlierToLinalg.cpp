@@ -1229,8 +1229,8 @@ struct CastsToNtensor : public mlir::OpConversionPattern<plier::CastOp> {
   mlir::LogicalResult
   matchAndRewrite(plier::CastOp op, plier::CastOp::Adaptor adaptor,
                   mlir::ConversionPatternRewriter &rewriter) const override {
-    auto src = adaptor.getValue();
-    auto srcType = src.getType();
+    mlir::Value src = adaptor.getValue();
+    mlir::Type srcType = src.getType();
 
     auto converter = getTypeConverter();
     assert(converter);
@@ -1244,20 +1244,25 @@ struct CastsToNtensor : public mlir::OpConversionPattern<plier::CastOp> {
       return mlir::success();
     }
 
-    if (numba::ntensor::NTensorType::isValidElementType(srcType) &&
-        dstType.isa<numba::ntensor::NTensorType>()) {
-      auto ntensorType = dstType.cast<numba::ntensor::NTensorType>();
-      if (srcType != ntensorType.getElementType() ||
-          !ntensorType.hasStaticShape())
-        return mlir::failure();
-
-      rewriter.replaceOpWithNewOp<numba::ntensor::CreateArrayOp>(
-          op, ntensorType, /*dynamicSizes*/ std::nullopt, src);
+    auto loc = op.getLoc();
+    if (auto res = doCast(rewriter, loc, src, dstType)) {
+      rewriter.replaceOp(op, *res);
       return mlir::success();
     }
 
-    if (auto res = doCast(rewriter, op->getLoc(), src, dstType)) {
-      rewriter.replaceOp(op, *res);
+    if (auto ntensorType = dstType.dyn_cast<numba::ntensor::NTensorType>()) {
+      if (!ntensorType.hasStaticShape())
+        return mlir::failure();
+
+      auto dstElemType = ntensorType.getElementType();
+
+      if (!numba::canConvert(srcType, dstElemType))
+        return mlir::failure();
+
+      src = numba::doConvert(rewriter, loc, src, dstElemType);
+
+      rewriter.replaceOpWithNewOp<numba::ntensor::CreateArrayOp>(
+          op, ntensorType, /*dynamicSizes*/ std::nullopt, src);
       return mlir::success();
     }
 

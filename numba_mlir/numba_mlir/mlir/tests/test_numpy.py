@@ -178,6 +178,36 @@ def test_binary(py_func, a, b):
 @parametrize_function_variants(
     "py_func",
     [
+        "lambda a, b, c: np.add(a, b, c)",
+        "lambda a, b, c: np.subtract(a, b, c)",
+        "lambda a, b, c: np.multiply(a, b, c)",
+        "lambda a, b, c: np.power(a, b, c)",
+        "lambda a, b, c: np.true_divide(a, b, c)",
+        "lambda a, b, c: np.minimum(a, b, c)",
+        "lambda a, b, c: np.maximum(a, b, c)",
+    ],
+)
+@pytest.mark.parametrize(
+    "a", _test_binary_test_arrays, ids=_test_binary_test_arrays_ids
+)
+@pytest.mark.parametrize(
+    "b", _test_binary_test_arrays, ids=_test_binary_test_arrays_ids
+)
+def test_binary_inplace(py_func, a, b):
+    jit_func = njit(py_func)
+
+    res_temp = np.broadcast(np.array(a), np.array(b))
+    py_res = np.zeros(res_temp.shape)
+    jit_res = np.zeros(res_temp.shape)
+
+    py_func(a, b, py_res)
+    jit_func(a, b, jit_res)
+    assert_allclose(py_res, jit_res, rtol=1e-7, atol=1e-7)
+
+
+@parametrize_function_variants(
+    "py_func",
+    [
         "lambda a, b: np.add(a, b)",
         "lambda a, b: a + b",
         "lambda a, b: np.subtract(a, b)",
