@@ -7,6 +7,7 @@
 #include "numba/Dialect/numba_util/Dialect.hpp"
 
 #include <mlir/Dialect/Arith/IR/Arith.h>
+#include <mlir/Dialect/Func/IR/FuncOps.h>
 #include <mlir/Dialect/Func/Transforms/FuncConversions.h>
 #include <mlir/Dialect/SCF/IR/SCF.h>
 #include <mlir/Dialect/SCF/Transforms/Transforms.h>
@@ -131,7 +132,6 @@ public:
       return mlir::failure();
 
     rewriter.replaceOp(op, *newResults);
-
     return mlir::success();
   }
 };
@@ -260,6 +260,37 @@ public:
 };
 } // namespace
 
+namespace {
+// TODO: upstream
+struct CallOpSignatureConversion
+    : public OpConversionPattern<mlir::func::CallOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(mlir::func::CallOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    auto converter = getTypeConverter();
+    assert(converter && "Invalid type converter");
+
+    llvm::SmallVector<mlir::Type> resultTypes;
+    if (mlir::failed(converter->convertTypes(op.getResultTypes(), resultTypes)))
+      return mlir::failure();
+
+    auto loc = op.getLoc();
+    auto newOp = rewriter.create<mlir::func::CallOp>(
+        loc, op.getCallee(), resultTypes, adaptor.getOperands());
+
+    auto newResults = packResults(rewriter, loc, *converter,
+                                  op.getResultTypes(), newOp.getResults());
+    if (!newResults)
+      return mlir::failure();
+
+    rewriter.replaceOp(op, *newResults);
+    return success();
+  }
+};
+} // namespace
+
 void numba::populateControlFlowTypeConversionRewritesAndTarget(
     mlir::TypeConverter &typeConverter, mlir::RewritePatternSet &patterns,
     mlir::ConversionTarget &target) {
@@ -286,6 +317,9 @@ void numba::populateControlFlowTypeConversionRewritesAndTarget(
       });
 
   mlir::populateCallOpTypeConversionPattern(patterns, typeConverter);
+  patterns.insert<CallOpSignatureConversion>(typeConverter,
+                                             patterns.getContext());
+
   target.addDynamicallyLegalOp<mlir::arith::SelectOp>(
       [&](mlir::Operation *op) -> std::optional<bool> {
         if (typeConverter.isLegal(op))

@@ -508,6 +508,21 @@ def test_tuple_len(a, b, c):
     assert_equal(py_func(a, b, c), jit_func(a, b, c))
 
 
+def test_tuple_ret_indirect():
+    def py_func1(a, b):
+        return a, b
+
+    jit_func1 = njit(py_func1)
+
+    def py_func2(a, b):
+        return jit_func1(a, b)
+
+    jit_func2 = njit(py_func2)
+
+    a, b = 2, 3
+    assert_equal(py_func2(a, b), jit_func2(a, b))
+
+
 def test_range1():
     def py_func(a):
         res = 0
