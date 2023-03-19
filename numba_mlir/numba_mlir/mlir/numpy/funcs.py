@@ -361,7 +361,7 @@ def _gen_binary_ops():
         ),
         (reg_func("operator.sub"), _select_float_type, lambda a, b, c: a - b),
         (
-            register_func("numpy.multiply", numpy.multiply),
+            reg_func("numpy.multiply", numpy.multiply),
             _select_float_type,
             lambda a, b, c: a * b,
         ),
