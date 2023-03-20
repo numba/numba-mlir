@@ -754,25 +754,46 @@ def shape_impl(builder, arg):
     return builder.force_copy(arg)
 
 
+def _get_transpose_axes(axes, dims):
+    axes = literal(axes)
+    if axes is None:
+        return tuple(range(dims)[::-1])
+
+    if (
+        isinstance(axes, tuple)
+        and all(isinstance(x, int) for x in axes)
+        and len(axes) == dims
+    ):
+        return axes
+
+    return None
+
+
 @register_attr("array.T")
 @register_func("numpy.transpose", numpy.transpose)
-def transpose_impl(builder, arg):
+def transpose_impl(builder, arg, axes=None):
     shape = arg.shape
     dims = len(shape)
+    axes = _get_transpose_axes(axes, dims)
+    if axes is None:
+        return None
+
     if dims == 1:
         return arg
-    if dims == 2:
-        iterators = ["parallel", "parallel"]
-        expr1 = "(d0,d1) -> (d0,d1)"
-        expr2 = "(d0,d1) -> (d1,d0)"
-        maps = [expr1, expr2]
-        res_shape = (shape[1], shape[0])
-        init = builder.init_tensor(res_shape, arg.dtype)
 
-        def body(a, b):
-            return a
+    iterators = ["parallel"] * dims
+    src_mapping = ",".join(f"d{i}" for i in range(dims))
+    dst_mapping = ",".join(f"d{i}" for i in axes)
+    expr1 = f"({src_mapping}) -> ({src_mapping})"
+    expr2 = f"({src_mapping}) -> ({dst_mapping})"
+    maps = [expr1, expr2]
+    res_shape = tuple(shape[i] for i in axes)
+    init = builder.init_tensor(res_shape, arg.dtype)
 
-        return builder.linalg_generic(arg, init, iterators, maps, body)
+    def body(a, b):
+        return a
+
+    return builder.linalg_generic(arg, init, iterators, maps, body)
 
 
 @register_attr("array.dtype")

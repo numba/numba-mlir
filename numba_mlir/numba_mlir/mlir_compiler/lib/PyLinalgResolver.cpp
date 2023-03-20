@@ -403,11 +403,17 @@ private:
                                           mlir::Value val) {
     assert(val);
     if (auto buildTuple = val.getDefiningOp<numba::util::BuildTupleOp>()) {
-      auto args = buildTuple.getArgs();
+      mlir::ValueRange args = buildTuple.getArgs();
       auto count = static_cast<unsigned>(args.size());
       py::tuple ret(count);
-      for (auto i : llvm::seq(0u, count))
-        ret[i] = createVar(context, args[i]);
+      for (auto i : llvm::seq(0u, count)) {
+        auto arg = args[i];
+        if (auto lit = makePyLiteral(context, arg)) {
+          ret[i] = *lit;
+        } else {
+          ret[i] = createVar(context, arg);
+        }
+      }
 
       return ret;
     }

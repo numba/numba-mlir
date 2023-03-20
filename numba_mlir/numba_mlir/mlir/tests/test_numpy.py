@@ -313,6 +313,19 @@ def test_broadcast(a, b):
     assert_equal(py_func(a, b), jit_func(a, b))
 
 
+@pytest.mark.parametrize("a", [np.arange(3 * 4 * 5).reshape(3, 4, 5)])
+@parametrize_function_variants(
+    "py_func",
+    list(
+        f"lambda a: np.transpose(a, {str(axes)})"
+        for axes in list(itertools.permutations((0, 1, 2)))
+    ),
+)
+def test_transpose(a, py_func):
+    jit_func = njit(py_func)
+    assert_equal(py_func(a), jit_func(a))
+
+
 @parametrize_function_variants(
     "py_func",
     [
