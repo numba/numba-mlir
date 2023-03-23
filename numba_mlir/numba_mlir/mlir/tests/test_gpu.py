@@ -315,21 +315,20 @@ def _test_binary(func, dtype, ir_pass, ir_check):
 
 @require_gpu
 @pytest.mark.parametrize("op", ["sqrt", "log", "sin", "cos", "floor"])
-def test_math_funcs_unary(op):
+@pytest.mark.parametrize("dtype", [np.float32, np.float64])
+def test_math_funcs_unary(op, dtype):
     f = eval(f"math.{op}")
 
     def func(a, b):
         i = get_global_id(0)
         b[i] = f(a[i])
 
-    _test_unary(
-        func, np.float32, "GPUToSpirvPass", lambda ir: ir.count(f"CL.{op}") == 1
-    )
+    _test_unary(func, dtype, "GPUToSpirvPass", lambda ir: ir.count(f"CL.{op}") == 1)
 
 
 @require_gpu
 @pytest.mark.parametrize("op", ["+", "-", "*", "/", "//", "%", "**"])
-@pytest.mark.parametrize("dtype", [np.int32, np.float32])
+@pytest.mark.parametrize("dtype", [np.int32, np.float32, np.float64])
 def test_gpu_ops_binary(op, dtype):
     f = eval(f"lambda a, b: a {op} b")
     inner = kernel_func(f)
