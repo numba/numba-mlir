@@ -40,52 +40,59 @@ struct RemoveUnusedArgsPass
     llvm::BitVector removeArgs;
     llvm::SmallVector<mlir::Value> newArgs;
     llvm::SmallVector<mlir::Type> newArgTypes;
-    module->walk([&](mlir::func::FuncOp func) {
-      if (func.isDeclaration() || func.isPublic())
-        return;
 
-      assert(!func.getBody().empty());
-      auto &block = func.getBody().front();
-      removeArgs.resize(block.getNumArguments());
+    bool repeat = true;
 
-      newArgTypes.clear();
-      bool hasUnused = false;
-      for (auto [i, arg] : llvm::enumerate(block.getArguments())) {
-        auto isUsed = isArgUsed(arg, func);
-        removeArgs[i] = !isUsed;
-        hasUnused = hasUnused || !isUsed;
-        if (isUsed)
-          newArgTypes.emplace_back(arg.getType());
-      }
-
-      if (!hasUnused)
-        return;
-
-      auto funcUses = mlir::SymbolTable::getSymbolUses(func, module);
-      if (!funcUses)
-        return;
-
-      for (auto use : *funcUses) {
-        if (!mlir::isa<mlir::func::CallOp>(use.getUser()))
+    while (repeat) {
+      repeat = false;
+      module->walk([&](mlir::func::FuncOp func) {
+        if (func.isDeclaration() || func.isPublic())
           return;
-      }
 
-      for (auto use : llvm::make_early_inc_range(*funcUses)) {
-        auto call = mlir::cast<mlir::func::CallOp>(use.getUser());
-        newArgs.clear();
-        assert(call.getOperands().size() == removeArgs.size());
-        for (auto [i, arg] : llvm::enumerate(call.getOperands())) {
-          if (!removeArgs[i])
-            newArgs.emplace_back(arg);
+        assert(!func.getBody().empty());
+        auto &block = func.getBody().front();
+        removeArgs.resize(block.getNumArguments());
+
+        newArgTypes.clear();
+        bool hasUnused = false;
+        for (auto [i, arg] : llvm::enumerate(block.getArguments())) {
+          auto isUsed = isArgUsed(arg, func);
+          removeArgs[i] = !isUsed;
+          hasUnused = hasUnused || !isUsed;
+          if (isUsed)
+            newArgTypes.emplace_back(arg.getType());
         }
 
-        call->setOperands(newArgs);
-      }
+        if (!hasUnused)
+          return;
 
-      block.eraseArguments(removeArgs);
-      func.eraseArguments(removeArgs);
-      changed = true;
-    });
+        auto funcUses = mlir::SymbolTable::getSymbolUses(func, module);
+        if (!funcUses)
+          return;
+
+        for (auto use : *funcUses) {
+          if (!mlir::isa<mlir::func::CallOp>(use.getUser()))
+            return;
+        }
+
+        for (auto use : llvm::make_early_inc_range(*funcUses)) {
+          auto call = mlir::cast<mlir::func::CallOp>(use.getUser());
+          newArgs.clear();
+          assert(call.getOperands().size() == removeArgs.size());
+          for (auto [i, arg] : llvm::enumerate(call.getOperands())) {
+            if (!removeArgs[i])
+              newArgs.emplace_back(arg);
+          }
+
+          call->setOperands(newArgs);
+        }
+
+        block.eraseArguments(removeArgs);
+        func.eraseArguments(removeArgs);
+        changed = true;
+        repeat = true;
+      });
+    }
 
     if (!changed)
       markAllAnalysesPreserved();
