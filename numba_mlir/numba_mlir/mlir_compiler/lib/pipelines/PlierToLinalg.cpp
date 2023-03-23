@@ -1573,7 +1573,12 @@ rewritePrimitiveFunc(mlir::PatternRewriter &rewriter, mlir::Location loc,
     if (funcRes)
       return funcRes;
 
-    if (opName.startswith("array.") && args.size() == 1)
+    auto isNone = [](mlir::Value val) {
+      return mlir::isa<mlir::NoneType>(val.getType());
+    };
+
+    if (opName.startswith("array.") && args.size() >= 1 &&
+        llvm::all_of(args.drop_front(), isNone))
       return resolver.rewriteAttr(opName, loc, rewriter, args.front());
 
     return std::nullopt;
