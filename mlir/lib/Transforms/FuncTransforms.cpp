@@ -87,7 +87,6 @@ struct RemoveUnusedArgsPass
           call->setOperands(newArgs);
         }
 
-        block.eraseArguments(removeArgs);
         func.eraseArguments(removeArgs);
         changed = true;
         repeat = true;

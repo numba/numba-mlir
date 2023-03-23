@@ -76,3 +76,19 @@ func.func private @test1(%arg1: index) {
 func.func private @test2(%arg1: index) {
   return
 }
+
+// -----
+
+// CHECK-LABEL: func private @test(%{{.*}}: index)
+func.func private @test(%arg1: index, %arg2: index) {
+  "test.test"(%arg1) : (index) -> ()
+  return
+}
+
+// -----
+
+// CHECK-LABEL: func private @test(%{{.*}}: index)
+func.func private @test(%arg1: index, %arg2: index) {
+  "test.test"(%arg2) : (index) -> ()
+  return
+}
