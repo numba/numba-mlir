@@ -24,6 +24,14 @@ static bool is_mkl_supported() {
 #endif
 }
 
+static bool is_sycl_mkl_supported() {
+#ifdef NUMBA_MLIR_USE_SYCL_MKL
+  return true;
+#else
+  return false;
+#endif
+}
+
 PYBIND11_MODULE(mlir_compiler, m) {
   m.def("init_compiler", &initCompiler, "No docs");
   m.def("create_module", &createModule, "No docs");
@@ -35,4 +43,5 @@ PYBIND11_MODULE(mlir_compiler, m) {
   m.def("module_str", &moduleStr, "No docs");
   m.def("is_dpnp_supported", &is_dpnp_supported, "No docs");
   m.def("is_mkl_supported", &is_mkl_supported, "No docs");
+  m.def("is_sycl_mkl_supported", &is_sycl_mkl_supported, "No docs");
 }

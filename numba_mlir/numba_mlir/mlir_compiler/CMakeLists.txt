@@ -116,6 +116,11 @@ if(NUMBA_MLIR_USE_MKL)
     target_compile_definitions(${PROJECT_NAME} PRIVATE NUMBA_MLIR_USE_MKL=1)
 endif()
 
+if(NUMBA_MLIR_USE_SYCL AND NUMBA_MLIR_USE_MKL)
+    target_compile_definitions(${PROJECT_NAME} PRIVATE NUMBA_MLIR_USE_SYCL_MKL=1)
+endif()
+
+
 if(NUMBA_MLIR_ENABLE_IGPU_DIALECT)
     target_compile_definitions(${PROJECT_NAME} PRIVATE NUMBA_MLIR_ENABLE_IGPU_DIALECT=1)
 endif()

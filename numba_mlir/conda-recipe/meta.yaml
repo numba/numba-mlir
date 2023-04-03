@@ -12,6 +12,7 @@ build:
         - LLVM_PATH
         - LEVEL_ZERO_DIR
         - LEVEL_ZERO_VERSION_CHECK_OFF
+        - NUMBA_MLIR_USE_SYCL
 
 requirements:
     build:
@@ -20,8 +21,10 @@ requirements:
         - ninja
         - cmake
         - pybind11
-        - mkl-devel >=2022.2
-        - mkl-devel-dpcpp >=2022.2
+        - mkl-devel >=2023.0.0
+        - mkl-devel-dpcpp >=2023.0.0
+        - dpcpp_linux-64 # [linux]
+        - dpcpp_win-64 # [win]
         - setuptools
         - zlib
     host:
