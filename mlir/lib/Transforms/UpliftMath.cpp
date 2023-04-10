@@ -50,8 +50,11 @@ struct UpliftMathCalls : public mlir::OpRewritePattern<mlir::func::CallOp> {
         llvm::any_of(op.getResultTypes(), isNotValidType))
       return mlir::failure();
 
-    llvm::StringRef funcNameF =
+    llvm::StringRef funcNameFPref =
         (funcName.front() == 'f' ? funcName.drop_front() : llvm::StringRef{});
+
+    llvm::StringRef funcNameFPost =
+        (funcName.back() == 'f' ? funcName.drop_back() : llvm::StringRef{});
 
     using func_t = mlir::Operation *(*)(mlir::OpBuilder &, mlir::Location,
                                         mlir::ValueRange);
@@ -69,7 +72,7 @@ struct UpliftMathCalls : public mlir::OpRewritePattern<mlir::func::CallOp> {
 
     for (auto &handler : handlers) {
       auto name = handler.first;
-      if (name == funcName || name == funcNameF) {
+      if (name == funcName || name == funcNameFPref || name == funcNameFPost) {
         auto res = handler.second(rewriter, op.getLoc(), op.getOperands());
         if (!res)
           return mlir::failure();

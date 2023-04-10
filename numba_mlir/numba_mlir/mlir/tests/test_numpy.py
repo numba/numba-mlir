@@ -546,6 +546,19 @@ def test_sum_add2():
     assert_equal(py_func(arr1, arr2, arr3), jit_func(arr1, arr2, arr3))
 
 
+@pytest.mark.parametrize("arr", _test_arrays)
+@pytest.mark.parametrize("name", ["sqrt", "log", "exp", "sin", "cos"])
+def test_math_uplifting1(arr, name):
+    py_func = eval(f"lambda a: np.{name}(a)")
+
+    with print_pass_ir([], ["UpliftMathPass"]):
+        jit_func = njit(py_func)
+
+        assert_equal(py_func(arr), jit_func(arr))
+        ir = get_print_buffer()
+        assert ir.count(f"math.{name}") == 1, ir
+
+
 _scalars = [1, 2.5, 3.6 + 4.7j]
 _complex_arrays = [
     np.array([1, 2, 3]),
