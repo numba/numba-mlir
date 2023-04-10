@@ -83,8 +83,6 @@ def _reduce_impl(state, value, op):
 
 
 def _setup_execution_state(global_size, local_size):
-    import numba_mlir.mlir.kernel_impl
-
     global _execution_state
     assert _execution_state is None
 

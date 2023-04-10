@@ -2,8 +2,6 @@
 #
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-import numpy as np
-
 from . import kernel_sim_impl
 
 from .kernel_base import KernelBase
