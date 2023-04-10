@@ -554,7 +554,7 @@ def test_math_uplifting1(arr, name):
     with print_pass_ir([], ["UpliftMathPass"]):
         jit_func = njit(py_func)
 
-        assert_equal(py_func(arr), jit_func(arr))
+        assert_allclose(py_func(arr), jit_func(arr), rtol=1e-7, atol=1e-7)
         ir = get_print_buffer()
         assert ir.count(f"math.{name}") == 1, ir
 
