@@ -773,7 +773,7 @@ private:
     suggestBlockSizeBuilder.create(loc, rewriter, params);
 
     mlir::Value blockSizeArray = rewriter.create<mlir::LLVM::LoadOp>(
-        loc, llvmIndexType, castToSizesPtrType(blockArrayPtr));
+        loc, sizesType, castToSizesPtrType(blockArrayPtr));
     llvm::SmallVector<mlir::Value, 3> result(numDims);
     for (auto i : llvm::seq(0u, numDims)) {
       auto blockSize = rewriter.create<mlir::LLVM::ExtractValueOp>(
