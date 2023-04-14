@@ -243,9 +243,8 @@ static mlir::Value unflatten(mlir::Type type, mlir::Location loc,
   namespace mllvm = mlir::LLVM;
   if (auto structType = type.dyn_cast<mlir::LLVM::LLVMStructType>()) {
     mlir::Value val = builder.create<mllvm::UndefOp>(loc, structType);
-    for (auto elem : llvm::enumerate(structType.getBody())) {
-      auto elemIndex = static_cast<int64_t>(elem.index());
-      auto elemType = elem.value();
+    for (auto &&[i, elemType] : llvm::enumerate(structType.getBody())) {
+      auto elemIndex = static_cast<int64_t>(i);
       auto elemVal =
           unflatten(elemType, loc, builder, std::forward<F>(nextFunc));
       val = builder.create<mlir::LLVM::InsertValueOp>(loc, val, elemVal,
@@ -659,12 +658,12 @@ struct ReturnOpLowering : public mlir::OpRewritePattern<mlir::func::ReturnOp> {
       auto resType =
           getFunctionResType(*ctx, typeConverter, op.getOperandTypes());
       auto val = rewriter.create<mlir::LLVM::UndefOp>(loc, resType).getResult();
-      for (auto it : llvm::enumerate(op.getOperands())) {
-        auto arg = convertVal(it.value());
+      for (auto &&[i, val] : llvm::enumerate(op.getOperands())) {
+        auto arg = convertVal(val);
         if (!arg)
           return mlir::failure();
 
-        auto index = static_cast<int64_t>(it.index());
+        auto index = static_cast<int64_t>(i);
         val = rewriter.create<mlir::LLVM::InsertValueOp>(loc, val, arg, index);
       }
       rewriter.create<mlir::LLVM::StoreOp>(loc, val, addr);
