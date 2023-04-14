@@ -618,6 +618,7 @@ struct ReturnOpLowering : public mlir::OpRewritePattern<mlir::func::ReturnOp> {
 
     auto ctx = op.getContext();
     auto loc = op.getLoc();
+
     auto convertVal = [&](mlir::Value val) -> mlir::Value {
       auto origType = val.getType();
       auto llRetType = typeConverter.convertType(origType);
@@ -642,12 +643,12 @@ struct ReturnOpLowering : public mlir::OpRewritePattern<mlir::func::ReturnOp> {
       return val;
     };
     rewriter.setInsertionPoint(op);
+
     auto addr = op->getParentRegion()->front().getArgument(0);
     if (op.getNumOperands() == 0) {
-      assert(addr.getType().isa<mlir::LLVM::LLVMPointerType>());
-      auto nullType =
-          addr.getType().cast<mlir::LLVM::LLVMPointerType>().getElementType();
-      auto llVal = rewriter.create<mlir::LLVM::NullOp>(op.getLoc(), nullType);
+      auto addrType = addr.getType();
+      assert(addrType.isa<mlir::LLVM::LLVMPointerType>());
+      auto llVal = rewriter.create<mlir::LLVM::NullOp>(loc, addrType);
       rewriter.create<mlir::LLVM::StoreOp>(loc, llVal, addr);
     } else if (op.getNumOperands() == 1) {
       mlir::Value val = convertVal(op.getOperand(0));
@@ -668,10 +669,12 @@ struct ReturnOpLowering : public mlir::OpRewritePattern<mlir::func::ReturnOp> {
       }
       rewriter.create<mlir::LLVM::StoreOp>(loc, val, addr);
     }
+
     auto retType = mlir::IntegerType::get(ctx, 32);
     mlir::Value ret = rewriter.create<mlir::LLVM::ConstantOp>(
         loc, retType, mlir::IntegerAttr::get(retType, 0));
     rewriter.replaceOpWithNewOp<mlir::LLVM::ReturnOp>(op, ret);
+
     return mlir::success();
   }
 
@@ -1341,10 +1344,8 @@ struct PreLLVMLowering
 
     mlir::RewritePatternSet patterns(&context);
     auto func = getOperation();
-    if (mlir::failed(fixFuncSig(type_helper, func))) {
-      signalPassFailure();
-      return;
-    }
+    if (mlir::failed(fixFuncSig(type_helper, func)))
+      return signalPassFailure();
 
     patterns.insert<ReturnOpLowering>(&context,
                                       type_helper.get_type_converter());
