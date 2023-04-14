@@ -46,6 +46,11 @@ private:
 static constexpr llvm::StringLiteral kEventCountAttrName("gpu.event_count");
 static constexpr llvm::StringLiteral kEventIndexAttrName("gpu.event_index");
 
+static mlir::Type getLLVMPointerType(mlir::Type elemType) {
+    assert(elemType);
+    return mlir::LLVM::LLVMPointerType::get(elemType.getContext());
+}
+
 template <typename OpTy>
 class ConvertOpToGpuRuntimeCallPattern
     : public mlir::ConvertOpToLLVMPattern<OpTy> {
@@ -58,25 +63,25 @@ protected:
 
   mlir::Type llvmVoidType = mlir::LLVM::LLVMVoidType::get(context);
   mlir::Type llvmPointerType =
-      mlir::LLVM::LLVMPointerType::get(mlir::IntegerType::get(context, 8));
+      getLLVMPointerType(mlir::IntegerType::get(context, 8));
   mlir::Type llvmPointerPointerType =
-      mlir::LLVM::LLVMPointerType::get(llvmPointerType);
+      getLLVMPointerType(llvmPointerType);
   mlir::Type llvmInt8Type = mlir::IntegerType::get(context, 8);
   mlir::Type llvmInt32Type = mlir::IntegerType::get(context, 32);
   mlir::Type llvmInt64Type = mlir::IntegerType::get(context, 64);
   mlir::Type llvmIndexType = mlir::IntegerType::get(
       context, this->getTypeConverter()->getPointerBitwidth(0));
 
-  mlir::Type llvmI32PtrType = mlir::LLVM::LLVMPointerType::get(llvmIndexType);
+  mlir::Type llvmI32PtrType = getLLVMPointerType(llvmIndexType);
 
   mlir::Type llvmRangeType = mlir::LLVM::LLVMStructType::getLiteral(
       context, {llvmPointerType, llvmIndexType});
   mlir::Type llvmRangePointerType =
-      mlir::LLVM::LLVMPointerType::get(llvmRangeType);
+      getLLVMPointerType(llvmRangeType);
   mlir::Type llvmAllocResType = mlir::LLVM::LLVMStructType::getLiteral(
       context, {llvmPointerType, llvmPointerType, llvmPointerType});
   mlir::Type llvmAllocResPtrType =
-      mlir::LLVM::LLVMPointerType::get(llvmAllocResType);
+      getLLVMPointerType(llvmAllocResType);
 
   FunctionCallBuilder streamCreateCallBuilder = {
       "gpuxStreamCreate",
@@ -190,7 +195,7 @@ protected:
     depsArray = rewriter.create<mlir::LLVM::InsertValueOp>(
         loc, depsArray, nullPtr, depsArraySize);
 
-    auto depsArrayPtrType = mlir::LLVM::LLVMPointerType::get(depsArrayType);
+    auto depsArrayPtrType = getLLVMPointerType(depsArrayType);
     numba::AllocaInsertionPoint allocaHelper(op);
     auto depsArrayPtr = allocaHelper.insert(rewriter, [&]() {
       auto size = rewriter.create<mlir::LLVM::ConstantOp>(
@@ -419,7 +424,7 @@ private:
     auto paramsCount = static_cast<unsigned>(kernelParams.size());
     auto paramsArrayType =
         mlir::LLVM::LLVMArrayType::get(llvmRangeType, paramsCount + 1);
-    auto paramsArrayPtrType = mlir::LLVM::LLVMPointerType::get(paramsArrayType);
+    auto paramsArrayPtrType = getLLVMPointerType(paramsArrayType);
 
     auto getKernelParamType = [&](unsigned i) -> mlir::Type {
       if (op.getKernelOperands()[i].getType().isa<mlir::MemRefType>()) {
@@ -435,7 +440,7 @@ private:
       auto one = rewriter.create<mlir::LLVM::ConstantOp>(
           loc, llvmInt64Type, rewriter.getI64IntegerAttr(1));
       for (auto i : llvm::seq(0u, paramsCount)) {
-        auto ptrType = mlir::LLVM::LLVMPointerType::get(getKernelParamType(i));
+        auto ptrType = getLLVMPointerType(getKernelParamType(i));
         paramsStorage[i] =
             rewriter.create<mlir::LLVM::AllocaOp>(loc, ptrType, one, 0);
       }
@@ -734,7 +739,7 @@ private:
     });
 
     auto sizesType = mlir::LLVM::LLVMArrayType::get(llvmInt32Type, numDims);
-    auto sizesPtrType = mlir::LLVM::LLVMPointerType::get((sizesType));
+    auto sizesPtrType = getLLVMPointerType((sizesType));
     auto castToSizesPtrType = [&](mlir::Value val) {
       return rewriter.create<mlir::LLVM::BitcastOp>(loc, sizesPtrType, val);
     };
@@ -841,7 +846,7 @@ void gpu_runtime::populateGpuToLLVMPatternsAndLegality(
     mlir::ConversionTarget &target) {
   auto context = patterns.getContext();
   auto llvmPointerType =
-      mlir::LLVM::LLVMPointerType::get(mlir::IntegerType::get(context, 8));
+      getLLVMPointerType(mlir::IntegerType::get(context, 8));
   converter.addConversion(
       [llvmPointerType](gpu_runtime::OpaqueType) -> mlir::Type {
         return llvmPointerType;

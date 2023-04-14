@@ -54,6 +54,11 @@ static mlir::Type convertTuple(mlir::MLIRContext &context,
   return convertTupleTypes(context, converter, tuple.getTypes());
 }
 
+static mlir::Type getLLVMPointerType(mlir::Type elemType) {
+    assert(elemType);
+    return mlir::LLVM::LLVMPointerType::get(elemType.getContext());
+}
+
 static void
 populateToLLVMAdditionalTypeConversion(mlir::LLVMTypeConverter &converter) {
   converter.addConversion(
@@ -63,7 +68,7 @@ populateToLLVMAdditionalTypeConversion(mlir::LLVMTypeConverter &converter) {
           return std::nullopt;
         return res;
       });
-  auto voidPtrType = mlir::LLVM::LLVMPointerType::get(
+  auto voidPtrType = getLLVMPointerType(
       mlir::IntegerType::get(&converter.getContext(), 8));
   converter.addConversion(
       [voidPtrType](mlir::NoneType) -> std::optional<mlir::Type> {
@@ -231,7 +236,7 @@ struct LowerTakeContextOp
 
     auto ctxStructType =
         mlir::LLVM::LLVMStructType::getLiteral(getContext(), resultTypes);
-    auto ctxStructPtrType = mlir::LLVM::LLVMPointerType::get(ctxStructType);
+    auto ctxStructPtrType = getLLVMPointerType(ctxStructType);
 
     auto mod = op->getParentOfType<mlir::ModuleOp>();
     assert(mod);
@@ -240,7 +245,7 @@ struct LowerTakeContextOp
     auto loc = op->getLoc();
     auto wrapperType =
         mlir::LLVM::LLVMFunctionType::get(getVoidType(), ctxType);
-    auto wrapperPtrType = mlir::LLVM::LLVMPointerType::get(wrapperType);
+    auto wrapperPtrType = getLLVMPointerType(wrapperType);
     mlir::Value initFuncPtr;
 
     auto insertFunc = [&](mlir::StringRef name, mlir::Type type,
@@ -370,7 +375,7 @@ struct LowerTakeContextOp
       llvm::StringRef name("nmrtTakeContext");
       auto retType = getVoidPtrType();
       const mlir::Type argTypes[] = {
-          mlir::LLVM::LLVMPointerType::get(getVoidPtrType()),
+          getLLVMPointerType(getVoidPtrType()),
           getIndexType(),
           wrapperPtrType,
           wrapperPtrType,
@@ -382,7 +387,7 @@ struct LowerTakeContextOp
     auto purgeCtxFunc = [&]() -> mlir::LLVM::LLVMFuncOp {
       llvm::StringRef name("nmrtPurgeContext");
       auto retType = getVoidType();
-      auto argType = mlir::LLVM::LLVMPointerType::get(getVoidPtrType());
+      auto argType = getLLVMPointerType(getVoidPtrType());
       auto funcType = mlir::LLVM::LLVMFunctionType::get(retType, argType);
       return lookupFunc(name, funcType);
     }();
