@@ -364,6 +364,9 @@ struct TailLoopToWhileCond
                   mlir::PatternRewriter &rewriter) const override {
     for (bool reverse : {false, true}) {
       auto bodyBlock = reverse ? op.getFalseDest() : op.getTrueDest();
+      if (bodyBlock == op->getBlock())
+        continue;
+
       auto args =
           reverse ? op.getFalseDestOperands() : op.getTrueDestOperands();
       auto res = tailLoopToWhile(rewriter, op.getLoc(), bodyBlock, args);
