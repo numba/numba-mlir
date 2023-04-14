@@ -786,10 +786,10 @@ private:
         auto block = func.addEntryBlock();
         builder.setInsertionPointToStart(block);
         auto arg = block->getArgument(0);
-        auto meminfoType = getLLVMPointerType(
-            getMeminfoType(*getTypeConverter()));
+        auto meminfoType = getMeminfoType(*getTypeConverter());
+        auto meminfoPtrType = getLLVMPointerType(meminfoType);
         auto meminfo =
-            builder.create<mlir::LLVM::BitcastOp>(loc, meminfoType, arg);
+            builder.create<mlir::LLVM::BitcastOp>(loc, meminfoPtrType, arg);
 
         auto llvmI32Type = builder.getI32Type();
 
@@ -800,7 +800,7 @@ private:
         auto refcntOffset = builder.create<mlir::LLVM::ConstantOp>(
             loc, llvmI32Type, builder.getI32IntegerAttr(MeminfoRefcntIndex));
         mlir::Value indices[] = {i32zero, refcntOffset};
-        auto refcntPtr = builder.create<mlir::LLVM::GEPOp>(loc, refcntType, indexType,
+        auto refcntPtr = builder.create<mlir::LLVM::GEPOp>(loc, refcntType, meminfoType,
                                                            meminfo, indices);
 
         auto one = builder.create<mlir::LLVM::ConstantOp>(
@@ -951,10 +951,10 @@ private:
 
         builder.setInsertionPointToStart(block);
         auto arg = block->getArgument(0);
-        auto meminfoType = getLLVMPointerType(
-            getMeminfoType(*getTypeConverter()));
+        auto meminfoType = getMeminfoType(*getTypeConverter());
+        auto meminfoPtrType = getLLVMPointerType(meminfoType);
         mlir::Value meminfo =
-            builder.create<mlir::LLVM::BitcastOp>(loc, meminfoType, arg);
+            builder.create<mlir::LLVM::BitcastOp>(loc, meminfoPtrType, arg);
 
         auto llvmI32Type = builder.getI32Type();
 
@@ -965,7 +965,7 @@ private:
         auto refcntOffset = builder.create<mlir::LLVM::ConstantOp>(
             loc, llvmI32Type, builder.getI32IntegerAttr(MeminfoRefcntIndex));
         mlir::Value indices[] = {i32zero, refcntOffset};
-        auto refcntPtr = builder.create<mlir::LLVM::GEPOp>(loc, refcntType, indexType,
+        auto refcntPtr = builder.create<mlir::LLVM::GEPOp>(loc, refcntType, meminfoType,
                                                            meminfo, indices);
 
         auto one = builder.create<mlir::LLVM::ConstantOp>(
@@ -987,7 +987,7 @@ private:
           builder.setInsertionPointToStart(mod.getBody());
           dtorFunc = builder.create<mlir::LLVM::LLVMFuncOp>(
               loc, dtorFuncName,
-              mlir::LLVM::LLVMFunctionType::get(llvmVoidType, meminfoType));
+              mlir::LLVM::LLVMFunctionType::get(llvmVoidType, meminfoPtrType));
         }
         builder.create<mlir::LLVM::CallOp>(loc, mlir::TypeRange(),
                                            mlir::SymbolRefAttr::get(dtorFunc),
@@ -1221,7 +1221,7 @@ struct LowerParallel : public mlir::OpRewritePattern<numba::util::ParallelOp> {
           loc, contextPtrType, entry->getArgument(2));
       auto zero = rewriter.create<mlir::LLVM::ConstantOp>(
           loc, llvmI32Type, rewriter.getI32IntegerAttr(0));
-      for (auto [index, oldVal] : llvm::enumerate(contextVars)) {
+      for (auto &&[index, oldVal] : llvm::enumerate(contextVars)) {
         const mlir::Value indices[] = {
             zero, rewriter.create<mlir::LLVM::ConstantOp>(
                       loc, llvmI32Type,
