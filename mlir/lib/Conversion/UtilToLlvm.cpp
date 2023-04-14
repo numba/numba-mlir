@@ -317,7 +317,8 @@ struct LowerTakeContextOp
         return func;
       }();
 
-      initFuncPtr = rewriter.create<mlir::LLVM::AddressOfOp>(loc, initFunc);
+      auto funcPtr = getLLVMPointerType(initFunc.getFunctionType());
+      initFuncPtr = rewriter.create<mlir::LLVM::AddressOfOp>(loc, funcPtr, initFunc.getSymName());
     } else {
       initFuncPtr = rewriter.create<mlir::LLVM::NullOp>(loc, wrapperPtrType);
     }
@@ -366,7 +367,8 @@ struct LowerTakeContextOp
         return func;
       }();
 
-      deinitFuncPtr = rewriter.create<mlir::LLVM::AddressOfOp>(loc, deinitFunc);
+      auto funcPtr = getLLVMPointerType(deinitFunc.getFunctionType());
+      deinitFuncPtr = rewriter.create<mlir::LLVM::AddressOfOp>(loc, funcPtr, deinitFunc.getSymName());
     } else {
       deinitFuncPtr = rewriter.create<mlir::LLVM::NullOp>(loc, wrapperPtrType);
     }
@@ -418,15 +420,18 @@ struct LowerTakeContextOp
 
       assert(llvm::hasSingleElement(cleanupFunc.getBody()));
       rewriter.setInsertionPointToStart(&cleanupFunc.getBody().front());
+
+      auto ctxPtrType = getLLVMPointerType(ctxType);
       mlir::Value addr =
-          rewriter.create<mlir::LLVM::AddressOfOp>(unknownLoc, handle);
+          rewriter.create<mlir::LLVM::AddressOfOp>(unknownLoc, ctxPtrType, handle.getSymName());
       rewriter.create<mlir::LLVM::CallOp>(unknownLoc, purgeCtxFunc, addr);
 
       return handle;
     }();
 
+    auto ctxPtrType = getLLVMPointerType(ctxType);
     auto ctxHandlePtr =
-        rewriter.create<mlir::LLVM::AddressOfOp>(loc, ctxHandle);
+        rewriter.create<mlir::LLVM::AddressOfOp>(loc, ctxPtrType, ctxHandle.getSymName());
     auto contextSize = getSizeInBytes(loc, ctxStructType, rewriter);
 
     const mlir::Value takeCtxArgs[] = {
