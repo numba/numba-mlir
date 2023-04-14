@@ -254,7 +254,7 @@ private:
 
       auto varName = numba::getUniqueLLVMGlobalName(mod, "device_name");
       data = mlir::LLVM::createGlobalString(loc, rewriter, varName, name,
-                                            mlir::LLVM::Linkage::Internal);
+                                            mlir::LLVM::Linkage::Internal, true);
     } else {
       data = rewriter.create<mlir::LLVM::NullOp>(loc, llvmPointerType);
     }
@@ -316,7 +316,7 @@ private:
     auto loc = op.getLoc();
     auto name = numba::getUniqueLLVMGlobalName(mod, "gpu_blob");
     auto data = mlir::LLVM::createGlobalString(loc, rewriter, name, blob,
-                                               mlir::LLVM::Linkage::Internal);
+                                               mlir::LLVM::Linkage::Internal, true);
     auto size = rewriter.create<mlir::LLVM::ConstantOp>(
         loc, llvmIndexType,
         mlir::IntegerAttr::get(llvmIndexType,
@@ -370,7 +370,7 @@ private:
 
     auto varName = numba::getUniqueLLVMGlobalName(mod, "kernel_name");
     auto data = mlir::LLVM::createGlobalString(loc, rewriter, varName, name,
-                                               mlir::LLVM::Linkage::Internal);
+                                               mlir::LLVM::Linkage::Internal, true);
     auto res =
         kernelGetCallBuilder.create(loc, rewriter, {adaptor.getModule(), data});
     rewriter.replaceOp(op, res.getResults());

@@ -765,7 +765,7 @@ mlir::LogicalResult numba::ntensor::SubviewOp::reifyResultShapes(
     if (auto attr = size.value().dyn_cast<mlir::Attribute>()) {
       reifiedReturnShapes[0].push_back(
           builder.create<mlir::arith::ConstantIndexOp>(
-              loc, attr.cast<mlir::IntegerAttr>().getInt()));
+              loc, attr.cast<mlir::IntegerAttr>().getInt()).getResult());
       continue;
     }
     reifiedReturnShapes[0].push_back(size.value().get<mlir::Value>());

@@ -858,7 +858,8 @@ private:
         [this](llvm::orc::MangleAndInterner m) -> llvm::orc::SymbolMap {
       llvm::orc::SymbolMap ret;
       for (auto [name, ptr] : symbolList) {
-        auto jitPtr = llvm::JITEvaluatedSymbol::fromPointer(ptr);
+        llvm::orc::ExecutorSymbolDef jitPtr{ llvm::orc::ExecutorAddr::fromPtr(ptr),
+                        llvm::JITSymbolFlags::Exported };
         ret.insert({m(name), jitPtr});
       }
       return ret;

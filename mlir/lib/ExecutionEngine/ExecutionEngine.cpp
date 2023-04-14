@@ -90,7 +90,7 @@ static void runOptimizationPasses(llvm::Module &M, llvm::TargetMachine &TM) {
   llvm::StandardInstrumentations si(M.getContext(), /*debugLogging*/ false,
                                     /*verifyEach*/ true, ppo);
 
-  si.registerCallbacks(pic, &fam);
+  si.registerCallbacks(pic, &mam);
 
   llvm::PassBuilder pb(&TM, getPipelineTuningOptions(optLevelVal));
 

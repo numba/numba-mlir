@@ -42,7 +42,7 @@ static LogicalResult runMLIRPasses(mlir::Operation *op,
   passManager.addNestedPass<mlir::func::FuncOp>(createLinalgBufferizePass());
   passManager.addNestedPass<mlir::func::FuncOp>(
       bufferization::createBufferizationBufferizePass());
-  passManager.addNestedPass<mlir::func::FuncOp>(createTensorBufferizePass());
+  passManager.addNestedPass<mlir::func::FuncOp>(tensor::createTensorBufferizePass());
   passManager.addPass(func::createFuncBufferizePass());
   passManager.addNestedPass<mlir::func::FuncOp>(
       bufferization::createFinalizingBufferizePass());

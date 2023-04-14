@@ -124,7 +124,7 @@ struct DimExpandShape : public mlir::OpRewritePattern<DimOp> {
 
     auto reassoc = es.getReassociationIndices();
     auto srcIndexAttr = [&]() -> std::optional<unsigned> {
-      for (auto &it : llvm::enumerate(reassoc))
+      for (auto &&it : llvm::enumerate(reassoc))
         for (auto i : it.value())
           if (i == dstIndex)
             return it.index();
@@ -982,8 +982,8 @@ struct ChangeLayoutCopy : public mlir::OpRewritePattern<mlir::memref::CopyOp> {
   mlir::LogicalResult
   matchAndRewrite(mlir::memref::CopyOp op,
                   mlir::PatternRewriter &rewriter) const override {
-    auto input = op.getSource();
-    auto output = op.getTarget();
+    mlir::Value input = op.getSource();
+    mlir::Value output = op.getTarget();
     auto clInput = input.getDefiningOp<numba::util::ChangeLayoutOp>();
     auto clOutput = output.getDefiningOp<numba::util::ChangeLayoutOp>();
     if (!clInput && !clOutput)
@@ -1967,7 +1967,7 @@ struct MergeAdjacentRegions
     {
       // Merge region from second op into ferst one.
       mlir::OpBuilder::InsertionGuard g(rewriter);
-      rewriter.mergeBlockBefore(nextBody, term);
+      rewriter.inlineBlockBefore(nextBody, term);
       rewriter.setInsertionPoint(term);
       rewriter.create<EnvironmentRegionYieldOp>(term->getLoc(), newYieldArgs);
       rewriter.eraseOp(term);
@@ -2002,7 +2002,7 @@ void EnvironmentRegionOp::inlineIntoParent(mlir::PatternRewriter &builder,
   auto term = mlir::cast<EnvironmentRegionYieldOp>(block->getTerminator());
   auto args = llvm::to_vector(term.getResults());
   builder.eraseOp(term);
-  builder.mergeBlockBefore(block, op);
+  builder.inlineBlockBefore(block, op);
   builder.replaceOp(op, args);
 }
 
