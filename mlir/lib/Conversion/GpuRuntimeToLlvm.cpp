@@ -730,13 +730,13 @@ private:
     auto gridArrayPtr = allocaHelper.insert(rewriter, [&]() {
       auto size = rewriter.create<mlir::LLVM::ConstantOp>(
           loc, llvmInt64Type, rewriter.getI64IntegerAttr(numDims));
-      return rewriter.create<mlir::LLVM::AllocaOp>(loc, llvmI32PtrType, llvmIndexType, size,
+      return rewriter.create<mlir::LLVM::AllocaOp>(loc, llvmI32PtrType, llvmInt32Type, size,
                                                    0);
     });
     auto blockArrayPtr = allocaHelper.insert(rewriter, [&]() {
       auto size = rewriter.create<mlir::LLVM::ConstantOp>(
           loc, llvmInt64Type, rewriter.getI64IntegerAttr(numDims));
-      return rewriter.create<mlir::LLVM::AllocaOp>(loc, llvmI32PtrType, llvmIndexType, size,
+      return rewriter.create<mlir::LLVM::AllocaOp>(loc, llvmI32PtrType, llvmInt32Type, size,
                                                    0);
     });
 
