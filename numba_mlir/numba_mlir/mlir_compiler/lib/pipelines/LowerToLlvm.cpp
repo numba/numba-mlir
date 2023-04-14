@@ -900,7 +900,7 @@ private:
     mlir::Value indices[] = {i32zero, dataOffset};
     auto dataPtrPtr = rewriter.create<mlir::LLVM::GEPOp>(loc, dataPtrPtrType,
                                                          meminfo, indices);
-    return rewriter.create<mlir::LLVM::LoadOp>(loc, dataPtrPtr);
+    return rewriter.create<mlir::LLVM::LoadOp>(loc, getVoidPtrType(), dataPtrPtr);
   }
 };
 

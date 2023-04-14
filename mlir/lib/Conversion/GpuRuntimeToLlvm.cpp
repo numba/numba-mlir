@@ -645,7 +645,7 @@ private:
         // clang-format on
     };
     allocCallBuilder.create(loc, rewriter, params);
-    auto res = rewriter.create<mlir::LLVM::LoadOp>(loc, resultPtr);
+    auto res = rewriter.create<mlir::LLVM::LoadOp>(loc, llvmAllocResType, resultPtr);
     auto meminfo = rewriter.create<mlir::LLVM::ExtractValueOp>(
         loc, llvmPointerType, res, 0);
     auto dataPtr = rewriter.create<mlir::LLVM::ExtractValueOp>(
@@ -772,7 +772,7 @@ private:
     suggestBlockSizeBuilder.create(loc, rewriter, params);
 
     mlir::Value blockSizeArray = rewriter.create<mlir::LLVM::LoadOp>(
-        loc, castToSizesPtrType(blockArrayPtr));
+        loc, llvmIndexType, castToSizesPtrType(blockArrayPtr));
     llvm::SmallVector<mlir::Value, 3> result(numDims);
     for (auto i : llvm::seq(0u, numDims)) {
       auto blockSize = rewriter.create<mlir::LLVM::ExtractValueOp>(
