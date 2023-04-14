@@ -902,7 +902,7 @@ private:
     auto dataOffset = rewriter.create<mlir::LLVM::ConstantOp>(
         loc, llvmI32Type, rewriter.getI32IntegerAttr(MeminfoDataIndex));
     mlir::Value indices[] = {i32zero, dataOffset};
-    auto dataPtrPtr = rewriter.create<mlir::LLVM::GEPOp>(loc, dataPtrPtrType, getVoidPtrType(),
+    auto dataPtrPtr = rewriter.create<mlir::LLVM::GEPOp>(loc, dataPtrPtrType, meminfoType,
                                                          meminfo, indices);
     return rewriter.create<mlir::LLVM::LoadOp>(loc, getVoidPtrType(), dataPtrPtr);
   }
