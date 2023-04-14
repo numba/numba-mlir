@@ -1426,7 +1426,7 @@ struct FixLLVMStructABIPass
             auto one = builder.create<mlir::LLVM::ConstantOp>(
                 unknownLoc, builder.getI32Type(), builder.getI32IntegerAttr(1));
             mlir::Value res = builder.create<mlir::LLVM::AllocaOp>(
-                unknownLoc, newType, one, 0);
+                unknownLoc, newType, origType, one, 0);
             newArgs.emplace_back(res);
           }
         });
