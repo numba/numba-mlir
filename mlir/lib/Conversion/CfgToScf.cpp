@@ -19,15 +19,6 @@
 namespace {
 static const constexpr bool debugLoopRestructuring = false;
 
-static mlir::Block *getNextBlock(mlir::Block *block) {
-  assert(nullptr != block);
-  if (auto br =
-          mlir::dyn_cast_or_null<mlir::cf::BranchOp>(block->getTerminator()))
-    return br.getDest();
-
-  return nullptr;
-};
-
 static void eraseBlocks(mlir::PatternRewriter &rewriter,
                         llvm::ArrayRef<mlir::Block *> blocks) {
   for (auto block : blocks) {
