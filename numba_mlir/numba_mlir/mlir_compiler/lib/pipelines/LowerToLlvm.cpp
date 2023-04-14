@@ -125,8 +125,8 @@ static mlir::Type convertTuple(mlir::MLIRContext &context,
 }
 
 static mlir::Type getLLVMPointerType(mlir::Type elemType) {
-    assert(elemType);
-    return mlir::LLVM::LLVMPointerType::get(elemType.getContext());
+  assert(elemType);
+  return mlir::LLVM::LLVMPointerType::get(elemType.getContext());
 }
 
 static void
@@ -138,8 +138,8 @@ populateToLLVMAdditionalTypeConversion(mlir::LLVMTypeConverter &converter) {
           return std::nullopt;
         return res;
       });
-  auto voidPtrType = getLLVMPointerType(
-      mlir::IntegerType::get(&converter.getContext(), 8));
+  auto voidPtrType =
+      getLLVMPointerType(mlir::IntegerType::get(&converter.getContext(), 8));
   converter.addConversion(
       [voidPtrType](mlir::NoneType) -> std::optional<mlir::Type> {
         return voidPtrType;
@@ -200,22 +200,22 @@ static mlir::LLVM::LLVMStructType getArrayType(mlir::TypeConverter &converter,
     auto shapeType = mlir::LLVM::LLVMArrayType::get(
         i64, static_cast<unsigned>(type.getRank()));
     const mlir::Type members[] = {
-        i8p,                                        // 0, meminfo
-        i8p,                                        // 1, parent
-        i64,                                        // 2, nitems
-        i64,                                        // 3, itemsize
-        getLLVMPointerType(dataType),               // 4, data
-        shapeType,                                  // 5, shape
-        shapeType,                                  // 6, strides
+        i8p,                          // 0, meminfo
+        i8p,                          // 1, parent
+        i64,                          // 2, nitems
+        i64,                          // 3, itemsize
+        getLLVMPointerType(dataType), // 4, data
+        shapeType,                    // 5, shape
+        shapeType,                    // 6, strides
     };
     return mlir::LLVM::LLVMStructType::getLiteral(ctx, members);
   } else {
     const mlir::Type members[] = {
-        i8p,                                        // 0, meminfo
-        i8p,                                        // 1, parent
-        i64,                                        // 2, nitems
-        i64,                                        // 3, itemsize
-        getLLVMPointerType(dataType),               // 4, data
+        i8p,                          // 0, meminfo
+        i8p,                          // 1, parent
+        i64,                          // 2, nitems
+        i64,                          // 3, itemsize
+        getLLVMPointerType(dataType), // 4, data
     };
     return mlir::LLVM::LLVMStructType::getLiteral(ctx, members);
   }
@@ -407,8 +407,7 @@ getToMemrefConversionFunc(mlir::ModuleOp module, mlir::OpBuilder &builder,
 
 static mlir::func::FuncOp
 getFromMemrefConversionFunc(mlir::ModuleOp module, mlir::OpBuilder &builder,
-                            mlir::MemRefType memrefType,
-                            mlir::Type elemType,
+                            mlir::MemRefType memrefType, mlir::Type elemType,
                             mlir::LLVM::LLVMStructType srcType,
                             mlir::LLVM::LLVMStructType dstType) {
   assert(memrefType);
@@ -445,8 +444,8 @@ getFromMemrefConversionFunc(mlir::ModuleOp module, mlir::OpBuilder &builder,
   auto rank = memrefType.getRank();
   auto shape = (rank > 0 ? extract(3) : mlir::Value());
   auto strides = (rank > 0 ? extract(4) : mlir::Value());
-  auto ptr = builder.create<mllvm::GEPOp>(loc, origPtr.getType(), elemType, origPtr,
-                                          offset.getResult());
+  auto ptr = builder.create<mllvm::GEPOp>(loc, origPtr.getType(), elemType,
+                                          origPtr, offset.getResult());
   mlir::Value res = builder.create<mllvm::UndefOp>(loc, dstType);
   auto null = builder.create<mllvm::NullOp>(loc, i8ptrType);
   mlir::Value nitems = builder.create<mllvm::ConstantOp>(
@@ -497,8 +496,7 @@ static mlir::Type getFunctionResType(mlir::MLIRContext &context,
                                      mlir::TypeConverter &converter,
                                      mlir::TypeRange types) {
   if (types.empty())
-    return getLLVMPointerType(
-        mlir::IntegerType::get(&context, 8));
+    return getLLVMPointerType(mlir::IntegerType::get(&context, 8));
 
   llvm::SmallVector<mlir::Type> newResTypes(types.size());
   for (auto it : llvm::enumerate(types)) {
@@ -658,7 +656,8 @@ struct ReturnOpLowering : public mlir::OpRewritePattern<mlir::func::ReturnOp> {
     } else {
       auto resType =
           getFunctionResType(*ctx, typeConverter, op.getOperandTypes());
-      mlir::Value val = rewriter.create<mlir::LLVM::UndefOp>(loc, resType).getResult();
+      mlir::Value val =
+          rewriter.create<mlir::LLVM::UndefOp>(loc, resType).getResult();
       for (auto &&[i, funcArg] : llvm::enumerate(op.getOperands())) {
         auto arg = convertVal(funcArg);
         if (!arg)
@@ -726,8 +725,7 @@ enum {
 static mlir::Type getMeminfoType(mlir::LLVMTypeConverter &converter) {
   auto indexType = converter.getIndexType();
   auto *context = &converter.getContext();
-  auto voidPtrType =
-      getLLVMPointerType(mlir::IntegerType::get(context, 8));
+  auto voidPtrType = getLLVMPointerType(mlir::IntegerType::get(context, 8));
   const mlir::Type members[] = {
       indexType,   // refcnt
       voidPtrType, // dtor
@@ -802,8 +800,8 @@ private:
         auto refcntOffset = builder.create<mlir::LLVM::ConstantOp>(
             loc, llvmI32Type, builder.getI32IntegerAttr(MeminfoRefcntIndex));
         mlir::Value indices[] = {i32zero, refcntOffset};
-        auto refcntPtr = builder.create<mlir::LLVM::GEPOp>(loc, refcntType, meminfoType,
-                                                           meminfo, indices);
+        auto refcntPtr = builder.create<mlir::LLVM::GEPOp>(
+            loc, refcntType, meminfoType, meminfo, indices);
 
         auto one = builder.create<mlir::LLVM::ConstantOp>(
             loc, indexType, builder.getIntegerAttr(indexType, 1));
@@ -904,9 +902,10 @@ private:
     auto dataOffset = rewriter.create<mlir::LLVM::ConstantOp>(
         loc, llvmI32Type, rewriter.getI32IntegerAttr(MeminfoDataIndex));
     mlir::Value indices[] = {i32zero, dataOffset};
-    auto dataPtrPtr = rewriter.create<mlir::LLVM::GEPOp>(loc, dataPtrPtrType, meminfoType,
-                                                         meminfo, indices);
-    return rewriter.create<mlir::LLVM::LoadOp>(loc, getVoidPtrType(), dataPtrPtr);
+    auto dataPtrPtr = rewriter.create<mlir::LLVM::GEPOp>(
+        loc, dataPtrPtrType, meminfoType, meminfo, indices);
+    return rewriter.create<mlir::LLVM::LoadOp>(loc, getVoidPtrType(),
+                                               dataPtrPtr);
   }
 };
 
@@ -967,8 +966,8 @@ private:
         auto refcntOffset = builder.create<mlir::LLVM::ConstantOp>(
             loc, llvmI32Type, builder.getI32IntegerAttr(MeminfoRefcntIndex));
         mlir::Value indices[] = {i32zero, refcntOffset};
-        auto refcntPtr = builder.create<mlir::LLVM::GEPOp>(loc, refcntType, meminfoType,
-                                                           meminfo, indices);
+        auto refcntPtr = builder.create<mlir::LLVM::GEPOp>(
+            loc, refcntType, meminfoType, meminfo, indices);
 
         auto one = builder.create<mlir::LLVM::ConstantOp>(
             loc, indexType, builder.getIntegerAttr(indexType, 1));
@@ -1126,7 +1125,8 @@ struct LowerParallel : public mlir::OpRewritePattern<numba::util::ParallelOp> {
     auto context = allocaInsertionPoint.insert(rewriter, [&]() {
       auto one = rewriter.create<mlir::LLVM::ConstantOp>(
           loc, llvmI32Type, rewriter.getI32IntegerAttr(1));
-      return rewriter.create<mlir::LLVM::AllocaOp>(loc, contextPtrType, contextType, one, 0);
+      return rewriter.create<mlir::LLVM::AllocaOp>(loc, contextPtrType,
+                                                   contextType, one, 0);
     });
 
     for (auto &&it : llvm::enumerate(contextVars)) {
@@ -1136,12 +1136,12 @@ struct LowerParallel : public mlir::OpRewritePattern<numba::util::ParallelOp> {
       mlir::Value indices[] = {
           zero, rewriter.create<mlir::LLVM::ConstantOp>(loc, llvmI32Type, i)};
       auto pointerType = getLLVMPointerType(type);
-      auto ptr = rewriter.create<mlir::LLVM::GEPOp>(loc, pointerType, contextType, context,
-                                                    indices);
+      auto ptr = rewriter.create<mlir::LLVM::GEPOp>(
+          loc, pointerType, contextType, context, indices);
       rewriter.create<mlir::LLVM::StoreOp>(loc, llvmVal, ptr);
     }
-    auto voidPtrType = getLLVMPointerType(
-        mlir::IntegerType::get(op.getContext(), 8));
+    auto voidPtrType =
+        getLLVMPointerType(mlir::IntegerType::get(op.getContext(), 8));
     auto contextAbstract =
         rewriter.create<mlir::LLVM::BitcastOp>(loc, voidPtrType, context);
 
@@ -1204,8 +1204,8 @@ struct LowerParallel : public mlir::OpRewritePattern<numba::util::ParallelOp> {
         const mlir::Value indices[] = {rewriter.create<mlir::LLVM::ConstantOp>(
             loc, llvmI32Type,
             rewriter.getI32IntegerAttr(static_cast<int32_t>(i)))};
-        auto ptr =
-            rewriter.create<mlir::LLVM::GEPOp>(loc, rangePtr, rangeType, arg, indices);
+        auto ptr = rewriter.create<mlir::LLVM::GEPOp>(loc, rangePtr, rangeType,
+                                                      arg, indices);
         auto dims = rewriter.create<mlir::LLVM::LoadOp>(loc, rangeType, ptr);
         auto lower = rewriter.create<mlir::LLVM::ExtractValueOp>(
             loc, llvmIndexType, dims, 0);
@@ -1229,10 +1229,9 @@ struct LowerParallel : public mlir::OpRewritePattern<numba::util::ParallelOp> {
                       loc, llvmI32Type,
                       rewriter.getI32IntegerAttr(static_cast<int32_t>(index)))};
         auto elemType = contextType.getBody()[index];
-        auto pointerType =
-            getLLVMPointerType(elemType);
-        auto ptr = rewriter.create<mlir::LLVM::GEPOp>(loc, pointerType, contextType,
-                                                      contextPtr, indices);
+        auto pointerType = getLLVMPointerType(elemType);
+        auto ptr = rewriter.create<mlir::LLVM::GEPOp>(
+            loc, pointerType, contextType, contextPtr, indices);
         auto llvmVal = rewriter.create<mlir::LLVM::LoadOp>(loc, elemType, ptr);
         auto val = doCast(rewriter, loc, llvmVal, oldVal.getType());
         mapping.map(oldVal, val);
@@ -1273,8 +1272,8 @@ struct LowerParallel : public mlir::OpRewritePattern<numba::util::ParallelOp> {
       auto numLoopsAttr = rewriter.getIntegerAttr(llvmIndexType, numLoops);
       auto numLoopsVar = rewriter.create<mlir::LLVM::ConstantOp>(
           loc, llvmIndexType, numLoopsAttr);
-      return rewriter.create<mlir::LLVM::AllocaOp>(loc, inputRangePtr, inputRangeType,
-                                                   numLoopsVar, 0);
+      return rewriter.create<mlir::LLVM::AllocaOp>(
+          loc, inputRangePtr, inputRangeType, numLoopsVar, 0);
     });
     for (unsigned i = 0; i < numLoops; ++i) {
       mlir::Value inputRange =
@@ -1288,8 +1287,8 @@ struct LowerParallel : public mlir::OpRewritePattern<numba::util::ParallelOp> {
       insert(toLLVMIndex(op.getSteps()[i]), 2);
       const mlir::Value indices[] = {rewriter.create<mlir::LLVM::ConstantOp>(
           loc, llvmI32Type, rewriter.getI32IntegerAttr(static_cast<int>(i)))};
-      auto ptr = rewriter.create<mlir::LLVM::GEPOp>(loc, inputRangePtr, inputRangeType,
-                                                    inputRanges, indices);
+      auto ptr = rewriter.create<mlir::LLVM::GEPOp>(
+          loc, inputRangePtr, inputRangeType, inputRanges, indices);
       rewriter.create<mlir::LLVM::StoreOp>(loc, inputRange, ptr);
     }
 

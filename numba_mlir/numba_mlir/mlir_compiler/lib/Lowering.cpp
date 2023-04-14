@@ -20,8 +20,8 @@
 #include <mlir/IR/BuiltinOps.h>
 #include <mlir/IR/BuiltinTypes.h>
 
-#include <mlir/Target/LLVMIR/Dialect/LLVMIR/LLVMToLLVMIRTranslation.h>
 #include <mlir/Target/LLVMIR/Dialect/Builtin/BuiltinToLLVMIRTranslation.h>
+#include <mlir/Target/LLVMIR/Dialect/LLVMIR/LLVMToLLVMIRTranslation.h>
 #include <mlir/Target/LLVMIR/Export.h>
 
 #include <llvm/Bitcode/BitcodeWriter.h>
@@ -859,8 +859,9 @@ private:
         [this](llvm::orc::MangleAndInterner m) -> llvm::orc::SymbolMap {
       llvm::orc::SymbolMap ret;
       for (auto &&[name, ptr] : symbolList) {
-        llvm::orc::ExecutorSymbolDef jitPtr{ llvm::orc::ExecutorAddr::fromPtr(ptr),
-                        llvm::JITSymbolFlags::Exported };
+        llvm::orc::ExecutorSymbolDef jitPtr{
+            llvm::orc::ExecutorAddr::fromPtr(ptr),
+            llvm::JITSymbolFlags::Exported};
         ret.insert({m(name), jitPtr});
       }
       return ret;

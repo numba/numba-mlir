@@ -21,8 +21,8 @@
 #include <mlir/InitAllPasses.h>
 #include <mlir/Pass/Pass.h>
 #include <mlir/Pass/PassManager.h>
-#include <mlir/Target/LLVMIR/Dialect/LLVMIR/LLVMToLLVMIRTranslation.h>
 #include <mlir/Target/LLVMIR/Dialect/Builtin/BuiltinToLLVMIRTranslation.h>
+#include <mlir/Target/LLVMIR/Dialect/LLVMIR/LLVMToLLVMIRTranslation.h>
 
 #include "numba/Conversion/GpuRuntimeToLlvm.hpp"
 #include "numba/Conversion/GpuToGpuRuntime.hpp"
@@ -43,7 +43,8 @@ static LogicalResult runMLIRPasses(mlir::Operation *op,
   passManager.addNestedPass<mlir::func::FuncOp>(createLinalgBufferizePass());
   passManager.addNestedPass<mlir::func::FuncOp>(
       bufferization::createBufferizationBufferizePass());
-  passManager.addNestedPass<mlir::func::FuncOp>(tensor::createTensorBufferizePass());
+  passManager.addNestedPass<mlir::func::FuncOp>(
+      tensor::createTensorBufferizePass());
   passManager.addPass(func::createFuncBufferizePass());
   passManager.addNestedPass<mlir::func::FuncOp>(
       bufferization::createFinalizingBufferizePass());
