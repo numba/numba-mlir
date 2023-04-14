@@ -1120,10 +1120,10 @@ struct LowerParallel : public mlir::OpRewritePattern<numba::util::ParallelOp> {
     auto context = allocaInsertionPoint.insert(rewriter, [&]() {
       auto one = rewriter.create<mlir::LLVM::ConstantOp>(
           loc, llvmI32Type, rewriter.getI32IntegerAttr(1));
-      return rewriter.create<mlir::LLVM::AllocaOp>(loc, contextPtrType, one, 0);
+      return rewriter.create<mlir::LLVM::AllocaOp>(loc, contextPtrType, contextType, one, 0);
     });
 
-    for (auto it : llvm::enumerate(contextVars)) {
+    for (auto &&it : llvm::enumerate(contextVars)) {
       auto type = contextType.getBody()[it.index()];
       auto llvmVal = doCast(rewriter, loc, it.value(), type);
       auto i = rewriter.getI32IntegerAttr(static_cast<int32_t>(it.index()));
@@ -1266,7 +1266,7 @@ struct LowerParallel : public mlir::OpRewritePattern<numba::util::ParallelOp> {
       auto numLoopsAttr = rewriter.getIntegerAttr(llvmIndexType, numLoops);
       auto numLoopsVar = rewriter.create<mlir::LLVM::ConstantOp>(
           loc, llvmIndexType, numLoopsAttr);
-      return rewriter.create<mlir::LLVM::AllocaOp>(loc, inputRangePtr,
+      return rewriter.create<mlir::LLVM::AllocaOp>(loc, inputRangePtr, inputRangeType,
                                                    numLoopsVar, 0);
     });
     for (unsigned i = 0; i < numLoops; ++i) {
@@ -1410,7 +1410,7 @@ struct FixLLVMStructABIPass
         newArgs.clear();
         numba::AllocaInsertionPoint allocaHelper(user);
         allocaHelper.insert(builder, [&] {
-          for (auto [arg, newType] :
+          for (auto &&[arg, newType] :
                llvm::zip(user->getOperands(), newFuncTypes)) {
             auto origType = arg.getType();
             if (origType == newType) {
@@ -1427,7 +1427,7 @@ struct FixLLVMStructABIPass
         });
         auto loc = user.getLoc();
         builder.setInsertionPoint(user);
-        for (auto [arg, newArg] : llvm::zip(user->getOperands(), newArgs)) {
+        for (auto &&[arg, newArg] : llvm::zip(user->getOperands(), newArgs)) {
           auto origType = arg.getType();
           auto newType = newArg.getType();
           if (origType == newType)

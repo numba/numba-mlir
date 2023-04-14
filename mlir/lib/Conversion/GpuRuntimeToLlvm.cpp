@@ -200,7 +200,7 @@ protected:
     auto depsArrayPtr = allocaHelper.insert(rewriter, [&]() {
       auto size = rewriter.create<mlir::LLVM::ConstantOp>(
           loc, llvmInt64Type, rewriter.getI64IntegerAttr(1));
-      return rewriter.create<mlir::LLVM::AllocaOp>(loc, depsArrayPtrType, size,
+      return rewriter.create<mlir::LLVM::AllocaOp>(loc, depsArrayPtrType, depsArrayType, size,
                                                    0);
     });
 
@@ -440,11 +440,12 @@ private:
       auto one = rewriter.create<mlir::LLVM::ConstantOp>(
           loc, llvmInt64Type, rewriter.getI64IntegerAttr(1));
       for (auto i : llvm::seq(0u, paramsCount)) {
-        auto ptrType = getLLVMPointerType(getKernelParamType(i));
+        auto paramType = getKernelParamType(i);
+        auto ptrType = getLLVMPointerType(paramType);
         paramsStorage[i] =
-            rewriter.create<mlir::LLVM::AllocaOp>(loc, ptrType, one, 0);
+            rewriter.create<mlir::LLVM::AllocaOp>(loc, ptrType, paramType, one, 0);
       }
-      return rewriter.create<mlir::LLVM::AllocaOp>(loc, paramsArrayPtrType, one,
+      return rewriter.create<mlir::LLVM::AllocaOp>(loc, paramsArrayPtrType, paramsArrayType, one,
                                                    0);
     });
 
@@ -628,7 +629,7 @@ private:
     auto resultPtr = allocaHelper.insert(rewriter, [&]() {
       auto size = rewriter.create<mlir::LLVM::ConstantOp>(
           loc, llvmInt64Type, rewriter.getI64IntegerAttr(1));
-      return rewriter.create<mlir::LLVM::AllocaOp>(loc, llvmAllocResPtrType,
+      return rewriter.create<mlir::LLVM::AllocaOp>(loc, llvmAllocResPtrType, llvmAllocResType,
                                                    size, 0);
     });
 
@@ -728,13 +729,13 @@ private:
     auto gridArrayPtr = allocaHelper.insert(rewriter, [&]() {
       auto size = rewriter.create<mlir::LLVM::ConstantOp>(
           loc, llvmInt64Type, rewriter.getI64IntegerAttr(numDims));
-      return rewriter.create<mlir::LLVM::AllocaOp>(loc, llvmI32PtrType, size,
+      return rewriter.create<mlir::LLVM::AllocaOp>(loc, llvmI32PtrType, llvmIndexType, size,
                                                    0);
     });
     auto blockArrayPtr = allocaHelper.insert(rewriter, [&]() {
       auto size = rewriter.create<mlir::LLVM::ConstantOp>(
           loc, llvmInt64Type, rewriter.getI64IntegerAttr(numDims));
-      return rewriter.create<mlir::LLVM::AllocaOp>(loc, llvmI32PtrType, size,
+      return rewriter.create<mlir::LLVM::AllocaOp>(loc, llvmI32PtrType, llvmIndexType, size,
                                                    0);
     });
 
