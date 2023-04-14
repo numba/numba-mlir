@@ -658,9 +658,9 @@ struct ReturnOpLowering : public mlir::OpRewritePattern<mlir::func::ReturnOp> {
     } else {
       auto resType =
           getFunctionResType(*ctx, typeConverter, op.getOperandTypes());
-      auto val = rewriter.create<mlir::LLVM::UndefOp>(loc, resType).getResult();
-      for (auto &&[i, val] : llvm::enumerate(op.getOperands())) {
-        auto arg = convertVal(val);
+      mlir::Value val = rewriter.create<mlir::LLVM::UndefOp>(loc, resType).getResult();
+      for (auto &&[i, funcArg] : llvm::enumerate(op.getOperands())) {
+        auto arg = convertVal(funcArg);
         if (!arg)
           return mlir::failure();
 
