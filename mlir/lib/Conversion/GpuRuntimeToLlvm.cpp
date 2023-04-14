@@ -459,8 +459,9 @@ private:
     auto computeTypeSize = [&](mlir::Type type) -> mlir::Value {
       // %Size = getelementptr %T* null, int 1
       // %SizeI = ptrtoint %T* %Size to i32
-      auto nullPtr = rewriter.create<mlir::LLVM::NullOp>(loc, type);
-      auto gep = rewriter.create<mlir::LLVM::GEPOp>(loc, type, nullPtr, one);
+      auto ptrType = getLLVMPointerType(type);
+      auto nullPtr = rewriter.create<mlir::LLVM::NullOp>(loc, ptrType);
+      auto gep = rewriter.create<mlir::LLVM::GEPOp>(loc, ptrType, type, nullPtr, one);
       return rewriter.create<mlir::LLVM::PtrToIntOp>(loc, llvmIndexType, gep);
     };
 

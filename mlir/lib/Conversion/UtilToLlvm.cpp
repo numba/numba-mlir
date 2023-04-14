@@ -520,6 +520,9 @@ struct LowerApplyOffsetOp
     if (!resType)
       return mlir::failure();
 
+    auto elemType = converter->convertType(memrefType.getElementType());
+    assert(elemType);
+
     auto loc = op.getLoc();
     mlir::MemRefDescriptor src(arg);
     auto dst = mlir::MemRefDescriptor::undef(rewriter, loc, resType);
@@ -532,7 +535,7 @@ struct LowerApplyOffsetOp
 
     auto alignedPtr = src.alignedPtr(rewriter, loc);
     auto srcOffset = src.offset(rewriter, loc);
-    alignedPtr = rewriter.create<mlir::LLVM::GEPOp>(loc, elemPtrType,
+    alignedPtr = rewriter.create<mlir::LLVM::GEPOp>(loc, elemPtrType, elemType,
                                                     alignedPtr, srcOffset);
 
     dst.setAllocatedPtr(rewriter, loc, allocatedPtr);
