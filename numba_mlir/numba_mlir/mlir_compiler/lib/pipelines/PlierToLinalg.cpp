@@ -3200,7 +3200,8 @@ static void populatePlierToLinalgOptPipeline(mlir::OpPassManager &pm) {
   pm.addNestedPass<mlir::func::FuncOp>(std::make_unique<AdditionalBufferize>());
   pm.addNestedPass<mlir::func::FuncOp>(mlir::createSCFBufferizePass());
   pm.addNestedPass<mlir::func::FuncOp>(mlir::createLinalgBufferizePass());
-  pm.addNestedPass<mlir::func::FuncOp>(mlir::createTensorBufferizePass());
+  pm.addNestedPass<mlir::func::FuncOp>(
+      mlir::tensor::createTensorBufferizePass());
   pm.addPass(mlir::func::createFuncBufferizePass());
   pm.addNestedPass<mlir::func::FuncOp>(mlir::createCanonicalizerPass());
   pm.addNestedPass<mlir::func::FuncOp>(

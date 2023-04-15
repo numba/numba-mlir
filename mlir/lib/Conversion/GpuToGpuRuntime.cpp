@@ -498,7 +498,7 @@ getFlatOffsetAndStrides(
   llvm::SmallVector<mlir::OpFoldResult> values(2 * sourceRank + 1);
   llvm::SmallVector<mlir::AffineExpr> symbols(2 * sourceRank + 1);
 
-  mlir::detail::bindSymbolsList(rewriter.getContext(), symbols);
+  mlir::bindSymbolsList(rewriter.getContext(), mlir::MutableArrayRef{symbols});
   mlir::AffineExpr expr = symbols.front();
   values[0] = mlir::ShapedType::isDynamic(sourceOffset)
                   ? getAsOpFoldResult(newExtractStridedMetadata.getOffset())

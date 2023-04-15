@@ -20,6 +20,7 @@
 #include <mlir/IR/BuiltinOps.h>
 #include <mlir/IR/BuiltinTypes.h>
 
+#include <mlir/Target/LLVMIR/Dialect/Builtin/BuiltinToLLVMIRTranslation.h>
 #include <mlir/Target/LLVMIR/Dialect/LLVMIR/LLVMToLLVMIRTranslation.h>
 #include <mlir/Target/LLVMIR/Export.h>
 
@@ -244,13 +245,13 @@ private:
     auto irBlocks = getBlocks(funcIr.attr("blocks"));
     assert(!irBlocks.empty());
     blocks.reserve(irBlocks.size());
-    for (auto [i, irBlock] : llvm::enumerate(irBlocks)) {
+    for (auto &&[i, irBlock] : llvm::enumerate(irBlocks)) {
       auto block = (0 == i ? func.addEntryBlock() : func.addBlock());
       blocks.emplace_back(block);
       blocksMap[irBlock.first] = block;
     }
 
-    for (auto [i, irBlock] : llvm::enumerate(irBlocks))
+    for (auto &&[i, irBlock] : llvm::enumerate(irBlocks))
       lowerBlock(blocks[i], irBlock.second);
 
     fixupPhis();
@@ -387,7 +388,7 @@ private:
       auto len = py::len(obj);
       llvm::SmallVector<mlir::Value> args(len);
       llvm::SmallVector<mlir::Type> types(len);
-      for (auto [i, val] : llvm::enumerate(obj)) {
+      for (auto &&[i, val] : llvm::enumerate(obj)) {
         auto arg = lowerStaticIndex(loc, val);
         args[i] = arg;
         types[i] = arg.getType();
@@ -745,7 +746,7 @@ numba::CompilerContext::Settings getSettings(py::handle settings,
     auto callback = settings["print_callback"].cast<py::function>();
     auto getList = [](py::list src) {
       llvm::SmallVector<std::string, 1> res(src.size());
-      for (auto [i, val] : llvm::enumerate(src))
+      for (auto &&[i, val] : llvm::enumerate(src))
         res[i] = py::str(val).cast<std::string>();
 
       return res;
@@ -857,8 +858,10 @@ private:
     opts.symbolMap =
         [this](llvm::orc::MangleAndInterner m) -> llvm::orc::SymbolMap {
       llvm::orc::SymbolMap ret;
-      for (auto [name, ptr] : symbolList) {
-        auto jitPtr = llvm::JITEvaluatedSymbol::fromPointer(ptr);
+      for (auto &&[name, ptr] : symbolList) {
+        llvm::orc::ExecutorSymbolDef jitPtr{
+            llvm::orc::ExecutorAddr::fromPtr(ptr),
+            llvm::JITSymbolFlags::Exported};
         ret.insert({m(name), jitPtr});
       }
       return ret;
@@ -946,7 +949,10 @@ py::capsule compileModule(const py::capsule &compiler,
   assert(mod);
 
   runCompiler(*mod, compilationContext);
-  mlir::registerLLVMDialectTranslation(*mod->module->getContext());
+
+  auto &mlirCtx = *mod->module->getContext();
+  mlir::registerLLVMDialectTranslation(mlirCtx);
+  mlir::registerBuiltinDialectTranslation(mlirCtx);
   auto res = context->executionEngine.loadModule(mod->module);
   if (!res)
     numba::reportError(llvm::Twine("Failed to load MLIR module:\n") +

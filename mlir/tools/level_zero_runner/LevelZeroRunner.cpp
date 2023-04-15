@@ -21,6 +21,7 @@
 #include <mlir/InitAllPasses.h>
 #include <mlir/Pass/Pass.h>
 #include <mlir/Pass/PassManager.h>
+#include <mlir/Target/LLVMIR/Dialect/Builtin/BuiltinToLLVMIRTranslation.h>
 #include <mlir/Target/LLVMIR/Dialect/LLVMIR/LLVMToLLVMIRTranslation.h>
 
 #include "numba/Conversion/GpuRuntimeToLlvm.hpp"
@@ -42,7 +43,8 @@ static LogicalResult runMLIRPasses(mlir::Operation *op,
   passManager.addNestedPass<mlir::func::FuncOp>(createLinalgBufferizePass());
   passManager.addNestedPass<mlir::func::FuncOp>(
       bufferization::createBufferizationBufferizePass());
-  passManager.addNestedPass<mlir::func::FuncOp>(createTensorBufferizePass());
+  passManager.addNestedPass<mlir::func::FuncOp>(
+      tensor::createTensorBufferizePass());
   passManager.addPass(func::createFuncBufferizePass());
   passManager.addNestedPass<mlir::func::FuncOp>(
       bufferization::createFinalizingBufferizePass());
@@ -113,6 +115,7 @@ int main(int argc, char **argv) {
                   mlir::func::FuncDialect, mlir::memref::MemRefDialect,
                   mlir::linalg::LinalgDialect, mlir::tensor::TensorDialect>();
   mlir::registerLLVMDialectTranslation(registry);
+  mlir::registerBuiltinDialectTranslation(registry);
 
   return mlir::JitRunnerMain(argc, argv, registry, jitRunnerConfig);
 }

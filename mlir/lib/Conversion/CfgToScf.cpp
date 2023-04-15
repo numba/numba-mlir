@@ -19,15 +19,6 @@
 namespace {
 static const constexpr bool debugLoopRestructuring = false;
 
-static mlir::Block *getNextBlock(mlir::Block *block) {
-  assert(nullptr != block);
-  if (auto br =
-          mlir::dyn_cast_or_null<mlir::cf::BranchOp>(block->getTerminator()))
-    return br.getDest();
-
-  return nullptr;
-};
-
 static void eraseBlocks(mlir::PatternRewriter &rewriter,
                         llvm::ArrayRef<mlir::Block *> blocks) {
   for (auto block : blocks) {
@@ -373,6 +364,9 @@ struct TailLoopToWhileCond
                   mlir::PatternRewriter &rewriter) const override {
     for (bool reverse : {false, true}) {
       auto bodyBlock = reverse ? op.getFalseDest() : op.getTrueDest();
+      if (bodyBlock == op->getBlock())
+        continue;
+
       auto args =
           reverse ? op.getFalseDestOperands() : op.getTrueDestOperands();
       auto res = tailLoopToWhile(rewriter, op.getLoc(), bodyBlock, args);

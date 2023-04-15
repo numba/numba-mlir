@@ -71,7 +71,7 @@ struct CanonicalizeReduction : public mlir::OpRewritePattern<mlir::scf::ForOp> {
       return mlir::failure();
 
     bool changed = false;
-    for (auto &[i, desc] : llvm::enumerate(stores)) {
+    for (auto &&[i, desc] : llvm::enumerate(stores)) {
       if (desc.aliasing)
         continue;
 

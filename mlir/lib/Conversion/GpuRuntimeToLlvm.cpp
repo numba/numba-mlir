@@ -46,6 +46,11 @@ private:
 static constexpr llvm::StringLiteral kEventCountAttrName("gpu.event_count");
 static constexpr llvm::StringLiteral kEventIndexAttrName("gpu.event_index");
 
+static mlir::Type getLLVMPointerType(mlir::Type elemType) {
+  assert(elemType);
+  return mlir::LLVM::LLVMPointerType::get(elemType.getContext());
+}
+
 template <typename OpTy>
 class ConvertOpToGpuRuntimeCallPattern
     : public mlir::ConvertOpToLLVMPattern<OpTy> {
@@ -58,25 +63,22 @@ protected:
 
   mlir::Type llvmVoidType = mlir::LLVM::LLVMVoidType::get(context);
   mlir::Type llvmPointerType =
-      mlir::LLVM::LLVMPointerType::get(mlir::IntegerType::get(context, 8));
-  mlir::Type llvmPointerPointerType =
-      mlir::LLVM::LLVMPointerType::get(llvmPointerType);
+      getLLVMPointerType(mlir::IntegerType::get(context, 8));
+  mlir::Type llvmPointerPointerType = getLLVMPointerType(llvmPointerType);
   mlir::Type llvmInt8Type = mlir::IntegerType::get(context, 8);
   mlir::Type llvmInt32Type = mlir::IntegerType::get(context, 32);
   mlir::Type llvmInt64Type = mlir::IntegerType::get(context, 64);
   mlir::Type llvmIndexType = mlir::IntegerType::get(
       context, this->getTypeConverter()->getPointerBitwidth(0));
 
-  mlir::Type llvmI32PtrType = mlir::LLVM::LLVMPointerType::get(llvmIndexType);
+  mlir::Type llvmI32PtrType = getLLVMPointerType(llvmIndexType);
 
   mlir::Type llvmRangeType = mlir::LLVM::LLVMStructType::getLiteral(
       context, {llvmPointerType, llvmIndexType});
-  mlir::Type llvmRangePointerType =
-      mlir::LLVM::LLVMPointerType::get(llvmRangeType);
+  mlir::Type llvmRangePointerType = getLLVMPointerType(llvmRangeType);
   mlir::Type llvmAllocResType = mlir::LLVM::LLVMStructType::getLiteral(
       context, {llvmPointerType, llvmPointerType, llvmPointerType});
-  mlir::Type llvmAllocResPtrType =
-      mlir::LLVM::LLVMPointerType::get(llvmAllocResType);
+  mlir::Type llvmAllocResPtrType = getLLVMPointerType(llvmAllocResType);
 
   FunctionCallBuilder streamCreateCallBuilder = {
       "gpuxStreamCreate",
@@ -190,13 +192,13 @@ protected:
     depsArray = rewriter.create<mlir::LLVM::InsertValueOp>(
         loc, depsArray, nullPtr, depsArraySize);
 
-    auto depsArrayPtrType = mlir::LLVM::LLVMPointerType::get(depsArrayType);
+    auto depsArrayPtrType = getLLVMPointerType(depsArrayType);
     numba::AllocaInsertionPoint allocaHelper(op);
     auto depsArrayPtr = allocaHelper.insert(rewriter, [&]() {
       auto size = rewriter.create<mlir::LLVM::ConstantOp>(
           loc, llvmInt64Type, rewriter.getI64IntegerAttr(1));
-      return rewriter.create<mlir::LLVM::AllocaOp>(loc, depsArrayPtrType, size,
-                                                   0);
+      return rewriter.create<mlir::LLVM::AllocaOp>(loc, depsArrayPtrType,
+                                                   depsArrayType, size, 0);
     });
 
     rewriter.create<mlir::LLVM::StoreOp>(loc, depsArray, depsArrayPtr);
@@ -253,8 +255,8 @@ private:
       name.push_back('\0');
 
       auto varName = numba::getUniqueLLVMGlobalName(mod, "device_name");
-      data = mlir::LLVM::createGlobalString(loc, rewriter, varName, name,
-                                            mlir::LLVM::Linkage::Internal);
+      data = mlir::LLVM::createGlobalString(
+          loc, rewriter, varName, name, mlir::LLVM::Linkage::Internal, true);
     } else {
       data = rewriter.create<mlir::LLVM::NullOp>(loc, llvmPointerType);
     }
@@ -315,8 +317,8 @@ private:
 
     auto loc = op.getLoc();
     auto name = numba::getUniqueLLVMGlobalName(mod, "gpu_blob");
-    auto data = mlir::LLVM::createGlobalString(loc, rewriter, name, blob,
-                                               mlir::LLVM::Linkage::Internal);
+    auto data = mlir::LLVM::createGlobalString(
+        loc, rewriter, name, blob, mlir::LLVM::Linkage::Internal, true);
     auto size = rewriter.create<mlir::LLVM::ConstantOp>(
         loc, llvmIndexType,
         mlir::IntegerAttr::get(llvmIndexType,
@@ -369,8 +371,8 @@ private:
     name.push_back('\0');
 
     auto varName = numba::getUniqueLLVMGlobalName(mod, "kernel_name");
-    auto data = mlir::LLVM::createGlobalString(loc, rewriter, varName, name,
-                                               mlir::LLVM::Linkage::Internal);
+    auto data = mlir::LLVM::createGlobalString(
+        loc, rewriter, varName, name, mlir::LLVM::Linkage::Internal, true);
     auto res =
         kernelGetCallBuilder.create(loc, rewriter, {adaptor.getModule(), data});
     rewriter.replaceOp(op, res.getResults());
@@ -419,7 +421,7 @@ private:
     auto paramsCount = static_cast<unsigned>(kernelParams.size());
     auto paramsArrayType =
         mlir::LLVM::LLVMArrayType::get(llvmRangeType, paramsCount + 1);
-    auto paramsArrayPtrType = mlir::LLVM::LLVMPointerType::get(paramsArrayType);
+    auto paramsArrayPtrType = getLLVMPointerType(paramsArrayType);
 
     auto getKernelParamType = [&](unsigned i) -> mlir::Type {
       if (op.getKernelOperands()[i].getType().isa<mlir::MemRefType>()) {
@@ -435,12 +437,13 @@ private:
       auto one = rewriter.create<mlir::LLVM::ConstantOp>(
           loc, llvmInt64Type, rewriter.getI64IntegerAttr(1));
       for (auto i : llvm::seq(0u, paramsCount)) {
-        auto ptrType = mlir::LLVM::LLVMPointerType::get(getKernelParamType(i));
-        paramsStorage[i] =
-            rewriter.create<mlir::LLVM::AllocaOp>(loc, ptrType, one, 0);
+        auto paramType = getKernelParamType(i);
+        auto ptrType = getLLVMPointerType(paramType);
+        paramsStorage[i] = rewriter.create<mlir::LLVM::AllocaOp>(
+            loc, ptrType, paramType, one, 0);
       }
-      return rewriter.create<mlir::LLVM::AllocaOp>(loc, paramsArrayPtrType, one,
-                                                   0);
+      return rewriter.create<mlir::LLVM::AllocaOp>(loc, paramsArrayPtrType,
+                                                   paramsArrayType, one, 0);
     });
 
     mlir::Value one = rewriter.create<mlir::LLVM::ConstantOp>(
@@ -453,8 +456,10 @@ private:
     auto computeTypeSize = [&](mlir::Type type) -> mlir::Value {
       // %Size = getelementptr %T* null, int 1
       // %SizeI = ptrtoint %T* %Size to i32
-      auto nullPtr = rewriter.create<mlir::LLVM::NullOp>(loc, type);
-      auto gep = rewriter.create<mlir::LLVM::GEPOp>(loc, type, nullPtr, one);
+      auto ptrType = getLLVMPointerType(type);
+      auto nullPtr = rewriter.create<mlir::LLVM::NullOp>(loc, ptrType);
+      auto gep =
+          rewriter.create<mlir::LLVM::GEPOp>(loc, ptrType, type, nullPtr, one);
       return rewriter.create<mlir::LLVM::PtrToIntOp>(loc, llvmIndexType, gep);
     };
 
@@ -624,7 +629,7 @@ private:
       auto size = rewriter.create<mlir::LLVM::ConstantOp>(
           loc, llvmInt64Type, rewriter.getI64IntegerAttr(1));
       return rewriter.create<mlir::LLVM::AllocaOp>(loc, llvmAllocResPtrType,
-                                                   size, 0);
+                                                   llvmAllocResType, size, 0);
     });
 
     mlir::Value params[] = {
@@ -639,7 +644,8 @@ private:
         // clang-format on
     };
     allocCallBuilder.create(loc, rewriter, params);
-    auto res = rewriter.create<mlir::LLVM::LoadOp>(loc, resultPtr);
+    auto res =
+        rewriter.create<mlir::LLVM::LoadOp>(loc, llvmAllocResType, resultPtr);
     auto meminfo = rewriter.create<mlir::LLVM::ExtractValueOp>(
         loc, llvmPointerType, res, 0);
     auto dataPtr = rewriter.create<mlir::LLVM::ExtractValueOp>(
@@ -723,18 +729,18 @@ private:
     auto gridArrayPtr = allocaHelper.insert(rewriter, [&]() {
       auto size = rewriter.create<mlir::LLVM::ConstantOp>(
           loc, llvmInt64Type, rewriter.getI64IntegerAttr(numDims));
-      return rewriter.create<mlir::LLVM::AllocaOp>(loc, llvmI32PtrType, size,
-                                                   0);
+      return rewriter.create<mlir::LLVM::AllocaOp>(loc, llvmI32PtrType,
+                                                   llvmInt32Type, size, 0);
     });
     auto blockArrayPtr = allocaHelper.insert(rewriter, [&]() {
       auto size = rewriter.create<mlir::LLVM::ConstantOp>(
           loc, llvmInt64Type, rewriter.getI64IntegerAttr(numDims));
-      return rewriter.create<mlir::LLVM::AllocaOp>(loc, llvmI32PtrType, size,
-                                                   0);
+      return rewriter.create<mlir::LLVM::AllocaOp>(loc, llvmI32PtrType,
+                                                   llvmInt32Type, size, 0);
     });
 
     auto sizesType = mlir::LLVM::LLVMArrayType::get(llvmInt32Type, numDims);
-    auto sizesPtrType = mlir::LLVM::LLVMPointerType::get((sizesType));
+    auto sizesPtrType = getLLVMPointerType((sizesType));
     auto castToSizesPtrType = [&](mlir::Value val) {
       return rewriter.create<mlir::LLVM::BitcastOp>(loc, sizesPtrType, val);
     };
@@ -766,7 +772,7 @@ private:
     suggestBlockSizeBuilder.create(loc, rewriter, params);
 
     mlir::Value blockSizeArray = rewriter.create<mlir::LLVM::LoadOp>(
-        loc, castToSizesPtrType(blockArrayPtr));
+        loc, sizesType, castToSizesPtrType(blockArrayPtr));
     llvm::SmallVector<mlir::Value, 3> result(numDims);
     for (auto i : llvm::seq(0u, numDims)) {
       auto blockSize = rewriter.create<mlir::LLVM::ExtractValueOp>(
@@ -840,8 +846,7 @@ void gpu_runtime::populateGpuToLLVMPatternsAndLegality(
     mlir::LLVMTypeConverter &converter, mlir::RewritePatternSet &patterns,
     mlir::ConversionTarget &target) {
   auto context = patterns.getContext();
-  auto llvmPointerType =
-      mlir::LLVM::LLVMPointerType::get(mlir::IntegerType::get(context, 8));
+  auto llvmPointerType = getLLVMPointerType(mlir::IntegerType::get(context, 8));
   converter.addConversion(
       [llvmPointerType](gpu_runtime::OpaqueType) -> mlir::Type {
         return llvmPointerType;

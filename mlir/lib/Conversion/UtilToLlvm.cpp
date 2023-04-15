@@ -54,6 +54,11 @@ static mlir::Type convertTuple(mlir::MLIRContext &context,
   return convertTupleTypes(context, converter, tuple.getTypes());
 }
 
+static mlir::Type getLLVMPointerType(mlir::Type elemType) {
+  assert(elemType);
+  return mlir::LLVM::LLVMPointerType::get(elemType.getContext());
+}
+
 static void
 populateToLLVMAdditionalTypeConversion(mlir::LLVMTypeConverter &converter) {
   converter.addConversion(
@@ -63,8 +68,8 @@ populateToLLVMAdditionalTypeConversion(mlir::LLVMTypeConverter &converter) {
           return std::nullopt;
         return res;
       });
-  auto voidPtrType = mlir::LLVM::LLVMPointerType::get(
-      mlir::IntegerType::get(&converter.getContext(), 8));
+  auto voidPtrType =
+      getLLVMPointerType(mlir::IntegerType::get(&converter.getContext(), 8));
   converter.addConversion(
       [voidPtrType](mlir::NoneType) -> std::optional<mlir::Type> {
         return voidPtrType;
@@ -231,7 +236,7 @@ struct LowerTakeContextOp
 
     auto ctxStructType =
         mlir::LLVM::LLVMStructType::getLiteral(getContext(), resultTypes);
-    auto ctxStructPtrType = mlir::LLVM::LLVMPointerType::get(ctxStructType);
+    auto ctxStructPtrType = getLLVMPointerType(ctxStructType);
 
     auto mod = op->getParentOfType<mlir::ModuleOp>();
     assert(mod);
@@ -240,7 +245,7 @@ struct LowerTakeContextOp
     auto loc = op->getLoc();
     auto wrapperType =
         mlir::LLVM::LLVMFunctionType::get(getVoidType(), ctxType);
-    auto wrapperPtrType = mlir::LLVM::LLVMPointerType::get(wrapperType);
+    auto wrapperPtrType = getLLVMPointerType(wrapperType);
     mlir::Value initFuncPtr;
 
     auto insertFunc = [&](mlir::StringRef name, mlir::Type type,
@@ -312,7 +317,9 @@ struct LowerTakeContextOp
         return func;
       }();
 
-      initFuncPtr = rewriter.create<mlir::LLVM::AddressOfOp>(loc, initFunc);
+      auto funcPtr = getLLVMPointerType(initFunc.getFunctionType());
+      initFuncPtr = rewriter.create<mlir::LLVM::AddressOfOp>(
+          loc, funcPtr, initFunc.getSymName());
     } else {
       initFuncPtr = rewriter.create<mlir::LLVM::NullOp>(loc, wrapperPtrType);
     }
@@ -361,7 +368,9 @@ struct LowerTakeContextOp
         return func;
       }();
 
-      deinitFuncPtr = rewriter.create<mlir::LLVM::AddressOfOp>(loc, deinitFunc);
+      auto funcPtr = getLLVMPointerType(deinitFunc.getFunctionType());
+      deinitFuncPtr = rewriter.create<mlir::LLVM::AddressOfOp>(
+          loc, funcPtr, deinitFunc.getSymName());
     } else {
       deinitFuncPtr = rewriter.create<mlir::LLVM::NullOp>(loc, wrapperPtrType);
     }
@@ -370,7 +379,7 @@ struct LowerTakeContextOp
       llvm::StringRef name("nmrtTakeContext");
       auto retType = getVoidPtrType();
       const mlir::Type argTypes[] = {
-          mlir::LLVM::LLVMPointerType::get(getVoidPtrType()),
+          getLLVMPointerType(getVoidPtrType()),
           getIndexType(),
           wrapperPtrType,
           wrapperPtrType,
@@ -382,7 +391,7 @@ struct LowerTakeContextOp
     auto purgeCtxFunc = [&]() -> mlir::LLVM::LLVMFuncOp {
       llvm::StringRef name("nmrtPurgeContext");
       auto retType = getVoidType();
-      auto argType = mlir::LLVM::LLVMPointerType::get(getVoidPtrType());
+      auto argType = getLLVMPointerType(getVoidPtrType());
       auto funcType = mlir::LLVM::LLVMFunctionType::get(retType, argType);
       return lookupFunc(name, funcType);
     }();
@@ -413,15 +422,18 @@ struct LowerTakeContextOp
 
       assert(llvm::hasSingleElement(cleanupFunc.getBody()));
       rewriter.setInsertionPointToStart(&cleanupFunc.getBody().front());
-      mlir::Value addr =
-          rewriter.create<mlir::LLVM::AddressOfOp>(unknownLoc, handle);
+
+      auto ctxPtrType = getLLVMPointerType(ctxType);
+      mlir::Value addr = rewriter.create<mlir::LLVM::AddressOfOp>(
+          unknownLoc, ctxPtrType, handle.getSymName());
       rewriter.create<mlir::LLVM::CallOp>(unknownLoc, purgeCtxFunc, addr);
 
       return handle;
     }();
 
-    auto ctxHandlePtr =
-        rewriter.create<mlir::LLVM::AddressOfOp>(loc, ctxHandle);
+    auto ctxPtrType = getLLVMPointerType(ctxType);
+    auto ctxHandlePtr = rewriter.create<mlir::LLVM::AddressOfOp>(
+        loc, ctxPtrType, ctxHandle.getSymName());
     auto contextSize = getSizeInBytes(loc, ctxStructType, rewriter);
 
     const mlir::Value takeCtxArgs[] = {
@@ -515,6 +527,9 @@ struct LowerApplyOffsetOp
     if (!resType)
       return mlir::failure();
 
+    auto elemType = converter->convertType(memrefType.getElementType());
+    assert(elemType);
+
     auto loc = op.getLoc();
     mlir::MemRefDescriptor src(arg);
     auto dst = mlir::MemRefDescriptor::undef(rewriter, loc, resType);
@@ -527,7 +542,7 @@ struct LowerApplyOffsetOp
 
     auto alignedPtr = src.alignedPtr(rewriter, loc);
     auto srcOffset = src.offset(rewriter, loc);
-    alignedPtr = rewriter.create<mlir::LLVM::GEPOp>(loc, elemPtrType,
+    alignedPtr = rewriter.create<mlir::LLVM::GEPOp>(loc, elemPtrType, elemType,
                                                     alignedPtr, srcOffset);
 
     dst.setAllocatedPtr(rewriter, loc, allocatedPtr);
