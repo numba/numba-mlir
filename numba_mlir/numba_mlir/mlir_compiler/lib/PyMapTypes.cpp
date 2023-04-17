@@ -97,7 +97,7 @@ static py::object mapType(const py::handle &typesMod, mlir::Type type) {
 
   if (auto t = type.dyn_cast<mlir::TupleType>()) {
     py::tuple ret(t.size());
-    for (auto [i, val] : llvm::enumerate(t.getTypes())) {
+    for (auto &&[i, val] : llvm::enumerate(t.getTypes())) {
       auto inner = mapType(typesMod, val);
       if (!inner)
         return {};
@@ -129,7 +129,7 @@ py::object mapTypeToNumba(py::handle typesMod, mlir::Type type) {
 
 py::object mapTypesToNumba(py::handle typesMod, mlir::TypeRange types) {
   py::list ret(types.size());
-  for (auto [i, val] : llvm::enumerate(types)) {
+  for (auto &&[i, val] : llvm::enumerate(types)) {
     auto type = mapTypeToNumba(typesMod, val);
     if (type.is_none())
       return py::none();

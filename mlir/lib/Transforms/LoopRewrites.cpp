@@ -85,7 +85,7 @@ struct CmpLoopBoundsSimplify
     if (!res)
       return mlir::failure();
 
-    auto [lowerBound, upperBound, indexVar] = *res;
+    auto &&[lowerBound, upperBound, indexVar] = *res;
 
     auto pred = cmp.getPredicate();
     auto lhs = cmp.getLhs();

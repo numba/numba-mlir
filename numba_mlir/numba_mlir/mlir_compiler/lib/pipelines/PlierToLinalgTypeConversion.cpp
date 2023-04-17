@@ -52,7 +52,7 @@ struct Conversion {
         return std::nullopt;
 
       llvm::SmallVector<int64_t> shape(ndim);
-      for (auto [i, dim] : llvm::enumerate(fixedDims)) {
+      for (auto &&[i, dim] : llvm::enumerate(fixedDims)) {
         if (dim.is_none()) {
           shape[i] = mlir::ShapedType::kDynamic;
         } else {

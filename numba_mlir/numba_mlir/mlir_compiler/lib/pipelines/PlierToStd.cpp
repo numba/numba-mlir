@@ -268,7 +268,7 @@ static mlir::Value replaceOp(mlir::PatternRewriter &rewriter,
                              mlir::Type newType) {
   auto signlessType = numba::makeSignlessType(newType);
   llvm::SmallVector<mlir::Value> newOperands(operands.size());
-  for (auto [i, val] : llvm::enumerate(operands))
+  for (auto &&[i, val] : llvm::enumerate(operands))
     newOperands[i] = numba::doConvert(rewriter, loc, val, signlessType);
 
   auto res = rewriter.createOrFold<T>(loc, newOperands);
@@ -763,7 +763,7 @@ protected:
 
     auto results = std::move(res).value();
     assert(results.size() == op->getNumResults());
-    for (auto [i, r] : llvm::enumerate(results)) {
+    for (auto &&[i, r] : llvm::enumerate(results)) {
       auto dstType = op->getResultTypes()[i];
       if (dstType != r.getType())
         results[i] = rewriter.create<plier::CastOp>(loc, dstType, r);
@@ -831,7 +831,7 @@ protected:
 
     llvm::SmallVector<mlir::Value> castedArgs(mappedArgs.size());
     auto funcTypes = externalFunc.getFunctionType().getInputs();
-    for (auto [i, arg] : llvm::enumerate(mappedArgs)) {
+    for (auto &&[i, arg] : llvm::enumerate(mappedArgs)) {
       auto dstType = funcTypes[i];
       castedArgs[i] = doSafeCast(rewriter, loc, arg, dstType);
     }
@@ -842,7 +842,7 @@ protected:
     auto results = newFuncCall.getResults();
     llvm::SmallVector<mlir::Value> castedResults(results.size());
 
-    for (auto [ind, res] : llvm::enumerate(results)) {
+    for (auto &&[ind, res] : llvm::enumerate(results)) {
       auto i = static_cast<unsigned>(ind);
       auto oldResType = op->getResult(i).getType();
       castedResults[i] = doSafeCast(rewriter, loc, res, oldResType);

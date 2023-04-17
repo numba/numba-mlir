@@ -34,7 +34,8 @@ static LogicalResult runMLIRPasses(mlir::Operation *op,
                                    mlir::JitRunnerOptions & /*options*/) {
   auto module = mlir::cast<mlir::ModuleOp>(op);
   PassManager passManager(module.getContext());
-  applyPassManagerCLOptions(passManager);
+  if (failed(applyPassManagerCLOptions(passManager)))
+    return mlir::failure();
 
   passManager.addPass(arith::createConstantBufferizePass());
   passManager.addNestedPass<mlir::func::FuncOp>(createSCFBufferizePass());

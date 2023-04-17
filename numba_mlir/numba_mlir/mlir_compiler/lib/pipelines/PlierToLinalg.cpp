@@ -273,7 +273,7 @@ static auto getSizes(mlir::OpBuilder &builder, mlir::Location loc,
 
   assert(mlir::isa<mlir::MemRefType>(src.getType()));
   llvm::SmallVector<mlir::OpFoldResult> sizes(shape.size());
-  for (auto [i, dim] : llvm::enumerate(shape)) {
+  for (auto &&[i, dim] : llvm::enumerate(shape)) {
     if (mlir::ShapedType::isDynamic(dim)) {
       sizes[i] = builder.createOrFold<mlir::memref::DimOp>(loc, src, i);
     } else {
@@ -507,7 +507,7 @@ void MakeStridedLayoutPass::runOnOperation() {
     if (hasBody)
       builder.setInsertionPointToStart(&body.front());
 
-    for (auto [ind, type] : llvm::enumerate(argTypes)) {
+    for (auto &&[ind, type] : llvm::enumerate(argTypes)) {
       auto i = static_cast<unsigned>(ind);
       auto memrefType = type.dyn_cast<mlir::MemRefType>();
       if (!memrefType || isContigiousArrayArg(i) ||
@@ -538,7 +538,7 @@ void MakeStridedLayoutPass::runOnOperation() {
       }
     }
 
-    for (auto [i, type] : llvm::enumerate(resTypes)) {
+    for (auto &&[i, type] : llvm::enumerate(resTypes)) {
       auto memrefType = type.dyn_cast<mlir::MemRefType>();
       if (!memrefType || !memrefType.getLayout().isIdentity())
         continue;
@@ -1530,7 +1530,7 @@ castRetTypes(mlir::Location loc, mlir::PatternRewriter &rewriter,
              std::optional<PyLinalgResolver::Values> vals) {
   auto results = std::move(vals).value();
   assert(results.size() == resultTypes.size());
-  for (auto [i, ret] : llvm::enumerate(results)) {
+  for (auto &&[i, ret] : llvm::enumerate(results)) {
     auto dstType = resultTypes[i];
 
     auto srcType = ret.getType();
@@ -1718,7 +1718,7 @@ struct NumpyCallsResolver
       }
     }();
 
-    for (auto [dst, src] : llvm::zip(outResults, results))
+    for (auto &&[dst, src] : llvm::zip(outResults, results))
       rewriter.create<numba::ntensor::CopyOp>(loc, src, dst);
 
     rewriter.replaceOp(op, results);
@@ -1745,7 +1745,7 @@ struct BuiltinCallsLowering : public mlir::OpRewritePattern<plier::PyCallOp> {
                "Args and names size mismatch");
         llvm::SmallVector<std::pair<llvm::StringRef, mlir::Value>> kwArgsArray;
         kwArgsArray.reserve(kwArgs.size());
-        for (auto [arg, nameAttr] : llvm::zip(kwArgs, kwNames)) {
+        for (auto &&[arg, nameAttr] : llvm::zip(kwArgs, kwNames)) {
           auto argName = nameAttr.cast<mlir::StringAttr>().getValue();
           kwArgsArray.emplace_back(argName, arg);
         }
@@ -1772,7 +1772,7 @@ struct UnaryOpsLowering
         {"not", "not"},
     };
 
-    for (auto [srcName, dstName] : mapping) {
+    for (auto &&[srcName, dstName] : mapping) {
       if (opName != srcName)
         continue;
 
@@ -1899,7 +1899,7 @@ struct WrapParforRegionsPass
     if (opsToProcess.empty())
       return markAllAnalysesPreserved();
 
-    for (auto [forOp, env] : opsToProcess) {
+    for (auto &&[forOp, env] : opsToProcess) {
       auto resultTypes = forOp.getResultTypes();
       builder.setInsertionPoint(forOp);
       auto envRegion = builder.create<numba::util::EnvironmentRegionOp>(
@@ -1941,7 +1941,7 @@ struct MarkInputShapesRanges
 
       auto &body = func.getFunctionBody();
       assert(!body.empty());
-      for (auto [i, arg] : llvm::enumerate(body.front().getArguments())) {
+      for (auto &&[i, arg] : llvm::enumerate(body.front().getArguments())) {
         auto shaped = arg.getType().dyn_cast<mlir::ShapedType>();
         if (!shaped)
           continue;
@@ -1954,7 +1954,7 @@ struct MarkInputShapesRanges
           auto rank = static_cast<unsigned>(shaped.getRank());
           llvm::SmallVector<mlir::Attribute> shapeRanges(rank);
 
-          for (auto [i, dim] : llvm::enumerate(shaped.getShape())) {
+          for (auto &&[i, dim] : llvm::enumerate(shaped.getShape())) {
             if (mlir::ShapedType::isDynamic(dim)) {
               shapeRanges[i] = getRange(2, std::numeric_limits<int64_t>::max());
             } else {
@@ -2533,7 +2533,8 @@ struct OptimizeIdentityLayoutStrides
     auto newStrides =
         computeIdentityStrides(rewriter, loc, memrefType.getShape(), sizesVals);
 
-    for (auto [oldStride, newStride] : llvm::zip(op.getStrides(), newStrides)) {
+    for (auto &&[oldStride, newStride] :
+         llvm::zip(op.getStrides(), newStrides)) {
       mlir::Value newStrideVal =
           mlir::getValueOrCreateConstantIndexOp(rewriter, loc, newStride);
       rewriter.replaceAllUsesWith(oldStride, newStrideVal);
@@ -2744,7 +2745,7 @@ struct BufferizeMixedGeneric
 
     bool changed = false;
     mlir::ValueRange inputs = adaptor.getInputs();
-    for (auto [i, input] : llvm::enumerate(inputs)) {
+    for (auto &&[i, input] : llvm::enumerate(inputs)) {
       auto orig = op.getInputs()[i];
       if (orig.getType().isa<mlir::RankedTensorType>())
         changed = true;
@@ -2752,7 +2753,7 @@ struct BufferizeMixedGeneric
 
     mlir::ValueRange outputs = adaptor.getOutputs();
     llvm::SmallVector<mlir::Value> newResults;
-    for (auto [i, output] : llvm::enumerate(outputs)) {
+    for (auto &&[i, output] : llvm::enumerate(outputs)) {
       auto orig = op.getOutputs()[i];
       if (orig.getType().isa<mlir::RankedTensorType>()) {
         changed = true;
@@ -2923,7 +2924,7 @@ void CloneArgsPass::runOnOperation() {
     bool needReplace = false;
     llvm::SmallVector<mlir::Value> newArgs(ret.getOperands().size());
     builder.setInsertionPoint(ret);
-    for (auto [i, arg] : llvm::enumerate(ret.getOperands())) {
+    for (auto &&[i, arg] : llvm::enumerate(ret.getOperands())) {
       if (arg.getType().isa<mlir::MemRefType>()) {
         newArgs[i] = builder.create<mlir::bufferization::CloneOp>(loc, arg);
         needReplace = true;
@@ -3079,7 +3080,7 @@ struct MakeGenericReduceInnermost
     llvm::SmallBitVector reductions(iters.size());
     bool seenReduction = false;
     bool needChange = false;
-    for (auto [i, iter] : llvm::enumerate(iters)) {
+    for (auto &&[i, iter] : llvm::enumerate(iters)) {
       if (iter == mlir::utils::IteratorType::reduction) {
         reductions[i] = true;
         seenReduction = true;

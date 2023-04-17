@@ -18,7 +18,7 @@ static void flattenTuple(mlir::OpBuilder &builder, mlir::Location loc,
                          llvm::SmallVectorImpl<mlir::Value> &ret) {
   for (auto arg : values) {
     if (auto tupleType = arg.getType().dyn_cast<mlir::TupleType>()) {
-      for (auto [i, argType] : llvm::enumerate(tupleType.getTypes())) {
+      for (auto &&[i, argType] : llvm::enumerate(tupleType.getTypes())) {
         auto ind = builder.createOrFold<mlir::arith::ConstantIndexOp>(loc, i);
         auto res = builder.createOrFold<numba::util::TupleExtractOp>(
             loc, argType, arg, ind);
@@ -72,7 +72,7 @@ static std::optional<mlir::Value> reconstructTuple(mlir::OpBuilder &builder,
                                                    mlir::TupleType tupleType,
                                                    mlir::ValueRange values) {
   llvm::SmallVector<mlir::Value, 4> vals(tupleType.size());
-  for (auto [i, type] : llvm::enumerate(tupleType.getTypes())) {
+  for (auto &&[i, type] : llvm::enumerate(tupleType.getTypes())) {
     if (auto innerTuple = type.dyn_cast<mlir::TupleType>()) {
       auto val = reconstructTuple(builder, loc, innerTuple, values);
       if (!val)

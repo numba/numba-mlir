@@ -136,7 +136,7 @@ static const constexpr std::pair<CheckFunc, LowerFunc> promoteHandlers[] = {
 
 static LowerFunc getLowerer(mlir::Operation *op, mlir::Value iterVar) {
   assert(op);
-  for (auto [checker, lowerer] : promoteHandlers)
+  for (auto &&[checker, lowerer] : promoteHandlers)
     if (checker(op, iterVar))
       return lowerer;
 
@@ -163,7 +163,7 @@ struct PromoteToParallel : public mlir::OpRewritePattern<mlir::scf::ForOp> {
     using ReductionDesc = std::tuple<mlir::Operation *, LowerFunc, mlir::Value>;
     llvm::SmallVector<ReductionDesc> reductionOps;
     llvm::SmallDenseSet<mlir::Operation *> reductionOpsSet;
-    for (auto [iterVar, result] : llvm::zip(iterVars, term.getResults())) {
+    for (auto &&[iterVar, result] : llvm::zip(iterVars, term.getResults())) {
       auto reductionOp = result.getDefiningOp();
       if (!reductionOp || reductionOp->getNumResults() != 1 ||
           reductionOp->getNumOperands() != 2 ||
@@ -196,7 +196,7 @@ struct PromoteToParallel : public mlir::OpRewritePattern<mlir::scf::ForOp> {
         if (0 == reductionOpsSet.count(&oldOp))
           builder.clone(oldOp, mapping);
 
-      for (auto [reductionOp, lowerer, reductionArg] : reductionOps) {
+      for (auto &&[reductionOp, lowerer, reductionArg] : reductionOps) {
         auto arg = mapping.lookupOrDefault(reductionArg);
         lowerer(builder, loc, arg, reductionOp);
       }
@@ -234,7 +234,7 @@ struct MergeNestedForIntoParallel
 
     auto yield = mlir::cast<mlir::scf::YieldOp>(block.getTerminator());
     assert(yield.getNumOperands() == op.getNumResults());
-    for (auto [arg, initVal, result, yieldOp] :
+    for (auto &&[arg, initVal, result, yieldOp] :
          llvm::zip(block.getArguments().drop_front(), op.getInitVals(),
                    op.getResults(), yield.getOperands())) {
       if (!arg.hasOneUse() || arg != initVal || result != yieldOp)

@@ -400,7 +400,7 @@ struct InsertGPUAllocs
           });
     };
 
-    for (auto [op, access] : gpuBufferAllocs) {
+    for (auto &&[op, access] : gpuBufferAllocs) {
       if (auto alloc = mlir::dyn_cast<mlir::memref::AllocOp>(op)) {
         builder.setInsertionPoint(alloc);
         bool hostShared = access.hostRead || access.hostWrite;
@@ -424,7 +424,7 @@ struct InsertGPUAllocs
       }
     }
 
-    for (auto [i, access] : gpuBufferParams) {
+    for (auto &&[i, access] : gpuBufferParams) {
       auto param = block.getArgument(i);
       builder.setInsertionPointToStart(&block);
       createGpuAlloc(param, access);
@@ -486,7 +486,7 @@ getFlatOffsetAndStrides(
     return rewriter.create<mlir::memref::ExtractStridedMetadataOp>(loc, source);
   }();
 
-  auto [sourceStrides, sourceOffset] = getStridesAndOffset(sourceType);
+  auto &&[sourceStrides, sourceOffset] = getStridesAndOffset(sourceType);
 
   // Compute the new strides and offset from the base strides and offset:
   // newStride#i = baseStride#i * subStride#i
@@ -537,7 +537,7 @@ getFlatOffsetAndStrides(
 static mlir::Value getFlatMemref(mlir::OpBuilder &rewriter, mlir::Location loc,
                                  mlir::Value source, mlir::ValueRange offsets) {
   auto offsetsTemp = mlir::getAsOpFoldResult(offsets);
-  auto [base, offset, ignore] =
+  auto &&[base, offset, ignore] =
       getFlatOffsetAndStrides(rewriter, loc, source, offsetsTemp);
   auto retType = base.getType().cast<mlir::MemRefType>();
   return rewriter.create<mlir::memref::ReinterpretCastOp>(
@@ -607,7 +607,7 @@ struct FlattenSubview : public mlir::OpRewritePattern<mlir::memref::SubViewOp> {
     auto subOffsets = op.getMixedOffsets();
     auto subSizes = op.getMixedSizes();
     auto subStrides = op.getMixedStrides();
-    auto [base, finalOffset, strides] =
+    auto &&[base, finalOffset, strides] =
         getFlatOffsetAndStrides(rewriter, loc, memref, subOffsets, subStrides);
 
     auto srcType = memref.getType().cast<mlir::MemRefType>();
@@ -1722,8 +1722,8 @@ struct TileParallelOp : public mlir::OpRewritePattern<mlir::scf::ParallelOp> {
     const unsigned maxLoops = 3;
     // Only unit step is supported and iteration must start from 0.
     unsigned numLoops = 0;
-    for (auto [start, step] : llvm::zip(oldLowerBounds.take_front(maxLoops),
-                                        oldSteps.take_front(maxLoops)))
+    for (auto &&[start, step] : llvm::zip(oldLowerBounds.take_front(maxLoops),
+                                          oldSteps.take_front(maxLoops)))
       if (mlir::isConstantIntValue(start, 0) &&
           mlir::isConstantIntValue(step, 1))
         ++numLoops;
@@ -1819,7 +1819,7 @@ struct TileParallelOp : public mlir::OpRewritePattern<mlir::scf::ParallelOp> {
       ifOp = [&]() -> mlir::scf::IfOp {
         if (!reductionOps.empty()) {
           llvm::SmallVector<mlir::Value> results;
-          for (auto [i, val] : llvm::enumerate(initVals)) {
+          for (auto &&[i, val] : llvm::enumerate(initVals)) {
             auto constVal =
                 rewriter.create<mlir::arith::ConstantOp>(loc, neutralValues[i]);
             results.emplace_back(constVal);
@@ -1847,7 +1847,7 @@ struct TileParallelOp : public mlir::OpRewritePattern<mlir::scf::ParallelOp> {
       rewriter.eraseOp(originalBlock->getTerminator());
       rewriter.setInsertionPointToEnd(originalBlock);
       llvm::SmallVector<mlir::Value> results;
-      for (auto [i, val] : llvm::enumerate(initVals)) {
+      for (auto &&[i, val] : llvm::enumerate(initVals)) {
         auto reductionArg =
             mapper.lookupOrDefault(reductionOps[i].getOperand());
         results.emplace_back(reductionArg);
@@ -1856,7 +1856,7 @@ struct TileParallelOp : public mlir::OpRewritePattern<mlir::scf::ParallelOp> {
 
       rewriter.setInsertionPointAfter(ifOp);
       auto ifResults = ifOp.getResults();
-      for (auto [i, reductionOp] : llvm::enumerate(reductionOps)) {
+      for (auto &&[i, reductionOp] : llvm::enumerate(reductionOps)) {
         mapper.map(reductionOp.getOperand(), ifResults[i]);
         rewriter.clone(*reductionOp, mapper);
         rewriter.eraseOp(reductionOp);
@@ -2225,7 +2225,7 @@ struct TruncateF64ForGPUPass
 
           newArgs.clear();
           newArgs.reserve(launch.getNumKernelOperands());
-          for (auto [origArg, newType] :
+          for (auto &&[origArg, newType] :
                llvm::zip(launch.getKernelOperands(), newSig.getInputs())) {
             auto origType = origArg.getType();
             if (newType == origType) {
@@ -2289,7 +2289,7 @@ struct InsertGPUGlobalReduce
     auto &loopBlock = op.getLoopBody().front();
     rewriter.setInsertionPointToStart(&loopBlock);
     mlir::Value cond;
-    for (auto [lb, arg] :
+    for (auto &&[lb, arg] :
          llvm::zip(op.getLowerBound(), loopBlock.getArguments())) {
       mlir::Value eq = rewriter.create<mlir::arith::CmpIOp>(
           loc, mlir::arith::CmpIPredicate::eq, arg, lb);
@@ -2300,7 +2300,7 @@ struct InsertGPUGlobalReduce
       }
     }
 
-    for (auto [reduce, init] : llvm::zip(reductionOpsVec, op.getInitVals())) {
+    for (auto &&[reduce, init] : llvm::zip(reductionOpsVec, op.getInitVals())) {
       auto reduceType = init.getType();
       auto memrefType = mlir::MemRefType::get(std::nullopt, reduceType);
 

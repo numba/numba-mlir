@@ -141,7 +141,8 @@ public:
 
     assert(operands.size() == op->getNumOperands() && "Invalid operands count");
     EnvValue env(mlir::Attribute{});
-    for (auto [argLattice, origArg] : llvm::zip(operands, op->getOperands())) {
+    for (auto &&[argLattice, origArg] :
+         llvm::zip(operands, op->getOperands())) {
       if (auto tensorEnv = getTensorEnv(origArg)) {
         auto &latticeVal = argLattice->getValue();
         if (!latticeVal.isUninitialized())
@@ -160,7 +161,8 @@ public:
     LLVM_DEBUG(llvm::dbgs()
                << "EnvValueAnalysis: Operation deduced env: " << env << "\n");
 
-    for (auto [resultLattice, result] : llvm::zip(results, op->getResults())) {
+    for (auto &&[resultLattice, result] :
+         llvm::zip(results, op->getResults())) {
       if (getTensorEnv(result)) {
         auto changed = resultLattice->join(env);
         propagateIfChanged(resultLattice, changed);
@@ -242,7 +244,7 @@ struct PropagateEnvironmentPass
       return;
 
     mlir::OpBuilder builder(&getContext());
-    for (auto [op, env] : opsToProcess) {
+    for (auto &&[op, env] : opsToProcess) {
       assert(op);
       if (mlir::isa<numba::ntensor::CastOp>(op))
         continue;
@@ -298,7 +300,7 @@ struct PropagateEnvironmentPass
 
       bool changed = false;
       builder.setInsertionPointToStart(&entryBlock);
-      for (auto [i, arg] : llvm::enumerate(entryBlock.getArguments())) {
+      for (auto &&[i, arg] : llvm::enumerate(entryBlock.getArguments())) {
         auto oldType = arg.getType().dyn_cast<numba::ntensor::NTensorType>();
         if (!oldType)
           continue;
@@ -354,7 +356,7 @@ struct PropagateEnvironmentPass
 
         auto loc = user->getLoc();
         builder.setInsertionPoint(user);
-        for (auto [i, arg] : llvm::enumerate(callOp.getArgOperands())) {
+        for (auto &&[i, arg] : llvm::enumerate(callOp.getArgOperands())) {
           auto oldType = arg.getType();
           auto newType = newArgsTypes[i];
           if (oldType == newType)

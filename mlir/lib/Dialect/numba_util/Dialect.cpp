@@ -179,7 +179,7 @@ struct FillExtractSlice
     llvm::SmallVector<mlir::OpFoldResult> newSizes;
     newSizes.reserve(sizes.size());
     auto droppedDims = op.getDroppedDims();
-    for (auto [i, val] : llvm::enumerate(sizes))
+    for (auto &&[i, val] : llvm::enumerate(sizes))
       if (!droppedDims[i])
         newSizes.emplace_back(val);
 
@@ -890,7 +890,7 @@ static std::optional<unsigned> getSingleDynamicDim(mlir::ShapedType type) {
     return std::nullopt;
 
   int dimIndex = -1;
-  for (auto [i, dim] : llvm::enumerate(type.getShape())) {
+  for (auto &&[i, dim] : llvm::enumerate(type.getShape())) {
     if (dim == mlir::ShapedType::kDynamic) {
       if (dimIndex != -1)
         return std::nullopt;
@@ -1121,7 +1121,7 @@ struct ChangeLayoutEnvRegion
     llvm::SmallVector<mlir::Value> updatedArgs(args.begin(), args.end());
 
     bool changed = false;
-    for (auto [i, arg] : llvm::enumerate(args)) {
+    for (auto &&[i, arg] : llvm::enumerate(args)) {
       auto cl = arg.getDefiningOp<numba::util::ChangeLayoutOp>();
       if (!cl)
         continue;
@@ -1142,7 +1142,7 @@ struct ChangeLayoutEnvRegion
       auto loc = region.getLoc();
       mlir::OpBuilder::InsertionGuard g(rewriter);
       rewriter.setInsertionPointAfter(region);
-      for (auto [arg, result] : llvm::zip(updatedArgs, region.getResults())) {
+      for (auto &&[arg, result] : llvm::zip(updatedArgs, region.getResults())) {
         auto oldType = result.getType();
         auto newType = arg.getType();
         if (newType == oldType)
@@ -1628,9 +1628,9 @@ struct SignCastIfPropagate : public mlir::OpRewritePattern<mlir::scf::IfOp> {
     unsigned idx;
     CastOp castOp;
     numba::util::UndefOp undefOp;
-    for (auto [i, args] : llvm::enumerate(
+    for (auto &&[i, args] : llvm::enumerate(
              llvm::zip(thenYield.getResults(), elseYield.getResults()))) {
-      auto [thenArg, elseArg] = args;
+      auto &&[thenArg, elseArg] = args;
       auto cast = thenArg.template getDefiningOp<CastOp>();
       auto undef = elseArg.template getDefiningOp<numba::util::UndefOp>();
       if (cast && undef) {

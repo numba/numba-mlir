@@ -55,7 +55,7 @@ struct RemoveUnusedArgsPass
 
         newArgTypes.clear();
         bool hasUnused = false;
-        for (auto [i, arg] : llvm::enumerate(block.getArguments())) {
+        for (auto &&[i, arg] : llvm::enumerate(block.getArguments())) {
           auto isUsed = isArgUsed(arg, func);
           removeArgs[i] = !isUsed;
           hasUnused = hasUnused || !isUsed;
@@ -79,7 +79,7 @@ struct RemoveUnusedArgsPass
           auto call = mlir::cast<mlir::func::CallOp>(use.getUser());
           newArgs.clear();
           assert(call.getOperands().size() == removeArgs.size());
-          for (auto [i, arg] : llvm::enumerate(call.getOperands())) {
+          for (auto &&[i, arg] : llvm::enumerate(call.getOperands())) {
             if (!removeArgs[i])
               newArgs.emplace_back(arg);
           }

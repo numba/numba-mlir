@@ -104,7 +104,7 @@ computeIndices(mlir::OpBuilder &builder, mlir::Location loc, mlir::Value value,
     if (count > rank)
       return mlir::failure();
 
-    for (auto [i, val] : llvm::enumerate(tupleType)) {
+    for (auto &&[i, val] : llvm::enumerate(tupleType)) {
       auto getitemInd = builder.create<mlir::arith::ConstantIndexOp>(loc, i);
       auto ind = builder.createOrFold<numba::util::TupleExtractOp>(
           loc, val, index, getitemInd);
@@ -160,7 +160,7 @@ static mlir::Value makeSubview(mlir::OpBuilder &builder, mlir::Location loc,
     auto viewType = view.getType().cast<numba::ntensor::NTensorType>();
 
     llvm::SmallVector<int64_t> dstShape(dstRank);
-    for (auto [i, ind] : llvm::enumerate(dimIndices)) {
+    for (auto &&[i, ind] : llvm::enumerate(dimIndices)) {
       auto sz = sizes[ind];
       if (auto szVal = sz.dyn_cast<mlir::Attribute>()) {
         dstShape[i] = szVal.cast<mlir::IntegerAttr>().getValue().getSExtValue();
@@ -183,7 +183,7 @@ static llvm::SmallVector<mlir::Value>
 toValues(mlir::OpBuilder &builder, mlir::Location loc,
          mlir::ArrayRef<mlir::OpFoldResult> vals) {
   llvm::SmallVector<mlir::Value> ret(vals.size());
-  for (auto [i, val] : llvm::enumerate(vals)) {
+  for (auto &&[i, val] : llvm::enumerate(vals)) {
     if (auto attr = val.dyn_cast<mlir::Attribute>()) {
       ret[i] = builder.create<mlir::arith::ConstantIndexOp>(
           loc, attr.cast<mlir::IntegerAttr>().getValue().getSExtValue());

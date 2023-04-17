@@ -145,7 +145,7 @@ struct PassManagerSchedule {
 
       stages = std::make_unique<std::unique_ptr<PassManagerStage>[]>(
           stagesTemp.size());
-      for (auto [i, val] : llvm::enumerate(stagesTemp)) {
+      for (auto &&[i, val] : llvm::enumerate(stagesTemp)) {
         stages[i] = std::move(val.stage);
       }
     };
