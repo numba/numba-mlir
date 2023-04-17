@@ -410,7 +410,7 @@ struct FlattenScfIf : public mlir::OpRewritePattern<mlir::scf::IfOp> {
 
     auto loc = op.getLoc();
     auto cond = op.getCondition();
-    for (auto [origTrueVal, origFalseVal] :
+    for (auto &&[origTrueVal, origFalseVal] :
          llvm::zip(trueYield.getResults(), falseYield.getResults())) {
       auto trueVal = mapper.lookupOrDefault(origTrueVal);
       auto falseVal = mapper.lookupOrDefault(origFalseVal);
@@ -913,7 +913,7 @@ protected:
 
     auto results = std::move(res).value();
     assert(results.size() == op->getNumResults());
-    for (auto [i, r] : llvm::enumerate(results)) {
+    for (auto &&[i, r] : llvm::enumerate(results)) {
       auto dstType = op->getResultTypes()[i];
       if (dstType != r.getType())
         results[i] = rewriter.create<plier::CastOp>(loc, dstType, r);
@@ -1608,7 +1608,7 @@ struct SinkGpuDims : public mlir::OpRewritePattern<mlir::gpu::LaunchOp> {
                                    op.getGridSizeZ(),  op.getBlockSizeX(),
                                    op.getBlockSizeY(), op.getBlockSizeZ()};
     llvm::SmallVector<std::pair<mlir::OpOperand *, unsigned>> uses;
-    for (auto [ind, val] : llvm::enumerate(dimArgs)) {
+    for (auto &&[ind, val] : llvm::enumerate(dimArgs)) {
       auto i = static_cast<unsigned>(ind);
       auto addUse = [&](mlir::OpOperand &use) {
         if (op->isProperAncestor(use.getOwner()))

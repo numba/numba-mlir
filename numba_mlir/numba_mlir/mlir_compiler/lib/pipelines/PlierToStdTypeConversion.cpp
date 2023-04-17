@@ -89,8 +89,8 @@ namespace {
 struct Conversion {
   Conversion(PyTypeConverter &conv) : converter(conv) {
     py::object mod = py::module::import("numba.core.types");
-    for (auto [i, it] : llvm::enumerate(PrimitiveTypes)) {
-      auto [name, func] = it;
+    for (auto &&[i, it] : llvm::enumerate(PrimitiveTypes)) {
+      auto &&[name, func] = it;
       auto obj = mod.attr(name.data());
       primitiveTypes[i] = {obj, func};
     }
@@ -179,7 +179,7 @@ struct Conversion {
     if (py::isinstance(obj, omittedType)) {
       auto value = obj.attr("value");
 
-      auto [type, attr] = [&]() -> std::pair<mlir::Type, mlir::Attribute> {
+      auto &&[type, attr] = [&]() -> std::pair<mlir::Type, mlir::Attribute> {
         if (py::isinstance<py::float_>(value)) {
           auto type = mlir::Float64Type::get(&context);
           auto val = mlir::FloatAttr::get(type, value.cast<double>());

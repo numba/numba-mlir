@@ -92,7 +92,7 @@ getBlocks(py::handle func) {
   llvm::SmallVector<std::pair<int, py::object>> ret;
   auto blocks = func.cast<py::dict>();
   ret.reserve(blocks.size());
-  for (auto [id, block] : blocks)
+  for (auto &&[id, block] : blocks)
     ret.emplace_back(id.cast<int>(), block.cast<py::object>());
 
   auto pred = [](auto lhs, auto rhs) { return lhs.first < rhs.first; };

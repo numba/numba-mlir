@@ -355,7 +355,7 @@ mergeLayouts(mlir::MemRefLayoutAttrInterface layout1,
   auto offset = mergeDims(strided1.getOffset(), strided2.getOffset(), isDst);
 
   llvm::SmallVector<int64_t> strides;
-  for (auto [stride1, stride2] :
+  for (auto &&[stride1, stride2] :
        llvm::zip(strided1.getStrides(), strided2.getStrides()))
     strides.emplace_back(mergeDims(stride1, stride2, isDst));
 
@@ -374,7 +374,7 @@ mergeMemrefTypes(mlir::MemRefType type1, mlir::MemRefType type2, bool isDst) {
 
   assert(type1.getRank() == type2.getRank());
   llvm::SmallVector<int64_t> shape;
-  for (auto [dim1, dim2] : llvm::zip(type1.getShape(), type2.getShape()))
+  for (auto &&[dim1, dim2] : llvm::zip(type1.getShape(), type2.getShape()))
     shape.emplace_back(mergeDims(dim1, dim2, isDst));
 
   return mlir::MemRefType::get(shape, type1.getElementType(), *layout,
@@ -438,7 +438,7 @@ struct NormalizeMemrefArgs
 
       bool typesChanged = false;
       newTypes.clear();
-      for (auto [i, arg] : llvm::enumerate(args)) {
+      for (auto &&[i, arg] : llvm::enumerate(args)) {
         if (!mlir::isa<mlir::MemRefType>(arg)) {
           newTypes.emplace_back(arg);
           continue;
@@ -484,7 +484,7 @@ struct NormalizeMemrefArgs
         mapping.clear();
         builder.setInsertionPoint(call);
         auto loc = call.getLoc();
-        for (auto [srcType, dstType, srcArg] :
+        for (auto &&[srcType, dstType, srcArg] :
              llvm::zip(args, newTypes, call.getArgOperands())) {
           assert(dstType);
           if (dstType == srcType)
@@ -506,7 +506,7 @@ struct NormalizeMemrefArgs
       assert(entryBlock.getNumArguments() == newTypes.size());
       builder.setInsertionPointToStart(&entryBlock);
       auto loc = builder.getUnknownLoc();
-      for (auto [srcArg, dstType] :
+      for (auto &&[srcArg, dstType] :
            llvm::zip(entryBlock.getArguments(), newTypes)) {
         auto srcType = srcArg.getType();
         if (srcType == dstType)

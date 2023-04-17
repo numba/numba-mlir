@@ -499,9 +499,7 @@ static mlir::Type getFunctionResType(mlir::MLIRContext &context,
     return getLLVMPointerType(mlir::IntegerType::get(&context, 8));
 
   llvm::SmallVector<mlir::Type> newResTypes(types.size());
-  for (auto it : llvm::enumerate(types)) {
-    auto i = it.index();
-    auto type = it.value();
+  for (auto &&[i, type] : llvm::enumerate(types)) {
     if (auto memreftype = type.dyn_cast<mlir::MemRefType>()) {
       newResTypes[i] = getArrayType(converter, memreftype);
     } else {

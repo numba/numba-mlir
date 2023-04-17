@@ -50,7 +50,7 @@ std::optional<PyFuncResolver::Result> PyFuncResolver::getFunc(
   for (auto arg : argNames) {
     auto kwarg = [&]() -> mlir::Value {
       auto argName = arg.cast<std::string>();
-      for (auto [name, kw] : llvm::zip(kwnames, kwargs)) {
+      for (auto &&[name, kw] : llvm::zip(kwnames, kwargs)) {
         if (argName == name)
           return kw;
       }

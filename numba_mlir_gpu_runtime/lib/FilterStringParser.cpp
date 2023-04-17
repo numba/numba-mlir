@@ -43,7 +43,7 @@ std::optional<DeviceDesc> parseFilterString(std::string_view filterString) {
   auto idx = tokens[2];
   auto begin = idx.data();
   auto end = begin + idx.size();
-  auto [ptr, ec] = std::from_chars(begin, end, ret.index);
+  auto &&[ptr, ec] = std::from_chars(begin, end, ret.index);
   if (ec != std::errc() || ptr != end)
     return {};
 

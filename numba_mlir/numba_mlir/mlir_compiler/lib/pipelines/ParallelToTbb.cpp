@@ -99,7 +99,7 @@ struct ParallelToTbb : public mlir::OpRewritePattern<mlir::scf::ParallelOp> {
     auto loc = op.getLoc();
     mlir::IRMapping mapping;
     llvm::SmallVector<mlir::Value> reduceVars(op.getNumResults());
-    for (auto [i, type] : llvm::enumerate(op.getResultTypes())) {
+    for (auto &&[i, type] : llvm::enumerate(op.getResultTypes())) {
       auto reduceType = getReduceType(type, maxConcurrency);
       assert(reduceType);
       auto reduce = allocaIP.insert(rewriter, [&]() {
@@ -113,7 +113,7 @@ struct ParallelToTbb : public mlir::OpRewritePattern<mlir::scf::ParallelOp> {
                                      mlir::ValueRange args) {
       assert(args.empty());
       (void)args;
-      for (auto [i, reduce] : llvm::enumerate(reduceVars)) {
+      for (auto &&[i, reduce] : llvm::enumerate(reduceVars)) {
         auto initVal = initVals[i];
         auto init = builder.create<mlir::arith::ConstantOp>(loc, initVal);
         builder.create<mlir::memref::StoreOp>(loc, init, reduce, index);
@@ -139,11 +139,10 @@ struct ParallelToTbb : public mlir::OpRewritePattern<mlir::scf::ParallelOp> {
                            mlir::ValueRange upperBound,
                            mlir::Value threadIndex) {
       llvm::SmallVector<mlir::Value> initVals(op.getInitVals().size());
-      for (auto it : llvm::enumerate(op.getInitVals())) {
-        auto reduceVar = reduceVars[it.index()];
+      for (auto &&[i, reduceVar] : llvm::enumerate(reduceVars)) {
         auto val =
             builder.create<mlir::memref::LoadOp>(loc, reduceVar, threadIndex);
-        initVals[it.index()] = val;
+        initVals[i] = val;
       }
       auto newOp =
           mlir::cast<mlir::scf::ParallelOp>(builder.clone(*op, mapping));
@@ -152,7 +151,7 @@ struct ParallelToTbb : public mlir::OpRewritePattern<mlir::scf::ParallelOp> {
       newOp.getLowerBoundMutable().assign(lowerBound);
       newOp.getUpperBoundMutable().assign(upperBound);
       newOp.getInitValsMutable().assign(initVals);
-      for (auto [i, val] : llvm::enumerate(newOp->getResults())) {
+      for (auto &&[i, val] : llvm::enumerate(newOp->getResults())) {
         auto reduceVar = reduceVars[i];
         builder.create<mlir::memref::StoreOp>(loc, val, reduceVar, threadIndex);
       }
@@ -171,10 +170,10 @@ struct ParallelToTbb : public mlir::OpRewritePattern<mlir::scf::ParallelOp> {
           });
       llvm::SmallVector<mlir::Value> yieldArgs;
       yieldArgs.reserve(args.size());
-      for (auto it : llvm::enumerate(reduceOps)) {
-        auto &reduceVar = reduceVars[it.index()];
-        auto arg = args[static_cast<unsigned>(it.index())];
-        auto reduceOp = mlir::cast<mlir::scf::ReduceOp>(it.value());
+      for (auto &&[i, iOp] : llvm::enumerate(reduceOps)) {
+        auto &reduceVar = reduceVars[i];
+        auto arg = args[static_cast<unsigned>(i)];
+        auto reduceOp = mlir::cast<mlir::scf::ReduceOp>(iOp);
         auto &reduceOpBody = reduceOp.getReductionOperator().front();
         assert(reduceOpBody.getNumArguments() == 2);
         auto prevVal =

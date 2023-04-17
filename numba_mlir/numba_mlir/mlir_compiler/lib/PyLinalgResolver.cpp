@@ -174,7 +174,7 @@ static size_t containerSize(py::handle obj) {
 
 template <typename F> static void containerIterate(py::handle obj, F &&func) {
   auto impl = [&](auto cont) {
-    for (auto [i, val] : llvm::enumerate(cont))
+    for (auto &&[i, val] : llvm::enumerate(cont))
       func(i, val);
   };
   if (py::isinstance<py::tuple>(obj)) {
@@ -312,7 +312,7 @@ struct PyLinalgResolver::Context {
       return createVar(context, values.front());
 
     py::tuple ret(values.size());
-    for (auto [i, val] : llvm::enumerate(values))
+    for (auto &&[i, val] : llvm::enumerate(values))
       ret[i] = createVar(context, val);
 
     return std::move(ret);
@@ -335,7 +335,7 @@ struct PyLinalgResolver::Context {
 
     if (py::isinstance<py::iterable>(obj)) {
       llvm::SmallVector<mlir::Value> elems(py::len(obj));
-      for (auto [i, val] : llvm::enumerate(obj))
+      for (auto &&[i, val] : llvm::enumerate(obj))
         elems[i] = unwrapVal(loc, builder, val);
 
       mlir::ValueRange vr(elems);
@@ -555,7 +555,7 @@ getArgs(py::handle inspect, py::handle func,
     return py::none();
 
   py::tuple ret(retArgs.size());
-  for (auto [i, val] : llvm::enumerate(retArgs))
+  for (auto &&[i, val] : llvm::enumerate(retArgs))
     ret[i] = std::move(val);
 
   return std::move(ret);
@@ -575,7 +575,7 @@ getAgrsFromTuple(py::handle args,
   if (py::isinstance<py::tuple>(args)) {
     auto tuple = args.cast<py::tuple>();
     ret.resize(tuple.size());
-    for (auto [i, val] : llvm::enumerate(tuple))
+    for (auto &&[i, val] : llvm::enumerate(tuple))
       ret[i] = unpack(val);
 
   } else {
@@ -586,7 +586,7 @@ getAgrsFromTuple(py::handle args,
 
 static auto getIterators(py::list iterators, mlir::MLIRContext &ctx) {
   llvm::SmallVector<mlir::utils::IteratorType> ret(iterators.size());
-  for (auto [i, iter] : llvm::enumerate(iterators)) {
+  for (auto &&[i, iter] : llvm::enumerate(iterators)) {
     auto str = iter.cast<std::string>();
     ret[i] = [&]() -> mlir::utils::IteratorType {
       if (str == "parallel")
@@ -610,7 +610,7 @@ static mlir::AffineMapAttr getAffineMapAttr(py::handle obj,
 
 static auto getAffineMaps(py::list maps, mlir::MLIRContext &ctx) {
   llvm::SmallVector<mlir::AffineMap> ret(maps.size());
-  for (auto [i, val] : llvm::enumerate(maps))
+  for (auto &&[i, val] : llvm::enumerate(maps))
     ret[i] = getAffineMapAttr(val, ctx).getValue();
 
   return ret;
@@ -653,7 +653,7 @@ static py::object broadcastImpl(py::capsule context, py::tuple args,
   llvm::SmallVector<mlir::Value> mlirArgs(args.size());
 
   int64_t rank = -1;
-  for (auto [i, obj] : llvm::enumerate(args)) {
+  for (auto &&[i, obj] : llvm::enumerate(args)) {
     auto val =
         toNTensor(loc, builder, ctx.context.unwrapVal(loc, builder, obj));
 
@@ -675,7 +675,7 @@ static py::object broadcastImpl(py::capsule context, py::tuple args,
   llvm::SmallVector<mlir::Type> resTypes(args.size());
   llvm::SmallVector<int64_t> resShape(rank >= 0 ? static_cast<size_t>(rank) : 0,
                                       mlir::ShapedType::kDynamic);
-  for (auto [i, arg] : llvm::enumerate(mlirArgs))
+  for (auto &&[i, arg] : llvm::enumerate(mlirArgs))
     resTypes[i] = arg.getType().cast<mlir::ShapedType>().clone(resShape);
 
   auto broadcast =
@@ -684,7 +684,7 @@ static py::object broadcastImpl(py::capsule context, py::tuple args,
   llvm::SmallVector<mlir::Value> results(broadcast->getNumResults());
   if (!resultType.is_none()) {
     auto resType = unwrapType(resultType);
-    for (auto [i, res] :
+    for (auto &&[i, res] :
          llvm::enumerate(mlir::ValueRange(broadcast.getResults()))) {
       auto srcType = res.getType().cast<mlir::ShapedType>();
       auto dstType = srcType.clone(resType);
@@ -715,7 +715,7 @@ static py::object broadcastImpl(py::capsule context, py::tuple args,
   }
 
   py::tuple ret(results.size());
-  for (auto [i, res] : llvm::enumerate(results)) {
+  for (auto &&[i, res] : llvm::enumerate(results)) {
     auto srcType = res.getType().cast<mlir::ShapedType>();
     auto dstType = mlir::RankedTensorType::get(srcType.getShape(),
                                                srcType.getElementType());
@@ -741,7 +741,7 @@ static py::object initTensorImpl(py::capsule context, py::iterable shape,
   auto count = py::len(shape);
   llvm::SmallVector<mlir::Value> dynamicShape;
   auto staticShape = getDynShape(count);
-  for (auto [i, elem] : llvm::enumerate(shape)) {
+  for (auto &&[i, elem] : llvm::enumerate(shape)) {
     auto elemVal = ctx.context.unwrapVal(loc, builder, elem, indexType);
     if (auto constVal = mlir::getConstantIntValue(elemVal)) {
       staticShape[i] = *constVal;
@@ -811,7 +811,7 @@ static py::object genericImpl(py::capsule context, py::handle inputs,
   auto castValues = [&](mlir::ValueRange vals, mlir::TypeRange types) {
     assert(vals.size() == types.size());
     llvm::SmallVector<mlir::Value> ret(vals.size());
-    for (auto [i, val] : llvm::enumerate(vals))
+    for (auto &&[i, val] : llvm::enumerate(vals))
       ret[i] = doCast(builder, loc, val, types[i]);
 
     return ret;
@@ -939,7 +939,7 @@ static py::object reshapeImpl(py::capsule context, py::handle src,
     if (py::isinstance<py::tuple>(newDims)) {
       auto t = newDims.cast<py::tuple>();
       ret.resize(t.size());
-      for (auto [i, val] : llvm::enumerate(t))
+      for (auto &&[i, val] : llvm::enumerate(t))
         ret[i] = unwrapDim(val);
 
       return ret;
@@ -1116,7 +1116,7 @@ static py::object externalCallImpl(py::capsule context, py::str funcName,
 
       if (!attrs.is_none()) {
         auto attrDict = attrs.cast<py::dict>();
-        for (auto [name, val] : attrDict) {
+        for (auto &&[name, val] : attrDict) {
           auto nameStr = name.cast<std::string>();
           auto attrVal = [&, v = val]() -> mlir::Attribute {
             if (py::isinstance<py::int_>(v))
@@ -1146,7 +1146,7 @@ static py::object externalCallImpl(py::capsule context, py::str funcName,
   llvm::SmallVector<mlir::Value> results;
   results.reserve(outputVals.size() + res.size());
 
-  for (auto [i, val] : llvm::enumerate(
+  for (auto &&[i, val] : llvm::enumerate(
            llvm::ArrayRef(inputVals).take_back(outputVals.size()))) {
     mlir::Value newVal = val;
     if (!returnTensor && outputVals[i].getType().isa<mlir::ShapedType>()) {
@@ -1167,7 +1167,7 @@ static py::object externalCallImpl(py::capsule context, py::str funcName,
     return ctx.context.createVar(context, results.front());
 
   py::tuple ret(results.size());
-  for (auto [i, val] : llvm::enumerate(results))
+  for (auto &&[i, val] : llvm::enumerate(results))
     ret[i] = ctx.context.createVar(context, val);
 
   return std::move(ret);
@@ -1189,7 +1189,7 @@ static py::object insertImpl(py::capsule context, py::handle src,
   auto unwrapList = [&](py::handle obj) {
     auto len = py::len(obj);
     llvm::SmallVector<mlir::Value> res(len);
-    for (auto [i, val] : llvm::enumerate(obj))
+    for (auto &&[i, val] : llvm::enumerate(obj))
       res[i] = unwrapIndex(val);
 
     return res;
@@ -1230,7 +1230,7 @@ static py::object inlineFuncImpl(py::capsule context, py::handle func,
       return ctx.context.unwrapVal(loc, builder, obj);
     };
     llvm::SmallVector<mlir::Value> ret(args.size());
-    for (auto [i, val] : llvm::enumerate(args))
+    for (auto &&[i, val] : llvm::enumerate(args))
       ret[i] = unwrapVal(val);
 
     return ret;
@@ -1253,7 +1253,7 @@ static py::object inlineFuncImpl(py::capsule context, py::handle func,
   auto castValues = [&](mlir::ValueRange vals, mlir::TypeRange types) {
     assert(vals.size() == types.size());
     llvm::SmallVector<mlir::Value> ret(vals.size());
-    for (auto [i, val] : llvm::enumerate(vals)) {
+    for (auto &&[i, val] : llvm::enumerate(vals)) {
       auto index = static_cast<unsigned>(i);
       ret[index] = doCast(builder, loc, val, types[index]);
     }
@@ -1409,7 +1409,7 @@ static py::object forceCopyImpl(py::capsule context, py::handle src) {
 
   auto valType = srcVal.getType().cast<numba::ntensor::NTensorType>();
   llvm::SmallVector<mlir::Value> dynamicSizes;
-  for (auto [i, dim] : llvm::enumerate(valType.getShape())) {
+  for (auto &&[i, dim] : llvm::enumerate(valType.getShape())) {
     if (mlir::ShapedType::isDynamic(dim)) {
       mlir::Value dimVal = builder.create<numba::ntensor::DimOp>(
           loc, srcVal, static_cast<int64_t>(i));
@@ -1517,7 +1517,7 @@ static py::object arrayTypeImpl(py::capsule context, py::iterable dims,
   auto &ctx = getPyContext(context);
   auto elemType = unwrapType(dtype);
   llvm::SmallVector<int64_t> shape(py::len(dims));
-  for (auto [i, val] : llvm::enumerate(dims))
+  for (auto &&[i, val] : llvm::enumerate(dims))
     shape[i] = val.cast<int64_t>();
 
   auto arrayType = mlir::RankedTensorType::get(shape, elemType);
@@ -1893,7 +1893,7 @@ static PyLinalgResolver::Values unpackResults(PyBuilderContext &ctx,
   if (py::isinstance<py::tuple>(object)) {
     auto tuple = object.cast<py::tuple>();
     llvm::SmallVector<mlir::Value> vals(tuple.size());
-    for (auto [i, val] : llvm::enumerate(tuple))
+    for (auto &&[i, val] : llvm::enumerate(tuple))
       vals[i] = unwrapVal(val);
 
     mlir::ValueRange vr(vals);

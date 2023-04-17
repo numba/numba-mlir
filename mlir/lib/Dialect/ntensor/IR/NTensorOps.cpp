@@ -367,7 +367,7 @@ struct LinalgGenericDimPropagate
 
     assert(generic.getOutputs().size() == generic.getResults().size());
     auto outIndex = [&]() -> size_t {
-      for (auto [i, out] : llvm::enumerate(generic.getResults())) {
+      for (auto &&[i, out] : llvm::enumerate(generic.getResults())) {
         if (out == src)
           return i;
       }
@@ -401,7 +401,7 @@ struct ExtractSliceDimPropagate
     auto droppedDims = extract.getDroppedDims();
     auto srcDims = extract.getMixedSizes();
     llvm::SmallVector<mlir::OpFoldResult> dims;
-    for (auto [i, dim] : llvm::enumerate(srcDims))
+    for (auto &&[i, dim] : llvm::enumerate(srcDims))
       if (!droppedDims[i])
         dims.emplace_back(dim);
 
@@ -660,7 +660,7 @@ static bool isIdentitySubview(numba::ntensor::SubviewOp op) {
       return false;
 
   auto srcShape = srcType.getShape();
-  for (auto [i, val] : llvm::enumerate(op.getMixedSizes())) {
+  for (auto &&[i, val] : llvm::enumerate(op.getMixedSizes())) {
     assert(i < srcShape.size());
     auto shapeVal = srcShape[i];
     if (mlir::ShapedType::isDynamic(shapeVal)) {
@@ -864,9 +864,9 @@ struct BroadcastSameStaticShape
 
     auto loc = op.getLoc();
     llvm::SmallVector<mlir::Value> newResults(inputs.size());
-    for (auto [i, it] :
+    for (auto &&[i, it] :
          llvm::enumerate(llvm::zip(op.getInputs(), op.getResults()))) {
-      auto [src, res] = it;
+      auto &&[src, res] = it;
       auto srcType = src.getType();
       auto dstType = res.getType();
 
@@ -959,7 +959,7 @@ static void printArgList(mlir::OpAsmPrinter &printer,
   assert(args.size() == argsNames.size());
   printer << '(';
   bool first = true;
-  for (auto [arg, name] : llvm::zip(args, argsNames)) {
+  for (auto &&[arg, name] : llvm::zip(args, argsNames)) {
     if (first) {
       first = false;
     } else {

@@ -95,7 +95,7 @@ private:
     operation = op;
     argCount = static_cast<unsigned>(a.size());
     type = t;
-    for (auto [i, arg] : llvm::enumerate(a)) {
+    for (auto &&[i, arg] : llvm::enumerate(a)) {
       if (i >= 1)
         new (&args[i]) Arg();
 
@@ -460,7 +460,7 @@ numba::MemorySSA::Node *memSSAProcessRegion(mlir::Region &region,
           if (nullptr == reg)
             return {};
 
-          for (auto [i, r] : llvm::enumerate(op.getRegions()))
+          for (auto &&[i, r] : llvm::enumerate(op.getRegions()))
             if (&r == reg)
               return static_cast<unsigned>(i);
 
@@ -539,7 +539,7 @@ numba::MemorySSA::Node *memSSAProcessRegion(mlir::Region &region,
                 return nullptr;
 
               _regResults[i] = res;
-              for (auto [i, ind] : llvm::enumerate(pred)) {
+              for (auto &&[i, ind] : llvm::enumerate(pred)) {
                 auto prevNode = visit(ind);
                 if (prevNode == nullptr)
                   return nullptr;
@@ -563,7 +563,7 @@ numba::MemorySSA::Node *memSSAProcessRegion(mlir::Region &region,
         } else {
           llvm::SmallVector<numba::MemorySSA::Node *> prevNodes(
               parentPredecessors.size());
-          for (auto [i, val] : llvm::enumerate(parentPredecessors)) {
+          for (auto &&[i, val] : llvm::enumerate(parentPredecessors)) {
             auto prev = visitor.visit(val);
             if (prev == nullptr)
               return nullptr;

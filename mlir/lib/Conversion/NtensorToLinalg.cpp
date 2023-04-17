@@ -164,7 +164,7 @@ struct ConvertElementwiseOp
           auto rank = static_cast<unsigned>(type.getRank());
 
           llvm::SmallVector<mlir::Value> inputs(src.size());
-          for (auto [i, arg] : llvm::enumerate(src)) {
+          for (auto &&[i, arg] : llvm::enumerate(src)) {
             auto srcTensorType =
                 toTensorType(arg.getType().cast<numba::ntensor::NTensorType>());
             inputs[i] = builder.create<numba::ntensor::ToTensorOp>(
@@ -174,12 +174,12 @@ struct ConvertElementwiseOp
           llvm::SmallVector<mlir::Value> results(dstType.size());
           llvm::SmallVector<mlir::Type> resultTypes(dstType.size());
           llvm::SmallVector<mlir::Value> dynSizes(rank);
-          for (auto [i, argType] : llvm::enumerate(dstType)) {
+          for (auto &&[i, argType] : llvm::enumerate(dstType)) {
             auto dstTensorType =
                 toTensorType(argType.cast<numba::ntensor::NTensorType>());
 
             dynSizes.clear();
-            for (auto [i, dim] : llvm::enumerate(dstTensorType.getShape()))
+            for (auto &&[i, dim] : llvm::enumerate(dstTensorType.getShape()))
               if (mlir::ShapedType::isDynamic(dim))
                 dynSizes.emplace_back(builder.create<mlir::tensor::DimOp>(
                     loc, inputs.front(), i));
@@ -220,7 +220,7 @@ struct ConvertElementwiseOp
           }
 
           llvm::SmallVector<mlir::Value> res(generic->getNumResults());
-          for (auto [i, arg] : llvm::enumerate(generic->getResults()))
+          for (auto &&[i, arg] : llvm::enumerate(generic->getResults()))
             res[i] = builder.create<numba::ntensor::FromTensorOp>(
                 loc, dstType[i], arg);
 
@@ -535,7 +535,7 @@ struct ConvertBroadcastOp
     mlir::ValueRange results = op.getResults();
     assert(inputs.size() == results.size());
 
-    for (auto [src, dst] : llvm::zip(inputs, results))
+    for (auto &&[src, dst] : llvm::zip(inputs, results))
       if (src.getType().cast<mlir::ShapedType>().getElementType() !=
           dst.getType().cast<mlir::ShapedType>().getElementType())
         return mlir::failure();
@@ -557,7 +557,7 @@ struct ConvertBroadcastOp
         rewriter, op.getLoc(), env, resultTypes,
         [&](mlir::OpBuilder &rewriter, mlir::Location loc) {
           llvm::SmallVector<mlir::Value> tensorInputs(inputs.size());
-          for (auto [i, input] : llvm::enumerate(inputs)) {
+          for (auto &&[i, input] : llvm::enumerate(inputs)) {
             auto tensorType = toTensorType(
                 input.getType().cast<numba::ntensor::NTensorType>());
             tensorInputs[i] = rewriter.create<numba::ntensor::ToTensorOp>(
@@ -598,7 +598,7 @@ struct ConvertBroadcastOp
 
           // Broadcast individual arrays
           llvm::SmallVector<mlir::Value> newResults(tensorInputs.size());
-          for (auto [i, input] : llvm::enumerate(tensorInputs)) {
+          for (auto &&[i, input] : llvm::enumerate(tensorInputs)) {
             auto srcType = input.getType().cast<mlir::ShapedType>();
             auto srcRank = static_cast<unsigned>(srcType.getRank());
             auto result = expandDims(rewriter, loc, input, srcRank, retShape);

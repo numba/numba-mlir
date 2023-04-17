@@ -64,7 +64,7 @@ parseDefault(mlir::OpBuilder &builder, mlir::Location loc, py::handle obj) {
   if (py::isinstance<py::tuple>(obj)) {
     auto val = obj.cast<py::tuple>();
     llvm::SmallVector<mlir::Value> elems(val.size());
-    for (auto [i, elem] : llvm::enumerate(val)) {
+    for (auto &&[i, elem] : llvm::enumerate(val)) {
       auto elemVal = parseDefault(builder, loc, elem);
       if (!elemVal)
         return std::nullopt;
@@ -93,14 +93,14 @@ mlir::LogicalResult NumpyResolver::resolveFuncArgs(
   llvm::SmallVector<std::pair<mlir::Value, mlir::StringAttr>>
       argsNamesAndValues;
   argsNamesAndValues.reserve(args.size());
-  for (auto [val, name] : llvm::zip(args, argsNames))
+  for (auto &&[val, name] : llvm::zip(args, argsNames))
     argsNamesAndValues.emplace_back(val, name.cast<mlir::StringAttr>());
 
   auto findArg = [&](llvm::StringRef argName) -> std::optional<mlir::Value> {
     if (argsNamesAndValues.empty())
       return std::nullopt;
 
-    for (auto [i, it] : llvm::enumerate(argsNamesAndValues)) {
+    for (auto &&[i, it] : llvm::enumerate(argsNamesAndValues)) {
       auto origArgName = it.second.getValue();
 
       if (origArgName == argName) {
@@ -114,7 +114,7 @@ mlir::LogicalResult NumpyResolver::resolveFuncArgs(
 
   auto outTuple = res.attr("out").cast<py::tuple>();
   llvm::SmallBitVector outProcessed(outTuple.size(), false);
-  for (auto [i, out] : llvm::enumerate(outTuple)) {
+  for (auto &&[i, out] : llvm::enumerate(outTuple)) {
     auto outName = out.cast<py::tuple>()[0];
     auto nameStr = outName.cast<std::string>();
     if (auto arg = findArg(nameStr)) {
@@ -163,7 +163,7 @@ mlir::LogicalResult NumpyResolver::resolveFuncArgs(
     }
   }
 
-  for (auto [i, out] : llvm::enumerate(outTuple)) {
+  for (auto &&[i, out] : llvm::enumerate(outTuple)) {
     if (argsNamesAndValues.empty())
       break;
 

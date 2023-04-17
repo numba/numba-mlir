@@ -75,7 +75,7 @@ public:
     llvm::SmallVector<mlir::ConstantIntRanges> resShapes;
     resShapes.reserve(
         std::min(lhs.shapeRanges->size(), rhs.shapeRanges->size()));
-    for (auto [l, r] : llvm::zip(*lhs.shapeRanges, *rhs.shapeRanges))
+    for (auto &&[l, r] : llvm::zip(*lhs.shapeRanges, *rhs.shapeRanges))
       resShapes.emplace_back(l.rangeUnion(r));
 
     ShapeValue ret;
@@ -93,7 +93,7 @@ public:
     llvm::SmallVector<mlir::ConstantIntRanges> resShapes;
     resShapes.reserve(
         std::min(lhs.shapeRanges->size(), rhs.shapeRanges->size()));
-    for (auto [l, r] : llvm::zip(*lhs.shapeRanges, *rhs.shapeRanges))
+    for (auto &&[l, r] : llvm::zip(*lhs.shapeRanges, *rhs.shapeRanges))
       resShapes.emplace_back(l.intersection(r));
 
     ShapeValue ret;
@@ -258,7 +258,7 @@ public:
 
       llvm::SmallVector<mlir::ConstantIntRanges> ranges;
       ranges.reserve(mixedSizes.size());
-      for (auto [i, size] : llvm::enumerate(mixedSizes)) {
+      for (auto &&[i, size] : llvm::enumerate(mixedSizes)) {
         if (droppedDims[i])
           continue;
 
@@ -454,7 +454,7 @@ public:
       return;
     }
 
-    for (auto [res, resultLattice] : llvm::zip(op->getResults(), results)) {
+    for (auto &&[res, resultLattice] : llvm::zip(op->getResults(), results)) {
       auto shaped = res.getType().dyn_cast<mlir::ShapedType>();
       if (!shaped)
         continue;
@@ -484,7 +484,7 @@ public:
 
       auto &body = func.getFunctionBody();
       assert(!body.empty());
-      for (auto [i, arg] : llvm::enumerate(body.front().getArguments())) {
+      for (auto &&[i, arg] : llvm::enumerate(body.front().getArguments())) {
         auto shaped = arg.getType().dyn_cast<mlir::ShapedType>();
         if (!shaped)
           continue;
@@ -574,7 +574,7 @@ public:
 
     // TODO: upstream
     if (!mlir::isa<mlir::InferIntRangeInterface>(op)) {
-      for (auto [lattice, value] : llvm::zip(results, op->getResults())) {
+      for (auto &&[lattice, value] : llvm::zip(results, op->getResults())) {
         if (value.getType().isIntOrIndex()) {
           propagateIfChanged(
               lattice,

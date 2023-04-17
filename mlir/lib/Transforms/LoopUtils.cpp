@@ -159,7 +159,7 @@ llvm::SmallVector<mlir::scf::ForOp, 2> numba::lowerWhileToFor(
         assert(afterBlock.getNumArguments() == beforeTerm.getArgs().size());
         mapper.map(beforeBlock.getArguments(), iterargs);
 
-        for (auto [blockArg, termArg] :
+        for (auto &&[blockArg, termArg] :
              llvm::zip(afterBlock.getArguments(), beforeTerm.getArgs())) {
           if (pairfirst && skipCasts(termArg) == pairfirst) {
             // iter arg
@@ -223,9 +223,9 @@ llvm::SmallVector<mlir::scf::ForOp, 2> numba::lowerWhileToFor(
   assert(whileOp.getNumResults() >= loopResults.size());
   builder.updateRootInPlace(whileOp, [&]() {
     assert(whileOp.getNumResults() == beforeTerm.getArgs().size());
-    for (auto [oldRes, operand] :
+    for (auto &&[oldRes, operand] :
          llvm::zip(whileOp.getResults(), beforeTerm.getArgs())) {
-      for (auto [i, arg] : llvm::enumerate(beforeBlock.getArguments())) {
+      for (auto &&[i, arg] : llvm::enumerate(beforeBlock.getArguments())) {
         if (arg == operand) {
           assert(i < loopResults.size());
           auto newRes = loopResults[static_cast<unsigned>(i)];

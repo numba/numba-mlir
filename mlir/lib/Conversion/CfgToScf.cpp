@@ -30,7 +30,7 @@ static void eraseBlocks(mlir::PatternRewriter &rewriter,
 }
 
 static bool isBlocksDifferent(llvm::ArrayRef<mlir::Block *> blocks) {
-  for (auto [i, block1] : llvm::enumerate(blocks)) {
+  for (auto &&[i, block1] : llvm::enumerate(blocks)) {
     assert(nullptr != block1);
     for (auto block2 : blocks.drop_front(i + 1)) {
       assert(nullptr != block2);
@@ -320,7 +320,7 @@ tailLoopToWhile(mlir::PatternRewriter &rewriter, mlir::Location loc,
 
     rewriter.create<mlir::cf::BranchOp>(loc, exitBlock, exitResults);
 
-    for (auto [oldVal, newVal] : llvm::zip(toReplace, definedResults))
+    for (auto &&[oldVal, newVal] : llvm::zip(toReplace, definedResults))
       rewriter.replaceAllUsesWith(oldVal, newVal);
 
     if (llvm::hasSingleElement(bodyBlock->getUses()))
@@ -392,7 +392,7 @@ struct SCC {
   llvm::SmallVector<Node> nodes;
 
   void dump() const {
-    for (auto [i, node] : llvm::enumerate(nodes)) {
+    for (auto &&[i, node] : llvm::enumerate(nodes)) {
       llvm::errs() << "scc node " << i << "\n";
       for (auto b : node.blocks) {
         llvm::errs() << " block ";
@@ -566,7 +566,7 @@ static void generateMultiplexedBranches(mlir::PatternRewriter &rewriter,
   }
 
   mlir::Block *currentBlock = srcBlock;
-  for (auto [i, edge] : llvm::enumerate(edges.drop_back())) {
+  for (auto &&[i, edge] : llvm::enumerate(edges.drop_back())) {
     auto dst = edge.second;
     auto numArgs = dst->getNumArguments();
     auto args = srcArgs.take_front(numArgs);
@@ -626,7 +626,7 @@ static void initMultiplexVars(mlir::PatternRewriter &rewriter,
                               llvm::ArrayRef<Edge> edges,
                               llvm::SmallVectorImpl<mlir::Value> &res) {
   assert(currentBlock < edges.size());
-  for (auto [j, edge] : llvm::enumerate(edges)) {
+  for (auto &&[j, edge] : llvm::enumerate(edges)) {
     mlir::ValueRange args = getEdgeArgs(edge);
     if (j == currentBlock) {
       res.append(args.begin(), args.end());
@@ -643,7 +643,7 @@ static void initUndefMultiplexVars(mlir::PatternRewriter &rewriter,
                                    mlir::Location loc,
                                    llvm::ArrayRef<Edge> edges,
                                    llvm::SmallVectorImpl<mlir::Value> &res) {
-  for (auto [j, edge] : llvm::enumerate(edges)) {
+  for (auto &&[j, edge] : llvm::enumerate(edges)) {
     for (auto type : edge.second->getArgumentTypes()) {
       mlir::Value init = rewriter.create<numba::util::UndefOp>(loc, type);
       res.emplace_back(init);
@@ -772,7 +772,7 @@ static mlir::Block *wrapIntoRegion(mlir::PatternRewriter &rewriter,
   rewriter.replaceOpWithNewOp<mlir::scf::YieldOp>(newExitBlock->getTerminator(),
                                                   definedValues);
 
-  for (auto [oldVal, newVal] :
+  for (auto &&[oldVal, newVal] :
        llvm::zip(definedValues, regionOp->getResults())) {
     for (auto &use : llvm::make_early_inc_range(oldVal.getUses())) {
       auto owner = use.getOwner();
@@ -962,7 +962,7 @@ static bool restructureLoop(mlir::PatternRewriter &rewriter, SCC::Node &node) {
     llvm::SmallVector<mlir::Block *> toReplace;
 
     toReplace.clear();
-    for (auto [i, inEdge] : llvm::enumerate(inEdges)) {
+    for (auto &&[i, inEdge] : llvm::enumerate(inEdges)) {
       auto entryBlock = createBlock();
       rewriter.setInsertionPointToStart(entryBlock);
       branchArgs.clear();
@@ -974,11 +974,11 @@ static bool restructureLoop(mlir::PatternRewriter &rewriter, SCC::Node &node) {
       rewriter.create<mlir::cf::BranchOp>(loc, multiplexEntryBlock, branchArgs);
       toReplace.emplace_back(entryBlock);
     }
-    for (auto [i, edge] : llvm::enumerate(inEdges))
+    for (auto &&[i, edge] : llvm::enumerate(inEdges))
       replaceEdgeDest(rewriter, edge, toReplace[i], {});
 
     toReplace.clear();
-    for (auto [i, repEdge] : llvm::enumerate(repetitionEdges)) {
+    for (auto &&[i, repEdge] : llvm::enumerate(repetitionEdges)) {
       auto preRepBlock = createBlock();
       rewriter.setInsertionPointToStart(preRepBlock);
       mlir::Value trueVal =
@@ -997,11 +997,11 @@ static bool restructureLoop(mlir::PatternRewriter &rewriter, SCC::Node &node) {
       rewriter.create<mlir::cf::BranchOp>(loc, repBlock, branchArgs);
       toReplace.emplace_back(preRepBlock);
     }
-    for (auto [i, edge] : llvm::enumerate(repetitionEdges))
+    for (auto &&[i, edge] : llvm::enumerate(repetitionEdges))
       replaceEdgeDest(rewriter, edge, toReplace[i], {});
 
     toReplace.clear();
-    for (auto [i, outEdge] : llvm::enumerate(outEdges)) {
+    for (auto &&[i, outEdge] : llvm::enumerate(outEdges)) {
       auto preRepBlock = createBlock();
       rewriter.setInsertionPointToStart(preRepBlock);
       mlir::Value falseVal =
@@ -1021,7 +1021,7 @@ static bool restructureLoop(mlir::PatternRewriter &rewriter, SCC::Node &node) {
       rewriter.create<mlir::cf::BranchOp>(loc, repBlock, branchArgs);
       toReplace.emplace_back(preRepBlock);
     }
-    for (auto [i, edge] : llvm::enumerate(outEdges))
+    for (auto &&[i, edge] : llvm::enumerate(outEdges))
       replaceEdgeDest(rewriter, edge, toReplace[i], {});
   }
 
@@ -1210,14 +1210,14 @@ struct WhileMoveToAfter : public mlir::OpRewritePattern<mlir::scf::WhileOp> {
         afterBlock.getArguments().take_back(definedOutside.size());
 
     mlir::IRMapping mapping;
-    for (auto [oldVal, newVal] : llvm::zip(definedOutside, newArgs))
+    for (auto &&[oldVal, newVal] : llvm::zip(definedOutside, newArgs))
       mapping.map(oldVal, newVal);
 
     rewriter.setInsertionPointToStart(&afterBlock);
     for (auto &op : ifBlock->without_terminator())
       rewriter.clone(op, mapping);
 
-    for (auto [res, yieldRes] :
+    for (auto &&[res, yieldRes] :
          llvm::zip(ifOp.getResults(), term.getResults())) {
       for (auto &use : res.getUses()) {
         assert(use.getOwner() == condOp);
@@ -1231,7 +1231,7 @@ struct WhileMoveToAfter : public mlir::OpRewritePattern<mlir::scf::WhileOp> {
 
     rewriter.setInsertionPoint(condOp);
     if (otherTerm) {
-      for (auto [res, otherRes] :
+      for (auto &&[res, otherRes] :
            llvm::zip(ifOp.getResults(), otherTerm.getResults())) {
         if (otherRes.getDefiningOp<numba::util::UndefOp>()) {
           mlir::Value undef =
@@ -1335,7 +1335,8 @@ struct WhileUndefArgs : public mlir::OpRewritePattern<mlir::scf::WhileOp> {
     bool changed = false;
 
     llvm::SmallVector<mlir::Value> newArgs;
-    for (auto [yieldArg, init] : llvm::zip(yield.getResults(), op.getInits())) {
+    for (auto &&[yieldArg, init] :
+         llvm::zip(yield.getResults(), op.getInits())) {
       if (!yieldArg.getDefiningOp<numba::util::UndefOp>()) {
         newArgs.emplace_back(yieldArg);
         continue;
@@ -1372,7 +1373,7 @@ struct CondBrSameTarget
 
     auto loc = op.getLoc();
     auto cond = op.getCondition();
-    for (auto [trueArg, falseArg] :
+    for (auto &&[trueArg, falseArg] :
          llvm::zip(op.getTrueDestOperands(), op.getFalseDestOperands())) {
       if (trueArg == falseArg) {
         args.emplace_back(trueArg);
