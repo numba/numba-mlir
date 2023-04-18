@@ -11,9 +11,8 @@ on:
   pull_request:
 
 env:
-  TBB_VER: 2021.6.0
+  TBB_VER: 2021.9.0
   LEVEL_ZERO_VER: v1.6.2
-  TBB_URL_PREFIX: https://github.com/oneapi-src/oneTBB/releases/download/
   LLVM_SHA_FILE: llvm-sha.txt
 
 jobs:
@@ -69,14 +68,6 @@ jobs:
           echo "WORKSPACE=$wspath" >> $env:GITHUB_ENV
           cat $env:GITHUB_ENV
 
-      - name: Cache TBB
-        id: cache-tbb
-        uses: actions/cache@v3
-        with:
-          path: |
-            D:\a\numba-mlir\tbb\*
-          key: ${{ runner.os }}-build-tbb-${{ env.TBB_VER }}
-
       - name: Cache Level-Zero
         id: cache-level-zero
         uses: actions/cache@v3
@@ -94,27 +85,6 @@ jobs:
           path: |
             D:\a\numba-mlir\llvm-mlir\_mlir_install\**
           key: ${{ runner.os }}-build-llvm-${{ env.LLVM_CACHE_NUMBER }}-${{ env.LLVM_SHA }}
-
-      - name: Download TBB
-        if: steps.cache-tbb.outputs.cache-hit != 'true'
-        run: |
-          cd $env:WORKSPACE
-          mkdir -ea 0 -p tbb
-          pushd tbb
-          if((Test-Path -PathType leaf bundle_id.txt) -and ((cat bundle_id.txt) -eq ($env:TBB_VER)))
-          {
-            echo "INFO: Using cached download of TBB $env:TBB_VER"
-          } else {
-            echo "INFO: Downloading TBB $env:TBB_VER"
-            rm -r *
-            $TBB_FN="oneapi-tbb-$env:TBB_VER-win.zip"
-            Invoke-WebRequest "$env:TBB_URL_PREFIX/v$env:TBB_VER/$TBB_FN" -OutFile $TBB_FN
-            Expand-Archive $TBB_FN -DestinationPath .
-            ls
-            (Select-String -Pattern "Version: " (ls -Filter tbb.pc -Recurse -Name)).Line.Split(" ")[-1] > bundle_id.txt
-            cat bundle_id.txt
-          }
-          popd
 
       - name: Download and Build Level-Zero
         if: steps.cache-level-zero.outputs.cache-hit != 'true'
@@ -184,7 +154,6 @@ jobs:
           $external_lit="$env:GITHUB_WORKSPACE\scripts\runlit.py"
           mkdir -p _build
           cd _build
-          $env:TBB_PATH=(Resolve-Path "$env:WORKSPACE/tbb/oneapi-tbb-$env:TBB_VER")
           $env:LEVEL_ZERO_DIR=(Resolve-Path "$env:WORKSPACE/level-zero/level-zero/level_zero_install")
           $env:LEVEL_ZERO_VERSION_CHECK_OFF="1"
           $env:LLVM_DIR=(Resolve-Path "$env:WORKSPACE/llvm-mlir/_mlir_install")
@@ -196,7 +165,6 @@ jobs:
             -DNUMBA_MLIR_ENABLE_IGPU_DIALECT=ON                                `
             -DNUMBA_MLIR_ENABLE_TESTS=ON                                       `
             -DNUMBA_MLIR_ENABLE_TBB_SUPPORT=ON                                 `
-            -DTBB_DIR="$env:TBB_PATH/lib/cmake/tbb"                            `
             -DLLVM_EXTERNAL_LIT="$external_lit"
           ninja all
 
@@ -248,14 +216,6 @@ jobs:
           echo "WORKSPACE=$wspath" >> $env:GITHUB_ENV
           cat $env:GITHUB_ENV
 
-      - name: Cache TBB
-        id: cache-tbb
-        uses: actions/cache@v3
-        with:
-          path: |
-            D:\a\numba-mlir\tbb\*
-          key: ${{ runner.os }}-build-tbb-${{ env.TBB_VER }}
-
       - name: Cache Level-Zero
         id: cache-level-zero
         uses: actions/cache@v3
@@ -288,7 +248,6 @@ jobs:
           python -c "import numba; print('numba', numba.__version__)"
           python -c "import numpy; print(numpy.get_include())"
           cmake --version
-          $env:TBB_PATH=(Resolve-Path "$env:WORKSPACE/tbb/oneapi-tbb-$env:TBB_VER")
           $env:LEVEL_ZERO_DIR=(Resolve-Path "$env:WORKSPACE/level-zero/level-zero/level_zero_install")
           $env:LEVEL_ZERO_VERSION_CHECK_OFF="1"
           $env:LLVM_PATH=(Resolve-Path "$env:WORKSPACE/llvm-mlir/_mlir_install")
@@ -321,7 +280,6 @@ jobs:
           mkdir numba_mlir_wheels
           pushd numba_mlir_wheels
           conda activate test-env
-          $env:TBB_PATH=(Resolve-Path "$env:WORKSPACE/tbb/oneapi-tbb-$env:TBB_VER")
           $env:LEVEL_ZERO_DIR=(Resolve-Path "$env:WORKSPACE/level-zero/level-zero/level_zero_install")
           $env:LEVEL_ZERO_VERSION_CHECK_OFF="1"
           $env:LLVM_PATH=(Resolve-Path "$env:WORKSPACE/llvm-mlir/_mlir_install")
@@ -388,14 +346,6 @@ jobs:
           echo "WORKSPACE=$wspath" >> $env:GITHUB_ENV
           cat $env:GITHUB_ENV
 
-      - name: Cache TBB
-        id: cache-tbb
-        uses: actions/cache@v3
-        with:
-          path: |
-            D:\a\numba-mlir\tbb\*
-          key: ${{ runner.os }}-build-tbb-${{ env.TBB_VER }}
-
       - name: Cache Level-Zero
         id: cache-level-zero
         uses: actions/cache@v3
@@ -428,7 +378,6 @@ jobs:
           Rename-Item -Path "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\Common7\Tools\vsdevcmd\ext\html_help.bat" -NewName "html_help.bat.bak"
           Rename-Item -Path "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\Common7\Tools\vsdevcmd\ext\perf_tools.bat" -NewName "perf_tools.bat.bak"
           Rename-Item -Path "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\Common7\Tools\vsdevcmd\ext\vssdk.bat" -NewName "vssdk.bat.bak"
-          $env:TBB_PATH=(Resolve-Path "$env:WORKSPACE/tbb/oneapi-tbb-$env:TBB_VER")
           $env:LEVEL_ZERO_DIR=(Resolve-Path "$env:WORKSPACE/level-zero/level-zero/level_zero_install")
           $env:LEVEL_ZERO_VERSION_CHECK_OFF="1"
           $env:LLVM_PATH=(Resolve-Path "$env:WORKSPACE/llvm-mlir/_mlir_install")
@@ -496,14 +445,6 @@ jobs:
           cat $GITHUB_WORKSPACE/$LLVM_SHA_FILE >> $GITHUB_ENV
           echo 'EOF' >> $GITHUB_ENV
 
-      - name: Cache TBB
-        id: cache-tbb
-        uses: actions/cache@v3
-        with:
-          path: |
-            /home/runner/work/tbb/*
-          key: ${{ runner.os }}-build-tbb-${{ env.TBB_VER }}
-
       - name: Cache Level-Zero
         id: cache-level-zero
         uses: actions/cache@v3
@@ -521,26 +462,6 @@ jobs:
           path: |
             /home/runner/work/llvm-mlir/_mlir_install/**
           key: ${{ runner.os }}-build-llvm-${{ env.LLVM_CACHE_NUMBER }}-${{ env.LLVM_SHA }}
-
-      - name: Download TBB
-        if: steps.cache-tbb.outputs.cache-hit != 'true'
-        shell: bash -l {0}
-        run: |
-          cd /home/runner/work
-          mkdir -p tbb
-          pushd tbb
-          if [[ -f bundle_id.txt && ( "$(cat bundle_id.txt)" == "${TBB_VER}" ) ]]; then
-            echo "INFO: Using cached download of TBB ${TBB_VER}"
-          else
-            echo "INFO: Downloading TBB ${TBB_VER}"
-            rm -rf *
-            export TBB_FN=oneapi-tbb-${TBB_VER}-lin.tgz
-            wget ${TBB_URL_PREFIX}/v${TBB_VER}/${TBB_FN} || exit 1
-            tar xf ${TBB_FN} -C . || exit 1
-            cat $(find . -name tbb.pc) | grep Version: | cut -d " " -f 2 > bundle_id.txt || rm -rf bundle_id.txt
-            [ -f bundle_id.txt ] || exit 1
-          fi
-          popd
 
       - name: Download and Build Level-Zero
         if: steps.cache-level-zero.outputs.cache-hit != 'true'
@@ -613,7 +534,6 @@ jobs:
           cd _build
           source $CONDA/bin/activate test-env
           export EXTERNAL_LIT=${GITHUB_WORKSPACE}/scripts/runlit.py
-          export TBB_PATH=/home/runner/work/tbb/oneapi-tbb-${TBB_VER}
           export LEVEL_ZERO_DIR=/home/runner/work/level-zero/level-zero/level_zero_install
           export LEVEL_ZERO_VERSION_CHECK_OFF=1
           export LLVM_DIR=/home/runner/work/llvm-mlir/_mlir_install
@@ -627,7 +547,6 @@ jobs:
             -DNUMBA_MLIR_ENABLE_IGPU_DIALECT=ON                                 \
             -DNUMBA_MLIR_ENABLE_TESTS=ON                                        \
             -DNUMBA_MLIR_ENABLE_TBB_SUPPORT=ON                                  \
-            -DTBB_DIR=${TBB_PATH}/lib/cmake/tbb                                 \
             -DLLVM_EXTERNAL_LIT=${EXTERNAL_LIT}                                 \
              || exit 1
           ninja all || exit 1
@@ -679,14 +598,6 @@ jobs:
           cat $GITHUB_WORKSPACE/$LLVM_SHA_FILE >> $GITHUB_ENV
           echo 'EOF' >> $GITHUB_ENV
 
-      - name: Cache TBB
-        id: cache-tbb
-        uses: actions/cache@v3
-        with:
-          path: |
-            /home/runner/work/tbb/*
-          key: ${{ runner.os }}-build-tbb-${{ env.TBB_VER }}
-
       - name: Cache Level-Zero
         id: cache-level-zero
         uses: actions/cache@v3
@@ -719,7 +630,6 @@ jobs:
           python -c "import numba; print('numba', numba.__version__)"
           python -c "import numpy; print(numpy.get_include())"
           cmake --version
-          export TBB_PATH=/home/runner/work/tbb/oneapi-tbb-${TBB_VER}
           export LLVM_PATH=/home/runner/work/llvm-mlir/_mlir_install
           export LEVEL_ZERO_DIR=/home/runner/work/level-zero/level-zero/level_zero_install
           export LEVEL_ZERO_VERSION_CHECK_OFF=1
@@ -758,7 +668,6 @@ jobs:
           mkdir numba_mlir_wheels
           pushd numba_mlir_wheels
           source $CONDA/bin/activate test-env
-          export TBB_PATH=/home/runner/work/tbb/oneapi-tbb-${TBB_VER}
           export LLVM_PATH=/home/runner/work/llvm-mlir/_mlir_install
           export LEVEL_ZERO_DIR=/home/runner/work/level-zero/level-zero/level_zero_install
           export LEVEL_ZERO_VERSION_CHECK_OFF=1
