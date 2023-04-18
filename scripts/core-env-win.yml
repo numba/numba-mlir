@@ -1,6 +1,7 @@
 name: dev
 channels:
   - conda-forge
+  - intel
   - nodefaults
 dependencies:
   - cmake
