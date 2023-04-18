@@ -23,9 +23,6 @@ import numba.tests.test_parfors
 
 
 def _gen_tests():
-    if not readenv("NUMBA_MLIR_ENABLE_PARFOR_TESTS", int, 0):
-        return
-
     testcases = [
         numba.tests.test_parfors.TestParforBasic,
         numba.tests.test_parfors.TestParforNumericalMisc,
@@ -107,6 +104,20 @@ def _gen_tests():
         "test_parfor_generate_fuse",  # operand #0 does not dominate this use
         "test_parfor_slice7",  # array.transpose
         "test_one_d_array_reduction",  # np.array
+        "test_setitem_2d_one_replaced",
+        "test_tuple_arg",
+        "test_tuple_arg_1d",
+        "test_tuple_arg_1d_literal",
+        "test_tuple_arg_literal",
+        "test_real_imag_attr",
+        "test_tuple_arg_not_whole_array",
+        "test_tuple_for_pndindex",
+        "test_tuple_of_literal_nonliteral",
+        "test_if_not_else_reduction",
+        "test_prange30",
+        "test_int_arg_pndindex",
+        "test_non_identity_initial",
+        "test_inplace_alias",
     }
 
     skip_tests = {
