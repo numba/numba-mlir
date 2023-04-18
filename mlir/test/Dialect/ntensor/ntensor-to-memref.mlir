@@ -289,3 +289,28 @@ func.func @test(%arg1: !ntensor.ntensor<?xf32>) -> !ntensor.ntensor<5xf32> {
 //  CHECK-NEXT:   numba_util.env_region_yield %[[RES1]] : memref<5xf32>
 //  CHECK-NEXT:   }
 //  CHECK-NEXT:   return %[[RES]] : memref<5xf32>
+
+// -----
+
+func.func @test() -> !ntensor.ntensor<?x?xf32> {
+  %0 = numba_util.undef : !ntensor.ntensor<?x?xf32>
+  return %0 : !ntensor.ntensor<?x?xf32>
+}
+
+// CHECK-LABEL: func @test()
+//       CHECK:   %[[RES:.*]] = numba_util.undef : memref<?x?xf32>
+//       CHECK:   return %[[RES]] : memref<?x?xf32>
+
+// -----
+
+func.func @test() -> !ntensor.ntensor<?x?xf32, "test"> {
+  %0 = numba_util.undef : !ntensor.ntensor<?x?xf32, "test">
+  return %0 : !ntensor.ntensor<?x?xf32, "test">
+}
+
+// CHECK-LABEL: func @test()
+//       CHECK:   %[[RES:.*]] = numba_util.env_region "test" -> memref<?x?xf32> {
+//       CHECK:   %[[RES1:.*]] = numba_util.undef : memref<?x?xf32>
+//       CHECK:   numba_util.env_region_yield %[[RES1]] : memref<?x?xf32>
+//       CHECK:   }
+//       CHECK:   return %[[RES]] : memref<?x?xf32>
