@@ -15,6 +15,7 @@
 #include <mlir/Interfaces/SideEffectInterfaces.h>
 #include <mlir/Transforms/GreedyPatternRewriteDriver.h>
 #include <mlir/Transforms/Passes.h>
+#include <mlir/Transforms/RegionUtils.h>
 
 namespace {
 static const constexpr bool debugLoopRestructuring = false;
@@ -174,6 +175,7 @@ struct ScfIfRewriteOneExit
         }
       }
 
+      auto *region = op->getParentRegion();
       if (postBlock == returnBlock) {
         rewriter.replaceOpWithNewOp<mlir::func::ReturnOp>(op,
                                                           ifOp.getResults());
@@ -182,12 +184,7 @@ struct ScfIfRewriteOneExit
                                                         ifOp.getResults());
       }
 
-      if (trueBlock->use_empty())
-        eraseBlocks(rewriter, trueBlock);
-
-      if (falseBlock->use_empty())
-        eraseBlocks(rewriter, falseBlock);
-
+      (void)mlir::simplifyRegions(rewriter, *region);
       return mlir::success();
     }
     return mlir::failure();
@@ -838,10 +835,8 @@ static void buildEdges(llvm::ArrayRef<mlir::Block *> blocks,
         if (predecessor->getParent() != region)
           continue;
 
-        if (isInSCC(predecessor)) {
+        if (isInSCC(predecessor))
           repetitionEdges.emplace_back(predecessor, block);
-          isInput = true;
-        }
       }
     }
   }
