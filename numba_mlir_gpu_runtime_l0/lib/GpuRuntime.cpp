@@ -471,7 +471,8 @@ gpuxStreamCreate(size_t eventsCount, const char *deviceName) {
   return catchAll([&]() { return new Stream(eventsCount, deviceName); });
 }
 
-extern "C" NUMBA_MLIR_GPU_RUNTIME_L0_EXPORT void gpuxStreamDestroy(void *stream) {
+extern "C" NUMBA_MLIR_GPU_RUNTIME_L0_EXPORT void
+gpuxStreamDestroy(void *stream) {
   LOG_FUNC();
   catchAll([&]() { static_cast<Stream *>(stream)->release(); });
 }
@@ -484,22 +485,24 @@ gpuxModuleLoad(void *stream, const void *data, size_t dataSize) {
   });
 }
 
-extern "C" NUMBA_MLIR_GPU_RUNTIME_L0_EXPORT void gpuxModuleDestroy(void *module) {
+extern "C" NUMBA_MLIR_GPU_RUNTIME_L0_EXPORT void
+gpuxModuleDestroy(void *module) {
   LOG_FUNC();
   catchAll([&]() {
     Stream::destroyModule(static_cast<ze_module_handle_t>(module));
   });
 }
 
-extern "C" NUMBA_MLIR_GPU_RUNTIME_L0_EXPORT void *gpuxKernelGet(void *module,
-                                                             const char *name) {
+extern "C" NUMBA_MLIR_GPU_RUNTIME_L0_EXPORT void *
+gpuxKernelGet(void *module, const char *name) {
   LOG_FUNC();
   return catchAll([&]() {
     return Stream::getKernel(static_cast<ze_module_handle_t>(module), name);
   });
 }
 
-extern "C" NUMBA_MLIR_GPU_RUNTIME_L0_EXPORT void gpuxKernelDestroy(void *kernel) {
+extern "C" NUMBA_MLIR_GPU_RUNTIME_L0_EXPORT void
+gpuxKernelDestroy(void *kernel) {
   LOG_FUNC();
   catchAll([&]() {
     Stream::destroyKernel(static_cast<ze_kernel_handle_t>(kernel));
@@ -543,7 +546,7 @@ gpuxAlloc(void *stream, size_t size, size_t alignment, int type, void *events,
 }
 
 extern "C" NUMBA_MLIR_GPU_RUNTIME_L0_EXPORT void gpuxDeAlloc(void *stream,
-                                                          void *ptr) {
+                                                             void *ptr) {
   LOG_FUNC();
   catchAll([&]() { static_cast<Stream *>(stream)->deallocBuffer(ptr); });
 }
