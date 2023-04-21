@@ -2,7 +2,6 @@
 //
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-
 #pragma once
 
 #include <string_view>
@@ -23,5 +22,4 @@ struct OffloadDeviceCapabilities {
   bool hasFP64;
 };
 
-
-}
+} // namespace numba
