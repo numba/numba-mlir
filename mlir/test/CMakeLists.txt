@@ -15,7 +15,7 @@ configure_lit_site_cfg(
 set(NUMBA_MLIR_TEST_DEPENDS
         FileCheck
         level_zero_runner
-        numba-mlir-gpu-runtime
+        numba-mlir-gpu-runtime-l0
         numba-mlir-opt
         numba-mlir-runtime
         )

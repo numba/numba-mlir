@@ -130,7 +130,7 @@ install(TARGETS numba-mlir-runtime numba-mlir-math-runtime numba-mlir-python-run
         )
 
 if(NUMBA_MLIR_ENABLE_IGPU_DIALECT)
-    install(TARGETS numba-mlir-gpu-runtime
+    install(TARGETS numba-mlir-gpu-runtime-l0
             DESTINATION "${CMAKE_INSTALL_PREFIX}/numba_mlir/numba_mlir"
             )
 endif()
