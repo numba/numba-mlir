@@ -14,12 +14,13 @@ public:
   virtual std::string_view getDeviceName() = 0;
 };
 
-// Must be kept in sync with the compiler.
 struct OffloadDeviceCapabilities {
   uint16_t spirvMajorVersion;
   uint16_t spirvMinorVersion;
   bool hasFP16;
   bool hasFP64;
 };
+
+enum class GpuAllocType { Device = 0, Shared = 1, Local = 2 };
 
 } // namespace numba
