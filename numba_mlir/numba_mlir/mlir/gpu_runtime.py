@@ -9,7 +9,7 @@ from .utils import load_lib, mlir_func_name, register_cfunc
 from numba.core.runtime import _nrt_python as _nrt
 
 try:
-    runtime_lib = load_lib("numba-mlir-gpu-runtime")
+    runtime_lib = load_lib("numba-mlir-gpu-runtime-l0")
     IS_GPU_RUNTIME_AVAILABLE = True
 except:
     IS_GPU_RUNTIME_AVAILABLE = False

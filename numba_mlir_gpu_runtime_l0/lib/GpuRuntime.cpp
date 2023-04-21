@@ -12,7 +12,7 @@
 #include <tuple>
 #include <vector>
 
-#include "numba-mlir-gpu-runtime_export.h"
+#include "numba-mlir-gpu-runtime-l0_export.h"
 
 #include "FilterStringParser.hpp"
 #include "LevelZeroPrinting.hpp"
@@ -459,24 +459,25 @@ private:
 };
 } // namespace
 
-extern "C" NUMBA_MLIR_GPU_RUNTIME_EXPORT void
+extern "C" NUMBA_MLIR_GPU_RUNTIME_L0_EXPORT void
 gpuxSetMemInfoAllocFunc(void *func) {
   LOG_FUNC();
   AllocFunc = reinterpret_cast<AllocFuncT>(func);
 }
 
-extern "C" NUMBA_MLIR_GPU_RUNTIME_EXPORT void *
+extern "C" NUMBA_MLIR_GPU_RUNTIME_L0_EXPORT void *
 gpuxStreamCreate(size_t eventsCount, const char *deviceName) {
   LOG_FUNC();
   return catchAll([&]() { return new Stream(eventsCount, deviceName); });
 }
 
-extern "C" NUMBA_MLIR_GPU_RUNTIME_EXPORT void gpuxStreamDestroy(void *stream) {
+extern "C" NUMBA_MLIR_GPU_RUNTIME_L0_EXPORT void
+gpuxStreamDestroy(void *stream) {
   LOG_FUNC();
   catchAll([&]() { static_cast<Stream *>(stream)->release(); });
 }
 
-extern "C" NUMBA_MLIR_GPU_RUNTIME_EXPORT void *
+extern "C" NUMBA_MLIR_GPU_RUNTIME_L0_EXPORT void *
 gpuxModuleLoad(void *stream, const void *data, size_t dataSize) {
   LOG_FUNC();
   return catchAll([&]() {
@@ -484,29 +485,31 @@ gpuxModuleLoad(void *stream, const void *data, size_t dataSize) {
   });
 }
 
-extern "C" NUMBA_MLIR_GPU_RUNTIME_EXPORT void gpuxModuleDestroy(void *module) {
+extern "C" NUMBA_MLIR_GPU_RUNTIME_L0_EXPORT void
+gpuxModuleDestroy(void *module) {
   LOG_FUNC();
   catchAll([&]() {
     Stream::destroyModule(static_cast<ze_module_handle_t>(module));
   });
 }
 
-extern "C" NUMBA_MLIR_GPU_RUNTIME_EXPORT void *gpuxKernelGet(void *module,
-                                                             const char *name) {
+extern "C" NUMBA_MLIR_GPU_RUNTIME_L0_EXPORT void *
+gpuxKernelGet(void *module, const char *name) {
   LOG_FUNC();
   return catchAll([&]() {
     return Stream::getKernel(static_cast<ze_module_handle_t>(module), name);
   });
 }
 
-extern "C" NUMBA_MLIR_GPU_RUNTIME_EXPORT void gpuxKernelDestroy(void *kernel) {
+extern "C" NUMBA_MLIR_GPU_RUNTIME_L0_EXPORT void
+gpuxKernelDestroy(void *kernel) {
   LOG_FUNC();
   catchAll([&]() {
     Stream::destroyKernel(static_cast<ze_kernel_handle_t>(kernel));
   });
 }
 
-extern "C" NUMBA_MLIR_GPU_RUNTIME_EXPORT void *
+extern "C" NUMBA_MLIR_GPU_RUNTIME_L0_EXPORT void *
 gpuxLaunchKernel(void *stream, void *kernel, size_t gridX, size_t gridY,
                  size_t gridZ, size_t blockX, size_t blockY, size_t blockZ,
                  void *events, void *params, size_t eventIndex) {
@@ -519,7 +522,7 @@ gpuxLaunchKernel(void *stream, void *kernel, size_t gridX, size_t gridY,
   });
 }
 
-extern "C" NUMBA_MLIR_GPU_RUNTIME_EXPORT void gpuxWait(void *event) {
+extern "C" NUMBA_MLIR_GPU_RUNTIME_L0_EXPORT void gpuxWait(void *event) {
   LOG_FUNC();
   catchAll([&]() { Stream::waitEvent(static_cast<ze_event_handle_t>(event)); });
 }
@@ -530,7 +533,7 @@ struct AllocResult {
   void *event;
 };
 
-extern "C" NUMBA_MLIR_GPU_RUNTIME_EXPORT void
+extern "C" NUMBA_MLIR_GPU_RUNTIME_L0_EXPORT void
 gpuxAlloc(void *stream, size_t size, size_t alignment, int type, void *events,
           size_t eventIndex, AllocResult *ret) {
   LOG_FUNC();
@@ -542,13 +545,13 @@ gpuxAlloc(void *stream, size_t size, size_t alignment, int type, void *events,
   });
 }
 
-extern "C" NUMBA_MLIR_GPU_RUNTIME_EXPORT void gpuxDeAlloc(void *stream,
-                                                          void *ptr) {
+extern "C" NUMBA_MLIR_GPU_RUNTIME_L0_EXPORT void gpuxDeAlloc(void *stream,
+                                                             void *ptr) {
   LOG_FUNC();
   catchAll([&]() { static_cast<Stream *>(stream)->deallocBuffer(ptr); });
 }
 
-extern "C" NUMBA_MLIR_GPU_RUNTIME_EXPORT void
+extern "C" NUMBA_MLIR_GPU_RUNTIME_L0_EXPORT void
 gpuxSuggestBlockSize(void *stream, void *kernel, const uint32_t *gridSize,
                      uint32_t *blockSize, size_t numDims) {
   LOG_FUNC();
@@ -567,7 +570,7 @@ struct OffloadDeviceCapabilities {
 };
 
 // TODO: device name
-extern "C" NUMBA_MLIR_GPU_RUNTIME_EXPORT bool
+extern "C" NUMBA_MLIR_GPU_RUNTIME_L0_EXPORT bool
 gpuxGetDeviceCapabilities(OffloadDeviceCapabilities *ret,
                           const char *deviceName) {
   LOG_FUNC();
