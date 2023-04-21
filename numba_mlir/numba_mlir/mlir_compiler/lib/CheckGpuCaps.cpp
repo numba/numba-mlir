@@ -8,7 +8,7 @@
 
 namespace py = pybind11;
 
-using ResolveFptr = bool (*)(OffloadDeviceCapabilities *, const char *);
+using ResolveFptr = bool (*)(numba::OffloadDeviceCapabilities *, const char *);
 
 static ResolveFptr getResolver() {
   static ResolveFptr resolver = []() {
@@ -19,13 +19,13 @@ static ResolveFptr getResolver() {
   return resolver;
 }
 
-std::optional<OffloadDeviceCapabilities>
+std::optional<numba::OffloadDeviceCapabilities>
 getOffloadDeviceCapabilities(const std::string &name) {
   auto resolver = getResolver();
   if (!resolver)
     return std::nullopt;
 
-  OffloadDeviceCapabilities ret;
+  numba::OffloadDeviceCapabilities ret;
   if (!resolver(&ret, name.c_str()))
     return std::nullopt;
 

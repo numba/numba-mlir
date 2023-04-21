@@ -8,6 +8,8 @@
 #include "numba/Transforms/FuncUtils.hpp"
 #include "numba/Transforms/TypeConversion.hpp"
 
+#include "GpuCommon.hpp"
+
 #include <mlir/Conversion/AsyncToLLVM/AsyncToLLVM.h>
 #include <mlir/Conversion/GPUCommon/GPUCommonPass.h>
 #include <mlir/Conversion/LLVMCommon/ConversionTarget.h>
@@ -608,16 +610,16 @@ private:
     auto alignmentVar =
         rewriter.create<mlir::LLVM::ConstantOp>(loc, llvmIndexType, alignment);
 
-    // Need to keep in sync with gpu runtime lib.
-    int memType = 0;
+    auto memType = numba::GpuAllocType::Device;
     if (isShared) {
-      memType = 1;
+      memType = numba::GpuAllocType::Shared;
     } else if (isLocal) {
-      memType = 2;
+      memType = numba::GpuAllocType::Local;
     }
 
     auto typeVar = rewriter.create<mlir::LLVM::ConstantOp>(
-        loc, llvmInt32Type, rewriter.getI32IntegerAttr(memType));
+        loc, llvmInt32Type,
+        rewriter.getI32IntegerAttr(static_cast<int>(memType)));
 
     auto depsArrayPtr =
         createDepsArray(rewriter, loc, op, adaptor.getAsyncDependencies());

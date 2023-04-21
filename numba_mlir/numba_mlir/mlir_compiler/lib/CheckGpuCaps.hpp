@@ -8,16 +8,10 @@
 #include <optional>
 #include <string>
 
-// Must be kept in sync with gpu_runtime version.
-struct OffloadDeviceCapabilities {
-  uint16_t spirvMajorVersion;
-  uint16_t spirvMinorVersion;
-  bool hasFP16;
-  bool hasFP64;
-};
+#include "GpuCommon.hpp"
 
 // TODO: device name
-std::optional<OffloadDeviceCapabilities>
+std::optional<numba::OffloadDeviceCapabilities>
 getOffloadDeviceCapabilities(const std::string &name);
 
 std::optional<std::string> getDefaultDevice();

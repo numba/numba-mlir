@@ -106,6 +106,7 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
 target_include_directories(${PROJECT_NAME} SYSTEM PRIVATE
     ${MLIR_INCLUDE_DIRS}
     PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../numba_mlir_gpu_common
     ./lib)
 
 if(NUMBA_MLIR_USE_DPNP)

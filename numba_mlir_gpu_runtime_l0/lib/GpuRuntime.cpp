@@ -213,8 +213,6 @@ static auto countEvents(ze_event_handle_t *events) {
       countUntil(events, static_cast<ze_event_handle_t>(nullptr)));
 }
 
-enum class GpuAllocType { Device = 0, Shared = 1, Local = 2 };
-
 class Stream : public numba::GPUStreamInterface {
 public:
   Stream(size_t eventsCount, const char *deviceName)
@@ -332,7 +330,7 @@ public:
   }
 
   std::tuple<void *, void *, ze_event_handle_t>
-  allocBuffer(size_t size, size_t alignment, GpuAllocType type,
+  allocBuffer(size_t size, size_t alignment, numba::GpuAllocType type,
               ze_event_handle_t *events, size_t eventIndex,
               AllocFuncT allocFunc) {
     // Alloc is always sync for now, synchronize
@@ -357,16 +355,16 @@ public:
       void *ret = nullptr;
       ze_device_mem_alloc_desc_t devDesc = {};
       devDesc.stype = ZE_STRUCTURE_TYPE_DEVICE_MEM_ALLOC_DESC;
-      if (type == GpuAllocType::Device) {
+      if (type == numba::GpuAllocType::Device) {
         devDesc.flags = ZE_DEVICE_MEM_ALLOC_FLAG_BIAS_INITIAL_PLACEMENT;
         CHECK_ZE_RESULT(zeMemAllocDevice(context.get(), &devDesc, size,
                                          alignment, device, &ret));
-      } else if (type == GpuAllocType::Shared) {
+      } else if (type == numba::GpuAllocType::Shared) {
         ze_host_mem_alloc_desc_t hostDesc = {};
         hostDesc.stype = ZE_STRUCTURE_TYPE_HOST_MEM_ALLOC_DESC;
         CHECK_ZE_RESULT(zeMemAllocShared(context.get(), &devDesc, &hostDesc,
                                          size, alignment, device, &ret));
-      } else if (type == GpuAllocType::Local) {
+      } else if (type == numba::GpuAllocType::Local) {
         // Local allocs are handled specially, do not allocate any pointer on
         // host side.
       } else {
@@ -533,7 +531,7 @@ gpuxAlloc(void *stream, size_t size, size_t alignment, int type, void *events,
   LOG_FUNC();
   catchAll([&]() {
     auto res = static_cast<Stream *>(stream)->allocBuffer(
-        size, alignment, static_cast<GpuAllocType>(type),
+        size, alignment, static_cast<numba::GpuAllocType>(type),
         static_cast<ze_event_handle_t *>(events), eventIndex, AllocFunc);
     *ret = AllocResult{std::get<0>(res), std::get<1>(res), std::get<2>(res)};
   });
