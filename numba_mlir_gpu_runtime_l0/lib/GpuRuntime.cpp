@@ -14,17 +14,11 @@
 
 #include "numba-mlir-gpu-runtime-l0_export.h"
 
+#include "GpuCommon.hpp"
+
 #include "FilterStringParser.hpp"
 #include "LevelZeroPrinting.hpp"
 #include "LevelZeroWrapper.hpp"
-
-/// Stream interface, must be in sync with math runtime.
-/// TODO: move to common place.
-class StreamInterface {
-public:
-  virtual ~StreamInterface() = default;
-  virtual std::string_view getDeviceName() = 0;
-};
 
 typedef void (*MemInfoDtorFunction)(void *ptr, size_t size, void *info);
 using AllocFuncT = void *(*)(void *, size_t, MemInfoDtorFunction, void *);
@@ -221,7 +215,7 @@ static auto countEvents(ze_event_handle_t *events) {
 
 enum class GpuAllocType { Device = 0, Shared = 1, Local = 2 };
 
-class Stream : public StreamInterface {
+class Stream : public numba::GPUStreamInterface {
 public:
   Stream(size_t eventsCount, const char *deviceName)
       : deviceName(deviceName ? deviceName : "") {
@@ -561,17 +555,9 @@ gpuxSuggestBlockSize(void *stream, void *kernel, const uint32_t *gridSize,
   });
 }
 
-// Must be kept in sync with compiler version.
-struct OffloadDeviceCapabilities {
-  uint16_t spirvMajorVersion;
-  uint16_t spirvMinorVersion;
-  bool hasFP16;
-  bool hasFP64;
-};
-
 // TODO: device name
 extern "C" NUMBA_MLIR_GPU_RUNTIME_L0_EXPORT bool
-gpuxGetDeviceCapabilities(OffloadDeviceCapabilities *ret,
+gpuxGetDeviceCapabilities(numba::OffloadDeviceCapabilities *ret,
                           const char *deviceName) {
   LOG_FUNC();
   assert(ret);
@@ -589,7 +575,7 @@ gpuxGetDeviceCapabilities(OffloadDeviceCapabilities *ret,
     CHECK_ZE_RESULT(
         zeDeviceGetModuleProperties(driverAndDevice.device, &props));
 
-    OffloadDeviceCapabilities result = {};
+    numba::OffloadDeviceCapabilities result = {};
     result.spirvMajorVersion =
         static_cast<uint16_t>(ZE_MAJOR_VERSION(props.spirvVersionSupported));
     result.spirvMinorVersion =

@@ -21,6 +21,7 @@ generate_export_header(${PROJECT_NAME})
 
 target_include_directories(${PROJECT_NAME} PRIVATE
     ${PROJECT_BINARY_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/../numba_mlir_gpu_common
     ${LevelZero_INCLUDE_DIR}
 )
 
