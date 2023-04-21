@@ -19,7 +19,10 @@ add_library(${PROJECT_NAME} SHARED ${SOURCES_LIST} ${HEADERS_LIST})
 generate_export_header(${PROJECT_NAME})
 
 target_include_directories(${PROJECT_NAME} PRIVATE
-    ${PROJECT_BINARY_DIR} "../include")
+    ${PROJECT_BINARY_DIR}
+    "../include"
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../numba_mlir_gpu_common
+)
 
 target_compile_features(${PROJECT_NAME} PRIVATE cxx_std_17)
 

@@ -15,15 +15,7 @@
 #include "oneapi/mkl.hpp"
 #endif
 
-/// Stream interface, must be in sync with gpu runtime.
-/// TODO: move to common place.
-class StreamInterface {
-public:
-  virtual ~StreamInterface() = default;
-  virtual std::string_view getDeviceName() = 0;
-};
-
-// using namespace cl;
+#include "GpuCommon.hpp"
 
 namespace {
 
@@ -69,7 +61,7 @@ template <typename T>
 static void deviceGemm(void *stream, const Memref<2, T> *a,
                        const Memref<2, T> *b, Memref<2, T> *c, T alpha,
                        T beta) {
-  auto streamIface = static_cast<StreamInterface *>(stream);
+  auto streamIface = static_cast<numba::GPUStreamInterface *>(stream);
 
   auto isContiguous = [](const Memref<2, T> *arr, char arr_name) {
     if (arr->strides[0] != 1 && arr->strides[1] != 1) {
