@@ -14,7 +14,8 @@ root_dir = os.path.dirname(os.path.abspath(__file__))
 if int(os.environ.get("NUMBA_MLIR_SETUP_RUN_CMAKE", 1)):
     import setup_helper
 
-    setup_helper.build_runtime()
+    install_dir = os.path.join(root_dir,"numba_mlir")
+    setup_helper.build_runtime(install_dir)
 
 packages = find_packages(where=root_dir, include=["numba_mlir", "numba_mlir.*"])
 

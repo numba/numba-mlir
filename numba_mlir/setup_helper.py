@@ -29,14 +29,62 @@ def _ensure_dir(dir_path):
     except FileExistsError:
         pass
 
+def build_sycl_runtime(install_prefix):
+    MATH_SYCL_RUNTIME_INSTALL_PATH = install_prefix
+    build_prefix = cmake_build_dir
+
+    cmake_build_dir_parent = os.path.join(build_prefix)
+    build_dir = os.path.join(build_prefix, "sycl", "runtime")
+    sycl_math_runtime_path = os.path.join(root_dir, "..", "numba_mlir_gpu_runtime_sycl")
+    cmake_cmd = [
+        "cmake",
+        sycl_math_runtime_path,
+    ]
+
+    cmake_cmd += ["-GNinja"]
+
+    cmake_cmd += [
+        "-DCMAKE_BUILD_TYPE=Release",
+        "-DSYCL_RUNTIME_INSTALL_PATH=" + MATH_SYCL_RUNTIME_INSTALL_PATH,
+    ]
+
+    _ensure_dir(build_dir)
+
+    env = os.environ.copy()
+
+    sys_name = platform.system()
+    is_windows = sys_name.casefold() == "Windows".casefold()
+    if is_windows:
+        c_compiler = "icx"
+        cpp_compiler = c_compiler
+    else:
+        c_compiler = "icx"
+        cpp_compiler = "icpx"
+
+    env["CC"] = c_compiler
+    env["CXX"] = cpp_compiler
+
+    conda_prefix = env.get("CONDA_PREFIX")
+    if is_windows and conda_prefix:
+        env["INCLUDE"] = env["INCLUDE"] + ";" + os.path.join(conda_prefix, "include")
+
+    subprocess.check_call(
+        cmake_cmd, stderr=subprocess.STDOUT, shell=False, cwd=build_dir, env=env
+    )
+    subprocess.check_call(
+        ["cmake", "--build", ".", "--config", "Release"], cwd=build_dir, env=env
+    )
+    subprocess.check_call(
+        ["cmake", "--install", ".", "--config", "Release"], cwd=build_dir, env=env
+    )
 
 def build_sycl_math_runtime(install_prefix):
     MATH_SYCL_RUNTIME_INSTALL_PATH = install_prefix
     build_prefix = cmake_build_dir
 
     cmake_build_dir_parent = os.path.join(build_prefix)
-    build_dir = os.path.join(build_prefix, "sycl/math_runtime")
-    sycl_math_runtime_path = os.path.join(root_dir, "numba_mlir/math_runtime/sycl")
+    build_dir = os.path.join(build_prefix, "sycl","math_runtime")
+    sycl_math_runtime_path = os.path.join(root_dir, "numba_mlir","math_runtime","sycl")
     cmake_cmd = [
         "cmake",
         sycl_math_runtime_path,
@@ -87,8 +135,8 @@ def build_sycl_math_runtime(install_prefix):
     )
 
 
-def build_runtime():
-    install_dir = os.path.join(CMAKE_INSTALL_PREFIX, "numba_mlir/numba_mlir")
+def build_runtime(install_dir):
+    build_sycl_runtime(install_dir)
     build_sycl_math_runtime(install_dir)
 
     cmake_cmd = [
