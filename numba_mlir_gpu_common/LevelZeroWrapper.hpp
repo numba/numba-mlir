@@ -74,6 +74,8 @@ auto wrapZeType(ze_device_handle_t src) { return src; }
 
 auto wrapZeType(ze_module_handle_t src) { return src; }
 
+auto wrapZeType(ze_context_handle_t src) { return src; }
+
 auto wrapZeType(int32_t src) { return src; }
 auto wrapZeType(uint32_t src) { return src; }
 auto wrapZeType(std::nullptr_t src) { return src; }
