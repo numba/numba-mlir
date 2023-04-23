@@ -129,7 +129,7 @@ public:
                                  size_t eventIndex) {
     assert(kernel);
     auto eventsCount = countEvents(srcEvents);
-    auto paramsCount = countUntil(params, numba::GPUParamDesc{nullptr, 0});
+    auto paramsCount = countUntil(params, numba::GPUParamDesc{nullptr, 0, numba::GpuParamType::null});
 
     auto globalRange = sycl::range<3>(blockZ * gridZ, blockY * gridY, blockX * gridX);
     auto localRange = ::sycl::range<3>(blockZ, blockY, blockX);
@@ -142,11 +142,9 @@ public:
         cgh.depends_on(*event);
       }
 
-      for (decltype(paramsCount) i = 0; i < paramsCount; i++) {
-        auto param = params[i];
-        auto ptr = param.data ? *(static_cast<void *const*>(param.data)) : nullptr;
-        cgh.set_arg(static_cast<uint32_t>(i), ptr);
-      }
+      for (decltype(paramsCount) i = 0; i < paramsCount; i++)
+        setKernelArg(cgh, static_cast<uint32_t>(i), params[i]);
+
       cgh.parallel_for(ndRange, syclKernel);
     });
 
@@ -247,6 +245,49 @@ private:
       return nullptr;
 
     return &events[index];
+  }
+
+  template<numba::GpuParamType TypeVal, typename Type>
+  static bool setKernelArgImpl(sycl::handler &cgh, uint32_t index, const numba::GPUParamDesc& desc) {
+    if (TypeVal == desc.type) {
+      assert(desc.size == sizeof(Type));
+      cgh.set_arg(index, *static_cast<const Type*>(desc.data));
+      return true;
+    }
+    return false;
+  }
+
+  template<numba::GpuParamType TypeVal>
+  static bool setKernelArgPtrImpl(sycl::handler &cgh, uint32_t index, const numba::GPUParamDesc& desc) {
+    using Type = void**;
+    if (TypeVal == desc.type) {
+      assert(desc.size == sizeof(Type));
+      auto ptr = desc.data ? *(static_cast<void *const*>(desc.data)) : nullptr;
+      cgh.set_arg(index, ptr);
+      return true;
+    }
+    return false;
+  }
+
+  static void setKernelArg(sycl::handler &cgh, uint32_t index, const numba::GPUParamDesc& desc) {
+    using HandlerPtrT = bool(*)(sycl::handler &, uint32_t, const numba::GPUParamDesc&);
+    const HandlerPtrT handlers[] = {
+      &setKernelArgImpl<numba::GpuParamType::int8, int8_t>,
+      &setKernelArgImpl<numba::GpuParamType::int16, int16_t>,
+      &setKernelArgImpl<numba::GpuParamType::int32, int32_t>,
+      &setKernelArgImpl<numba::GpuParamType::int64, int64_t>,
+      &setKernelArgImpl<numba::GpuParamType::float32, float>,
+      &setKernelArgImpl<numba::GpuParamType::float64, double>,
+      &setKernelArgPtrImpl<numba::GpuParamType::ptr>,
+    };
+
+    for (auto handler : handlers)
+      if (handler(cgh, index, desc))
+        return;
+
+    fprintf(stdout, "Unhandled param type: %d\n", static_cast<int>(desc.type));
+    fflush(stdout);
+    abort();
   }
 };
 } // namespace
