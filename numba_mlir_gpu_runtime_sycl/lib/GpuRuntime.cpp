@@ -259,9 +259,8 @@ private:
 
   template<numba::GpuParamType TypeVal>
   static bool setKernelArgPtrImpl(sycl::handler &cgh, uint32_t index, const numba::GPUParamDesc& desc) {
-    using Type = void**;
     if (TypeVal == desc.type) {
-      assert(desc.size == sizeof(Type));
+      assert(desc.size == sizeof(void**));
       auto ptr = desc.data ? *(static_cast<void *const*>(desc.data)) : nullptr;
       cgh.set_arg(index, ptr);
       return true;
