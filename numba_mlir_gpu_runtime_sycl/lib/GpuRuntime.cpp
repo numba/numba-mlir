@@ -1,23 +1,21 @@
-// SPDX-FileCopyrightText: 2021 - 2022 Intel Corporation
+// SPDX-FileCopyrightText: 2023 Intel Corporation
 //
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include <algorithm>
-#include <array>
 #include <atomic>
 #include <cassert>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <tuple>
-#include <vector>
 
 #include "numba-mlir-gpu-runtime-sycl_export.h"
 
 #include "GpuCommon.hpp"
 #include "GpuModule.hpp"
 
-#include <sycl/sycl.hpp>
+#include <CL/sycl.hpp>
 
 #if 0 // Log functions
 namespace {
