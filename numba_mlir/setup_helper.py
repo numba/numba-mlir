@@ -23,6 +23,13 @@ CMAKE_INSTALL_PREFIX = os.path.join(root_dir, "..")
 cmake_build_dir = os.path.join(CMAKE_INSTALL_PREFIX, "numba_mlir_cmake_build")
 
 
+def _ensure_dir(dir_path):
+    try:
+        os.makedirs(dir_path)
+    except FileExistsError:
+        pass
+
+
 def build_sycl_math_runtime(install_prefix):
     MATH_SYCL_RUNTIME_INSTALL_PATH = install_prefix
     build_prefix = cmake_build_dir
@@ -49,10 +56,7 @@ def build_sycl_math_runtime(install_prefix):
     if NUMBA_MLIR_USE_SYCL is not None:
         cmake_cmd += ["-DNUMBA_MLIR_USE_SYCL=" + NUMBA_MLIR_USE_SYCL]
 
-    try:
-        os.makedirs(build_dir)
-    except FileExistsError:
-        pass
+    _ensure_dir(build_dir)
 
     env = os.environ.copy()
 
@@ -140,10 +144,7 @@ def build_runtime():
             "-DNUMBA_MLIR_ENABLE_IGPU_DIALECT=ON",
         ]
 
-    try:
-        os.mkdir(cmake_build_dir)
-    except FileExistsError:
-        pass
+    _ensure_dir(cmake_build_dir)
 
     # dpcpp conda package installs it's own includes to conda/include folders
     # breaking every other compiler. So, if dpcpp is installed we need to temporaly move
