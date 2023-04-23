@@ -157,8 +157,8 @@ public:
 
       for (decltype(paramsCount) i = 0; i < paramsCount; i++) {
         auto param = params[i];
-        cgh.set_arg(static_cast<uint32_t>(i),
-                    *(static_cast<void *const*>(param.data)));
+        auto ptr = param.data ? *(static_cast<void *const*>(param.data)) : nullptr;
+        cgh.set_arg(static_cast<uint32_t>(i), ptr);
       }
       cgh.parallel_for(ndRange, syclKernel);
     });
