@@ -16,14 +16,6 @@
 #include "mkl.h"
 #endif
 
-/// Stream interface, must be in sync with gpu runtime.
-/// TODO: move to common place.
-class StreamInterface {
-public:
-  virtual ~StreamInterface() = default;
-  virtual std::string_view getDeviceName() = 0;
-};
-
 namespace {
 
 template <typename T>
