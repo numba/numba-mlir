@@ -12,8 +12,8 @@ set(SOURCES_LIST
 )
 set(HEADERS_LIST
     lib/FilterStringParser.hpp
-    lib/LevelZeroPrinting.hpp
-    lib/LevelZeroWrapper.hpp
+    ../numba_mlir_gpu_common/LevelZeroPrinting.hpp
+    ../numba_mlir_gpu_common/LevelZeroWrapper.hpp
 )
 
 add_library(${PROJECT_NAME} SHARED ${SOURCES_LIST} ${HEADERS_LIST})
