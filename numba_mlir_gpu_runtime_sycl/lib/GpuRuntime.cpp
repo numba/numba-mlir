@@ -56,17 +56,6 @@ template <typename F> static auto catchAll(F &&func) {
 
 static numba::MemInfoAllocFuncT AllocFunc = nullptr;
 
-struct ParamDesc {
-  const void *data;
-  size_t size;
-
-  bool operator==(const ParamDesc &rhs) const {
-    return data == rhs.data && size == rhs.size;
-  }
-
-  bool operator!=(const ParamDesc &rhs) const { return !(*this == rhs); }
-};
-
 template <typename T> static size_t countUntil(T *ptr, T &&elem) {
   assert(ptr);
   auto curr = ptr;
@@ -136,11 +125,11 @@ public:
   sycl::event* launchKernel(GPUKernel* kernel, size_t gridX,
                                  size_t gridY, size_t gridZ, size_t blockX,
                                  size_t blockY, size_t blockZ,
-                                 sycl::event **srcEvents, ParamDesc *params,
+                                 sycl::event **srcEvents, numba::GPUParamDesc *params,
                                  size_t eventIndex) {
     assert(kernel);
     auto eventsCount = countEvents(srcEvents);
-    auto paramsCount = countUntil(params, ParamDesc{nullptr, 0});
+    auto paramsCount = countUntil(params, numba::GPUParamDesc{nullptr, 0});
 
     auto globalRange = sycl::range<3>(blockZ * gridZ, blockY * gridY, blockX * gridX);
     auto localRange = ::sycl::range<3>(blockZ, blockY, blockX);
@@ -321,7 +310,7 @@ gpuxLaunchKernel(void *stream, void *kernel, size_t gridX, size_t gridY,
     return static_cast<Stream *>(stream)->launchKernel(
         static_cast<GPUKernel*>(kernel), gridX, gridY, gridZ, blockX,
         blockY, blockZ, static_cast<sycl::event**>(events),
-        static_cast<ParamDesc *>(params), eventIndex);
+        static_cast<numba::GPUParamDesc *>(params), eventIndex);
   });
 }
 

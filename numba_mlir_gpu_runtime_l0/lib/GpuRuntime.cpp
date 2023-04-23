@@ -71,17 +71,6 @@ struct DriverAndDevice {
   ze_device_handle_t device = nullptr;
 };
 
-struct ParamDesc {
-  const void *data;
-  size_t size;
-
-  bool operator==(const ParamDesc &rhs) const {
-    return data == rhs.data && size == rhs.size;
-  }
-
-  bool operator!=(const ParamDesc &rhs) const { return !(*this == rhs); }
-};
-
 template <typename T> static size_t countUntil(T *ptr, T &&elem) {
   assert(ptr);
   auto curr = ptr;
@@ -297,11 +286,11 @@ public:
   ze_event_handle_t launchKernel(ze_kernel_handle_t kernel, size_t gridX,
                                  size_t gridY, size_t gridZ, size_t blockX,
                                  size_t blockY, size_t blockZ,
-                                 ze_event_handle_t *events, ParamDesc *params,
+                                 ze_event_handle_t *events, numba::GPUParamDesc *params,
                                  size_t eventIndex) {
     assert(kernel);
     auto eventsCount = countEvents(events);
-    auto paramsCount = countUntil(params, ParamDesc{nullptr, 0});
+    auto paramsCount = countUntil(params, numba::GPUParamDesc{nullptr, 0});
 
     auto castSz = [](size_t val) { return static_cast<uint32_t>(val); };
 
@@ -506,7 +495,7 @@ gpuxLaunchKernel(void *stream, void *kernel, size_t gridX, size_t gridY,
     return static_cast<Stream *>(stream)->launchKernel(
         static_cast<ze_kernel_handle_t>(kernel), gridX, gridY, gridZ, blockX,
         blockY, blockZ, static_cast<ze_event_handle_t *>(events),
-        static_cast<ParamDesc *>(params), eventIndex);
+        static_cast<numba::GPUParamDesc *>(params), eventIndex);
   });
 }
 

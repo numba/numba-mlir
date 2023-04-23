@@ -23,6 +23,16 @@ struct OffloadDeviceCapabilities {
 
 enum class GpuAllocType { Device = 0, Shared = 1, Local = 2 };
 
+struct GPUParamDesc {
+  const void *data;
+  size_t size;
+
+  bool operator==(const GPUParamDesc &rhs) const {
+    return data == rhs.data && size == rhs.size;
+  }
+
+  bool operator!=(const GPUParamDesc &rhs) const { return !(*this == rhs); }
+};
 
 typedef void (*MemInfoDtorFunction)(void *ptr, size_t size, void *info);
 using MemInfoAllocFuncT = void *(*)(void *, size_t, MemInfoDtorFunction, void *);
