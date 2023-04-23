@@ -23,4 +23,8 @@ struct OffloadDeviceCapabilities {
 
 enum class GpuAllocType { Device = 0, Shared = 1, Local = 2 };
 
+
+typedef void (*MemInfoDtorFunction)(void *ptr, size_t size, void *info);
+using MemInfoAllocFuncT = void *(*)(void *, size_t, MemInfoDtorFunction, void *);
+
 } // namespace numba

@@ -20,9 +20,6 @@
 #include "LevelZeroPrinting.hpp"
 #include "LevelZeroWrapper.hpp"
 
-typedef void (*MemInfoDtorFunction)(void *ptr, size_t size, void *info);
-using AllocFuncT = void *(*)(void *, size_t, MemInfoDtorFunction, void *);
-
 #if 0 // Log functions
 namespace {
 struct FuncScope {
@@ -68,7 +65,7 @@ template <typename F> auto catchAll(F &&func) {
   }
 }
 
-static AllocFuncT AllocFunc = nullptr;
+static numba::MemInfoAllocFuncT AllocFunc = nullptr;
 
 struct DriverAndDevice {
   ze_driver_handle_t driver = nullptr;
@@ -332,7 +329,7 @@ public:
   std::tuple<void *, void *, ze_event_handle_t>
   allocBuffer(size_t size, size_t alignment, numba::GpuAllocType type,
               ze_event_handle_t *events, size_t eventIndex,
-              AllocFuncT allocFunc) {
+              numba::MemInfoAllocFuncT allocFunc) {
     // Alloc is always sync for now, synchronize
     auto eventsCount = countEvents(events);
     for (decltype(eventsCount) i = 0; i < eventsCount; ++i) {
@@ -454,7 +451,7 @@ private:
 extern "C" NUMBA_MLIR_GPU_RUNTIME_L0_EXPORT void
 gpuxSetMemInfoAllocFunc(void *func) {
   LOG_FUNC();
-  AllocFunc = reinterpret_cast<AllocFuncT>(func);
+  AllocFunc = reinterpret_cast<numba::MemInfoAllocFuncT>(func);
 }
 
 extern "C" NUMBA_MLIR_GPU_RUNTIME_L0_EXPORT void *
