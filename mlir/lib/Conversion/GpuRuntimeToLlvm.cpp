@@ -524,12 +524,14 @@ private:
           auto rank = static_cast<unsigned>(memrefType.getRank());
           auto typeSize = std::max(memrefType.getElementTypeBitWidth(), 8u) / 8;
           mlir::Value size = rewriter.create<mlir::LLVM::ConstantOp>(
-              loc, llvmInt32Type,
-              rewriter.getIntegerAttr(llvmInt32Type, typeSize));
+              loc, llvmIndexType,
+              rewriter.getIntegerAttr(llvmIndexType, typeSize));
           for (auto i : llvm::seq(0u, rank)) {
             auto dim = desc.size(rewriter, loc, i);
-            size = rewriter.create<mlir::LLVM::MulOp>(loc, llvmInt32Type, size,
+            size = rewriter.create<mlir::LLVM::MulOp>(loc, llvmIndexType, size,
                                                       dim);
+            if (llvmIndexType != llvmInt32Type)
+              size = rewriter.create<mlir::LLVM::TruncOp>(loc, llvmInt32Type, size);
           }
           return {size, nullptr};
         }
