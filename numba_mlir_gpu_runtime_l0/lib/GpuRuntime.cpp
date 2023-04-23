@@ -51,7 +51,7 @@ static bool printGpuInfoEnabled() {
   return value;
 }
 
-template <typename F> auto catchAll(F &&func) {
+template <typename F> static auto catchAll(F &&func) {
   try {
     return func();
   } catch (const std::exception &e) {
@@ -83,7 +83,7 @@ struct ParamDesc {
   bool operator!=(const ParamDesc &rhs) const { return !(*this == rhs); }
 };
 
-template <typename T> size_t countUntil(T *ptr, T &&elem) {
+template <typename T> static size_t countUntil(T *ptr, T &&elem) {
   assert(ptr);
   auto curr = ptr;
   while (*curr != elem) {
@@ -516,21 +516,15 @@ extern "C" NUMBA_MLIR_GPU_RUNTIME_L0_EXPORT void gpuxWait(void *event) {
   catchAll([&]() { Stream::waitEvent(static_cast<ze_event_handle_t>(event)); });
 }
 
-struct AllocResult {
-  void *info;
-  void *ptr;
-  void *event;
-};
-
 extern "C" NUMBA_MLIR_GPU_RUNTIME_L0_EXPORT void
 gpuxAlloc(void *stream, size_t size, size_t alignment, int type, void *events,
-          size_t eventIndex, AllocResult *ret) {
+          size_t eventIndex, numba::GPUAllocResult *ret) {
   LOG_FUNC();
   catchAll([&]() {
     auto res = static_cast<Stream *>(stream)->allocBuffer(
         size, alignment, static_cast<numba::GpuAllocType>(type),
         static_cast<ze_event_handle_t *>(events), eventIndex, AllocFunc);
-    *ret = AllocResult{std::get<0>(res), std::get<1>(res), std::get<2>(res)};
+    *ret = {std::get<0>(res), std::get<1>(res), std::get<2>(res)};
   });
 }
 
