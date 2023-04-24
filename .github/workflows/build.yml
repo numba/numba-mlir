@@ -750,6 +750,7 @@ jobs:
         shell: bash -l {0}
 
         run: |
+          sudo apt-get update
           sudo apt-get install intel-opencl-icd intel-level-zero-gpu level-zero
           cd numba_mlir
           source $CONDA/bin/activate test-env
