@@ -4,6 +4,7 @@
 
 import ctypes
 import atexit
+import logging
 from .utils import load_lib, mlir_func_name, register_cfunc, readenv
 
 from numba.core.runtime import _nrt_python as _nrt
@@ -27,9 +28,8 @@ def _get_gpu_runtime_name():
 try:
     runtime_lib = load_lib(_get_gpu_runtime_name())
     IS_GPU_RUNTIME_AVAILABLE = True
-except Exception as e:
-    print("GPU runtime loading failed")
-    print(e)
+except Exception:
+    logging.exception("GPU runtime loading failed")
     IS_GPU_RUNTIME_AVAILABLE = False
 
 
