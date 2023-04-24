@@ -736,6 +736,7 @@ jobs:
           export NUMBA_MLIR_USE_SYCL=ON
           python setup.py develop
 
+
       - name: Test Python frontend
         shell: bash -l {0}
 
@@ -743,6 +744,20 @@ jobs:
           cd numba_mlir
           source $CONDA/bin/activate test-env
           python $GITHUB_WORKSPACE/scripts/run_package_tests.py verbose
+
+
+      - name: Run offload tests
+        shell: bash -l {0}
+
+        run: |
+          cd numba_mlir
+          source $CONDA/bin/activate test-env
+          conda install dpctl -c intel
+          conda list
+          export NUMBA_MLIR_GPU_RUNTIME=sycl
+          export NUMBA_MLIR_DEFAULT_DEVICE=opencl:cpu:0
+          python $GITHUB_WORKSPACE/scripts/run_package_tests.py verbose gpu
+
 
       - name: Build wheels
         shell: bash -l {0}
