@@ -100,6 +100,7 @@ struct OCLLoader {
     using clCreateProgramWithIL_T = cl_program(*)(cl_context,const void *,size_t,cl_int *);
     using clReleaseProgram_T = cl_int (*)(cl_program);
     using clBuildProgram_T = cl_int(*)(cl_program,cl_uint,const cl_device_id *,const char *,void (*)(cl_program, void *),void *);
+    using clGetProgramBuildInfo_T = cl_int (*)(cl_program,cl_device_id,cl_program_build_info,size_t,void *,size_t *);
     using clCreateKernel_T = cl_kernel (*)(cl_program, const char *, cl_int *);
     using clReleaseKernel_T = cl_int (*) (cl_kernel);
 
@@ -107,6 +108,7 @@ struct OCLLoader {
         clCreateProgramWithIL = dynLib.getSymbol<clCreateProgramWithIL_T>("clCreateProgramWithIL");
         clReleaseProgram = dynLib.getSymbol<clReleaseProgram_T>("clReleaseProgram");
         clBuildProgram = dynLib.getSymbol<clBuildProgram_T>("clBuildProgram");
+        clGetProgramBuildInfo = dynLib.getSymbol<clGetProgramBuildInfo_T>("clGetProgramBuildInfo");
         clCreateKernel = dynLib.getSymbol<clCreateKernel_T>("clCreateKernel");
         clReleaseKernel = dynLib.getSymbol<clReleaseKernel_T>("clReleaseKernel");
     }
@@ -114,6 +116,7 @@ struct OCLLoader {
     clCreateProgramWithIL_T clCreateProgramWithIL;
     clReleaseProgram_T clReleaseProgram;
     clBuildProgram_T clBuildProgram;
+    clGetProgramBuildInfo_T clGetProgramBuildInfo;
     clCreateKernel_T clCreateKernel;
     clReleaseKernel_T clReleaseKernel;
 private:
@@ -126,9 +129,26 @@ static OCLLoader& getClLoader() {
     return loader;
 }
 
-void checkClResult(const char* func, cl_int res) {
+static std::string getClErrorString(cl_int val) {
+#define CL_ENUM_VAL(arg) case arg: return #arg
+    switch(val) {
+        CL_ENUM_VAL(CL_BUILD_PROGRAM_FAILURE);
+        CL_ENUM_VAL(CL_INVALID_CONTEXT);
+        CL_ENUM_VAL(CL_INVALID_DEVICE);
+        CL_ENUM_VAL(CL_INVALID_VALUE);
+        CL_ENUM_VAL(CL_OUT_OF_RESOURCES);
+        CL_ENUM_VAL(CL_OUT_OF_HOST_MEMORY);
+        CL_ENUM_VAL(CL_INVALID_OPERATION);
+        CL_ENUM_VAL(CL_INVALID_BINARY);
+    default:
+        return "Unknown error: " + std::to_string(val);
+    }
+#undef CL_ENUM_VAL
+}
+
+static void checkClResult(const char* func, cl_int res) {
     if (res != CL_SUCCESS)
-        reportError(std::string(func) + " failed: " + std::to_string(res));
+        reportError(std::string(func) + " failed: " + getClErrorString(res));
 }
 
 #define CHECK_CL_RESULT(arg) checkClResult(#arg, arg)
@@ -198,7 +218,22 @@ GPUModule* createGPUModule(sycl::queue& queue, const void *data, size_t dataSize
         ClProgram program(loader.clCreateProgramWithIL(clContext, data, dataSize, &errCode));
         checkClResult("clCreateProgramWithILF", errCode);
 
-        CHECK_CL_RESULT(loader.clBuildProgram(program.get(), 1, &clDevice, "", nullptr, nullptr));
+        try {
+            CHECK_CL_RESULT(loader.clBuildProgram(program.get(), 1, &clDevice, "", nullptr, nullptr));
+        } catch (std::exception& e) {
+            size_t len = 0;
+            auto ret = loader.clGetProgramBuildInfo(program.get(), clDevice, CL_PROGRAM_BUILD_LOG, 0, nullptr, &len);
+            if (ret != CL_SUCCESS)
+                throw;
+
+            std::string str;
+            str.resize(len);
+            ret = loader.clGetProgramBuildInfo(program.get(), clDevice, CL_PROGRAM_BUILD_LOG, len, str.data(), nullptr);
+            if (ret != CL_SUCCESS)
+                throw;
+
+            throw std::runtime_error(e.what() + std::string("\n") + str);
+        }
 
         auto kernelBundle = sycl::make_kernel_bundle<cl_be, sycl::bundle_state::executable>(program.get(), ctx);
         return new GPUModule{&queue, std::move(kernelBundle), nullptr, std::move(program)};
