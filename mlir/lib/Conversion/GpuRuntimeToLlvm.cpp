@@ -128,17 +128,17 @@ protected:
       "gpuxLaunchKernel",
       llvmPointerType, // dep
       {
-          llvmPointerType,        // stream
-          llvmPointerType,        // kernel
-          llvmIndexType,          // gridXDim
-          llvmIndexType,          // gridyDim
-          llvmIndexType,          // gridZDim
-          llvmIndexType,          // blockXDim
-          llvmIndexType,          // blockYDim
-          llvmIndexType,          // blockZDim
-          llvmPointerPointerType, // deps (null-term)
-          llvmGpuParamPointerType,   // params (null-term)
-          llvmIndexType,          // eventIndex
+          llvmPointerType,         // stream
+          llvmPointerType,         // kernel
+          llvmIndexType,           // gridXDim
+          llvmIndexType,           // gridyDim
+          llvmIndexType,           // gridZDim
+          llvmIndexType,           // blockXDim
+          llvmIndexType,           // blockYDim
+          llvmIndexType,           // blockZDim
+          llvmPointerPointerType,  // deps (null-term)
+          llvmGpuParamPointerType, // params (null-term)
+          llvmIndexType,           // eventIndex
       }};
 
   FunctionCallBuilder waitEventCallBuilder = {"gpuxWait",
@@ -403,8 +403,7 @@ private:
   }
 };
 
-template<unsigned Size>
-static bool isInt(mlir::Type type) {
+template <unsigned Size> static bool isInt(mlir::Type type) {
   auto intType = mlir::dyn_cast<mlir::IntegerType>(type);
   if (!intType)
     return false;
@@ -412,8 +411,7 @@ static bool isInt(mlir::Type type) {
   return intType.getWidth() == Size;
 }
 
-template<unsigned Size>
-static bool isFloat(mlir::Type type) {
+template <unsigned Size> static bool isFloat(mlir::Type type) {
   auto floatType = mlir::dyn_cast<mlir::FloatType>(type);
   if (!floatType)
     return false;
@@ -427,21 +425,21 @@ static bool isPointer(mlir::Type type) {
 
 static std::optional<mlir::TypedAttr> getGpuParamType(mlir::Type type) {
   assert(type);
-  using CheckFuncT = bool(*)(mlir::Type);
+  using CheckFuncT = bool (*)(mlir::Type);
   using PType = numba::GpuParamType;
   const std::pair<CheckFuncT, PType> handlers[] = {
-    // clang-format off
-    {&isInt<8>,    PType::int8},
-    {&isInt<16>,   PType::int16},
-    {&isInt<32>,   PType::int32},
-    {&isInt<64>,   PType::int64},
-    {&isFloat<32>, PType::float32},
-    {&isFloat<64>, PType::float64},
-    {&isPointer,   PType::ptr},
-    // clang-format on
+      // clang-format off
+      {&isInt<8>,    PType::int8},
+      {&isInt<16>,   PType::int16},
+      {&isInt<32>,   PType::int32},
+      {&isInt<64>,   PType::int64},
+      {&isFloat<32>, PType::float32},
+      {&isFloat<64>, PType::float64},
+      {&isPointer,   PType::ptr},
+      // clang-format on
   };
 
-  for (auto &&[handler, val]: handlers) {
+  for (auto &&[handler, val] : handlers) {
     if (handler(type)) {
       auto intType = mlir::IntegerType::get(type.getContext(), 32);
       return mlir::IntegerAttr::get(intType, static_cast<int64_t>(val));
@@ -531,7 +529,8 @@ private:
             size = rewriter.create<mlir::LLVM::MulOp>(loc, llvmIndexType, size,
                                                       dim);
             if (llvmIndexType != llvmInt32Type)
-              size = rewriter.create<mlir::LLVM::TruncOp>(loc, llvmInt32Type, size);
+              size = rewriter.create<mlir::LLVM::TruncOp>(loc, llvmInt32Type,
+                                                          size);
           }
           return {size, nullptr};
         }
@@ -571,7 +570,8 @@ private:
           rewriter.create<mlir::LLVM::InsertValueOp>(loc, range, typeSize, 1);
 
       auto typeConst = rewriter.create<mlir::LLVM::ConstantOp>(loc, *typeAttr);
-      range = rewriter.create<mlir::LLVM::InsertValueOp>(loc, range, typeConst, 2);
+      range =
+          rewriter.create<mlir::LLVM::InsertValueOp>(loc, range, typeConst, 2);
 
       paramsArray = rewriter.create<mlir::LLVM::InsertValueOp>(loc, paramsArray,
                                                                range, i);
@@ -587,9 +587,12 @@ private:
           rewriter.create<mlir::LLVM::InsertValueOp>(loc, range, nullPtr, 0);
       range = rewriter.create<mlir::LLVM::InsertValueOp>(loc, range, zero, 1);
 
-      auto nullTypeAttr = mlir::IntegerAttr::get(llvmInt32Type, static_cast<int64_t>(numba::GpuParamType::null));
-      auto typeConst = rewriter.create<mlir::LLVM::ConstantOp>(loc, nullTypeAttr);
-      range = rewriter.create<mlir::LLVM::InsertValueOp>(loc, range, typeConst, 2);
+      auto nullTypeAttr = mlir::IntegerAttr::get(
+          llvmInt32Type, static_cast<int64_t>(numba::GpuParamType::null));
+      auto typeConst =
+          rewriter.create<mlir::LLVM::ConstantOp>(loc, nullTypeAttr);
+      range =
+          rewriter.create<mlir::LLVM::InsertValueOp>(loc, range, typeConst, 2);
 
       return range;
     }();

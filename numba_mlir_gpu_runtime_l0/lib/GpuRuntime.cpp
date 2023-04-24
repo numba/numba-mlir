@@ -286,7 +286,8 @@ public:
   ze_event_handle_t launchKernel(ze_kernel_handle_t kernel, size_t gridX,
                                  size_t gridY, size_t gridZ, size_t blockX,
                                  size_t blockY, size_t blockZ,
-                                 ze_event_handle_t *events, numba::GPUParamDesc *params,
+                                 ze_event_handle_t *events,
+                                 numba::GPUParamDesc *params,
                                  size_t eventIndex) {
     assert(kernel);
     auto eventsCount = countEvents(events);

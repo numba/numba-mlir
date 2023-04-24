@@ -11,6 +11,7 @@ from numba.core.runtime import _nrt_python as _nrt
 
 GPU_RUNTIME = readenv("NUMBA_MLIR_GPU_RUNTIME", str, "sycl")
 
+
 def _get_gpu_runtime_name():
     if GPU_RUNTIME == "sycl":
         return "numba-mlir-gpu-runtime-sycl"
@@ -18,8 +19,9 @@ def _get_gpu_runtime_name():
     if GPU_RUNTIME == "level-zero":
         return "numba-mlir-gpu-runtime-l0"
 
-    raise ValueError(f'Invalid GPU runtime type: "{GPU_RUNTIME}", expected "sycl" or "level-zero"')
-
+    raise ValueError(
+        f'Invalid GPU runtime type: "{GPU_RUNTIME}", expected "sycl" or "level-zero"'
+    )
 
 
 try:

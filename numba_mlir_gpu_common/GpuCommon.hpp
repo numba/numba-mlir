@@ -48,7 +48,8 @@ struct GPUParamDesc {
 };
 
 typedef void (*MemInfoDtorFunction)(void *ptr, size_t size, void *info);
-using MemInfoAllocFuncT = void *(*)(void *, size_t, MemInfoDtorFunction, void *);
+using MemInfoAllocFuncT = void *(*)(void *, size_t, MemInfoDtorFunction,
+                                    void *);
 
 struct GPUAllocResult {
   void *info;

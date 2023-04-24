@@ -65,18 +65,18 @@ template <typename T> static size_t countUntil(T *ptr, T &&elem) {
   return static_cast<size_t>(curr - ptr);
 }
 
-
-static auto countEvents(sycl::event**events) {
+static auto countEvents(sycl::event **events) {
   assert(events);
   return static_cast<uint32_t>(
-      countUntil(events, static_cast<sycl::event*>(nullptr)));
+      countUntil(events, static_cast<sycl::event *>(nullptr)));
 }
 
 class Stream : public numba::GPUStreamInterface {
 public:
   Stream(size_t eventsCount, const char *devName)
       : deviceName(devName ? devName : "") {
-    queue = sycl::queue{sycl::device{sycl::ext::oneapi::filter_selector(deviceName)}};
+    queue = sycl::queue{
+        sycl::device{sycl::ext::oneapi::filter_selector(deviceName)}};
 
     if (eventsCount > 0)
       events = std::make_unique<sycl::event[]>(eventsCount);
@@ -100,38 +100,39 @@ public:
     Stream *stream;
   };
 
-  GPUModule* loadModule(const void *data, size_t dataSize) {
+  GPUModule *loadModule(const void *data, size_t dataSize) {
     assert(data);
     return createGPUModule(queue, data, dataSize);
   }
 
-  static auto destroyModule(GPUModule* module) {
+  static auto destroyModule(GPUModule *module) {
     assert(module);
     destoyGPUModule(module);
   }
 
-  static GPUKernel* getKernel(GPUModule* module,
-                                      const char *name) {
+  static GPUKernel *getKernel(GPUModule *module, const char *name) {
     assert(module);
     assert(name);
-    return getGPUKernel(module, name);;
+    return getGPUKernel(module, name);
+    ;
   }
 
-  static void destroyKernel(GPUKernel* kernel) {
+  static void destroyKernel(GPUKernel *kernel) {
     assert(kernel);
     destroyGPUKernel(kernel);
   }
 
-  sycl::event* launchKernel(GPUKernel* kernel, size_t gridX,
-                                 size_t gridY, size_t gridZ, size_t blockX,
-                                 size_t blockY, size_t blockZ,
-                                 sycl::event **srcEvents, numba::GPUParamDesc *params,
-                                 size_t eventIndex) {
+  sycl::event *launchKernel(GPUKernel *kernel, size_t gridX, size_t gridY,
+                            size_t gridZ, size_t blockX, size_t blockY,
+                            size_t blockZ, sycl::event **srcEvents,
+                            numba::GPUParamDesc *params, size_t eventIndex) {
     assert(kernel);
     auto eventsCount = countEvents(srcEvents);
-    auto paramsCount = countUntil(params, numba::GPUParamDesc{nullptr, 0, numba::GpuParamType::null});
+    auto paramsCount = countUntil(
+        params, numba::GPUParamDesc{nullptr, 0, numba::GpuParamType::null});
 
-    auto globalRange = sycl::range<3>(blockZ * gridZ, blockY * gridY, blockX * gridX);
+    auto globalRange =
+        sycl::range<3>(blockZ * gridZ, blockY * gridY, blockX * gridX);
     auto localRange = ::sycl::range<3>(blockZ, blockY, blockX);
     auto ndRange = sycl::nd_range<3>(globalRange, localRange);
     auto syclKernel = getSYCLKernel(kernel);
@@ -152,12 +153,12 @@ public:
     return getEvent(eventIndex);
   }
 
-  static void waitEvent(sycl::event* event) {
+  static void waitEvent(sycl::event *event) {
     assert(event);
     event->wait();
   }
 
-  std::tuple<void *, void *, sycl::event*>
+  std::tuple<void *, void *, sycl::event *>
   allocBuffer(size_t size, size_t alignment, numba::GpuAllocType type,
               sycl::event **srcEvents, size_t eventIndex,
               numba::MemInfoAllocFuncT allocFunc) {
@@ -181,7 +182,6 @@ public:
     if (event) {
       events[eventIndex] = sycl::event{};
     }
-
 
     auto mem = [&]() -> void * {
       void *ret = nullptr;
@@ -225,7 +225,7 @@ public:
     release();
   }
 
-  void suggestBlockSize(GPUKernel* kernel, const uint32_t *gridSize,
+  void suggestBlockSize(GPUKernel *kernel, const uint32_t *gridSize,
                         uint32_t *blockSize, size_t numDims) {
     assert(kernel);
     suggestGPUBlockSize(kernel, gridSize, blockSize, numDims);
@@ -240,44 +240,48 @@ private:
 
   static const constexpr size_t NoEvent = static_cast<size_t>(-1);
 
-  sycl::event* getEvent(size_t index) {
+  sycl::event *getEvent(size_t index) {
     if (index == NoEvent)
       return nullptr;
 
     return &events[index];
   }
 
-  template<numba::GpuParamType TypeVal, typename Type>
-  static bool setKernelArgImpl(sycl::handler &cgh, uint32_t index, const numba::GPUParamDesc& desc) {
+  template <numba::GpuParamType TypeVal, typename Type>
+  static bool setKernelArgImpl(sycl::handler &cgh, uint32_t index,
+                               const numba::GPUParamDesc &desc) {
     if (TypeVal == desc.type) {
       assert(desc.size == sizeof(Type));
-      cgh.set_arg(index, *static_cast<const Type*>(desc.data));
+      cgh.set_arg(index, *static_cast<const Type *>(desc.data));
       return true;
     }
     return false;
   }
 
-  template<numba::GpuParamType TypeVal>
-  static bool setKernelArgPtrImpl(sycl::handler &cgh, uint32_t index, const numba::GPUParamDesc& desc) {
+  template <numba::GpuParamType TypeVal>
+  static bool setKernelArgPtrImpl(sycl::handler &cgh, uint32_t index,
+                                  const numba::GPUParamDesc &desc) {
     if (TypeVal == desc.type) {
-      assert(desc.size == sizeof(void**));
-      auto ptr = desc.data ? *(static_cast<void *const*>(desc.data)) : nullptr;
+      assert(desc.size == sizeof(void **));
+      auto ptr = desc.data ? *(static_cast<void *const *>(desc.data)) : nullptr;
       cgh.set_arg(index, ptr);
       return true;
     }
     return false;
   }
 
-  static void setKernelArg(sycl::handler &cgh, uint32_t index, const numba::GPUParamDesc& desc) {
-    using HandlerPtrT = bool(*)(sycl::handler &, uint32_t, const numba::GPUParamDesc&);
+  static void setKernelArg(sycl::handler &cgh, uint32_t index,
+                           const numba::GPUParamDesc &desc) {
+    using HandlerPtrT =
+        bool (*)(sycl::handler &, uint32_t, const numba::GPUParamDesc &);
     const HandlerPtrT handlers[] = {
-      &setKernelArgImpl<numba::GpuParamType::int8, int8_t>,
-      &setKernelArgImpl<numba::GpuParamType::int16, int16_t>,
-      &setKernelArgImpl<numba::GpuParamType::int32, int32_t>,
-      &setKernelArgImpl<numba::GpuParamType::int64, int64_t>,
-      &setKernelArgImpl<numba::GpuParamType::float32, float>,
-      &setKernelArgImpl<numba::GpuParamType::float64, double>,
-      &setKernelArgPtrImpl<numba::GpuParamType::ptr>,
+        &setKernelArgImpl<numba::GpuParamType::int8, int8_t>,
+        &setKernelArgImpl<numba::GpuParamType::int16, int16_t>,
+        &setKernelArgImpl<numba::GpuParamType::int32, int32_t>,
+        &setKernelArgImpl<numba::GpuParamType::int64, int64_t>,
+        &setKernelArgImpl<numba::GpuParamType::float32, float>,
+        &setKernelArgImpl<numba::GpuParamType::float64, double>,
+        &setKernelArgPtrImpl<numba::GpuParamType::ptr>,
     };
 
     for (auto handler : handlers)
@@ -320,25 +324,21 @@ gpuxModuleLoad(void *stream, const void *data, size_t dataSize) {
 extern "C" NUMBA_MLIR_GPU_RUNTIME_SYCL_EXPORT void
 gpuxModuleDestroy(void *module) {
   LOG_FUNC();
-  catchAll([&]() {
-    Stream::destroyModule(static_cast<GPUModule*>(module));
-  });
+  catchAll([&]() { Stream::destroyModule(static_cast<GPUModule *>(module)); });
 }
 
 extern "C" NUMBA_MLIR_GPU_RUNTIME_SYCL_EXPORT void *
 gpuxKernelGet(void *module, const char *name) {
   LOG_FUNC();
   return catchAll([&]() {
-    return Stream::getKernel(static_cast<GPUModule*>(module), name);
+    return Stream::getKernel(static_cast<GPUModule *>(module), name);
   });
 }
 
 extern "C" NUMBA_MLIR_GPU_RUNTIME_SYCL_EXPORT void
 gpuxKernelDestroy(void *kernel) {
   LOG_FUNC();
-  catchAll([&]() {
-    Stream::destroyKernel(static_cast<GPUKernel*>(kernel));
-  });
+  catchAll([&]() { Stream::destroyKernel(static_cast<GPUKernel *>(kernel)); });
 }
 
 extern "C" NUMBA_MLIR_GPU_RUNTIME_SYCL_EXPORT void *
@@ -348,15 +348,15 @@ gpuxLaunchKernel(void *stream, void *kernel, size_t gridX, size_t gridY,
   LOG_FUNC();
   return catchAll([&]() {
     return static_cast<Stream *>(stream)->launchKernel(
-        static_cast<GPUKernel*>(kernel), gridX, gridY, gridZ, blockX,
-        blockY, blockZ, static_cast<sycl::event**>(events),
+        static_cast<GPUKernel *>(kernel), gridX, gridY, gridZ, blockX, blockY,
+        blockZ, static_cast<sycl::event **>(events),
         static_cast<numba::GPUParamDesc *>(params), eventIndex);
   });
 }
 
 extern "C" NUMBA_MLIR_GPU_RUNTIME_SYCL_EXPORT void gpuxWait(void *event) {
   LOG_FUNC();
-  catchAll([&]() { Stream::waitEvent(static_cast<sycl::event*>(event)); });
+  catchAll([&]() { Stream::waitEvent(static_cast<sycl::event *>(event)); });
 }
 
 extern "C" NUMBA_MLIR_GPU_RUNTIME_SYCL_EXPORT void
@@ -366,13 +366,13 @@ gpuxAlloc(void *stream, size_t size, size_t alignment, int type, void *events,
   catchAll([&]() {
     auto res = static_cast<Stream *>(stream)->allocBuffer(
         size, alignment, static_cast<numba::GpuAllocType>(type),
-        static_cast<sycl::event**>(events), eventIndex, AllocFunc);
+        static_cast<sycl::event **>(events), eventIndex, AllocFunc);
     *ret = {std::get<0>(res), std::get<1>(res), std::get<2>(res)};
   });
 }
 
 extern "C" NUMBA_MLIR_GPU_RUNTIME_SYCL_EXPORT void gpuxDeAlloc(void *stream,
-                                                             void *ptr) {
+                                                               void *ptr) {
   LOG_FUNC();
   catchAll([&]() { static_cast<Stream *>(stream)->deallocBuffer(ptr); });
 }
@@ -383,7 +383,7 @@ gpuxSuggestBlockSize(void *stream, void *kernel, const uint32_t *gridSize,
   LOG_FUNC();
   catchAll([&]() {
     static_cast<Stream *>(stream)->suggestBlockSize(
-        static_cast<GPUKernel*>(kernel), gridSize, blockSize, numDims);
+        static_cast<GPUKernel *>(kernel), gridSize, blockSize, numDims);
   });
 }
 

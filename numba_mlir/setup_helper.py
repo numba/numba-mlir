@@ -29,6 +29,7 @@ def _ensure_dir(dir_path):
     except FileExistsError:
         pass
 
+
 def build_sycl_runtime(install_prefix):
     MATH_SYCL_RUNTIME_INSTALL_PATH = install_prefix
     build_prefix = cmake_build_dir
@@ -78,13 +79,16 @@ def build_sycl_runtime(install_prefix):
         ["cmake", "--install", ".", "--config", "Release"], cwd=build_dir, env=env
     )
 
+
 def build_sycl_math_runtime(install_prefix):
     MATH_SYCL_RUNTIME_INSTALL_PATH = install_prefix
     build_prefix = cmake_build_dir
 
     cmake_build_dir_parent = os.path.join(build_prefix)
-    build_dir = os.path.join(build_prefix, "sycl","math_runtime")
-    sycl_math_runtime_path = os.path.join(root_dir, "numba_mlir","math_runtime","sycl")
+    build_dir = os.path.join(build_prefix, "sycl", "math_runtime")
+    sycl_math_runtime_path = os.path.join(
+        root_dir, "numba_mlir", "math_runtime", "sycl"
+    )
     cmake_cmd = [
         "cmake",
         sycl_math_runtime_path,

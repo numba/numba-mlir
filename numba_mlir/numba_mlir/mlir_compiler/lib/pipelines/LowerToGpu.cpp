@@ -359,7 +359,8 @@ struct GPULowerDefaultLocalSize
         return;
 
       builder.setInsertionPoint(op);
-      auto newOp = builder.create<gpu_runtime::GPUSuggestBlockSizeOp>(loc, /*stream*/ std::nullopt, op.getGridSize(), launch.getKernel());
+      auto newOp = builder.create<gpu_runtime::GPUSuggestBlockSizeOp>(
+          loc, /*stream*/ std::nullopt, op.getGridSize(), launch.getKernel());
       op->replaceAllUsesWith(newOp.getResults());
       op.erase();
     });
