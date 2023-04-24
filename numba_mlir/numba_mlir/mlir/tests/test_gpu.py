@@ -1177,6 +1177,7 @@ def test_cfd_reshape():
 
 @pytest.mark.smoke
 @require_dpctl
+@skip_opencl_reductions
 @pytest.mark.parametrize("size", [1, 7, 16, 64, 65, 256, 512, 1024 * 1024])
 def test_cfd_reduce1(size):
     if size == 1:
@@ -1207,6 +1208,7 @@ _shapes = (1, 7, 16, 25, 64, 65)
 
 
 @require_dpctl
+@skip_opencl_reductions
 @parametrize_function_variants(
     "py_func",
     [
