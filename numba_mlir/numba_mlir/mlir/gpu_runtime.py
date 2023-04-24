@@ -27,7 +27,9 @@ def _get_gpu_runtime_name():
 try:
     runtime_lib = load_lib(_get_gpu_runtime_name())
     IS_GPU_RUNTIME_AVAILABLE = True
-except:
+except Exception as e:
+    print("GPU runtime loading failed")
+    print(e)
     IS_GPU_RUNTIME_AVAILABLE = False
 
 

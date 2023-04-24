@@ -34,10 +34,12 @@ if DPCTL_TESTS_ENABLED:
 
 
 def require_gpu(func):
+    func = pytest.mark.test_gpu(func)
     return pytest.mark.skipif(not GPU_TESTS_ENABLED, reason="GPU tests disabled")(func)
 
 
 def require_dpctl(func):
+    func = pytest.mark.test_gpu(func)
     return pytest.mark.skipif(
         not DPCTL_TESTS_ENABLED, reason="DPCTL interop tests disabled"
     )(func)
