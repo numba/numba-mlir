@@ -153,7 +153,7 @@ if _is_dpctl_available:
             dtype = numpy_support.from_dtype(val.dtype)
         except NotImplementedError:
             raise ValueError("Unsupported array dtype: %s" % (val.dtype,))
-        layout = "C"  # TODO: infer layout
+        layout = numpy_support.map_layout(val)
         readonly = False
         filter_string = _get_filter_string(val)
         assert filter_string is not None
