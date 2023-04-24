@@ -328,23 +328,40 @@ struct GPULowerDefaultLocalSize
       }
     }
 
-    if (!setDefSize)
-      return markAllAnalysesPreserved();
-
-    auto localSizes = setDefSize.getOperands();
-
     mlir::DominanceInfo dom;
     mlir::OpBuilder builder(&getContext());
     func.walk([&](gpu_runtime::GPUSuggestBlockSizeOp op) {
-      if (!dom.properlyDominates(setDefSize, op))
+      auto loc = op.getLoc();
+      if (setDefSize && dom.properlyDominates(setDefSize, op)) {
+        auto localSizes = setDefSize.getOperands();
+        builder.setInsertionPoint(op);
+        for (auto i : llvm::seq(0u, 3u)) {
+          auto castedRes = numba::indexCast(builder, loc, localSizes[i]);
+          op.getResult(i).replaceAllUsesWith(castedRes);
+        }
+        op.erase();
+        return;
+      }
+
+      mlir::gpu::LaunchFuncOp launch;
+      for (auto user : op->getUsers()) {
+        auto l = mlir::dyn_cast<mlir::gpu::LaunchFuncOp>(user);
+        if (!l)
+          continue;
+
+        if (launch && launch != l)
+          return;
+
+        launch = l;
+      }
+
+      if (!launch)
         return;
 
-      auto loc = op.getLoc();
       builder.setInsertionPoint(op);
-      for (auto i : llvm::seq(0u, 3u)) {
-        auto castedRes = numba::indexCast(builder, loc, localSizes[i]);
-        op.getResult(i).replaceAllUsesWith(castedRes);
-      }
+      auto newOp = builder.create<gpu_runtime::GPUSuggestBlockSizeOp>(loc, /*stream*/ std::nullopt, op.getGridSize(), launch.getKernel());
+      op->replaceAllUsesWith(newOp.getResults());
+      op.erase();
     });
 
     func.walk([&](mlir::func::CallOp op) {
@@ -354,7 +371,7 @@ struct GPULowerDefaultLocalSize
           signalPassFailure();
           return;
         }
-        op->erase();
+        op.erase();
       }
     });
   }
