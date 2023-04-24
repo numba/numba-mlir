@@ -728,9 +728,29 @@ static void rerunStdPipeline(mlir::Operation *op) {
 }
 
 static mlir::FailureOr<mlir::StringAttr>
-getDeviceDescFromFunc(mlir::MLIRContext *context, mlir::TypeRange argTypes) {
+getDeviceDescFromArgs(mlir::MLIRContext *context, mlir::TypeRange argTypes) {
   mlir::StringAttr res;
   for (auto arg : argTypes) {
+    if (auto tupleType = mlir::dyn_cast<mlir::TupleType>(arg)) {
+      auto tupleRes = getDeviceDescFromArgs(context, tupleType.getTypes());
+      if (mlir::failed(tupleRes))
+        return mlir::failure();
+
+      auto newRes = *tupleRes;
+      if (!newRes)
+        continue;
+
+      if (!res) {
+        res = newRes;
+        continue;
+      }
+
+      if (newRes != res)
+        return mlir::failure();
+
+      continue;
+    }
+
     auto tensor = arg.dyn_cast<numba::ntensor::NTensorType>();
     if (!tensor)
       continue;
@@ -749,12 +769,24 @@ getDeviceDescFromFunc(mlir::MLIRContext *context, mlir::TypeRange argTypes) {
     }
   }
 
-  // TODO: remove default device.
-  if (!res)
-    if (auto dev = getDefaultDevice())
-      res = mlir::StringAttr::get(context, *dev);
-
   return res;
+}
+
+static mlir::FailureOr<mlir::StringAttr>
+getDeviceDescFromFunc(mlir::MLIRContext *context, mlir::TypeRange argTypes) {
+  auto res = getDeviceDescFromArgs(context, argTypes);
+  if (mlir::failed(res))
+    return mlir::failure();
+
+  // TODO: remove default device.
+  if (*res)
+    return res;
+
+  if (auto dev = getDefaultDevice()) {
+    return mlir::StringAttr::get(context, *dev);
+  } else {
+    return mlir::failure();
+  }
 }
 
 struct LowerGpuRange final : public numba::CallOpLowering {
