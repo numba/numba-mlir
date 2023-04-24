@@ -750,6 +750,9 @@ jobs:
         shell: bash -l {0}
 
         run: |
+          sudo apt-get install -y gpg-agent wget
+          wget -qO - https://repositories.intel.com/graphics/intel-graphics.key | sudo gpg --dearmor --output /usr/share/keyrings/intel-graphics.gpg
+          echo 'deb [arch=amd64,i386 signed-by=/usr/share/keyrings/intel-graphics.gpg] https://repositories.intel.com/graphics/ubuntu jammy arc' | sudo tee  /etc/apt/sources.list.d/intel.gpu.jammy.list
           sudo apt-get update
           sudo apt-get install intel-opencl-icd intel-level-zero-gpu level-zero
           cd numba_mlir
