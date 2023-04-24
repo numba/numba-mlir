@@ -787,6 +787,9 @@ private:
   matchAndRewrite(gpu_runtime::GPUSuggestBlockSizeOp op,
                   gpu_runtime::GPUSuggestBlockSizeOp::Adaptor adaptor,
                   mlir::ConversionPatternRewriter &rewriter) const override {
+    if (!op.getKernel())
+      return mlir::failure();
+
     auto numDims = op.getNumResults();
     auto loc = op.getLoc();
     numba::AllocaInsertionPoint allocaHelper(op);
