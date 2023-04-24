@@ -10,6 +10,7 @@ import math
 import numba
 import itertools
 
+from numba_mlir.mlir.dpctl_interop import get_default_device_name
 from numba_mlir.mlir.utils import readenv
 from numba_mlir.kernel import *
 from numba_mlir.mlir.passes import (
@@ -897,6 +898,10 @@ def test_private_memory(blocksize):
 @pytest.mark.parametrize("local_size", [1, 2, 7, 17, 33])
 @pytest.mark.parametrize("dtype", [np.int32, np.int64, np.float32])
 def test_group_func(group_op, global_size, local_size, dtype):
+    if get_default_device_name().startswith("opencl"):
+        # TODO: subgroup reduction are not supported in opencl backend.
+        pytest.skip()
+
     def func(a, b):
         i = get_global_id(0)
         v = group_op(a[i])
