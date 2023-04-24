@@ -926,7 +926,8 @@ def test_group_func(group_op, global_size, local_size, dtype):
 
 
 def _from_host(arr, buffer):
-    ret = dpt.usm_ndarray(arr.shape, dtype=arr.dtype, buffer=buffer)
+    device = get_default_device_name()
+    ret = dpt.usm_ndarray(arr.shape, dtype=arr.dtype, buffer=buffer).to_device(device)
     ret.usm_data.copy_from_host(arr.reshape((-1)).view("|u1"))
     return ret
 
