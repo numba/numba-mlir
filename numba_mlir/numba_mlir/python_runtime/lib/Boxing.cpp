@@ -124,7 +124,7 @@ nmrtUnboxSyclInterface(PyObject *obj, arystruct_t *arystruct) {
       if (!elem || !PyLong_Check(elem.get()))
         return -1;
 
-      strides[i] = PyLong_AsLong(elem.get());
+      strides[i] = PyLong_AsLong(elem.get()) * itemsize;
     }
   }
 
