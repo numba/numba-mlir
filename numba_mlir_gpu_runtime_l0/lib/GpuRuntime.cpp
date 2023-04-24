@@ -3,7 +3,6 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include <algorithm>
-#include <array>
 #include <atomic>
 #include <cassert>
 #include <cstdint>
@@ -19,9 +18,6 @@
 #include "FilterStringParser.hpp"
 #include "LevelZeroPrinting.hpp"
 #include "LevelZeroWrapper.hpp"
-
-typedef void (*MemInfoDtorFunction)(void *ptr, size_t size, void *info);
-using AllocFuncT = void *(*)(void *, size_t, MemInfoDtorFunction, void *);
 
 #if 0 // Log functions
 namespace {
@@ -54,7 +50,7 @@ static bool printGpuInfoEnabled() {
   return value;
 }
 
-template <typename F> auto catchAll(F &&func) {
+template <typename F> static auto catchAll(F &&func) {
   try {
     return func();
   } catch (const std::exception &e) {
@@ -68,25 +64,14 @@ template <typename F> auto catchAll(F &&func) {
   }
 }
 
-static AllocFuncT AllocFunc = nullptr;
+static numba::MemInfoAllocFuncT AllocFunc = nullptr;
 
 struct DriverAndDevice {
   ze_driver_handle_t driver = nullptr;
   ze_device_handle_t device = nullptr;
 };
 
-struct ParamDesc {
-  const void *data;
-  size_t size;
-
-  bool operator==(const ParamDesc &rhs) const {
-    return data == rhs.data && size == rhs.size;
-  }
-
-  bool operator!=(const ParamDesc &rhs) const { return !(*this == rhs); }
-};
-
-template <typename T> size_t countUntil(T *ptr, T &&elem) {
+template <typename T> static size_t countUntil(T *ptr, T &&elem) {
   assert(ptr);
   auto curr = ptr;
   while (*curr != elem) {
@@ -301,11 +286,12 @@ public:
   ze_event_handle_t launchKernel(ze_kernel_handle_t kernel, size_t gridX,
                                  size_t gridY, size_t gridZ, size_t blockX,
                                  size_t blockY, size_t blockZ,
-                                 ze_event_handle_t *events, ParamDesc *params,
+                                 ze_event_handle_t *events,
+                                 numba::GPUParamDesc *params,
                                  size_t eventIndex) {
     assert(kernel);
     auto eventsCount = countEvents(events);
-    auto paramsCount = countUntil(params, ParamDesc{nullptr, 0});
+    auto paramsCount = countUntil(params, numba::GPUParamDesc{nullptr, 0});
 
     auto castSz = [](size_t val) { return static_cast<uint32_t>(val); };
 
@@ -332,7 +318,7 @@ public:
   std::tuple<void *, void *, ze_event_handle_t>
   allocBuffer(size_t size, size_t alignment, numba::GpuAllocType type,
               ze_event_handle_t *events, size_t eventIndex,
-              AllocFuncT allocFunc) {
+              numba::MemInfoAllocFuncT allocFunc) {
     // Alloc is always sync for now, synchronize
     auto eventsCount = countEvents(events);
     for (decltype(eventsCount) i = 0; i < eventsCount; ++i) {
@@ -454,7 +440,7 @@ private:
 extern "C" NUMBA_MLIR_GPU_RUNTIME_L0_EXPORT void
 gpuxSetMemInfoAllocFunc(void *func) {
   LOG_FUNC();
-  AllocFunc = reinterpret_cast<AllocFuncT>(func);
+  AllocFunc = reinterpret_cast<numba::MemInfoAllocFuncT>(func);
 }
 
 extern "C" NUMBA_MLIR_GPU_RUNTIME_L0_EXPORT void *
@@ -510,7 +496,7 @@ gpuxLaunchKernel(void *stream, void *kernel, size_t gridX, size_t gridY,
     return static_cast<Stream *>(stream)->launchKernel(
         static_cast<ze_kernel_handle_t>(kernel), gridX, gridY, gridZ, blockX,
         blockY, blockZ, static_cast<ze_event_handle_t *>(events),
-        static_cast<ParamDesc *>(params), eventIndex);
+        static_cast<numba::GPUParamDesc *>(params), eventIndex);
   });
 }
 
@@ -519,21 +505,15 @@ extern "C" NUMBA_MLIR_GPU_RUNTIME_L0_EXPORT void gpuxWait(void *event) {
   catchAll([&]() { Stream::waitEvent(static_cast<ze_event_handle_t>(event)); });
 }
 
-struct AllocResult {
-  void *info;
-  void *ptr;
-  void *event;
-};
-
 extern "C" NUMBA_MLIR_GPU_RUNTIME_L0_EXPORT void
 gpuxAlloc(void *stream, size_t size, size_t alignment, int type, void *events,
-          size_t eventIndex, AllocResult *ret) {
+          size_t eventIndex, numba::GPUAllocResult *ret) {
   LOG_FUNC();
   catchAll([&]() {
     auto res = static_cast<Stream *>(stream)->allocBuffer(
         size, alignment, static_cast<numba::GpuAllocType>(type),
         static_cast<ze_event_handle_t *>(events), eventIndex, AllocFunc);
-    *ret = AllocResult{std::get<0>(res), std::get<1>(res), std::get<2>(res)};
+    *ret = {std::get<0>(res), std::get<1>(res), std::get<2>(res)};
   });
 }
 

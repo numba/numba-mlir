@@ -2,6 +2,10 @@
 #
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+from .utils import readenv
+
+DEFAULT_DEVICE = readenv("NUMBA_MLIR_DEFAULT_DEVICE", str, "")
+
 try:
     import dpctl
     from dpctl.tensor import usm_ndarray
@@ -200,6 +204,9 @@ if _is_dpctl_available:
             raise ValueError(err_str)
 
     def get_default_device_name():
+        if DEFAULT_DEVICE:
+            return DEFAULT_DEVICE
+
         return dpctl.select_default_device().filter_string
 
 else:  # _is_dpctl_available
@@ -211,4 +218,7 @@ else:  # _is_dpctl_available
 
     def get_default_device_name():
         # TODO: deprecated
+        if DEFAULT_DEVICE:
+            return DEFAULT_DEVICE
+
         return "level_zero:gpu:0"

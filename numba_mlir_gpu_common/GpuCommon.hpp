@@ -23,4 +23,38 @@ struct OffloadDeviceCapabilities {
 
 enum class GpuAllocType { Device = 0, Shared = 1, Local = 2 };
 
+enum class GpuParamType : int32_t {
+  null = 0,
+  int8,
+  int16,
+  int32,
+  int64,
+  float32,
+  float64,
+  ptr,
+};
+
+// Must be kept in sync with the compiler.
+struct GPUParamDesc {
+  const void *data;
+  int32_t size;
+  GpuParamType type;
+
+  bool operator==(const GPUParamDesc &rhs) const {
+    return data == rhs.data && size == rhs.size && type == rhs.type;
+  }
+
+  bool operator!=(const GPUParamDesc &rhs) const { return !(*this == rhs); }
+};
+
+typedef void (*MemInfoDtorFunction)(void *ptr, size_t size, void *info);
+using MemInfoAllocFuncT = void *(*)(void *, size_t, MemInfoDtorFunction,
+                                    void *);
+
+struct GPUAllocResult {
+  void *info;
+  void *ptr;
+  void *event;
+};
+
 } // namespace numba

@@ -23,13 +23,20 @@ CMAKE_INSTALL_PREFIX = os.path.join(root_dir, "..")
 cmake_build_dir = os.path.join(CMAKE_INSTALL_PREFIX, "numba_mlir_cmake_build")
 
 
-def build_sycl_math_runtime(install_prefix):
+def _ensure_dir(dir_path):
+    try:
+        os.makedirs(dir_path)
+    except FileExistsError:
+        pass
+
+
+def build_sycl_runtime(install_prefix):
     MATH_SYCL_RUNTIME_INSTALL_PATH = install_prefix
     build_prefix = cmake_build_dir
 
     cmake_build_dir_parent = os.path.join(build_prefix)
-    build_dir = os.path.join(build_prefix, "sycl/math_runtime")
-    sycl_math_runtime_path = os.path.join(root_dir, "numba_mlir/math_runtime/sycl")
+    build_dir = os.path.join(build_prefix, "sycl", "runtime")
+    sycl_math_runtime_path = os.path.join(root_dir, "..", "numba_mlir_gpu_runtime_sycl")
     cmake_cmd = [
         "cmake",
         sycl_math_runtime_path,
@@ -39,20 +46,10 @@ def build_sycl_math_runtime(install_prefix):
 
     cmake_cmd += [
         "-DCMAKE_BUILD_TYPE=Release",
-        "-DMATH_SYCL_RUNTIME_INSTALL_PATH=" + MATH_SYCL_RUNTIME_INSTALL_PATH,
-        "-DTBB_DIR=" + TBB_DIR,
+        "-DSYCL_RUNTIME_INSTALL_PATH=" + MATH_SYCL_RUNTIME_INSTALL_PATH,
     ]
 
-    if NUMBA_MLIR_USE_MKL is not None:
-        cmake_cmd += ["-DNUMBA_MLIR_USE_MKL=" + NUMBA_MLIR_USE_MKL]
-
-    if NUMBA_MLIR_USE_SYCL is not None:
-        cmake_cmd += ["-DNUMBA_MLIR_USE_SYCL=" + NUMBA_MLIR_USE_SYCL]
-
-    try:
-        os.makedirs(build_dir)
-    except FileExistsError:
-        pass
+    _ensure_dir(build_dir)
 
     env = os.environ.copy()
 
@@ -83,8 +80,67 @@ def build_sycl_math_runtime(install_prefix):
     )
 
 
-def build_runtime():
-    install_dir = os.path.join(CMAKE_INSTALL_PREFIX, "numba_mlir/numba_mlir")
+def build_sycl_math_runtime(install_prefix):
+    MATH_SYCL_RUNTIME_INSTALL_PATH = install_prefix
+    build_prefix = cmake_build_dir
+
+    cmake_build_dir_parent = os.path.join(build_prefix)
+    build_dir = os.path.join(build_prefix, "sycl", "math_runtime")
+    sycl_math_runtime_path = os.path.join(
+        root_dir, "numba_mlir", "math_runtime", "sycl"
+    )
+    cmake_cmd = [
+        "cmake",
+        sycl_math_runtime_path,
+    ]
+
+    cmake_cmd += ["-GNinja"]
+
+    cmake_cmd += [
+        "-DCMAKE_BUILD_TYPE=Release",
+        "-DMATH_SYCL_RUNTIME_INSTALL_PATH=" + MATH_SYCL_RUNTIME_INSTALL_PATH,
+        "-DTBB_DIR=" + TBB_DIR,
+    ]
+
+    if NUMBA_MLIR_USE_MKL is not None:
+        cmake_cmd += ["-DNUMBA_MLIR_USE_MKL=" + NUMBA_MLIR_USE_MKL]
+
+    if NUMBA_MLIR_USE_SYCL is not None:
+        cmake_cmd += ["-DNUMBA_MLIR_USE_SYCL=" + NUMBA_MLIR_USE_SYCL]
+
+    _ensure_dir(build_dir)
+
+    env = os.environ.copy()
+
+    sys_name = platform.system()
+    is_windows = sys_name.casefold() == "Windows".casefold()
+    if is_windows:
+        c_compiler = "icx"
+        cpp_compiler = c_compiler
+    else:
+        c_compiler = "icx"
+        cpp_compiler = "icpx"
+
+    env["CC"] = c_compiler
+    env["CXX"] = cpp_compiler
+
+    conda_prefix = env.get("CONDA_PREFIX")
+    if is_windows and conda_prefix:
+        env["INCLUDE"] = env["INCLUDE"] + ";" + os.path.join(conda_prefix, "include")
+
+    subprocess.check_call(
+        cmake_cmd, stderr=subprocess.STDOUT, shell=False, cwd=build_dir, env=env
+    )
+    subprocess.check_call(
+        ["cmake", "--build", ".", "--config", "Release"], cwd=build_dir, env=env
+    )
+    subprocess.check_call(
+        ["cmake", "--install", ".", "--config", "Release"], cwd=build_dir, env=env
+    )
+
+
+def build_runtime(install_dir):
+    build_sycl_runtime(install_dir)
     build_sycl_math_runtime(install_dir)
 
     cmake_cmd = [
@@ -140,10 +196,7 @@ def build_runtime():
             "-DNUMBA_MLIR_ENABLE_IGPU_DIALECT=ON",
         ]
 
-    try:
-        os.mkdir(cmake_build_dir)
-    except FileExistsError:
-        pass
+    _ensure_dir(cmake_build_dir)
 
     # dpcpp conda package installs it's own includes to conda/include folders
     # breaking every other compiler. So, if dpcpp is installed we need to temporaly move

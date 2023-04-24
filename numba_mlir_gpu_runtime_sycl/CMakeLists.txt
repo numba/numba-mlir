@@ -2,16 +2,24 @@
 #
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-project(numba-mlir-gpu-runtime-l0 LANGUAGES CXX C)
+cmake_minimum_required(VERSION 3.20)
+
+project(numba-mlir-gpu-runtime-sycl LANGUAGES CXX C)
+
+find_package(IntelDPCPP REQUIRED)
+
+set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/../cmake/modules/")
+
+find_package(LevelZero REQUIRED)
 
 include(GenerateExportHeader)
 
 set(SOURCES_LIST
-    lib/FilterStringParser.cpp
     lib/GpuRuntime.cpp
+    lib/GpuModule.cpp
 )
 set(HEADERS_LIST
-    lib/FilterStringParser.hpp
+    lib/GpuModule.hpp
     ../numba_mlir_gpu_common/LevelZeroPrinting.hpp
     ../numba_mlir_gpu_common/LevelZeroWrapper.hpp
 )
@@ -30,3 +38,7 @@ target_link_directories(${PROJECT_NAME} PRIVATE
 )
 
 target_link_libraries(${PROJECT_NAME} PRIVATE ${LevelZero_LIBRARY})
+
+install(TARGETS ${PROJECT_NAME}
+        DESTINATION "${SYCL_RUNTIME_INSTALL_PATH}"
+        )

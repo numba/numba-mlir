@@ -330,36 +330,39 @@ struct GPULowerDefaultLocalSize
 
     mlir::DominanceInfo dom;
     mlir::OpBuilder builder(&getContext());
-    func.walk([&](mlir::gpu::LaunchFuncOp op) {
-      auto bx = op.getBlockSizeX();
-      if (auto call = bx.getDefiningOp<gpu_runtime::GPUSuggestBlockSizeOp>()) {
-        if (call.getKernel())
+    func.walk([&](gpu_runtime::GPUSuggestBlockSizeOp op) {
+      auto loc = op.getLoc();
+      if (setDefSize && dom.properlyDominates(setDefSize, op)) {
+        auto localSizes = setDefSize.getOperands();
+        builder.setInsertionPoint(op);
+        for (auto i : llvm::seq(0u, 3u)) {
+          auto castedRes = numba::indexCast(builder, loc, localSizes[i]);
+          op.getResult(i).replaceAllUsesWith(castedRes);
+        }
+        op.erase();
+        return;
+      }
+
+      mlir::gpu::LaunchFuncOp launch;
+      for (auto user : op->getUsers()) {
+        auto l = mlir::dyn_cast<mlir::gpu::LaunchFuncOp>(user);
+        if (!l)
+          continue;
+
+        if (launch && launch != l)
           return;
 
-        auto loc = call.getLoc();
-        auto kernel = op.getKernel();
-        builder.setInsertionPoint(call);
-
-        mlir::ValueRange operands = call.getGridSize();
-        if (setDefSize && dom.properlyDominates(setDefSize, call))
-          operands = setDefSize.getArgOperands();
-
-        auto count = static_cast<unsigned>(operands.size());
-        llvm::SmallVector<mlir::Value, 3> globalSize(count);
-        for (auto i : llvm::seq(0u, count))
-          globalSize[i] = numba::indexCast(builder, loc, operands[i]);
-
-        auto res = builder
-                       .create<gpu_runtime::GPUSuggestBlockSizeOp>(
-                           loc, /*stream*/ std::nullopt, globalSize, kernel)
-                       .getResults();
-
-        for (auto i : llvm::seq(0u, count)) {
-          auto castedRes = numba::indexCast(builder, loc, res[i],
-                                            call.getResult(i).getType());
-          call.getResult(i).replaceAllUsesWith(castedRes);
-        }
+        launch = l;
       }
+
+      if (!launch)
+        return;
+
+      builder.setInsertionPoint(op);
+      auto newOp = builder.create<gpu_runtime::GPUSuggestBlockSizeOp>(
+          loc, /*stream*/ std::nullopt, op.getGridSize(), launch.getKernel());
+      op->replaceAllUsesWith(newOp.getResults());
+      op.erase();
     });
 
     func.walk([&](mlir::func::CallOp op) {
@@ -369,7 +372,7 @@ struct GPULowerDefaultLocalSize
           signalPassFailure();
           return;
         }
-        op->erase();
+        op.erase();
       }
     });
   }
@@ -728,9 +731,29 @@ static void rerunStdPipeline(mlir::Operation *op) {
 }
 
 static mlir::FailureOr<mlir::StringAttr>
-getDeviceDescFromFunc(mlir::MLIRContext *context, mlir::TypeRange argTypes) {
+getDeviceDescFromArgs(mlir::MLIRContext *context, mlir::TypeRange argTypes) {
   mlir::StringAttr res;
   for (auto arg : argTypes) {
+    if (auto tupleType = mlir::dyn_cast<mlir::TupleType>(arg)) {
+      auto tupleRes = getDeviceDescFromArgs(context, tupleType.getTypes());
+      if (mlir::failed(tupleRes))
+        return mlir::failure();
+
+      auto newRes = *tupleRes;
+      if (!newRes)
+        continue;
+
+      if (!res) {
+        res = newRes;
+        continue;
+      }
+
+      if (newRes != res)
+        return mlir::failure();
+
+      continue;
+    }
+
     auto tensor = arg.dyn_cast<numba::ntensor::NTensorType>();
     if (!tensor)
       continue;
@@ -749,12 +772,24 @@ getDeviceDescFromFunc(mlir::MLIRContext *context, mlir::TypeRange argTypes) {
     }
   }
 
-  // TODO: remove default device.
-  if (!res)
-    if (auto dev = getDefaultDevice())
-      res = mlir::StringAttr::get(context, *dev);
-
   return res;
+}
+
+static mlir::FailureOr<mlir::StringAttr>
+getDeviceDescFromFunc(mlir::MLIRContext *context, mlir::TypeRange argTypes) {
+  auto res = getDeviceDescFromArgs(context, argTypes);
+  if (mlir::failed(res))
+    return mlir::failure();
+
+  // TODO: remove default device.
+  if (*res)
+    return res;
+
+  if (auto dev = getDefaultDevice()) {
+    return mlir::StringAttr::get(context, *dev);
+  } else {
+    return mlir::failure();
+  }
 }
 
 struct LowerGpuRange final : public numba::CallOpLowering {
