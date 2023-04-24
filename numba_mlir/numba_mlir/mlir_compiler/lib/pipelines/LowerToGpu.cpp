@@ -328,37 +328,22 @@ struct GPULowerDefaultLocalSize
       }
     }
 
+    if (!setDefSize)
+      return markAllAnalysesPreserved();
+
+    auto localSizes = setDefSize.getOperands();
+
     mlir::DominanceInfo dom;
     mlir::OpBuilder builder(&getContext());
-    func.walk([&](mlir::gpu::LaunchFuncOp op) {
-      auto bx = op.getBlockSizeX();
-      if (auto call = bx.getDefiningOp<gpu_runtime::GPUSuggestBlockSizeOp>()) {
-        if (call.getKernel())
-          return;
+    func.walk([&](gpu_runtime::GPUSuggestBlockSizeOp op) {
+      if (!dom.properlyDominates(setDefSize, op))
+        return;
 
-        auto loc = call.getLoc();
-        auto kernel = op.getKernel();
-        builder.setInsertionPoint(call);
-
-        mlir::ValueRange operands = call.getGridSize();
-        if (setDefSize && dom.properlyDominates(setDefSize, call))
-          operands = setDefSize.getArgOperands();
-
-        auto count = static_cast<unsigned>(operands.size());
-        llvm::SmallVector<mlir::Value, 3> globalSize(count);
-        for (auto i : llvm::seq(0u, count))
-          globalSize[i] = numba::indexCast(builder, loc, operands[i]);
-
-        auto res = builder
-                       .create<gpu_runtime::GPUSuggestBlockSizeOp>(
-                           loc, /*stream*/ std::nullopt, globalSize, kernel)
-                       .getResults();
-
-        for (auto i : llvm::seq(0u, count)) {
-          auto castedRes = numba::indexCast(builder, loc, res[i],
-                                            call.getResult(i).getType());
-          call.getResult(i).replaceAllUsesWith(castedRes);
-        }
+      auto loc = op.getLoc();
+      builder.setInsertionPoint(op);
+      for (auto i : llvm::seq(0u, 3u)) {
+        auto castedRes = numba::indexCast(builder, loc, localSizes[i]);
+        op.getResult(i).replaceAllUsesWith(castedRes);
       }
     });
 
