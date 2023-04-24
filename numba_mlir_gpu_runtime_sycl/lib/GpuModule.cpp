@@ -294,6 +294,28 @@ void destroyGPUKernel(GPUKernel *kernel) { delete kernel; }
 
 sycl::kernel getSYCLKernel(GPUKernel *kernel) { return kernel->syclKernel; }
 
+static uint32_t downPow2(uint32_t x) {
+  assert(x > 0);
+  x |= (x >> 1);
+  x |= (x >> 2);
+  x |= (x >> 4);
+  x |= (x >> 8);
+  x |= (x >> 16);
+  return x - (x >> 1);
+}
+
+static uint32_t upPow2(uint32_t x) {
+  assert(x > 0);
+  x--;
+  x |= (x >> 1);
+  x |= (x >> 2);
+  x |= (x >> 4);
+  x |= (x >> 8);
+  x |= (x >> 16);
+  x++;
+  return x;
+}
+
 void suggestGPUBlockSize(GPUKernel *kernel, const uint32_t *gridSize,
                          uint32_t *blockSize, size_t numDims) {
   assert(numDims > 0 && numDims <= 3);
@@ -311,14 +333,15 @@ void suggestGPUBlockSize(GPUKernel *kernel, const uint32_t *gridSize,
     return;
   }
 
-  for (size_t i = 0; i < numDims; ++i)
-    blockSize[i] = 1;
-
+  auto maxWgSize = downPow2(kernel->maxWgSize);
   for (size_t i = 0; i < numDims; ++i) {
     auto gsize = gridSize[i];
     if (gsize > 1) {
-      blockSize[i] = std::min(gsize, kernel->maxWgSize);
-      break;
+      auto lsize = std::min(gsize, maxWgSize);
+      blockSize[i] = lsize;
+      maxWgSize /= upPow2(lsize);
+    } else {
+      blockSize[i] = 1;
     }
   }
 }
