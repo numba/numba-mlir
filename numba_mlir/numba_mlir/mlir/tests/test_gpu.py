@@ -943,7 +943,7 @@ def _from_host(arr, buffer):
         obj=arr,
         dtype=arr.dtype,
         device=_def_device,
-        copy=None,
+        copy=True,
         usm_type=buffer,
         sycl_queue=None,
         order=order,
