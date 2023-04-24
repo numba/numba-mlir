@@ -933,14 +933,25 @@ def test_group_func(group_op, global_size, local_size, dtype):
 
 
 def _from_host(arr, buffer):
-    ret = dpt.usm_ndarray(arr.shape, dtype=arr.dtype, buffer=buffer)
-    ret = ret.to_device(_def_device)
-    ret.usm_data.copy_from_host(arr.reshape((-1)).view("|u1"))
-    return ret
+    if arr.flags["C_CONTIGUOUS"]:
+        order = "C"
+    elif arr.flags["F_CONTIGUOUS"]:
+        order = "F"
+    else:
+        order = "K"
+    return dpt.asarray(
+        obj=arr,
+        dtype=arr.dtype,
+        device=_def_device,
+        copy=None,
+        usm_type=buffer,
+        sycl_queue=None,
+        order=order,
+    )
 
 
 def _to_host(src, dst):
-    src.usm_data.copy_to_host(dst.reshape((-1)).view("|u1"))
+    np.copyto(dst, dpt.asnumpy(src))
 
 
 @pytest.mark.smoke
