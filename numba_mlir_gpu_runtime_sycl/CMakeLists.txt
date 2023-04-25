@@ -33,10 +33,6 @@ target_include_directories(${PROJECT_NAME} PRIVATE
     ${LevelZero_INCLUDE_DIR}
 )
 
-target_link_directories(${PROJECT_NAME} PRIVATE
-    ${LevelZero_LIBRARIES_DIR}
-)
-
 target_link_libraries(${PROJECT_NAME} PRIVATE ${LevelZero_LIBRARY})
 
 install(TARGETS ${PROJECT_NAME}
