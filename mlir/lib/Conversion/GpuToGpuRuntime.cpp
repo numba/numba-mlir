@@ -1471,7 +1471,6 @@ static mlir::spirv::TargetEnvAttr defaultCapsMapper(mlir::gpu::GPUModuleOp op) {
       spirv::Capability::Float16Buffer,
       spirv::Capability::Float64,
       spirv::Capability::GenericPointer,
-      spirv::Capability::GroupNonUniformArithmetic,
       spirv::Capability::Groups,
       spirv::Capability::Int16,
       spirv::Capability::Int64,

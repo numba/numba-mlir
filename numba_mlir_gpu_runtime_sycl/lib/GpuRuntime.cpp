@@ -407,7 +407,7 @@ gpuxGetDeviceCapabilities(numba::OffloadDeviceCapabilities *ret,
 
     // Spirv version is hardcoded for now.
     result.spirvMajorVersion = 1;
-    result.spirvMinorVersion = 3;
+    result.spirvMinorVersion = 2;
     result.hasFP16 = device.has(sycl::aspect::fp16);
     result.hasFP64 = device.has(sycl::aspect::fp64);
     *ret = result;
