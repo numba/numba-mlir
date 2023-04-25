@@ -13,7 +13,7 @@
 #include <mlir/Pass/Pass.h>
 #include <mlir/Transforms/GreedyPatternRewriteDriver.h>
 
-static mlir::LogicalResult convertBlockingOp(gpu_runtime::GPUBarrierOp op,
+static mlir::LogicalResult convertBlockingOp(mlir::Operation* op,
                                              mlir::PatternRewriter &rewriter) {
   auto launchOp = op->getParentOfType<mlir::gpu::LaunchOp>();
 
@@ -45,7 +45,7 @@ static mlir::LogicalResult convertBlockingOp(gpu_runtime::GPUBarrierOp op,
     for (auto result : beforeOp.getResults()) {
       for (mlir::OpOperand &&user : result.getUsers()) {
         auto owner = user.getOwner();
-        if (dom.properlyDominates(op, owner)) {
+        if (dom.dominates(op, owner)) {
           auto idx = static_cast<unsigned>(yieldArgsMap.size());
           yieldArgsMap.insert({result, idx});
         }
@@ -88,9 +88,13 @@ static mlir::LogicalResult convertBlockingOp(gpu_runtime::GPUBarrierOp op,
 
   rewriter.mergeBlocks(beforeBlock, beforeIf.thenBlock());
 
-  auto barrierLoc = op.getLoc();
-  auto barrierFlags = op.getFlags();
-  rewriter.create<gpu_runtime::GPUBarrierOp>(barrierLoc, barrierFlags);
+  auto barrierLoc = op->getLoc();
+  if (auto barrier = mlir::dyn_cast<gpu_runtime::GPUBarrierOp>(op)) {
+    auto barrierFlags = barrier.getFlags();
+    rewriter.create<gpu_runtime::GPUBarrierOp>(barrierLoc, barrierFlags);
+  } else {
+    llvm_unreachable("Unsupported barrie op");
+  }
   rewriter.eraseOp(op);
 
   auto beforeIfResults = beforeIf.getResults();
