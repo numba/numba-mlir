@@ -91,7 +91,50 @@ struct RemoveUnusedOp : public mlir::OpRewritePattern<Op> {
     return mlir::success();
   }
 };
+
+// TODO: upstream
+struct MakeAllReduceUniform
+    : public mlir::OpRewritePattern<mlir::gpu::AllReduceOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(mlir::gpu::AllReduceOp op,
+                  mlir::PatternRewriter &rewriter) const override {
+    if (op.getUniform())
+      return mlir::failure();
+
+    if (!mlir::isa<mlir::gpu::LaunchOp>(op->getParentOp()))
+      return mlir::failure();
+
+    rewriter.updateRootInPlace(op, [&]() { op.setUniform(true); });
+    return mlir::success();
+  }
+};
+
+// TODO: upstream
+struct MakeSubgroupReduceUniform
+    : public mlir::OpRewritePattern<mlir::gpu::SubgroupReduceOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(mlir::gpu::SubgroupReduceOp op,
+                  mlir::PatternRewriter &rewriter) const override {
+    if (op.getUniform())
+      return mlir::failure();
+
+    if (!mlir::isa<mlir::gpu::LaunchOp>(op->getParentOp()))
+      return mlir::failure();
+
+    rewriter.updateRootInPlace(op, [&]() { op.setUniform(true); });
+    return mlir::success();
+  }
+};
 } // namespace
+
+void GpuRuntimeDialect::getCanonicalizationPatterns(
+    ::mlir::RewritePatternSet &results) const {
+  results.insert<MakeAllReduceUniform, MakeSubgroupReduceUniform>(getContext());
+}
 
 void CreateGpuStreamOp::build(mlir::OpBuilder &odsBuilder,
                               mlir::OperationState &odsState,
