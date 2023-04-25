@@ -1151,6 +1151,20 @@ template <typename Op>
 static void genBarrierOp(mlir::Operation *srcOp,
                          mlir::PatternRewriter &rewriter,
                          gpu_runtime::FenceFlags flags) {
+  auto newOp = rewriter.create<Op>(srcOp->getLoc());
+  auto attr = rewriter.getI64IntegerAttr(static_cast<int64_t>(flags));
+  newOp->setAttr(gpu_runtime::getFenceFlagsAttrName(), attr);
+
+  // TODO: remove
+  assert(srcOp->getNumResults() == 1);
+  auto retType = srcOp->getResult(0).getType();
+  rewriter.replaceOpWithNewOp<numba::util::UndefOp>(srcOp, retType);
+}
+
+template <typename Op>
+static void genCustomBarrierOp(mlir::Operation *srcOp,
+                               mlir::PatternRewriter &rewriter,
+                               gpu_runtime::FenceFlags flags) {
   rewriter.create<Op>(srcOp->getLoc(), static_cast<int64_t>(flags));
 
   // TODO: remove
@@ -1183,8 +1197,8 @@ public:
     using funcptr_t = void (*)(mlir::Operation *, mlir::PatternRewriter &,
                                gpu_runtime::FenceFlags);
     const std::pair<llvm::StringRef, funcptr_t> handlers[] = {
-        {"kernel_barrier", &genBarrierOp<gpu_runtime::GPUBarrierOp>},
-        {"kernel_mem_fence", &genBarrierOp<gpu_runtime::GPUMemFenceOp>},
+        {"kernel_barrier", &genBarrierOp<mlir::gpu::BarrierOp>},
+        {"kernel_mem_fence", &genCustomBarrierOp<gpu_runtime::GPUMemFenceOp>},
     };
 
     auto funcName = op.getCallee();
@@ -1355,8 +1369,10 @@ public:
     rewriter.create<mlir::memref::StoreOp>(loc, sgResult, groupBuffer,
                                            subgroupId);
 
-    rewriter.create<gpu_runtime::GPUBarrierOp>(
-        loc, static_cast<int64_t>(gpu_runtime::FenceFlags::local));
+    auto barrierOp = rewriter.create<mlir::gpu::BarrierOp>(loc);
+    auto barrierFlagAttr = rewriter.getI64IntegerAttr(
+        static_cast<int64_t>(gpu_runtime::FenceFlags::local));
+    barrierOp->setAttr(gpu_runtime::getFenceFlagsAttrName(), barrierFlagAttr);
 
     mlir::Value numSubgroups = [&]() {
       mlir::OpBuilder::InsertionGuard g(rewriter);
@@ -1400,8 +1416,8 @@ public:
 
     rewriter.create<mlir::scf::IfOp>(loc, isFirstSg, ifBodyBuilder);
 
-    rewriter.create<gpu_runtime::GPUBarrierOp>(
-        loc, static_cast<int64_t>(gpu_runtime::FenceFlags::local));
+    barrierOp = rewriter.create<mlir::gpu::BarrierOp>(loc);
+    barrierOp->setAttr(gpu_runtime::getFenceFlagsAttrName(), barrierFlagAttr);
 
     mlir::Value result =
         rewriter.create<mlir::memref::LoadOp>(loc, groupBuffer, zero);

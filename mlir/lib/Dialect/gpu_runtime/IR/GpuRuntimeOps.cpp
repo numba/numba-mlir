@@ -255,6 +255,8 @@ mlir::StringAttr GPUSuggestBlockSizeOp::getKernelName() {
 mlir::StringRef getGpuAccessibleAttrName() {
   return "gpu_runtime.gpu_accessible";
 }
+
+mlir::StringRef getFenceFlagsAttrName() { return "gpu_runtime.fence_flags"; }
 } // namespace gpu_runtime
 
 // TODO: unify with upstream

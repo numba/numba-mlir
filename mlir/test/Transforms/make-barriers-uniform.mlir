@@ -9,7 +9,7 @@ func.func @test() {
     scf.if %cond {
       "test.test2"() : () -> ()
       %1 = "test.test3"() : () -> i32
-      gpu_runtime.barrier  1 {test.test_attr}
+      gpu.barrier {test.test_attr}
       "test.test4"() : () -> ()
       "test.test5"(%1) : (i32) -> ()
     }
@@ -29,7 +29,7 @@ func.func @test() {
 //       CHECK: %[[V2:.*]] = numba_util.undef : i32
 //       CHECK: scf.yield %[[V2]] : i32
 //       CHECK: }
-//       CHECK: gpu_runtime.barrier  1 {test.test_attr}
+//       CHECK: gpu.barrier {test.test_attr}
 //       CHECK: scf.if %[[COND]] {
 //       CHECK: "test.test4"() : () -> ()
 //       CHECK: "test.test5"(%[[RES1]]) : (i32) -> ()
@@ -49,11 +49,11 @@ func.func @test() {
       "test.test2"() : () -> ()
       %1 = "test.test3"() : () -> i32
       %2 = "test.test4"() : () -> i64
-      gpu_runtime.barrier  1
+      gpu.barrier
       "test.test5"() : () -> ()
       "test.test6"(%1) : (i32) -> ()
       %3 = "test.test7"() : () -> index
-      gpu_runtime.barrier  2
+      gpu.barrier {test.test_attr}
       "test.test8"() : () -> ()
       "test.test9"(%2) : (i64) -> ()
       "test.test10"(%3) : (index) -> ()
@@ -76,7 +76,7 @@ func.func @test() {
 //       CHECK: %[[V4:.*]] = numba_util.undef : i64
 //       CHECK: scf.yield %[[V3]], %[[V4]] : i32, i64
 //       CHECK: }
-//       CHECK: gpu_runtime.barrier  1
+//       CHECK: gpu.barrier
 //       CHECK: %[[RES2:.*]] = scf.if %[[COND]] -> (index) {
 //       CHECK: "test.test5"() : () -> ()
 //       CHECK: "test.test6"(%[[RES1]]#0) : (i32) -> ()
@@ -86,7 +86,7 @@ func.func @test() {
 //       CHECK: %[[V6:.*]] = numba_util.undef : index
 //       CHECK: scf.yield %[[V6]] : index
 //       CHECK: }
-//       CHECK: gpu_runtime.barrier 2
+//       CHECK: gpu.barrier {test.test_attr}
 //       CHECK: scf.if %[[COND]] {
 //       CHECK: "test.test8"() : () -> ()
 //       CHECK: "test.test9"(%[[RES1]]#1) : (i64) -> ()

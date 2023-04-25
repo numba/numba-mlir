@@ -4,7 +4,6 @@
 
 #include "numba/Dialect/gpu_runtime/Transforms/MakeBarriersUniform.hpp"
 
-#include "numba/Dialect/gpu_runtime/IR/GpuRuntimeOps.hpp"
 #include "numba/Dialect/numba_util/Dialect.hpp"
 
 #include <mlir/Dialect/Arith/IR/Arith.h>
@@ -147,8 +146,8 @@ static mlir::LogicalResult convertBlockingOp(mlir::Operation *op,
   rewriter.mergeBlocks(beforeBlock, beforeIf.thenBlock());
   auto beforeIfResults = beforeIf.getResults();
 
-  if (auto barrierOp = mlir::dyn_cast<gpu_runtime::GPUBarrierOp>(op)) {
-    // Use clone to copy user-defined attrs.
+  if (auto barrierOp = mlir::dyn_cast<mlir::gpu::BarrierOp>(op)) {
+    // Use clone to preserve user-defined attrs.
     auto newOp = rewriter.clone(*barrierOp);
     rewriter.replaceOp(barrierOp, newOp->getResults());
   } else if (auto reduceOp = mlir::dyn_cast<mlir::gpu::AllReduceOp>(op)) {
@@ -195,12 +194,11 @@ static mlir::LogicalResult convertBlockingOp(mlir::Operation *op,
 }
 
 namespace {
-struct ConvertBarrierOp
-    : public mlir::OpRewritePattern<gpu_runtime::GPUBarrierOp> {
+struct ConvertBarrierOp : public mlir::OpRewritePattern<mlir::gpu::BarrierOp> {
   using OpRewritePattern::OpRewritePattern;
 
   mlir::LogicalResult
-  matchAndRewrite(gpu_runtime::GPUBarrierOp op,
+  matchAndRewrite(mlir::gpu::BarrierOp op,
                   mlir::PatternRewriter &rewriter) const override {
     return convertBlockingOp(op, rewriter);
   }
@@ -231,7 +229,6 @@ struct MakeBarriersUniformPass
 
   virtual void
   getDependentDialects(mlir::DialectRegistry &registry) const override {
-    registry.insert<gpu_runtime::GpuRuntimeDialect>();
     registry.insert<mlir::arith::ArithDialect>();
     registry.insert<mlir::gpu::GPUDialect>();
     registry.insert<mlir::scf::SCFDialect>();

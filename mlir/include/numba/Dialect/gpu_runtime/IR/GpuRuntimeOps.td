@@ -188,14 +188,6 @@ def GPUSuggestBlockSizeOp : GpuRuntime_Op<"suggest_block_size",
   }];
 }
 
-def GPUBarrierOp : GpuRuntime_Op<"barrier"> {
-  let summary = "Synchronizes all work items of a workgroup.";
-
-  let arguments = (ins I64Attr:$flags);
-
-  let assemblyFormat = "$flags attr-dict";
-}
-
 def GPUMemFenceOp : GpuRuntime_Op<"mem_fence"> {
   let summary = "Orders loads and stores of a work-item executing a kernel.";
 

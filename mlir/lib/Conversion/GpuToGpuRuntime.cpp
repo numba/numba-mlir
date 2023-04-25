@@ -1000,29 +1000,50 @@ public:
   }
 };
 
+static gpu_runtime::FenceFlags getOpFlags(mlir::Operation *op) {
+  assert(op);
+  auto attr = op->getAttrOfType<mlir::IntegerAttr>(
+      gpu_runtime::getFenceFlagsAttrName());
+  if (!attr)
+    return gpu_runtime::FenceFlags::global;
+
+  return static_cast<gpu_runtime::FenceFlags>(attr.getValue().getSExtValue());
+}
+
+static std::optional<mlir::spirv::MemorySemantics>
+getSpirvMemSematics(gpu_runtime::FenceFlags flags) {
+  if (flags == gpu_runtime::FenceFlags::global) {
+    return mlir::spirv::MemorySemantics::SequentiallyConsistent |
+           mlir::spirv::MemorySemantics::CrossWorkgroupMemory;
+  }
+  if (flags == gpu_runtime::FenceFlags::local) {
+    return mlir::spirv::MemorySemantics::SequentiallyConsistent |
+           mlir::spirv::MemorySemantics::WorkgroupMemory;
+  }
+  return std::nullopt;
+}
+
 class ConvertBarrierOp
-    : public mlir::OpConversionPattern<gpu_runtime::GPUBarrierOp> {
+    : public mlir::OpConversionPattern<mlir::gpu::BarrierOp> {
 public:
-  using OpConversionPattern::OpConversionPattern;
+  // Set benefit higher than upstream lowering.
+  ConvertBarrierOp(mlir::TypeConverter &typeConverter,
+                   mlir::MLIRContext *context)
+      : mlir::OpConversionPattern<mlir::gpu::BarrierOp>(typeConverter, context,
+                                                        /*benefit*/ 10) {}
 
   mlir::LogicalResult
-  matchAndRewrite(gpu_runtime::GPUBarrierOp op,
-                  gpu_runtime::GPUBarrierOp::Adaptor adaptor,
+  matchAndRewrite(mlir::gpu::BarrierOp op,
+                  mlir::gpu::BarrierOp::Adaptor adaptor,
                   mlir::ConversionPatternRewriter &rewriter) const override {
-    auto scope = mlir::spirv::Scope::Workgroup;
-    mlir::spirv::MemorySemantics semantics;
-    auto flags = static_cast<gpu_runtime::FenceFlags>(adaptor.getFlags());
-    if (flags == gpu_runtime::FenceFlags::global) {
-      semantics = mlir::spirv::MemorySemantics::SequentiallyConsistent |
-                  mlir::spirv::MemorySemantics::CrossWorkgroupMemory;
-    } else if (flags == gpu_runtime::FenceFlags::local) {
-      semantics = mlir::spirv::MemorySemantics::SequentiallyConsistent |
-                  mlir::spirv::MemorySemantics::WorkgroupMemory;
-    } else {
+    auto flags = getOpFlags(op);
+    auto semantics = getSpirvMemSematics(flags);
+    if (!semantics)
       return mlir::failure();
-    }
+
+    auto scope = mlir::spirv::Scope::Workgroup;
     rewriter.replaceOpWithNewOp<mlir::spirv::ControlBarrierOp>(op, scope, scope,
-                                                               semantics);
+                                                               *semantics);
     return mlir::success();
   }
 };
@@ -1036,20 +1057,14 @@ public:
   matchAndRewrite(gpu_runtime::GPUMemFenceOp op,
                   gpu_runtime::GPUMemFenceOp::Adaptor adaptor,
                   mlir::ConversionPatternRewriter &rewriter) const override {
-    auto scope = mlir::spirv::Scope::Workgroup;
-    mlir::spirv::MemorySemantics semantics;
     auto flags = static_cast<gpu_runtime::FenceFlags>(adaptor.getFlags());
-    if (flags == gpu_runtime::FenceFlags::global) {
-      semantics = mlir::spirv::MemorySemantics::SequentiallyConsistent |
-                  mlir::spirv::MemorySemantics::CrossWorkgroupMemory;
-    } else if (flags == gpu_runtime::FenceFlags::local) {
-      semantics = mlir::spirv::MemorySemantics::SequentiallyConsistent |
-                  mlir::spirv::MemorySemantics::WorkgroupMemory;
-    } else {
+    auto semantics = getSpirvMemSematics(flags);
+    if (!semantics)
       return mlir::failure();
-    }
+
+    auto scope = mlir::spirv::Scope::Workgroup;
     rewriter.replaceOpWithNewOp<mlir::spirv::MemoryBarrierOp>(op, scope,
-                                                              semantics);
+                                                              *semantics);
     return mlir::success();
   }
 };
