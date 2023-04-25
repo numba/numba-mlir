@@ -74,19 +74,9 @@ getNeutralValue(mlir::gpu::AllReduceOp reduceOp) {
 
 static mlir::LogicalResult convertBlockingOp(mlir::Operation *op,
                                              mlir::PatternRewriter &rewriter) {
-  auto launchOp = op->getParentOfType<mlir::gpu::LaunchOp>();
-
-  // Must be within launch op.
-  if (!launchOp)
-    return mlir::failure();
-
   // IfOp must be an immediate parent
   auto ifOp = mlir::dyn_cast<mlir::scf::IfOp>(op->getParentOp());
   if (!ifOp)
-    return mlir::failure();
-
-  // LaunchOp must be an immediate parent of ifOp.
-  if (ifOp->getParentOp() != launchOp)
     return mlir::failure();
 
   // IfOp with else block is not yet supported;
