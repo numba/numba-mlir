@@ -47,14 +47,6 @@ def require_dpctl(func):
 
 _def_device = get_default_device_name()
 
-
-def skip_opencl_reductions(func):
-    global _def_device
-    return pytest.mark.skipif(
-        _def_device.startswith("opencl"), reason="Reduction issue witch OpenCL backend"
-    )(func)
-
-
 _test_values = [
     True,
     False,
@@ -905,7 +897,6 @@ def test_private_memory(blocksize):
 
 
 @require_gpu
-@skip_opencl_reductions
 @pytest.mark.parametrize("group_op", [group.reduce_add])
 @pytest.mark.parametrize("global_size", [1, 2, 4, 27, 67, 101])
 @pytest.mark.parametrize("local_size", [1, 2, 7, 17, 33])
@@ -1179,7 +1170,6 @@ def test_cfd_reshape():
 
 @pytest.mark.smoke
 @require_dpctl
-@skip_opencl_reductions
 @pytest.mark.parametrize("size", [1, 7, 16, 64, 65, 256, 512, 1024 * 1024])
 def test_cfd_reduce1(size):
     if size == 1:
@@ -1210,7 +1200,6 @@ _shapes = (1, 7, 16, 25, 64, 65)
 
 
 @require_dpctl
-@skip_opencl_reductions
 @parametrize_function_variants(
     "py_func",
     [

@@ -1285,6 +1285,11 @@ public:
     if (!launchOp)
       return mlir::failure();
 
+    // This case will be handled by MakeBarriersUniformPass.
+    if (mlir::isa<mlir::scf::IfOp>(op->getParentOp()) &&
+        op->getParentOp()->getParentOp() == launchOp)
+      return mlir::failure();
+
     if (!op.getOp())
       return mlir::failure();
 
@@ -1770,10 +1775,6 @@ static mlir::spirv::TargetEnvAttr deviceCapsMapper(mlir::gpu::GPUModuleOp op) {
 
   auto spirvVersion = *spirvVersionRet;
 
-  // Pretend we are supporting 1.3 for non-uniform ops.
-  if (spirvVersion == mlir::spirv::Version::V_1_2)
-    spirvVersion = mlir::spirv::Version::V_1_3;
-
   auto context = op.getContext();
   namespace spirv = mlir::spirv;
   spirv::Capability fixedCaps[] = {
@@ -1782,7 +1783,6 @@ static mlir::spirv::TargetEnvAttr deviceCapsMapper(mlir::gpu::GPUModuleOp op) {
       spirv::Capability::AtomicFloat32AddEXT,
       spirv::Capability::ExpectAssumeKHR,
       spirv::Capability::GenericPointer,
-      spirv::Capability::GroupNonUniformArithmetic,
       spirv::Capability::GroupUniformArithmeticKHR,
       spirv::Capability::Groups,
       spirv::Capability::Int16,
@@ -1851,9 +1851,9 @@ static void populateLowerToGPUPipelineMed(mlir::OpPassManager &pm) {
   funcPM.addPass(mlir::memref::createExpandStridedMetadataPass());
   funcPM.addPass(mlir::createLowerAffinePass());
 
+  funcPM.addPass(gpu_runtime::createMakeBarriersUniformPass());
   commonOptPasses(funcPM);
   funcPM.addPass(std::make_unique<KernelMemrefOpsMovementPass>());
-  funcPM.addPass(gpu_runtime::createMakeBarriersUniformPass());
   funcPM.addPass(std::make_unique<SinkGpuDimsPass>());
   funcPM.addPass(std::make_unique<GpuLaunchSinkOpsPass>());
   pm.addPass(mlir::createGpuKernelOutliningPass());

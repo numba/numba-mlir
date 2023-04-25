@@ -20,7 +20,9 @@ def GpuRuntime_Dialect : Dialect {
   let description = [{
       GpuRuntime Dialect for representing Gpu runtime ops for level zero runtime
     }];
-  let cppNamespace = "gpu_runtime";
+  let cppNamespace = "::gpu_runtime";
+
+  let hasCanonicalizer = 1;
   let hasConstantMaterializer = 1;
   let useDefaultAttributePrinterParser = 1;
   let useDefaultTypePrinterParser = 1;
