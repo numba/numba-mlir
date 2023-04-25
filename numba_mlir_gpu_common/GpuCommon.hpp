@@ -22,7 +22,7 @@ public:
   /// Returns device name.
   virtual std::string_view getDeviceName() = 0;
 
-  /// Returns sycl queue associated with this stream or null is queue is not
+  /// Returns sycl queue associated with this stream or null if queue is not
   /// available.
   virtual sycl::queue *getQueue() = 0;
 };
