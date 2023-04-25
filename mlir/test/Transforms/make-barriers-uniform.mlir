@@ -20,21 +20,21 @@ func.func @test() {
 
 // CHECK-LABEL: func @test
 //       CHECK: gpu.launch blocks
-//  CHECK-NEXT: %[[COND:.*]] = "test.test1"() : () -> i1
-//  CHECK-NEXT: %[[RES1:.*]] = scf.if %[[COND]] -> (i32) {
-//  CHECK-NEXT: "test.test2"() : () -> ()
-//  CHECK-NEXT: %[[V1:.*]] = "test.test3"() : () -> i32
-//  CHECK-NEXT: scf.yield %[[V1]] : i32
-//  CHECK-NEXT: } else {
-//  CHECK-NEXT: %[[V2:.*]] = numba_util.undef : i32
-//  CHECK-NEXT: scf.yield %[[V2]] : i32
-//  CHECK-NEXT: }
-//  CHECK-NEXT: gpu_runtime.barrier  1
-//  CHECK-NEXT: scf.if %[[COND]] {
-//  CHECK-NEXT: "test.test4"() : () -> ()
-//  CHECK-NEXT: "test.test5"(%[[RES1]]) : (i32) -> ()
-//  CHECK-NEXT: }
-//  CHECK-NEXT: gpu.terminator
+//       CHECK: %[[COND:.*]] = "test.test1"() : () -> i1
+//       CHECK: %[[RES1:.*]] = scf.if %[[COND]] -> (i32) {
+//       CHECK: "test.test2"() : () -> ()
+//       CHECK: %[[V1:.*]] = "test.test3"() : () -> i32
+//       CHECK: scf.yield %[[V1]] : i32
+//       CHECK: } else {
+//       CHECK: %[[V2:.*]] = numba_util.undef : i32
+//       CHECK: scf.yield %[[V2]] : i32
+//       CHECK: }
+//       CHECK: gpu_runtime.barrier  1
+//       CHECK: scf.if %[[COND]] {
+//       CHECK: "test.test4"() : () -> ()
+//       CHECK: "test.test5"(%[[RES1]]) : (i32) -> ()
+//       CHECK: }
+//       CHECK: gpu.terminator
 //       CHECK: return
 
 // -----
@@ -65,34 +65,34 @@ func.func @test() {
 
 // CHECK-LABEL: func @test
 //       CHECK: gpu.launch blocks
-//  CHECK-NEXT: %[[COND:.*]] = "test.test1"() : () -> i1
-//  CHECK-NEXT: %[[RES1:.*]]:2 = scf.if %[[COND]] -> (i32, i64) {
-//  CHECK-NEXT: "test.test2"() : () -> ()
-//  CHECK-NEXT: %[[V1:.*]] = "test.test3"() : () -> i32
-//  CHECK-NEXT: %[[V2:.*]] = "test.test4"() : () -> i64
-//  CHECK-NEXT: scf.yield %[[V1]], %[[V2]] : i32, i64
-//  CHECK-NEXT: } else {
-//  CHECK-NEXT: %[[V3:.*]] = numba_util.undef : i32
-//  CHECK-NEXT: %[[V4:.*]] = numba_util.undef : i64
-//  CHECK-NEXT: scf.yield %[[V3]], %[[V4]] : i32, i64
-//  CHECK-NEXT: }
-//  CHECK-NEXT: gpu_runtime.barrier  1
-//  CHECK-NEXT: %[[RES2:.*]] = scf.if %[[COND]] -> (index) {
-//  CHECK-NEXT: "test.test5"() : () -> ()
-//  CHECK-NEXT: "test.test6"(%[[RES1]]#0) : (i32) -> ()
-//  CHECK-NEXT: %[[V5:.*]] = "test.test7"() : () -> index
-//  CHECK-NEXT: scf.yield %[[V5]] : index
-//  CHECK-NEXT: } else {
-//  CHECK-NEXT: %[[V6:.*]] = numba_util.undef : index
-//  CHECK-NEXT: scf.yield %[[V6]] : index
-//  CHECK-NEXT: }
-//  CHECK-NEXT: gpu_runtime.barrier 2
-//  CHECK-NEXT: scf.if %[[COND]] {
-//  CHECK-NEXT: "test.test8"() : () -> ()
-//  CHECK-NEXT: "test.test9"(%[[RES1]]#1) : (i64) -> ()
-//  CHECK-NEXT: "test.test10"(%[[RES2]]) : (index) -> ()
-//  CHECK-NEXT: }
-//  CHECK-NEXT: gpu.terminator
+//       CHECK: %[[COND:.*]] = "test.test1"() : () -> i1
+//       CHECK: %[[RES1:.*]]:2 = scf.if %[[COND]] -> (i32, i64) {
+//       CHECK: "test.test2"() : () -> ()
+//       CHECK: %[[V1:.*]] = "test.test3"() : () -> i32
+//       CHECK: %[[V2:.*]] = "test.test4"() : () -> i64
+//       CHECK: scf.yield %[[V1]], %[[V2]] : i32, i64
+//       CHECK: } else {
+//       CHECK: %[[V3:.*]] = numba_util.undef : i32
+//       CHECK: %[[V4:.*]] = numba_util.undef : i64
+//       CHECK: scf.yield %[[V3]], %[[V4]] : i32, i64
+//       CHECK: }
+//       CHECK: gpu_runtime.barrier  1
+//       CHECK: %[[RES2:.*]] = scf.if %[[COND]] -> (index) {
+//       CHECK: "test.test5"() : () -> ()
+//       CHECK: "test.test6"(%[[RES1]]#0) : (i32) -> ()
+//       CHECK: %[[V5:.*]] = "test.test7"() : () -> index
+//       CHECK: scf.yield %[[V5]] : index
+//       CHECK: } else {
+//       CHECK: %[[V6:.*]] = numba_util.undef : index
+//       CHECK: scf.yield %[[V6]] : index
+//       CHECK: }
+//       CHECK: gpu_runtime.barrier 2
+//       CHECK: scf.if %[[COND]] {
+//       CHECK: "test.test8"() : () -> ()
+//       CHECK: "test.test9"(%[[RES1]]#1) : (i64) -> ()
+//       CHECK: "test.test10"(%[[RES2]]) : (index) -> ()
+//       CHECK: }
+//       CHECK: gpu.terminator
 //       CHECK: return
 
 // -----
@@ -124,29 +124,29 @@ func.func @test() {
 // CHECK-LABEL: func @test
 //       CHECK: %[[NEUTRAL:.*]] = arith.constant 0 : i64
 //       CHECK: gpu.launch blocks
-//  CHECK-NEXT: %[[COND:.*]] = "test.test1"() : () -> i1
-//  CHECK-NEXT: %[[RES1:.*]]:2 = scf.if %[[COND]] -> (i32, i64) {
-//  CHECK-NEXT: "test.test2"() : () -> ()
-//  CHECK-NEXT: %[[V1:.*]] = "test.test3"() : () -> i32
-//  CHECK-NEXT: %[[V2:.*]] = "test.test4"() : () -> i64
-//  CHECK-NEXT: scf.yield %[[V1]], %[[V2]] : i32, i64
-//  CHECK-NEXT: } else {
-//  CHECK-NEXT: %[[V3:.*]] = numba_util.undef : i32
-//  CHECK-NEXT: %[[V4:.*]] = numba_util.undef : i64
-//  CHECK-NEXT: scf.yield %[[V3]], %[[V4]] : i32, i64
-//  CHECK-NEXT: }
-//  CHECK-NEXT: %[[RARG:.*]] = arith.select %[[COND]], %[[RES1]]#1, %[[NEUTRAL]] : i64
-//  CHECK-NEXT: %[[RRES:.*]] = gpu.all_reduce %[[RARG]] uniform {
-//  CHECK-NEXT:  ^bb0(%[[A1:.*]]: i64, %[[A2:.*]]: i64):
-//  CHECK-NEXT:   %[[X:.*]] = arith.xori %[[A1]], %[[A2]] : i64
-//  CHECK-NEXT:   "gpu.yield"(%[[X]]) : (i64) -> ()
-//  CHECK-NEXT:   } : (i64) -> i64
-//  CHECK-NEXT: scf.if %[[COND]] {
-//  CHECK-NEXT: "test.test5"() : () -> ()
-//  CHECK-NEXT: "test.test6"(%[[RES1]]#0) : (i32) -> ()
-//  CHECK-NEXT: "test.test7"(%[[RRES]]) : (i64) -> ()
-//  CHECK-NEXT: }
-//  CHECK-NEXT: gpu.terminator
+//       CHECK: %[[COND:.*]] = "test.test1"() : () -> i1
+//       CHECK: %[[RES1:.*]]:2 = scf.if %[[COND]] -> (i32, i64) {
+//       CHECK: "test.test2"() : () -> ()
+//       CHECK: %[[V1:.*]] = "test.test3"() : () -> i32
+//       CHECK: %[[V2:.*]] = "test.test4"() : () -> i64
+//       CHECK: scf.yield %[[V1]], %[[V2]] : i32, i64
+//       CHECK: } else {
+//       CHECK: %[[V3:.*]] = numba_util.undef : i32
+//       CHECK: %[[V4:.*]] = numba_util.undef : i64
+//       CHECK: scf.yield %[[V3]], %[[V4]] : i32, i64
+//       CHECK: }
+//       CHECK: %[[RARG:.*]] = arith.select %[[COND]], %[[RES1]]#1, %[[NEUTRAL]] : i64
+//       CHECK: %[[RRES:.*]] = gpu.all_reduce %[[RARG]] uniform {
+//       CHECK:  ^bb0(%[[A1:.*]]: i64, %[[A2:.*]]: i64):
+//       CHECK:   %[[X:.*]] = arith.xori %[[A1]], %[[A2]] : i64
+//       CHECK:   "gpu.yield"(%[[X]]) : (i64) -> ()
+//       CHECK:   } : (i64) -> i64
+//       CHECK: scf.if %[[COND]] {
+//       CHECK: "test.test5"() : () -> ()
+//       CHECK: "test.test6"(%[[RES1]]#0) : (i32) -> ()
+//       CHECK: "test.test7"(%[[RRES]]) : (i64) -> ()
+//       CHECK: }
+//       CHECK: gpu.terminator
 //       CHECK: return
 
 // -----
@@ -174,24 +174,24 @@ func.func @test() {
 // CHECK-LABEL: func @test
 //       CHECK: %[[NEUTRAL:.*]] = arith.constant 1 : i64
 //       CHECK: gpu.launch blocks
-//  CHECK-NEXT: %[[COND:.*]] = "test.test1"() : () -> i1
-//  CHECK-NEXT: %[[RES1:.*]]:2 = scf.if %[[COND]] -> (i32, i64) {
-//  CHECK-NEXT: "test.test2"() : () -> ()
-//  CHECK-NEXT: %[[V1:.*]] = "test.test3"() : () -> i32
-//  CHECK-NEXT: %[[V2:.*]] = "test.test4"() : () -> i64
-//  CHECK-NEXT: scf.yield %[[V1]], %[[V2]] : i32, i64
-//  CHECK-NEXT: } else {
-//  CHECK-NEXT: %[[V3:.*]] = numba_util.undef : i32
-//  CHECK-NEXT: %[[V4:.*]] = numba_util.undef : i64
-//  CHECK-NEXT: scf.yield %[[V3]], %[[V4]] : i32, i64
-//  CHECK-NEXT: }
-//  CHECK-NEXT: %[[RARG:.*]] = arith.select %[[COND]], %[[RES1]]#1, %[[NEUTRAL]] : i64
-//  CHECK-NEXT: %[[RRES:.*]] = gpu.all_reduce mul %[[RARG]] {
-//  CHECK-NEXT:   } : (i64) -> i64
-//  CHECK-NEXT: scf.if %[[COND]] {
-//  CHECK-NEXT: "test.test5"() : () -> ()
-//  CHECK-NEXT: "test.test6"(%[[RES1]]#0) : (i32) -> ()
-//  CHECK-NEXT: "test.test7"(%[[RRES]]) : (i64) -> ()
-//  CHECK-NEXT: }
-//  CHECK-NEXT: gpu.terminator
+//       CHECK: %[[COND:.*]] = "test.test1"() : () -> i1
+//       CHECK: %[[RES1:.*]]:2 = scf.if %[[COND]] -> (i32, i64) {
+//       CHECK: "test.test2"() : () -> ()
+//       CHECK: %[[V1:.*]] = "test.test3"() : () -> i32
+//       CHECK: %[[V2:.*]] = "test.test4"() : () -> i64
+//       CHECK: scf.yield %[[V1]], %[[V2]] : i32, i64
+//       CHECK: } else {
+//       CHECK: %[[V3:.*]] = numba_util.undef : i32
+//       CHECK: %[[V4:.*]] = numba_util.undef : i64
+//       CHECK: scf.yield %[[V3]], %[[V4]] : i32, i64
+//       CHECK: }
+//       CHECK: %[[RARG:.*]] = arith.select %[[COND]], %[[RES1]]#1, %[[NEUTRAL]] : i64
+//       CHECK: %[[RRES:.*]] = gpu.all_reduce mul %[[RARG]] {
+//       CHECK:   } : (i64) -> i64
+//       CHECK: scf.if %[[COND]] {
+//       CHECK: "test.test5"() : () -> ()
+//       CHECK: "test.test6"(%[[RES1]]#0) : (i32) -> ()
+//       CHECK: "test.test7"(%[[RRES]]) : (i64) -> ()
+//       CHECK: }
+//       CHECK: gpu.terminator
 //       CHECK: return
