@@ -13,6 +13,110 @@
 #include <mlir/Pass/Pass.h>
 #include <mlir/Transforms/GreedyPatternRewriteDriver.h>
 
+static mlir::LogicalResult convertBlockingOp(gpu_runtime::GPUBarrierOp op,
+                                             mlir::PatternRewriter &rewriter) {
+  auto launchOp = op->getParentOfType<mlir::gpu::LaunchOp>();
+
+  // Must be within launch op.
+  if (!launchOp)
+    return mlir::failure();
+
+  // IfOp must be an immediate parent
+  auto ifOp = mlir::dyn_cast<mlir::scf::IfOp>(op->getParentOp());
+  if (!ifOp)
+    return mlir::failure();
+
+  // LaunchOp must be an immediate parent of ifOp.
+  if (ifOp->getParentOp() != launchOp)
+    return mlir::failure();
+
+  // IfOp with else block is not yet supported;
+  if (ifOp.elseBlock())
+    return mlir::failure();
+
+  mlir::Block *ifBody = ifOp.thenBlock();
+  assert(ifBody);
+
+  mlir::DominanceInfo dom;
+  llvm::SmallMapVector<mlir::Value, unsigned, 8> yieldArgsMap;
+
+  auto barrierIt = op->getIterator();
+  for (auto &beforeOp : llvm::make_range(ifBody->begin(), barrierIt)) {
+    for (auto result : beforeOp.getResults()) {
+      for (mlir::OpOperand &&user : result.getUsers()) {
+        auto owner = user.getOwner();
+        if (dom.properlyDominates(op, owner)) {
+          auto idx = static_cast<unsigned>(yieldArgsMap.size());
+          yieldArgsMap.insert({result, idx});
+        }
+      }
+    }
+  }
+
+  auto yieldArgs = llvm::to_vector(llvm::make_first_range(yieldArgsMap));
+
+  auto afterBlock = rewriter.splitBlock(ifBody, std::next(barrierIt));
+  auto beforeBlock = rewriter.splitBlock(ifBody, ifBody->begin());
+
+  auto barrierLoc = op.getLoc();
+  auto barrierFlags = op.getFlags();
+  rewriter.eraseOp(op);
+
+  rewriter.setInsertionPointToEnd(beforeBlock);
+  rewriter.create<mlir::scf::YieldOp>(rewriter.getUnknownLoc(), yieldArgs);
+
+  rewriter.setInsertionPoint(ifOp);
+  auto ifLoc = ifOp->getLoc();
+  auto cond = ifOp.getCondition();
+
+  auto emptyBodyBuilder = [&](mlir::OpBuilder & /*builder*/,
+                              mlir::Location /*loc*/) {};
+
+  auto bodyBuilder = [&](mlir::OpBuilder &builder, mlir::Location loc) {
+    llvm::SmallVector<mlir::Value> results;
+    results.reserve(yieldArgs.size());
+    for (auto arg : yieldArgs) {
+      auto val = builder.create<numba::util::UndefOp>(loc, arg.getType());
+      results.emplace_back(val);
+    }
+
+    builder.create<mlir::scf::YieldOp>(loc, results);
+  };
+
+  mlir::ValueRange yieldArgsRange(yieldArgs);
+  auto beforeIf =
+      rewriter.create<mlir::scf::IfOp>(ifLoc, cond, bodyBuilder, bodyBuilder);
+  for (auto &op :
+       llvm::make_early_inc_range(llvm::reverse(*beforeIf.thenBlock())))
+    rewriter.eraseOp(&op);
+
+  rewriter.mergeBlocks(beforeBlock, beforeIf.thenBlock());
+
+  rewriter.create<gpu_runtime::GPUBarrierOp>(barrierLoc, barrierFlags);
+
+  auto beforeIfResults = beforeIf.getResults();
+
+  auto afterIf =
+      rewriter.create<mlir::scf::IfOp>(ifLoc, cond, emptyBodyBuilder);
+  rewriter.mergeBlocks(afterBlock, afterIf.thenBlock());
+
+  for (auto &op : *afterIf.thenBlock()) {
+    for (mlir::OpOperand &arg : op.getOpOperands()) {
+      auto val = arg.get();
+      auto it = yieldArgsMap.find(val);
+      if (it != yieldArgsMap.end()) {
+        auto i = it->second;
+        assert(i < beforeIfResults.size() && "Invalid result index.");
+        auto newVal = beforeIfResults[i];
+        rewriter.updateRootInPlace(&op, [&]() { arg.set(newVal); });
+      }
+    }
+  }
+
+  rewriter.eraseOp(ifOp);
+  return mlir::success();
+}
+
 namespace {
 struct ConvertBarrierOp
     : public mlir::OpRewritePattern<gpu_runtime::GPUBarrierOp> {
@@ -21,109 +125,7 @@ struct ConvertBarrierOp
   mlir::LogicalResult
   matchAndRewrite(gpu_runtime::GPUBarrierOp op,
                   mlir::PatternRewriter &rewriter) const override {
-    auto launchOp = op->getParentOfType<mlir::gpu::LaunchOp>();
-
-    // Must be within launch op.
-    if (!launchOp)
-      return mlir::failure();
-
-    // If op must be an immediate parent
-    auto ifOp = mlir::dyn_cast<mlir::scf::IfOp>(op->getParentOp());
-    if (!ifOp)
-      return mlir::failure();
-
-    // Launch op must be an immediate parent of ifOp.
-    if (ifOp->getParentOp() != launchOp)
-      return mlir::failure();
-
-    // IfOp with else block is not yet supported;
-    if (ifOp.elseBlock())
-      return mlir::failure();
-
-    mlir::Block *ifBody = ifOp.thenBlock();
-    assert(ifBody);
-
-    mlir::DominanceInfo dom;
-    llvm::SmallMapVector<mlir::Value, unsigned, 8> yieldArgsMap;
-
-    auto barrierIt = op->getIterator();
-    for (auto &beforeOp : llvm::make_range(ifBody->begin(), barrierIt)) {
-      for (auto result : beforeOp.getResults()) {
-        for (mlir::OpOperand user : result.getUsers()) {
-          auto owner = user.getOwner();
-          if (dom.properlyDominates(op, owner)) {
-            auto idx = static_cast<unsigned>(yieldArgsMap.size());
-            yieldArgsMap.insert({result, idx});
-          }
-        }
-      }
-    }
-
-    auto yieldArgs = [&]() {
-      auto range = llvm::make_first_range(yieldArgsMap);
-      return llvm::SmallVector<mlir::Value>(std::begin(range), std::end(range));
-    }();
-
-    auto afterBlock = rewriter.splitBlock(ifBody, std::next(barrierIt));
-    auto beforeBlock = rewriter.splitBlock(ifBody, ifBody->begin());
-
-    auto barrierLoc = op->getLoc();
-    auto barrierFlags = op.getFlags();
-    rewriter.eraseOp(op);
-
-    rewriter.setInsertionPointToEnd(beforeBlock);
-    rewriter.create<mlir::scf::YieldOp>(rewriter.getUnknownLoc(), yieldArgs);
-
-    rewriter.setInsertionPoint(ifOp);
-    auto ifLoc = ifOp->getLoc();
-    auto cond = ifOp.getCondition();
-
-    auto emptyBodyBuilder = [&](mlir::OpBuilder & /*builder*/,
-                                mlir::Location /*loc*/) {};
-
-    auto bodyBuilder = [&](mlir::OpBuilder &builder, mlir::Location loc) {
-      llvm::SmallVector<mlir::Value> results;
-      results.reserve(yieldArgs.size());
-      for (auto arg : yieldArgs) {
-        auto val = builder.create<numba::util::UndefOp>(loc, arg.getType());
-        results.emplace_back(val);
-      }
-
-      builder.create<mlir::scf::YieldOp>(loc, results);
-    };
-
-    mlir::ValueRange yieldArgsRange(yieldArgs);
-    auto beforeIf =
-        rewriter.create<mlir::scf::IfOp>(ifLoc, cond, bodyBuilder, bodyBuilder);
-    for (auto &op :
-         llvm::make_early_inc_range(llvm::reverse(*beforeIf.thenBlock())))
-      rewriter.eraseOp(&op);
-
-    rewriter.mergeBlocks(beforeBlock, beforeIf.thenBlock());
-
-    rewriter.create<gpu_runtime::GPUBarrierOp>(barrierLoc, barrierFlags);
-
-    auto beforeIfResults = beforeIf.getResults();
-
-    auto afterIf =
-        rewriter.create<mlir::scf::IfOp>(ifLoc, cond, emptyBodyBuilder);
-    rewriter.mergeBlocks(afterBlock, afterIf.thenBlock());
-
-    for (auto &op : *afterIf.thenBlock()) {
-      for (mlir::OpOperand &arg : op.getOpOperands()) {
-        auto val = arg.get();
-        auto it = yieldArgsMap.find(val);
-        if (it != yieldArgsMap.end()) {
-          auto i = it->second;
-          assert(i < beforeIfResults.size() && "Invalid result index.");
-          auto newVal = beforeIfResults[i];
-          rewriter.updateRootInPlace(&op, [&]() { arg.set(newVal); });
-        }
-      }
-    }
-
-    rewriter.eraseOp(ifOp);
-    return mlir::success();
+    return convertBlockingOp(op, rewriter);
   }
 };
 } // namespace
