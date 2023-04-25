@@ -7,13 +7,27 @@
 #include "numba/Dialect/gpu_runtime/IR/GpuRuntimeOps.hpp"
 #include "numba/Dialect/numba_util/Dialect.hpp"
 
+#include <mlir/Dialect/Arith/IR/Arith.h>
 #include <mlir/Dialect/GPU/IR/GPUDialect.h>
+#include <mlir/Dialect/Linalg/Utils/Utils.h>
 #include <mlir/Dialect/SCF/IR/SCF.h>
 #include <mlir/IR/Dominance.h>
 #include <mlir/Pass/Pass.h>
 #include <mlir/Transforms/GreedyPatternRewriteDriver.h>
 
-static mlir::LogicalResult convertBlockingOp(mlir::Operation* op,
+static std::optional<mlir::Attribute> getNeutralValue(mlir::Region &region) {
+  if (!llvm::hasSingleElement(region))
+    return std::nullopt;
+
+  mlir::Block &block = region.front();
+  auto body = block.without_terminator();
+  if (!llvm::hasSingleElement(body))
+    return std::nullopt;
+
+  return mlir::linalg::getNeutralElement(&(*body.begin()));
+}
+
+static mlir::LogicalResult convertBlockingOp(mlir::Operation *op,
                                              mlir::PatternRewriter &rewriter) {
   auto launchOp = op->getParentOfType<mlir::gpu::LaunchOp>();
 
@@ -33,6 +47,15 @@ static mlir::LogicalResult convertBlockingOp(mlir::Operation* op,
   // IfOp with else block is not yet supported;
   if (ifOp.elseBlock())
     return mlir::failure();
+
+  mlir::TypedAttr neutralValAttr;
+  if (auto reduceOp = mlir::dyn_cast<mlir::gpu::AllReduceOp>(op)) {
+    auto nval = getNeutralValue(reduceOp.getBody());
+    if (!nval)
+      return mlir::failure();
+
+    neutralValAttr = mlir::cast<mlir::TypedAttr>(*nval);
+  }
 
   mlir::Block *ifBody = ifOp.thenBlock();
   assert(ifBody);
@@ -87,17 +110,32 @@ static mlir::LogicalResult convertBlockingOp(mlir::Operation* op,
     rewriter.eraseOp(&op);
 
   rewriter.mergeBlocks(beforeBlock, beforeIf.thenBlock());
+  auto beforeIfResults = beforeIf.getResults();
 
-  auto barrierLoc = op->getLoc();
-  if (auto barrier = mlir::dyn_cast<gpu_runtime::GPUBarrierOp>(op)) {
-    auto barrierFlags = barrier.getFlags();
-    rewriter.create<gpu_runtime::GPUBarrierOp>(barrierLoc, barrierFlags);
+  if (auto barrierOp = mlir::dyn_cast<gpu_runtime::GPUBarrierOp>(op)) {
+    auto barrierFlags = barrierOp.getFlags();
+    rewriter.replaceOpWithNewOp<gpu_runtime::GPUBarrierOp>(op, barrierFlags);
+  } else if (auto reduceOp = mlir::dyn_cast<mlir::gpu::AllReduceOp>(op)) {
+    auto loc = reduceOp.getLoc();
+    auto reduceArg = reduceOp.getValue();
+    assert(yieldArgsMap.count(reduceArg));
+    auto reduceArgIndex = yieldArgsMap.find(reduceArg)->second;
+    auto mappedReduceArg = beforeIfResults[reduceArgIndex];
+
+    assert(neutralValAttr);
+    auto neutralVal =
+        rewriter.create<mlir::arith::ConstantOp>(loc, neutralValAttr);
+    auto val = rewriter.create<mlir::arith::SelectOp>(
+        loc, cond, mappedReduceArg, neutralVal);
+
+    mlir::IRMapping mapping;
+    mapping.map(reduceArg, val);
+    auto newOp = rewriter.clone(*reduceOp, mapping);
+    rewriter.updateRootInPlace(reduceOp, [&]() { reduceOp.setUniform(true); });
+    rewriter.replaceOp(op, newOp->getResults());
   } else {
     llvm_unreachable("Unsupported barrie op");
   }
-  rewriter.eraseOp(op);
-
-  auto beforeIfResults = beforeIf.getResults();
 
   auto afterIf =
       rewriter.create<mlir::scf::IfOp>(ifLoc, cond, emptyBodyBuilder);
@@ -131,11 +169,22 @@ struct ConvertBarrierOp
     return convertBlockingOp(op, rewriter);
   }
 };
+
+struct ConvertAllReduceOp
+    : public mlir::OpRewritePattern<mlir::gpu::AllReduceOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(mlir::gpu::AllReduceOp op,
+                  mlir::PatternRewriter &rewriter) const override {
+    return convertBlockingOp(op, rewriter);
+  }
+};
 } // namespace
 
 void gpu_runtime::populateMakeBarriersUniformPatterns(
     mlir::RewritePatternSet &patterns) {
-  patterns.insert<ConvertBarrierOp>(patterns.getContext());
+  patterns.insert<ConvertBarrierOp, ConvertAllReduceOp>(patterns.getContext());
 }
 
 namespace {
@@ -147,6 +196,7 @@ struct MakeBarriersUniformPass
   virtual void
   getDependentDialects(mlir::DialectRegistry &registry) const override {
     registry.insert<gpu_runtime::GpuRuntimeDialect>();
+    registry.insert<mlir::arith::ArithDialect>();
     registry.insert<mlir::gpu::GPUDialect>();
     registry.insert<mlir::scf::SCFDialect>();
     registry.insert<numba::util::NumbaUtilDialect>();

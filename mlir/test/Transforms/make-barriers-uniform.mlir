@@ -94,3 +94,57 @@ func.func @test() {
 //  CHECK-NEXT: }
 //  CHECK-NEXT: gpu.terminator
 //       CHECK: return
+
+// -----
+
+func.func @test() {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  gpu.launch blocks(%bx, %by, %bz) in (%grid_x = %c1, %grid_y = %c1, %grid_z = %c1)
+             threads(%tx, %ty, %tz) in (%block_x = %c1, %block_y = %c1, %block_z = %c1) {
+    %cond = "test.test1"() : () -> i1
+    scf.if %cond {
+      "test.test2"() : () -> ()
+      %1 = "test.test3"() : () -> i32
+      %2 = "test.test4"() : () -> i64
+      %3 = gpu.all_reduce %2 uniform {
+      ^bb(%lhs : i64, %rhs : i64):
+        %xor = arith.xori %lhs, %rhs : i64
+        "gpu.yield"(%xor) : (i64) -> ()
+      } : (i64) -> (i64)
+      "test.test5"() : () -> ()
+      "test.test6"(%1) : (i32) -> ()
+      "test.test7"(%3) : (i64) -> ()
+    }
+    gpu.terminator
+  }
+  return
+}
+
+// CHECK-LABEL: func @test
+//       CHECK: %[[NEUTRAL:.*]] = arith.constant 0 : i64
+//       CHECK: gpu.launch blocks
+//  CHECK-NEXT: %[[COND:.*]] = "test.test1"() : () -> i1
+//  CHECK-NEXT: %[[RES1:.*]]:2 = scf.if %[[COND]] -> (i32, i64) {
+//  CHECK-NEXT: "test.test2"() : () -> ()
+//  CHECK-NEXT: %[[V1:.*]] = "test.test3"() : () -> i32
+//  CHECK-NEXT: %[[V2:.*]] = "test.test4"() : () -> i64
+//  CHECK-NEXT: scf.yield %[[V1]], %[[V2]] : i32, i64
+//  CHECK-NEXT: } else {
+//  CHECK-NEXT: %[[V3:.*]] = numba_util.undef : i32
+//  CHECK-NEXT: %[[V4:.*]] = numba_util.undef : i64
+//  CHECK-NEXT: scf.yield %[[V3]], %[[V4]] : i32, i64
+//  CHECK-NEXT: }
+//  CHECK-NEXT: %[[RARG:.*]] = arith.select %[[COND]], %[[RES1]]#1, %[[NEUTRAL]] : i64
+//  CHECK-NEXT: %[[RRES:.*]] = gpu.all_reduce %[[RARG]] uniform {
+//  CHECK-NEXT:  ^bb0(%[[A1:.*]]: i64, %[[A2:.*]]: i64):
+//  CHECK-NEXT:   %[[X:.*]] = arith.xori %[[A1]], %[[A2]] : i64
+//  CHECK-NEXT:   "gpu.yield"(%[[X]]) : (i64) -> ()
+//  CHECK-NEXT:   } : (
+//  CHECK-NEXT: scf.if %[[COND]] {
+//  CHECK-NEXT: "test.test5"() : () -> ()
+//  CHECK-NEXT: "test.test6"(%[[RES1]]#0) : (i32) -> ()
+//  CHECK-NEXT: "test.test7"(%[[RRES]]) : (i64) -> ()
+//  CHECK-NEXT: }
+//  CHECK-NEXT: gpu.terminator
+//        CHECK: return
