@@ -84,6 +84,8 @@ public:
 
   std::string_view getDeviceName() override { return deviceName; }
 
+  sycl::queue *getQueue() override { return &queue; }
+
   void retain() { ++refcout; }
 
   void release() {

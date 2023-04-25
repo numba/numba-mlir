@@ -4,14 +4,27 @@
 
 #pragma once
 
+#include <cstdint>
 #include <string_view>
+
+namespace sycl {
+inline namespace _V1 {
+class queue;
+}
+} // namespace sycl
 
 namespace numba {
 
 class GPUStreamInterface {
 public:
   virtual ~GPUStreamInterface() = default;
+
+  /// Returns device name.
   virtual std::string_view getDeviceName() = 0;
+
+  /// Returns sycl queue associated with this stream or null if queue is not
+  /// available.
+  virtual sycl::queue *getQueue() = 0;
 };
 
 struct OffloadDeviceCapabilities {

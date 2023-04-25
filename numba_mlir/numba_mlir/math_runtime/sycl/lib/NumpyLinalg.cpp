@@ -49,6 +49,15 @@ struct QueueMap {
 
 static std::unique_ptr<QueueMap> qMapPtr;
 
+static cl::sycl::queue getQueue(numba::GPUStreamInterface *streamIface) {
+  assert(streamIface);
+  if (auto queue = streamIface->getQueue())
+    return *queue;
+
+  assert(qMapPtr);
+  return qMapPtr->getQueue(std::string(streamIface->getDeviceName()));
+}
+
 template <typename T>
 using GemmFunc = sycl::event (*)(cl::sycl::queue &, oneapi::mkl::transpose,
                                  oneapi::mkl::transpose, std::int64_t,
@@ -105,7 +114,7 @@ static void deviceGemm(void *stream, const Memref<2, T> *a,
   auto bData = getMemrefData(b);
   auto cData = getMemrefData(c);
 
-  auto queue = qMapPtr->getQueue(std::string(streamIface->getDeviceName()));
+  auto queue = getQueue(streamIface);
 
   Gemm(queue,  /*queue*/
        transA, /*transa*/
