@@ -28,38 +28,40 @@ static std::optional<mlir::Attribute> getNeutralValue(mlir::Region &region) {
 }
 
 // TODO: Upstream
-static std::optional<mlir::Attribute> getNeutralValue(mlir::Type resultType, mlir::gpu::AllReduceOperation op) {
+static std::optional<mlir::Attribute>
+getNeutralValue(mlir::Type resultType, mlir::gpu::AllReduceOperation op) {
   using Op = mlir::gpu::AllReduceOperation;
   // Builder only used as helper for attribute creation.
-    mlir::OpBuilder b(resultType.getContext());
-    if (auto floatType = resultType.dyn_cast<mlir::FloatType>()) {
-      const llvm::fltSemantics &semantic = floatType.getFloatSemantics();
-      if (op == Op::ADD)
-        return b.getFloatAttr(resultType, llvm::APFloat::getZero(semantic));
-      if (op == Op::MUL)
-        return b.getFloatAttr(resultType, llvm::APFloat(semantic, 1));
-      if (op == Op::MAX)
-        return b.getFloatAttr(resultType,
-                              llvm::APFloat::getInf(semantic, /*Negative=*/true));
-      if (op == Op::MIN)
-        return b.getFloatAttr(
-            resultType, llvm::APFloat::getInf(semantic, /*Negative=*/false));
-      return std::nullopt;
-    }
-    if (op == Op::ADD || op == Op::OR || op == Op::XOR)
-      return b.getIntegerAttr(resultType, 0);
-    if (op == Op::AND)
-      return b.getIntegerAttr(resultType, -1);
-    if (op == Op::MAX)
-      return b.getIntegerAttr(resultType, std::numeric_limits<int64_t>::min());
-    if (op == Op::MIN)
-      return b.getIntegerAttr(resultType, std::numeric_limits<int64_t>::max());
+  mlir::OpBuilder b(resultType.getContext());
+  if (auto floatType = resultType.dyn_cast<mlir::FloatType>()) {
+    const llvm::fltSemantics &semantic = floatType.getFloatSemantics();
+    if (op == Op::ADD)
+      return b.getFloatAttr(resultType, llvm::APFloat::getZero(semantic));
     if (op == Op::MUL)
-      return b.getIntegerAttr(resultType, 1);
+      return b.getFloatAttr(resultType, llvm::APFloat(semantic, 1));
+    if (op == Op::MAX)
+      return b.getFloatAttr(resultType,
+                            llvm::APFloat::getInf(semantic, /*Negative=*/true));
+    if (op == Op::MIN)
+      return b.getFloatAttr(
+          resultType, llvm::APFloat::getInf(semantic, /*Negative=*/false));
     return std::nullopt;
+  }
+  if (op == Op::ADD || op == Op::OR || op == Op::XOR)
+    return b.getIntegerAttr(resultType, 0);
+  if (op == Op::AND)
+    return b.getIntegerAttr(resultType, -1);
+  if (op == Op::MAX)
+    return b.getIntegerAttr(resultType, std::numeric_limits<int64_t>::min());
+  if (op == Op::MIN)
+    return b.getIntegerAttr(resultType, std::numeric_limits<int64_t>::max());
+  if (op == Op::MUL)
+    return b.getIntegerAttr(resultType, 1);
+  return std::nullopt;
 }
 
-static std::optional<mlir::Attribute> getNeutralValue(mlir::gpu::AllReduceOp reduceOp) {
+static std::optional<mlir::Attribute>
+getNeutralValue(mlir::gpu::AllReduceOp reduceOp) {
   if (auto res = getNeutralValue(reduceOp.getBody()))
     return res;
 
@@ -174,7 +176,8 @@ static mlir::LogicalResult convertBlockingOp(mlir::Operation *op,
 
     mlir::IRMapping mapping;
     mapping.map(reduceArg, val);
-    auto newOp = mlir::cast<mlir::gpu::AllReduceOp>(rewriter.clone(*reduceOp, mapping));
+    auto newOp =
+        mlir::cast<mlir::gpu::AllReduceOp>(rewriter.clone(*reduceOp, mapping));
     rewriter.replaceOp(op, newOp.getResult());
   } else {
     llvm_unreachable("Unsupported barrier op");
