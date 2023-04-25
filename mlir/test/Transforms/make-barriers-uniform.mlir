@@ -1,7 +1,6 @@
 // RUN: numba-mlir-opt -allow-unregistered-dialect --gpux-make-barriers-uniform --split-input-file %s | FileCheck %s
 
 func.func @test() {
-  %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   gpu.launch blocks(%bx, %by, %bz) in (%grid_x = %c1, %grid_y = %c1, %grid_z = %c1)
              threads(%tx, %ty, %tz) in (%block_x = %c1, %block_y = %c1, %block_z = %c1) {
@@ -40,7 +39,6 @@ func.func @test() {
 // -----
 
 func.func @test() {
-  %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   gpu.launch blocks(%bx, %by, %bz) in (%grid_x = %c1, %grid_y = %c1, %grid_z = %c1)
              threads(%tx, %ty, %tz) in (%block_x = %c1, %block_y = %c1, %block_z = %c1) {
@@ -98,7 +96,6 @@ func.func @test() {
 // -----
 
 func.func @test() {
-  %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   gpu.launch blocks(%bx, %by, %bz) in (%grid_x = %c1, %grid_y = %c1, %grid_z = %c1)
              threads(%tx, %ty, %tz) in (%block_x = %c1, %block_y = %c1, %block_z = %c1) {
@@ -152,7 +149,6 @@ func.func @test() {
 // -----
 
 func.func @test() {
-  %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   gpu.launch blocks(%bx, %by, %bz) in (%grid_x = %c1, %grid_y = %c1, %grid_z = %c1)
              threads(%tx, %ty, %tz) in (%block_x = %c1, %block_y = %c1, %block_z = %c1) {
@@ -188,6 +184,51 @@ func.func @test() {
 //       CHECK: %[[RARG:.*]] = arith.select %[[COND]], %[[RES1]]#1, %[[NEUTRAL]] : i64
 //       CHECK: %[[RRES:.*]] = gpu.all_reduce mul %[[RARG]] {
 //       CHECK:   } : (i64) -> i64
+//       CHECK: scf.if %[[COND]] {
+//       CHECK: "test.test5"() : () -> ()
+//       CHECK: "test.test6"(%[[RES1]]#0) : (i32) -> ()
+//       CHECK: "test.test7"(%[[RRES]]) : (i64) -> ()
+//       CHECK: }
+//       CHECK: gpu.terminator
+//       CHECK: return
+
+// -----
+
+func.func @test() {
+  %c1 = arith.constant 1 : index
+  gpu.launch blocks(%bx, %by, %bz) in (%grid_x = %c1, %grid_y = %c1, %grid_z = %c1)
+             threads(%tx, %ty, %tz) in (%block_x = %c1, %block_y = %c1, %block_z = %c1) {
+    %cond = "test.test1"() : () -> i1
+    scf.if %cond {
+      "test.test2"() : () -> ()
+      %1 = "test.test3"() : () -> i32
+      %2 = "test.test4"() : () -> i64
+      %3 = gpu.subgroup_reduce min %2 {} : (i64) -> (i64)
+      "test.test5"() : () -> ()
+      "test.test6"(%1) : (i32) -> ()
+      "test.test7"(%3) : (i64) -> ()
+    }
+    gpu.terminator
+  }
+  return
+}
+
+// CHECK-LABEL: func @test
+//       CHECK: %[[NEUTRAL:.*]] = arith.constant 9223372036854775807 : i64
+//       CHECK: gpu.launch blocks
+//       CHECK: %[[COND:.*]] = "test.test1"() : () -> i1
+//       CHECK: %[[RES1:.*]]:2 = scf.if %[[COND]] -> (i32, i64) {
+//       CHECK: "test.test2"() : () -> ()
+//       CHECK: %[[V1:.*]] = "test.test3"() : () -> i32
+//       CHECK: %[[V2:.*]] = "test.test4"() : () -> i64
+//       CHECK: scf.yield %[[V1]], %[[V2]] : i32, i64
+//       CHECK: } else {
+//       CHECK: %[[V3:.*]] = numba_util.undef : i32
+//       CHECK: %[[V4:.*]] = numba_util.undef : i64
+//       CHECK: scf.yield %[[V3]], %[[V4]] : i32, i64
+//       CHECK: }
+//       CHECK: %[[RARG:.*]] = arith.select %[[COND]], %[[RES1]]#1, %[[NEUTRAL]] : i64
+//       CHECK: %[[RRES:.*]] = gpu.subgroup_reduce min %[[RARG]] : (i64) -> i64
 //       CHECK: scf.if %[[COND]] {
 //       CHECK: "test.test5"() : () -> ()
 //       CHECK: "test.test6"(%[[RES1]]#0) : (i32) -> ()
