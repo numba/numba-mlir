@@ -131,7 +131,7 @@ static ZELoader &getZeLoader() {
   return loader;
 }
 
-static std::string getZeErrorString(cl_int val) {
+static std::string getZeErrorString(ze_result_t val) {
 #define ZE_ENUM_VAL(arg)                                                       \
   case arg:                                                                    \
     return #arg
