@@ -58,10 +58,6 @@ static mlir::LogicalResult convertBlockingOp(gpu_runtime::GPUBarrierOp op,
   auto afterBlock = rewriter.splitBlock(ifBody, std::next(barrierIt));
   auto beforeBlock = rewriter.splitBlock(ifBody, ifBody->begin());
 
-  auto barrierLoc = op.getLoc();
-  auto barrierFlags = op.getFlags();
-  rewriter.eraseOp(op);
-
   rewriter.setInsertionPointToEnd(beforeBlock);
   rewriter.create<mlir::scf::YieldOp>(rewriter.getUnknownLoc(), yieldArgs);
 
@@ -92,7 +88,10 @@ static mlir::LogicalResult convertBlockingOp(gpu_runtime::GPUBarrierOp op,
 
   rewriter.mergeBlocks(beforeBlock, beforeIf.thenBlock());
 
+  auto barrierLoc = op.getLoc();
+  auto barrierFlags = op.getFlags();
   rewriter.create<gpu_runtime::GPUBarrierOp>(barrierLoc, barrierFlags);
+  rewriter.eraseOp(op);
 
   auto beforeIfResults = beforeIf.getResults();
 
