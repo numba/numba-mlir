@@ -9,7 +9,7 @@ func.func @test() {
     scf.if %cond {
       "test.test2"() : () -> ()
       %1 = "test.test3"() : () -> i32
-      gpu_runtime.barrier  1
+      gpu_runtime.barrier  1 {test.test_attr}
       "test.test4"() : () -> ()
       "test.test5"(%1) : (i32) -> ()
     }
@@ -29,7 +29,7 @@ func.func @test() {
 //       CHECK: %[[V2:.*]] = numba_util.undef : i32
 //       CHECK: scf.yield %[[V2]] : i32
 //       CHECK: }
-//       CHECK: gpu_runtime.barrier  1
+//       CHECK: gpu_runtime.barrier  1 {test.test_attr}
 //       CHECK: scf.if %[[COND]] {
 //       CHECK: "test.test4"() : () -> ()
 //       CHECK: "test.test5"(%[[RES1]]) : (i32) -> ()

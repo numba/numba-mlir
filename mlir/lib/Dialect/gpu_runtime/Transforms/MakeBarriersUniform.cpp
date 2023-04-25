@@ -148,8 +148,9 @@ static mlir::LogicalResult convertBlockingOp(mlir::Operation *op,
   auto beforeIfResults = beforeIf.getResults();
 
   if (auto barrierOp = mlir::dyn_cast<gpu_runtime::GPUBarrierOp>(op)) {
-    auto barrierFlags = barrierOp.getFlags();
-    rewriter.replaceOpWithNewOp<gpu_runtime::GPUBarrierOp>(op, barrierFlags);
+    // Use clone to copy user-defined attrs.
+    auto newOp = rewriter.clone(*barrierOp);
+    rewriter.replaceOp(barrierOp, newOp->getResults());
   } else if (auto reduceOp = mlir::dyn_cast<mlir::gpu::AllReduceOp>(op)) {
     auto loc = reduceOp.getLoc();
     auto reduceArg = reduceOp.getValue();
@@ -166,9 +167,8 @@ static mlir::LogicalResult convertBlockingOp(mlir::Operation *op,
 
     mlir::IRMapping mapping;
     mapping.map(reduceArg, val);
-    auto newOp =
-        mlir::cast<mlir::gpu::AllReduceOp>(rewriter.clone(*reduceOp, mapping));
-    rewriter.replaceOp(op, newOp.getResult());
+    auto newOp = rewriter.clone(*reduceOp, mapping);
+    rewriter.replaceOp(op, newOp->getResults());
   } else {
     llvm_unreachable("Unsupported barrier op");
   }
