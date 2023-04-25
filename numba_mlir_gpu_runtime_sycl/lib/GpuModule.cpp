@@ -105,6 +105,7 @@ struct ZELoader {
   DECL_TYPE(zeModuleBuildLogDestroy);
   DECL_TYPE(zeKernelCreate);
   DECL_TYPE(zeKernelDestroy);
+  DECL_TYPE(zeKernelSuggestGroupSize);
 
   ZELoader() : dynLib(zeLibName) {
     INIT_FUNC(zeModuleCreate);
@@ -113,6 +114,7 @@ struct ZELoader {
     INIT_FUNC(zeModuleBuildLogDestroy);
     INIT_FUNC(zeKernelCreate);
     INIT_FUNC(zeKernelDestroy);
+    INIT_FUNC(zeKernelSuggestGroupSize);
   }
 
   DECL_FUNC(zeModuleCreate);
@@ -121,6 +123,7 @@ struct ZELoader {
   DECL_FUNC(zeModuleBuildLogDestroy);
   DECL_FUNC(zeKernelCreate);
   DECL_FUNC(zeKernelDestroy);
+  DECL_FUNC(zeKernelSuggestGroupSize);
 
 private:
   DynamicLibHelper dynLib;
@@ -343,11 +346,13 @@ GPUModule *createGPUModule(sycl::queue &queue, const void *data,
       ZeBuildLog log(logHandle);
 
       size_t len = 0;
-      CHECK_ZE_RESULT(zeModuleBuildLogGetString(log.get(), &len, nullptr));
+      CHECK_ZE_RESULT(
+          loader.zeModuleBuildLogGetString(log.get(), &len, nullptr));
 
       std::string str;
       str.resize(len);
-      CHECK_ZE_RESULT(zeModuleBuildLogGetString(log.get(), &len, str.data()));
+      CHECK_ZE_RESULT(
+          loader.zeModuleBuildLogGetString(log.get(), &len, str.data()));
       throw std::runtime_error(e.what() + std::string("\n") + str);
     }
     ZeBuildLog log(logHandle);
@@ -479,7 +484,7 @@ void suggestGPUBlockSize(GPUKernel *kernel, const uint32_t *gridSize,
       bSize[i] = &blockSize[i];
     }
 
-    CHECK_ZE_RESULT(zeKernelSuggestGroupSize(
+    CHECK_ZE_RESULT(getZeLoader().zeKernelSuggestGroupSize(
         zeKernel, gSize[0], gSize[1], gSize[2], bSize[0], bSize[1], bSize[2]));
     return;
   }
