@@ -4,7 +4,6 @@
 
 #include "numba/Dialect/gpu_runtime/Transforms/MakeBarriersUniform.hpp"
 
-#include "numba/Dialect/gpu_runtime/IR/GpuRuntimeOps.hpp"
 #include "numba/Dialect/numba_util/Dialect.hpp"
 
 #include <mlir/Dialect/Arith/IR/Arith.h>
@@ -72,6 +71,11 @@ getNeutralValue(mlir::gpu::AllReduceOp reduceOp) {
   return std::nullopt;
 }
 
+static std::optional<mlir::Attribute>
+getNeutralValue(mlir::gpu::SubgroupReduceOp reduceOp) {
+  return getNeutralValue(reduceOp.getResult().getType(), reduceOp.getOp());
+}
+
 static mlir::LogicalResult convertBlockingOp(mlir::Operation *op,
                                              mlir::PatternRewriter &rewriter) {
   // IfOp must be an immediate parent
@@ -85,6 +89,12 @@ static mlir::LogicalResult convertBlockingOp(mlir::Operation *op,
 
   mlir::TypedAttr neutralValAttr;
   if (auto reduceOp = mlir::dyn_cast<mlir::gpu::AllReduceOp>(op)) {
+    auto nval = getNeutralValue(reduceOp);
+    if (!nval)
+      return mlir::failure();
+
+    neutralValAttr = mlir::cast<mlir::TypedAttr>(*nval);
+  } else if (auto reduceOp = mlir::dyn_cast<mlir::gpu::SubgroupReduceOp>(op)) {
     auto nval = getNeutralValue(reduceOp);
     if (!nval)
       return mlir::failure();
@@ -147,17 +157,38 @@ static mlir::LogicalResult convertBlockingOp(mlir::Operation *op,
   rewriter.mergeBlocks(beforeBlock, beforeIf.thenBlock());
   auto beforeIfResults = beforeIf.getResults();
 
-  if (auto barrierOp = mlir::dyn_cast<gpu_runtime::GPUBarrierOp>(op)) {
-    // Use clone to copy user-defined attrs.
+  auto getBeforeIfResult = [&](unsigned i) {
+    assert(i < beforeIfResults.size() && "Invalid result index.");
+    return beforeIfResults[i];
+  };
+
+  if (auto barrierOp = mlir::dyn_cast<mlir::gpu::BarrierOp>(op)) {
+    // Use clone to preserve user-defined attrs.
     auto newOp = rewriter.clone(*barrierOp);
     rewriter.replaceOp(barrierOp, newOp->getResults());
   } else if (auto reduceOp = mlir::dyn_cast<mlir::gpu::AllReduceOp>(op)) {
     auto loc = reduceOp.getLoc();
     auto reduceArg = reduceOp.getValue();
     assert(yieldArgsMap.count(reduceArg));
-    auto i = yieldArgsMap.find(reduceArg)->second;
-    assert(i < beforeIfResults.size() && "Invalid result index.");
-    auto mappedReduceArg = beforeIfResults[i];
+    auto mappedReduceArg =
+        getBeforeIfResult(yieldArgsMap.find(reduceArg)->second);
+
+    assert(neutralValAttr);
+    auto neutralVal =
+        rewriter.create<mlir::arith::ConstantOp>(loc, neutralValAttr);
+    auto val = rewriter.create<mlir::arith::SelectOp>(
+        loc, cond, mappedReduceArg, neutralVal);
+
+    mlir::IRMapping mapping;
+    mapping.map(reduceArg, val);
+    auto newOp = rewriter.clone(*reduceOp, mapping);
+    rewriter.replaceOp(op, newOp->getResults());
+  } else if (auto reduceOp = mlir::dyn_cast<mlir::gpu::SubgroupReduceOp>(op)) {
+    auto loc = reduceOp.getLoc();
+    auto reduceArg = reduceOp.getValue();
+    assert(yieldArgsMap.count(reduceArg));
+    auto mappedReduceArg =
+        getBeforeIfResult(yieldArgsMap.find(reduceArg)->second);
 
     assert(neutralValAttr);
     auto neutralVal =
@@ -182,9 +213,7 @@ static mlir::LogicalResult convertBlockingOp(mlir::Operation *op,
       auto val = arg.get();
       auto it = yieldArgsMap.find(val);
       if (it != yieldArgsMap.end()) {
-        auto i = it->second;
-        assert(i < beforeIfResults.size() && "Invalid result index.");
-        auto newVal = beforeIfResults[i];
+        auto newVal = getBeforeIfResult(it->second);
         rewriter.updateRootInPlace(&op, [&]() { arg.set(newVal); });
       }
     }
@@ -195,12 +224,11 @@ static mlir::LogicalResult convertBlockingOp(mlir::Operation *op,
 }
 
 namespace {
-struct ConvertBarrierOp
-    : public mlir::OpRewritePattern<gpu_runtime::GPUBarrierOp> {
+struct ConvertBarrierOp : public mlir::OpRewritePattern<mlir::gpu::BarrierOp> {
   using OpRewritePattern::OpRewritePattern;
 
   mlir::LogicalResult
-  matchAndRewrite(gpu_runtime::GPUBarrierOp op,
+  matchAndRewrite(mlir::gpu::BarrierOp op,
                   mlir::PatternRewriter &rewriter) const override {
     return convertBlockingOp(op, rewriter);
   }
@@ -216,11 +244,24 @@ struct ConvertAllReduceOp
     return convertBlockingOp(op, rewriter);
   }
 };
+
+struct ConvertSubgroupReduceOp
+    : public mlir::OpRewritePattern<mlir::gpu::SubgroupReduceOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(mlir::gpu::SubgroupReduceOp op,
+                  mlir::PatternRewriter &rewriter) const override {
+    return convertBlockingOp(op, rewriter);
+  }
+};
 } // namespace
 
 void gpu_runtime::populateMakeBarriersUniformPatterns(
     mlir::RewritePatternSet &patterns) {
-  patterns.insert<ConvertBarrierOp, ConvertAllReduceOp>(patterns.getContext());
+  patterns
+      .insert<ConvertBarrierOp, ConvertAllReduceOp, ConvertSubgroupReduceOp>(
+          patterns.getContext());
 }
 
 namespace {
@@ -231,7 +272,6 @@ struct MakeBarriersUniformPass
 
   virtual void
   getDependentDialects(mlir::DialectRegistry &registry) const override {
-    registry.insert<gpu_runtime::GpuRuntimeDialect>();
     registry.insert<mlir::arith::ArithDialect>();
     registry.insert<mlir::gpu::GPUDialect>();
     registry.insert<mlir::scf::SCFDialect>();
