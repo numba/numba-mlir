@@ -56,6 +56,12 @@ template <typename F> static auto catchAll(F &&func) {
 
 static numba::MemInfoAllocFuncT AllocFunc = nullptr;
 
+static auto getDeviceSelector(std::string deviceName) {
+  using Sel = sycl::ext::oneapi::filter_selector;
+  return [selector = Sel(std::move(deviceName))](
+             const sycl::device &dev) -> int { return selector(dev); };
+}
+
 template <typename T> static size_t countUntil(T *ptr, T &&elem) {
   assert(ptr);
   auto curr = ptr;
@@ -75,8 +81,7 @@ class Stream : public numba::GPUStreamInterface {
 public:
   Stream(size_t eventsCount, const char *devName)
       : deviceName(devName ? devName : "") {
-    queue = sycl::queue{
-        sycl::device{sycl::ext::oneapi::filter_selector(deviceName)}};
+    queue = sycl::queue{sycl::device{getDeviceSelector(devName)}};
 
     if (eventsCount > 0)
       events = std::make_unique<sycl::event[]>(eventsCount);
@@ -403,7 +408,7 @@ gpuxGetDeviceCapabilities(numba::OffloadDeviceCapabilities *ret,
 
   bool success = true;
   catchAll([&]() {
-    sycl::device device{sycl::ext::oneapi::filter_selector(deviceName)};
+    sycl::device device{getDeviceSelector(deviceName)};
 
     numba::OffloadDeviceCapabilities result = {};
 

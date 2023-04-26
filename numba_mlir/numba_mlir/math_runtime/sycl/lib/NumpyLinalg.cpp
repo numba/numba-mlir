@@ -21,6 +21,12 @@ namespace {
 
 #ifdef NUMBA_MLIR_USE_SYCL_MKL
 
+static auto getDeviceSelector(std::string deviceName) {
+  using Sel = sycl::ext::oneapi::filter_selector;
+  return [selector = Sel(std::move(deviceName))](
+             const sycl::device &dev) -> int { return selector(dev); };
+}
+
 struct QueueMap {
   std::unordered_map<std::string, cl::sycl::queue> map;
   std::mutex m;
@@ -29,7 +35,7 @@ struct QueueMap {
     auto device_queue_iter = map.find(device);
     if (device_queue_iter == map.end()) {
       try {
-        sycl::device d{sycl::ext::oneapi::filter_selector(device.c_str())};
+        sycl::device d{getDeviceSelector(device)};
         device_queue_iter = map.insert({device, sycl::queue(d)}).first;
       } catch (const sycl::exception &e) {
         std::vector<cl::sycl::device> devices = cl::sycl::device::get_devices();
