@@ -11,11 +11,13 @@
 #include <mlir/Conversion/LLVMCommon/TypeConverter.h>
 #include <mlir/Conversion/SCFToGPU/SCFToGPUPass.h>
 #include <mlir/Dialect/Affine/IR/AffineOps.h>
+#include <mlir/Dialect/Arith/IR/Arith.h>
 #include <mlir/Dialect/Arith/Transforms/Passes.h>
 #include <mlir/Dialect/ControlFlow/IR/ControlFlowOps.h>
 #include <mlir/Dialect/Func/IR/FuncOps.h>
 #include <mlir/Dialect/GPU/Transforms/Passes.h>
 #include <mlir/Dialect/GPU/Transforms/Utils.h>
+#include <mlir/Dialect/Math/IR/Math.h>
 #include <mlir/Dialect/MemRef/IR/MemRef.h>
 #include <mlir/Dialect/MemRef/Transforms/Passes.h>
 #include <mlir/Dialect/SCF/IR/SCF.h>
@@ -296,6 +298,52 @@ struct AssumeGpuIdRangePass
   }
 };
 
+static bool isMathOp(mlir::Operation *op) {
+  assert(op);
+  return mlir::isa<mlir::arith::ArithDialect, mlir::math::MathDialect>(
+      op->getDialect());
+}
+
+template <typename C>
+static void collectLaunchOps(mlir::Operation *op, C &res) {
+  assert(op);
+
+  llvm::SmallVector<mlir::Operation *> stack;
+  auto users = op->getUsers();
+  stack.append(users.begin(), users.end());
+
+  while (!stack.empty()) {
+    auto current = stack.pop_back_val();
+    if (isMathOp(current)) {
+      auto users = current->getUsers();
+      stack.append(users.begin(), users.end());
+      continue;
+    }
+
+    if (auto launch = mlir::dyn_cast<mlir::gpu::LaunchFuncOp>(current))
+      res.insert(launch);
+  }
+}
+
+static void copySuggestBlockTree(mlir::Operation *op, mlir::OpBuilder &builder,
+                                 mlir::IRMapping &mapping) {
+  assert(op);
+
+  llvm::SmallVector<mlir::Operation *> stack;
+  auto users = op->getUsers();
+  stack.append(users.begin(), users.end());
+
+  while (!stack.empty()) {
+    auto current = stack.pop_back_val();
+    if (isMathOp(current)) {
+      builder.setInsertionPoint(current);
+      builder.clone(*current, mapping);
+      auto users = current->getUsers();
+      stack.append(users.begin(), users.end());
+    }
+  }
+}
+
 struct GPULowerDefaultLocalSize
     : public mlir::PassWrapper<GPULowerDefaultLocalSize,
                                mlir::OperationPass<mlir::func::FuncOp>> {
@@ -303,6 +351,8 @@ struct GPULowerDefaultLocalSize
 
   virtual void
   getDependentDialects(mlir::DialectRegistry &registry) const override {
+    registry.insert<mlir::arith::ArithDialect>();
+    registry.insert<mlir::math::MathDialect>();
     registry.insert<mlir::func::FuncDialect>();
     registry.insert<numba::util::NumbaUtilDialect>();
   }
@@ -328,6 +378,9 @@ struct GPULowerDefaultLocalSize
       }
     }
 
+    mlir::IRMapping mapping;
+    llvm::SmallSetVector<mlir::gpu::LaunchFuncOp, 8> launchOps;
+
     mlir::DominanceInfo dom;
     mlir::OpBuilder builder(&getContext());
     func.walk([&](gpu_runtime::GPUSuggestBlockSizeOp op) {
@@ -343,26 +396,39 @@ struct GPULowerDefaultLocalSize
         return;
       }
 
-      mlir::gpu::LaunchFuncOp launch;
-      for (auto user : op->getUsers()) {
-        auto l = mlir::dyn_cast<mlir::gpu::LaunchFuncOp>(user);
-        if (!l)
-          continue;
+      launchOps.clear();
+      collectLaunchOps(op, launchOps);
 
-        if (launch && launch != l)
-          return;
-
-        launch = l;
-      }
-
-      if (!launch)
+      if (launchOps.empty())
         return;
 
-      builder.setInsertionPoint(op);
-      auto newOp = builder.create<gpu_runtime::GPUSuggestBlockSizeOp>(
-          loc, /*stream*/ std::nullopt, op.getGridSize(), launch.getKernel());
-      op->replaceAllUsesWith(newOp.getResults());
-      op.erase();
+      if (launchOps.size() == 1) {
+        auto launch = launchOps.front();
+        builder.setInsertionPoint(op);
+        auto newOp = builder.create<gpu_runtime::GPUSuggestBlockSizeOp>(
+            loc, /*stream*/ std::nullopt, op.getGridSize(), launch.getKernel());
+        op->replaceAllUsesWith(newOp.getResults());
+        op.erase();
+        return;
+      }
+
+      for (auto launch : launchOps) {
+        mapping.clear();
+
+        builder.setInsertionPoint(op);
+        auto newOp = builder.create<gpu_runtime::GPUSuggestBlockSizeOp>(
+            loc, /*stream*/ std::nullopt, op.getGridSize(), launch.getKernel());
+
+        mapping.map(op.getResults(), newOp.getResults());
+        copySuggestBlockTree(op, builder, mapping);
+
+        for (auto &arg : launch->getOpOperands()) {
+          auto val = arg.get();
+          auto newVal = mapping.lookupOrDefault(val);
+          if (newVal != val)
+            arg.set(newVal);
+        }
+      }
     });
 
     func.walk([&](mlir::func::CallOp op) {
