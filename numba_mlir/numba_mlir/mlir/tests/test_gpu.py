@@ -1278,6 +1278,8 @@ def test_cfd_dot(a, b, py_func):
     assert_equal(res_py, gpu_res)
 
 
+@pytest.mark.smoke
+@require_dpctl
 def test_l2_norm():
     def py_func(a, d):
         sq = np.square(a)
