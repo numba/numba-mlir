@@ -32,6 +32,14 @@ def mlir_jit(
             **options
         )
 
+    fp64_truncate = options.get("gpu_fp64_truncate", False)
+    assert fp64_truncate in [
+        True,
+        False,
+        "auto",
+    ], 'gpu_fp64_truncate supported values are True/False/"auto"'
+    options.pop("gpu_fp64_truncate", None)
+
     pipeline = (
         mlir_compiler_gpu_pipeline
         if options.get("enable_gpu_pipeline", True)

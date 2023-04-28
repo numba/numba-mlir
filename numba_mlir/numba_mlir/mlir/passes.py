@@ -66,6 +66,7 @@ class MlirBackendBase(FunctionPass):
     def __init__(self, push_func_stack):
         self._push_func_stack = push_func_stack
         self._get_func_name = func_registry.get_func_name
+        self._fp64_truncate = False
         FunctionPass.__init__(self)
 
     def run_pass(self, state):
@@ -141,6 +142,7 @@ class MlirBackendBase(FunctionPass):
         )
         ctx["opt_level"] = lambda: OPT_LEVEL
         ctx["globals"] = lambda: state.func_id.func.__globals__
+        ctx["fp64_truncate"] = lambda: self._fp64_truncate
         return ctx
 
 
