@@ -257,6 +257,9 @@ mlir::StringRef getGpuAccessibleAttrName() {
 }
 
 mlir::StringRef getFenceFlagsAttrName() { return "gpu_runtime.fence_flags"; }
+mlir::StringRef getFp64TruncateAttrName() {
+  return "gpu_runtime.fp64_truncate";
+}
 } // namespace gpu_runtime
 
 // TODO: unify with upstream

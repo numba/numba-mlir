@@ -222,6 +222,15 @@ private:
       func->setAttr(numba::util::attributes::getMaxConcurrencyName(),
                     builder.getI64IntegerAttr(maxConcurrency));
 
+    auto fp64_truncate = compilationContext["fp64_truncate"]();
+    if (fp64_truncate.equal(py::str("auto"))) {
+      // Nothing
+    } else {
+      auto attr =
+          mlir::BoolAttr::get(mod->getContext(), fp64_truncate.cast<bool>());
+      mod->setAttr(gpu_runtime::getFp64TruncateAttrName(), attr);
+    }
+
     globals = compilationContext["globals"]();
 
     mod.push_back(func);

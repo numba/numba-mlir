@@ -2085,6 +2085,12 @@ struct TruncateF64ForGPUPass
   }
 
   void runOnOperation() override {
+    auto module = getOperation();
+    auto truncAttr = module->getAttrOfType<mlir::BoolAttr>(
+        gpu_runtime::getFp64TruncateAttrName());
+    if (truncAttr && !truncAttr.getValue())
+      return markAllAnalysesPreserved();
+
     auto *ctx = &getContext();
     mlir::ConversionTarget target(*ctx);
     mlir::TypeConverter converter;
@@ -2157,8 +2163,6 @@ struct TruncateF64ForGPUPass
 
     mlir::FrozenRewritePatternSet frozenPatterns(std::move(patterns));
 
-    auto module = getOperation();
-
     llvm::SmallVector<mlir::Value> newArgs;
     mlir::OpBuilder builder(ctx);
     for (auto gpuModule : module.getOps<mlir::gpu::GPUModuleOp>()) {
@@ -2168,9 +2172,11 @@ struct TruncateF64ForGPUPass
         return signalPassFailure();
       }
 
-      auto caps = targetEnv.getCapabilities();
-      if (llvm::is_contained(caps, mlir::spirv::Capability::Float64))
-        continue;
+      if (!truncAttr || !truncAttr.getValue()) {
+        auto caps = targetEnv.getCapabilities();
+        if (llvm::is_contained(caps, mlir::spirv::Capability::Float64))
+          continue;
+      }
 
       for (auto gpuFunc : gpuModule.getOps<mlir::gpu::GPUFuncOp>()) {
         auto origSig = gpuFunc.getFunctionType();
