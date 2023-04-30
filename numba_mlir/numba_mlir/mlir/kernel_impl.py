@@ -368,26 +368,42 @@ class group(Stub):
     pass
 
 
-def group_reduce_add(shape, dtype):
-    _stub_error()
+def _define_group_funcs():
+    ops = ["add", "mul", "min", "max"]
+
+    def get_func(func_name):
+        def api_func_impl(builder, value):
+            elem_type = value.type
+            api_func_name = f"{func_name}_{dtype_str(builder, elem_type)}"
+            res = builder.cast(0, elem_type)
+            return builder.external_call(api_func_name, inputs=value, outputs=res)
+
+        return api_func_impl
+
+    def get_stub_func(func_name):
+        exec(f"def {func_name}(value): _stub_error()")
+        return eval(func_name)
+
+    class _GroupId(AbstractTemplate):
+        def generic(self, args, kws):
+            assert not kws
+            assert len(args) == 1
+            elem_type = args[0]
+
+            return signature(elem_type, elem_type)
+
+    this_module = sys.modules[__name__]
+
+    for op in ops:
+        func_name = f"group_reduce_{op}"
+        short_name = f"reduce_{op}"
+        func = get_stub_func(func_name)
+        setattr(this_module, func_name, func)
+
+        infer_global(func)(_GroupId)
+        registry.register_func(func_name, func)(get_func(func_name))
+        setattr(group, short_name, func)
 
 
-setattr(group, "reduce_add", group_reduce_add)
-
-
-@infer_global(group_reduce_add)
-class _GroupId(AbstractTemplate):
-    def generic(self, args, kws):
-        assert not kws
-        assert len(args) == 1
-        elem_type = args[0]
-
-        return signature(elem_type, elem_type)
-
-
-@registry.register_func("group_reduce_add", group_reduce_add)
-def _group_add_impl(builder, value):
-    elem_type = value.type
-    func_name = f"group_reduce_add_{dtype_str(builder, elem_type)}"
-    res = builder.cast(0, elem_type)
-    return builder.external_call(func_name, inputs=value, outputs=res)
+_define_group_funcs()
+del _define_group_funcs

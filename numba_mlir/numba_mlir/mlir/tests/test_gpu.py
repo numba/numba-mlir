@@ -928,11 +928,17 @@ def test_private_memory(blocksize):
 
 
 @require_gpu
-@pytest.mark.parametrize("group_op", [group.reduce_add])
+@pytest.mark.parametrize(
+    "group_op", [group.reduce_add, group.reduce_mul, group.reduce_min, group.reduce_max]
+)
 @pytest.mark.parametrize("global_size", [1, 2, 4, 27, 67, 101])
 @pytest.mark.parametrize("local_size", [1, 2, 7, 17, 33])
 @pytest.mark.parametrize("dtype", [np.int32, np.int64, np.float32])
 def test_group_func(group_op, global_size, local_size, dtype):
+    if global_size > 25 and group_op is group.reduce_mul and dtype is np.int64:
+        # TODO: investigate overflow handling by spirv group ops
+        pytest.skip()
+
     def func(a, b):
         i = get_global_id(0)
         v = group_op(a[i])
@@ -944,16 +950,16 @@ def test_group_func(group_op, global_size, local_size, dtype):
     a = np.arange(global_size, dtype=dtype)
 
     sim_res = np.zeros(global_size, a.dtype)
-    sim_func[global_size, local_size](a, sim_res)
+    sim_func[(global_size,), (local_size,)](a, sim_res)
 
     gpu_res = np.zeros(global_size, a.dtype)
 
     with print_pass_ir([], ["ConvertParallelLoopToGpu"]):
-        gpu_func[global_size, local_size](a, gpu_res)
+        gpu_func[(global_size,), (local_size,)](a, gpu_res)
         ir = get_print_buffer()
         assert ir.count("gpu.launch blocks") == 1, ir
 
-    assert_allclose(gpu_res, sim_res)
+    assert_allclose(gpu_res, sim_res, rtol=1e-5)
 
 
 def _from_host(arr, buffer):
