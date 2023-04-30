@@ -26,6 +26,13 @@ static std::optional<mlir::Attribute> getNeutralValue(mlir::Region &region) {
   return mlir::linalg::getNeutralElement(&(*body.begin()));
 }
 
+static int64_t getMinVal(unsigned bits) {
+  assert(bits > 0 && bits <= 64);
+  return static_cast<int64_t>(1) << (bits - 1);
+}
+
+static int64_t getMaxVal(unsigned bits) { return getMinVal(bits) - 1; }
+
 // TODO: Upstream
 static std::optional<mlir::Attribute>
 getNeutralValue(mlir::Type resultType, mlir::gpu::AllReduceOperation op) {
@@ -51,9 +58,11 @@ getNeutralValue(mlir::Type resultType, mlir::gpu::AllReduceOperation op) {
   if (op == Op::AND)
     return b.getIntegerAttr(resultType, -1);
   if (op == Op::MAX)
-    return b.getIntegerAttr(resultType, std::numeric_limits<int64_t>::min());
+    return b.getIntegerAttr(resultType,
+                            getMinVal(resultType.getIntOrFloatBitWidth()));
   if (op == Op::MIN)
-    return b.getIntegerAttr(resultType, std::numeric_limits<int64_t>::max());
+    return b.getIntegerAttr(resultType,
+                            getMaxVal(resultType.getIntOrFloatBitWidth()));
   if (op == Op::MUL)
     return b.getIntegerAttr(resultType, 1);
   return std::nullopt;
