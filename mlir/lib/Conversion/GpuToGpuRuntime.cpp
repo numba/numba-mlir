@@ -2086,6 +2086,7 @@ struct TruncateF64ForGPUPass
 
   void runOnOperation() override {
     auto module = getOperation();
+
     auto *ctx = &getContext();
     mlir::ConversionTarget target(*ctx);
     mlir::TypeConverter converter;
