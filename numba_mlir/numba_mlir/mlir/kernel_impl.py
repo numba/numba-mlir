@@ -107,7 +107,9 @@ class Kernel(KernelBase):
     def __init__(self, func, kwargs):
         super().__init__(func)
         fp64_truncate = kwargs.get("gpu_fp64_truncate", False)
-        self._jit_func = mlir_njit(inline="always", enable_gpu_pipeline=True, gpu_fp64_truncate=fp64_truncate)(func)
+        self._jit_func = mlir_njit(
+            inline="always", enable_gpu_pipeline=True, gpu_fp64_truncate=fp64_truncate
+        )(func)
         self._kern_body = mlir_njit(enable_gpu_pipeline=True, **kwargs)(_kernel_body)
         self._kern_body_def_size = mlir_njit(enable_gpu_pipeline=True, **kwargs)(
             _kernel_body_def_size

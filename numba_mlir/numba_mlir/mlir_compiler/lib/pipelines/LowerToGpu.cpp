@@ -1712,7 +1712,8 @@ public:
       return signalPassFailure();
     }
 
-    auto use = mlir::dyn_cast<mlir::gpu::LaunchFuncOp>(funcUses->begin()->getUser());
+    auto use =
+        mlir::dyn_cast<mlir::gpu::LaunchFuncOp>(funcUses->begin()->getUser());
     if (!use) {
       gpuMod->emitError("Invalid func use");
       return signalPassFailure();
@@ -1724,7 +1725,8 @@ public:
       return signalPassFailure();
     }
 
-    auto attrName = mlir::StringAttr::get(&getContext(), gpu_runtime::getFp64TruncateAttrName());
+    auto attrName = mlir::StringAttr::get(
+        &getContext(), gpu_runtime::getFp64TruncateAttrName());
     auto attr = parent->getAttr(attrName);
     if (attr)
       gpuMod->setAttr(attrName, attr);
@@ -1991,7 +1993,8 @@ static void populateLowerToGPUPipelineMed(mlir::OpPassManager &pm) {
   funcPM.addPass(std::make_unique<SinkGpuDimsPass>());
   funcPM.addPass(std::make_unique<GpuLaunchSinkOpsPass>());
   pm.addPass(mlir::createGpuKernelOutliningPass());
-  pm.addNestedPass<mlir::gpu::GPUModuleOp>(std::make_unique<GpuPropagateFp64truncFlagPass>());
+  pm.addNestedPass<mlir::gpu::GPUModuleOp>(
+      std::make_unique<GpuPropagateFp64truncFlagPass>());
   pm.addPass(std::make_unique<NameGpuModulesPass>());
   pm.addPass(mlir::createSymbolDCEPass());
 

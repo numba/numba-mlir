@@ -100,6 +100,7 @@ class mlir_compiler_pipeline(orig_CompilerBase):
             pms.append(mlir_PassBuilder.define_objectmode_pipeline(self.state))
         return pms
 
+
 @functools.cache
 def get_gpu_pipeline(fp64_truncate):
     class mlir_compiler_gpu_pipeline(orig_CompilerBase):
@@ -109,7 +110,9 @@ def get_gpu_pipeline(fp64_truncate):
             if not self.state.flags.force_pyobject:
                 pms.append(
                     mlir_PassBuilder.define_nopython_pipeline(
-                        self.state, enable_gpu_pipeline=True, fp64_truncate=fp64_truncate
+                        self.state,
+                        enable_gpu_pipeline=True,
+                        fp64_truncate=fp64_truncate,
                     )
                 )
             if self.state.status.can_fallback or self.state.flags.force_pyobject:

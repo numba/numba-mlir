@@ -205,8 +205,6 @@ class MlirBackend(MlirBackendBase):
         return True
 
 
-
-
 @functools.cache
 def get_gpu_backend(fp64_trunc):
     class MlirBackendGPU(MlirBackend):
