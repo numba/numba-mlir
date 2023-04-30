@@ -57,6 +57,15 @@ class group_proxy:
     def reduce_add(value):
         return kernel_sim_impl.group_reduce(value, lambda a, b: a + b)
 
+    def reduce_mul(value):
+        return kernel_sim_impl.group_reduce(value, lambda a, b: a * b)
+
+    def reduce_min(value):
+        return kernel_sim_impl.group_reduce(value, lambda a, b: min(a, b))
+
+    def reduce_max(value):
+        return kernel_sim_impl.group_reduce(value, lambda a, b: max(a, b))
+
 
 def barrier_proxy(flags):
     kernel_sim_impl.barrier()
@@ -79,9 +88,19 @@ _globals_to_replace = [
     (private.array, private_proxy.array),
     (group, group_proxy),
     (group.reduce_add, group_proxy.reduce_add),
+    (group.reduce_mul, group_proxy.reduce_mul),
+    (group.reduce_min, group_proxy.reduce_min),
+    (group.reduce_max, group_proxy.reduce_max),
 ]
 
-_barrier_ops = [barrier, group, group.reduce_add]
+_barrier_ops = [
+    barrier,
+    group,
+    group.reduce_add,
+    group.reduce_mul,
+    group.reduce_min,
+    group.reduce_max,
+]
 
 
 def _have_barrier_ops(func):

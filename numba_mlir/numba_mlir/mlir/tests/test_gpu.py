@@ -928,7 +928,9 @@ def test_private_memory(blocksize):
 
 
 @require_gpu
-@pytest.mark.parametrize("group_op", [group.reduce_add])
+@pytest.mark.parametrize(
+    "group_op", [group.reduce_add, group.reduce_mul, group.reduce_min, group.reduce_max]
+)
 @pytest.mark.parametrize("global_size", [1, 2, 4, 27, 67, 101])
 @pytest.mark.parametrize("local_size", [1, 2, 7, 17, 33])
 @pytest.mark.parametrize("dtype", [np.int32, np.int64, np.float32])
@@ -953,7 +955,7 @@ def test_group_func(group_op, global_size, local_size, dtype):
         ir = get_print_buffer()
         assert ir.count("gpu.launch blocks") == 1, ir
 
-    assert_allclose(gpu_res, sim_res)
+    assert_allclose(gpu_res, sim_res, rtol=1e-5)
 
 
 def _from_host(arr, buffer):

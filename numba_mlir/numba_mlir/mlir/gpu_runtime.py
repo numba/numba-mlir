@@ -69,7 +69,7 @@ if IS_GPU_RUNTIME_AVAILABLE:
             _funcs.append(mlir_func_name(f"local_array_{t}_{n}"))
             _funcs.append(mlir_func_name(f"private_array_{t}_{n}"))
 
-        _group_ops = ["reduce_add"]
+        _group_ops = ["reduce_add", "reduce_mul", "reduce_min", "reduce_max"]
         for o, t in product(_group_ops, _types):
             _funcs.append(mlir_func_name(f"group_{o}_{t}"))
 

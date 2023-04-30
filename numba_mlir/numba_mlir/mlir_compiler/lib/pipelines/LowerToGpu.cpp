@@ -1319,6 +1319,9 @@ public:
         void (*)(mlir::Operation *, mlir::PatternRewriter &, mlir::Value);
     const std::pair<llvm::StringRef, funcptr_t> handlers[] = {
         {"reduce_add", &genGroupOp<mlir::gpu::AllReduceOperation::ADD>},
+        {"reduce_mul", &genGroupOp<mlir::gpu::AllReduceOperation::MUL>},
+        {"reduce_min", &genGroupOp<mlir::gpu::AllReduceOperation::MIN>},
+        {"reduce_max", &genGroupOp<mlir::gpu::AllReduceOperation::MAX>},
     };
 
     for (auto &h : handlers) {
