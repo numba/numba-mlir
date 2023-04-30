@@ -101,7 +101,7 @@ class mlir_compiler_pipeline(orig_CompilerBase):
         return pms
 
 
-@functools.cache
+@functools.lru_cache
 def get_gpu_pipeline(fp64_truncate):
     class mlir_compiler_gpu_pipeline(orig_CompilerBase):
         def define_pipelines(self):
