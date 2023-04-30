@@ -2,6 +2,8 @@
 #
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+import functools
+
 from numba.core import types
 from numba.core.compiler import DEFAULT_FLAGS, compile_result
 from numba.core.compiler_machinery import FunctionPass, register_pass
@@ -203,11 +205,17 @@ class MlirBackend(MlirBackendBase):
         return True
 
 
-@register_pass(mutates_CFG=True, analysis_only=False)
-class MlirBackendGPU(MlirBackend):
-    def __init__(self):
-        MlirBackend.__init__(self)
-        self.enable_gpu_pipeline = True
+
+
+@functools.cache
+def get_gpu_backend(fp64_trunc):
+    class MlirBackendGPU(MlirBackend):
+        def __init__(self):
+            MlirBackend.__init__(self)
+            self.enable_gpu_pipeline = True
+            self._fp64_truncate = fp64_trunc
+
+    return register_pass(mutates_CFG=True, analysis_only=False)(MlirBackendGPU)
 
 
 @register_pass(mutates_CFG=True, analysis_only=False)

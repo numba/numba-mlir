@@ -6,7 +6,7 @@
 Define @jit and related decorators.
 """
 
-from .mlir.compiler import mlir_compiler_pipeline, mlir_compiler_gpu_pipeline
+from .mlir.compiler import mlir_compiler_pipeline, get_gpu_pipeline
 from .mlir.vectorize import vectorize as mlir_vectorize
 from .mlir.settings import USE_MLIR
 
@@ -41,7 +41,7 @@ def mlir_jit(
     options.pop("gpu_fp64_truncate", None)
 
     pipeline = (
-        mlir_compiler_gpu_pipeline
+        get_gpu_pipeline(fp64_truncate)
         if options.get("enable_gpu_pipeline", True)
         else mlir_compiler_pipeline
     )

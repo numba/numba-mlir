@@ -228,7 +228,7 @@ private:
     } else {
       auto attr =
           mlir::BoolAttr::get(mod->getContext(), fp64_truncate.cast<bool>());
-      mod->setAttr(gpu_runtime::getFp64TruncateAttrName(), attr);
+      func->setAttr(gpu_runtime::getFp64TruncateAttrName(), attr);
     }
 
     globals = compilationContext["globals"]();

@@ -2086,11 +2086,6 @@ struct TruncateF64ForGPUPass
 
   void runOnOperation() override {
     auto module = getOperation();
-    auto truncAttr = module->getAttrOfType<mlir::BoolAttr>(
-        gpu_runtime::getFp64TruncateAttrName());
-    if (truncAttr && !truncAttr.getValue())
-      return markAllAnalysesPreserved();
-
     auto *ctx = &getContext();
     mlir::ConversionTarget target(*ctx);
     mlir::TypeConverter converter;
@@ -2166,6 +2161,11 @@ struct TruncateF64ForGPUPass
     llvm::SmallVector<mlir::Value> newArgs;
     mlir::OpBuilder builder(ctx);
     for (auto gpuModule : module.getOps<mlir::gpu::GPUModuleOp>()) {
+      auto truncAttr = gpuModule->getAttrOfType<mlir::BoolAttr>(
+          gpu_runtime::getFp64TruncateAttrName());
+      if (truncAttr && !truncAttr.getValue())
+        continue;
+
       auto targetEnv = mlir::spirv::lookupTargetEnv(gpuModule);
       if (!targetEnv) {
         gpuModule->emitError("TargetEnv not found");
