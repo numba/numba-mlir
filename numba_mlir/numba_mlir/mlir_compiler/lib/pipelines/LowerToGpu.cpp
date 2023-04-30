@@ -1679,6 +1679,60 @@ public:
   }
 };
 
+class GpuPropagateFp64truncFlagPass
+    : public mlir::PassWrapper<GpuPropagateFp64truncFlagPass,
+                               mlir::OperationPass<mlir::gpu::GPUModuleOp>> {
+public:
+  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(GpuPropagateFp64truncFlagPass)
+
+  virtual void
+  getDependentDialects(mlir::DialectRegistry &registry) const override {
+    registry.insert<mlir::gpu::GPUDialect>();
+  }
+
+  void runOnOperation() override {
+    auto gpuMod = getOperation();
+    auto mod = gpuMod->getParentOfType<mlir::ModuleOp>();
+    if (!mod) {
+      gpuMod->emitError("No module parent");
+      return signalPassFailure();
+    }
+
+    auto funcs = gpuMod.getOps<mlir::gpu::GPUFuncOp>();
+    if (!llvm::hasSingleElement(funcs)) {
+      gpuMod->emitError("GPU module must have exactly one func");
+      return signalPassFailure();
+    }
+
+    auto gpuFunc = *funcs.begin();
+
+    auto funcUses = mlir::SymbolTable::getSymbolUses(gpuFunc, mod);
+    if (!funcUses || !llvm::hasSingleElement(*funcUses)) {
+      gpuMod->emitError("GPU func must have exactly one use");
+      return signalPassFailure();
+    }
+
+    auto use =
+        mlir::dyn_cast<mlir::gpu::LaunchFuncOp>(funcUses->begin()->getUser());
+    if (!use) {
+      gpuMod->emitError("Invalid func use");
+      return signalPassFailure();
+    }
+
+    auto parent = use->getParentOfType<mlir::FunctionOpInterface>();
+    if (!parent) {
+      gpuMod->emitError("Invalid func parent");
+      return signalPassFailure();
+    }
+
+    auto attrName = mlir::StringAttr::get(
+        &getContext(), gpu_runtime::getFp64TruncateAttrName());
+    auto attr = parent->getAttr(attrName);
+    if (attr)
+      gpuMod->setAttr(attrName, attr);
+  }
+};
+
 static const constexpr llvm::StringLiteral
     kGpuModuleDeviceName("gpu_module_device");
 
@@ -1939,6 +1993,8 @@ static void populateLowerToGPUPipelineMed(mlir::OpPassManager &pm) {
   funcPM.addPass(std::make_unique<SinkGpuDimsPass>());
   funcPM.addPass(std::make_unique<GpuLaunchSinkOpsPass>());
   pm.addPass(mlir::createGpuKernelOutliningPass());
+  pm.addNestedPass<mlir::gpu::GPUModuleOp>(
+      std::make_unique<GpuPropagateFp64truncFlagPass>());
   pm.addPass(std::make_unique<NameGpuModulesPass>());
   pm.addPass(mlir::createSymbolDCEPass());
 

@@ -20,10 +20,41 @@ from numba_mlir.mlir.passes import (
 )
 
 from .utils import JitfuncCache, parametrize_function_variants
-from .utils import njit_cached as njit
+from numba_mlir import njit as njit_orig
 
-kernel_cache = JitfuncCache(kernel)
+FP64_TRUNCATE = readenv("NUMBA_MLIR_TESTS_FP64_TRUNCATE", str, "")
+
+
+def kernel_wrapper(*args, **kwargs):
+    if FP64_TRUNCATE:
+        if FP64_TRUNCATE == "auto":
+            fp64_truncate = "auto"
+        else:
+            fp64_truncate = bool(FP64_TRUNCATE)
+
+        kwargs["gpu_fp64_truncate"] = fp64_truncate
+
+    return kernel(*args, **kwargs)
+
+
+kernel_cache = JitfuncCache(kernel_wrapper)
 kernel_cached = kernel_cache.cached_decorator
+
+
+def njit_wrapper(*args, **kwargs):
+    if FP64_TRUNCATE:
+        if FP64_TRUNCATE == "auto":
+            fp64_truncate = "auto"
+        else:
+            fp64_truncate = bool(FP64_TRUNCATE)
+
+        kwargs["gpu_fp64_truncate"] = fp64_truncate
+
+    return njit_orig(*args, **kwargs)
+
+
+njit_cache = JitfuncCache(njit_wrapper)
+njit = njit_cache.cached_decorator
 
 GPU_TESTS_ENABLED = readenv("NUMBA_MLIR_ENABLE_GPU_TESTS", int, 0)
 DPCTL_TESTS_ENABLED = readenv("NUMBA_MLIR_ENABLE_DPCTL_TESTS", int, 0)

@@ -30,6 +30,7 @@
 namespace gpu_runtime {
 mlir::StringRef getGpuAccessibleAttrName();
 mlir::StringRef getFenceFlagsAttrName();
+mlir::StringRef getFp64TruncateAttrName();
 
 enum class FenceFlags : int64_t {
   local = 1,
