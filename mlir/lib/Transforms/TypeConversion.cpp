@@ -143,9 +143,21 @@ static void unpackUnrealizedConversionCast(Value v,
                                            SmallVectorImpl<Value> &unpacked) {
   if (auto cast =
           dyn_cast_or_null<UnrealizedConversionCastOp>(v.getDefiningOp())) {
-    if (cast.getInputs().size() != 1) {
+    auto inputs = cast.getInputs();
+    if (inputs.size() != 1) {
       // 1 : N type conversion.
-      unpacked.append(cast.getInputs().begin(), cast.getInputs().end());
+      unpacked.append(inputs.begin(), inputs.end());
+      return;
+    }
+  }
+
+  // TODO: hack for tuple, need proper 1 : N conversion support upstream
+  if (auto cast =
+          dyn_cast_or_null<numba::util::BuildTupleOp>(v.getDefiningOp())) {
+    auto inputs = cast.getArgs();
+    if (inputs.size() != 1) {
+      // 1 : N type conversion.
+      unpacked.append(inputs.begin(), inputs.end());
       return;
     }
   }
@@ -276,9 +288,25 @@ struct CallOpSignatureConversion
     if (mlir::failed(converter->convertTypes(op.getResultTypes(), resultTypes)))
       return mlir::failure();
 
+    llvm::SmallVector<mlir::Type> unpackedTypes;
+    llvm::SmallVector<mlir::Value> unpackedArgs;
+    for (auto arg : adaptor.getOperands()) {
+      auto origType = arg.getType();
+      unpackedTypes.clear();
+      if (mlir::failed(converter->convertTypes(origType, unpackedTypes)))
+        return mlir::failure();
+
+      if (unpackedTypes.size() == 1 && unpackedTypes.front() == origType) {
+        unpackedArgs.emplace_back(arg);
+        continue;
+      }
+
+      unpackUnrealizedConversionCast(arg, unpackedArgs);
+    }
+
     auto loc = op.getLoc();
-    auto newOp = rewriter.create<mlir::func::CallOp>(
-        loc, op.getCallee(), resultTypes, adaptor.getOperands());
+    auto newOp = rewriter.create<mlir::func::CallOp>(loc, op.getCallee(),
+                                                     resultTypes, unpackedArgs);
 
     auto newResults = packResults(rewriter, loc, *converter,
                                   op.getResultTypes(), newOp.getResults());

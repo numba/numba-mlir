@@ -867,7 +867,7 @@ def test_barrier1(global_size, local_size):
 
 @require_gpu
 @pytest.mark.parametrize("blocksize", [1, 10, 17, 64, 67, 101])
-def test_local_memory(blocksize):
+def test_local_memory1(blocksize):
     local_array = local.array
 
     def func(A):
@@ -900,7 +900,40 @@ def test_local_memory(blocksize):
 
 @require_gpu
 @pytest.mark.parametrize("blocksize", [1, 10, 17, 64, 67, 101])
-def test_private_memory(blocksize):
+def test_local_memory2(blocksize):
+    local_array = local.array
+
+    def func(A):
+        lm = local_array(shape=(1, blocksize), dtype=np.float32)
+        i = get_global_id(0)
+
+        # preload
+        lm[0, i] = A[i]
+        # barrier local or global will both work as we only have one work group
+        barrier(CLK_LOCAL_MEM_FENCE)  # local mem fence
+        # write
+        A[i] += lm[0, blocksize - 1 - i]
+
+    sim_func = kernel_sim(func)
+    gpu_func = kernel_cached(func)
+
+    arr = np.arange(blocksize).astype(np.float32)
+
+    sim_res = arr.copy()
+    sim_func[blocksize, blocksize](sim_res)
+
+    with print_pass_ir([], ["ConvertParallelLoopToGpu"]):
+        gpu_res = arr.copy()
+        gpu_func[blocksize, blocksize](gpu_res)
+        ir = get_print_buffer()
+        assert ir.count("gpu.launch blocks") == 1, ir
+
+    assert_allclose(sim_res, gpu_res)
+
+
+@require_gpu
+@pytest.mark.parametrize("blocksize", [1, 10, 17, 64, 67, 101])
+def test_private_memory1(blocksize):
     private_array = private.array
 
     def func(A):
@@ -909,6 +942,35 @@ def test_private_memory(blocksize):
         prvt_mem[0] = i
         barrier(CLK_LOCAL_MEM_FENCE)  # local mem fence
         A[i] = prvt_mem[0] * 2
+
+    sim_func = kernel_sim(func)
+    gpu_func = kernel_cached(func)
+
+    arr = np.zeros(blocksize).astype(np.float32)
+
+    sim_res = arr.copy()
+    sim_func[blocksize, blocksize](sim_res)
+
+    with print_pass_ir([], ["ConvertParallelLoopToGpu"]):
+        gpu_res = arr.copy()
+        gpu_func[blocksize, blocksize](gpu_res)
+        ir = get_print_buffer()
+        assert ir.count("gpu.launch blocks") == 1, ir
+
+    assert_allclose(sim_res, gpu_res)
+
+
+@require_gpu
+@pytest.mark.parametrize("blocksize", [1, 10, 17, 64, 67, 101])
+def test_private_memory2(blocksize):
+    private_array = private.array
+
+    def func(A):
+        i = get_global_id(0)
+        prvt_mem = private_array(shape=(1, 1), dtype=np.float32)
+        prvt_mem[0, 0] = i
+        barrier(CLK_LOCAL_MEM_FENCE)  # local mem fence
+        A[i] = prvt_mem[0, 0] * 2
 
     sim_func = kernel_sim(func)
     gpu_func = kernel_cached(func)
