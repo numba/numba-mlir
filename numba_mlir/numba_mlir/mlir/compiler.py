@@ -17,6 +17,7 @@ from numba.core.compiler_machinery import PassManager
 from numba.core.compiler import CompilerBase as orig_CompilerBase
 from numba.core.compiler import DefaultPassBuilder as orig_DefaultPassBuilder
 from numba.core.typed_passes import NativeLowering as orig_NativeLowering
+from numba.core.typed_passes import NativeParforLowering as orig_NativeParforLowering
 from numba.core.typed_passes import (
     PreParforPass,
     ParforPass,
@@ -67,7 +68,11 @@ class mlir_PassBuilder(orig_DefaultPassBuilder):
             pm.passes, replaced = _replace_pass(
                 pm.passes, orig_NativeLowering, mlir_NativeLowering
             )
-            assert replaced == 1, replaced
+            if replaced == 0:
+                pm.passes, replaced = _replace_pass(
+                    pm.passes, orig_NativeParforLowering, mlir_NativeLowering
+                )
+            assert replaced == 1, "Failed to replace lowering pass"
 
             pm.passes, removed = _remove_passes(
                 pm.passes,
