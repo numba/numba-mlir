@@ -39,13 +39,13 @@ struct ForceInline : public mlir::OpRewritePattern<mlir::func::CallOp> {
     auto loc = op.getLoc();
     auto reg =
         rewriter.create<mlir::scf::ExecuteRegionOp>(loc, op.getResultTypes());
-    auto newCall = [&]() -> mlir::Operation * {
+    auto newCall = [&]() -> mlir::CallOpInterface {
       auto &regBlock = reg.getRegion().emplaceBlock();
       mlir::OpBuilder::InsertionGuard g(rewriter);
       rewriter.setInsertionPointToStart(&regBlock);
       auto call = rewriter.clone(*op);
       rewriter.create<mlir::scf::YieldOp>(loc, call->getResults());
-      return call;
+      return mlir::cast<mlir::CallOpInterface>(call);
     }();
 
     mlir::InlinerInterface inlinerInterface(op->getContext());

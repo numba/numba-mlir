@@ -93,7 +93,8 @@ mlir::Operation *NumbaUtilDialect::materializeConstant(mlir::OpBuilder &builder,
                                                        mlir::Type type,
                                                        mlir::Location loc) {
   if (mlir::arith::ConstantOp::isBuildableWith(value, type))
-    return builder.create<mlir::arith::ConstantOp>(loc, type, value);
+    return builder.create<mlir::arith::ConstantOp>(
+        loc, type, mlir::cast<mlir::TypedAttr>(value));
 
   if (type.isa<mlir::IndexType>())
     if (auto val = mlir::getConstantIntValue(value))

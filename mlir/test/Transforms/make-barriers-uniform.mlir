@@ -182,7 +182,7 @@ func.func @test() {
 //       CHECK: scf.yield %[[V3]], %[[V4]] : i32, i64
 //       CHECK: }
 //       CHECK: %[[RARG:.*]] = arith.select %[[COND]], %[[RES1]]#1, %[[NEUTRAL]] : i64
-//       CHECK: %[[RRES:.*]] = gpu.all_reduce mul %[[RARG]] {
+//       CHECK: %[[RRES:.*]] = gpu.all_reduce mul %[[RARG]] uniform {
 //       CHECK:   } : (i64) -> i64
 //       CHECK: scf.if %[[COND]] {
 //       CHECK: "test.test5"() : () -> ()
@@ -228,7 +228,7 @@ func.func @test() {
 //       CHECK: scf.yield %[[V3]], %[[V4]] : i32, i64
 //       CHECK: }
 //       CHECK: %[[RARG:.*]] = arith.select %[[COND]], %[[RES1]]#1, %[[NEUTRAL]] : i64
-//       CHECK: %[[RRES:.*]] = gpu.subgroup_reduce min %[[RARG]] : (i64) -> i64
+//       CHECK: %[[RRES:.*]] = gpu.subgroup_reduce min %[[RARG]] uniform : (i64) -> i64
 //       CHECK: scf.if %[[COND]] {
 //       CHECK: "test.test5"() : () -> ()
 //       CHECK: "test.test6"(%[[RES1]]#0) : (i32) -> ()

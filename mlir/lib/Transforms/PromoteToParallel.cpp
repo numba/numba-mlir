@@ -80,7 +80,7 @@ static void subLower(mlir::OpBuilder &builder, mlir::Location loc,
                      mlir::Value val, mlir::Operation *origOp) {
   auto type = val.getType();
   auto zeroAttr = numba::getConstAttr(type, 0.0);
-  auto zero = builder.create<mlir::arith::ConstantOp>(loc, zeroAttr, type);
+  auto zero = builder.create<mlir::arith::ConstantOp>(loc, type, zeroAttr);
   val = builder.create<SubOp>(loc, zero, val);
   auto bodyBuilder = [&](mlir::OpBuilder &b, mlir::Location l, mlir::Value lhs,
                          mlir::Value rhs) {
@@ -95,7 +95,7 @@ static void divLower(mlir::OpBuilder &builder, mlir::Location loc,
                      mlir::Value val, mlir::Operation *origOp) {
   auto type = val.getType();
   auto oneAttr = numba::getConstAttr(type, 1.0);
-  auto one = builder.create<mlir::arith::ConstantOp>(loc, oneAttr, type);
+  auto one = builder.create<mlir::arith::ConstantOp>(loc, type, oneAttr);
   val = builder.create<DivOp>(loc, one, val);
   auto bodyBuilder = [&](mlir::OpBuilder &b, mlir::Location l, mlir::Value lhs,
                          mlir::Value rhs) {

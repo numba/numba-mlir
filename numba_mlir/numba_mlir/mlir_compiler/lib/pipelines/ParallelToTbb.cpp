@@ -20,7 +20,6 @@
 
 #include "numba/Compiler/PipelineRegistry.hpp"
 #include "numba/Dialect/numba_util/Dialect.hpp"
-#include "numba/Transforms/ConstUtils.hpp"
 #include "numba/Transforms/FuncUtils.hpp"
 #include "numba/Transforms/RewriteWrapper.hpp"
 
@@ -32,7 +31,7 @@ static mlir::MemRefType getReduceType(mlir::Type type, int64_t count) {
   return {};
 }
 
-static std::optional<mlir::Attribute>
+static std::optional<mlir::TypedAttr>
 getReduceInitVal(mlir::Type type, mlir::Block &reduceBlock) {
   if (!llvm::hasSingleElement(reduceBlock.without_terminator()))
     return std::nullopt;
@@ -70,7 +69,7 @@ struct ParallelToTbb : public mlir::OpRewritePattern<mlir::scf::ParallelOp> {
       if (!getReduceType(type, maxConcurrency))
         return mlir::failure();
 
-    llvm::SmallVector<mlir::Attribute> initVals;
+    llvm::SmallVector<mlir::TypedAttr> initVals;
     initVals.reserve(op.getNumResults());
     for (auto &nestedOp : op.getLoopBody().front().without_terminator()) {
       if (auto reduce = mlir::dyn_cast<mlir::scf::ReduceOp>(nestedOp)) {
@@ -303,6 +302,7 @@ struct HoistBufferAllocs
         auto oldShape = oldType.getShape();
         newShape.append(oldShape.begin(), oldShape.end());
         return mlir::MemRefType::get(newShape, oldType.getElementType(),
+                                     mlir::MemRefLayoutAttrInterface{},
                                      oldType.getMemorySpace());
       }
       return oldType;

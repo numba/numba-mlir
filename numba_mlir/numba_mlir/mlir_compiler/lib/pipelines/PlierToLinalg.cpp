@@ -2125,7 +2125,7 @@ struct InsertSliceToPad
         return val.get<mlir::Value>();
 
       return rewriter.create<mlir::arith::ConstantOp>(
-          loc, val.get<mlir::Attribute>());
+          loc, mlir::cast<mlir::TypedAttr>(val.get<mlir::Attribute>()));
     };
 
     for (auto i : llvm::seq(0u, rank)) {
@@ -2461,7 +2461,8 @@ struct OptimizeGlobalsConstsLoad
     if (!elements)
       return mlir::failure();
 
-    if (elements.getType().getElementType() != op.getType() ||
+    auto elementsType = mlir::dyn_cast<mlir::ShapedType>(elements.getType());
+    if (!elementsType || elementsType.getElementType() != op.getType() ||
         !elements.isValidIndex(indices))
       return mlir::failure();
 
@@ -2476,7 +2477,8 @@ struct OptimizeGlobalsConstsLoad
       rewriter.replaceOpWithNewOp<mlir::complex::ConstantOp>(
           op, complexType, val.cast<mlir::ArrayAttr>());
     } else {
-      rewriter.replaceOpWithNewOp<mlir::arith::ConstantOp>(op, val);
+      rewriter.replaceOpWithNewOp<mlir::arith::ConstantOp>(
+          op, mlir::cast<mlir::TypedAttr>(val));
     }
 
     return mlir::success();

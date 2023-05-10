@@ -360,9 +360,9 @@ struct InsertGPUAllocs
 
       auto allocType = memrefType;
       if (!allocType.getLayout().isIdentity())
-        allocType = mlir::MemRefType::get(allocType.getShape(),
-                                          allocType.getElementType(),
-                                          allocType.getMemorySpace());
+        allocType = mlir::MemRefType::get(
+            allocType.getShape(), allocType.getElementType(),
+            mlir::MemRefLayoutAttrInterface{}, allocType.getMemorySpace());
 
       bool hostShared = access.hostRead || access.hostWrite;
       auto results = numba::util::wrapEnvRegion(
@@ -514,7 +514,7 @@ getFlatOffsetAndStrides(
             : mlir::OpFoldResult(rewriter.getIndexAttr(sourceStrides[i]));
 
     if (!subStrides.empty()) {
-      strides.push_back(makeComposedFoldedAffineApply(
+      strides.push_back(mlir::affine::makeComposedFoldedAffineApply(
           rewriter, loc, s0 * s1, {subStrides[i], origStride}));
     }
 
@@ -529,7 +529,7 @@ getFlatOffsetAndStrides(
 
   // Compute the offset.
   mlir::OpFoldResult finalOffset =
-      makeComposedFoldedAffineApply(rewriter, loc, expr, values);
+      mlir::affine::makeComposedFoldedAffineApply(rewriter, loc, expr, values);
 
   return {newExtractStridedMetadata.getBaseBuffer(), finalOffset, strides};
 }
@@ -1233,7 +1233,7 @@ struct GPUToSpirvPass
 
   virtual void
   getDependentDialects(mlir::DialectRegistry &registry) const override {
-    registry.insert<mlir::AffineDialect>();
+    registry.insert<mlir::affine::AffineDialect>();
     registry.insert<mlir::spirv::SPIRVDialect>();
   }
 
@@ -1652,7 +1652,7 @@ struct GenDeviceFuncsPass
   }
 };
 
-static std::optional<mlir::Attribute> getNeutralValue(mlir::Block &block) {
+static std::optional<mlir::TypedAttr> getNeutralValue(mlir::Block &block) {
   auto body = block.without_terminator();
   if (!llvm::hasSingleElement(body))
     return std::nullopt;
@@ -1681,7 +1681,7 @@ struct TileParallelOp : public mlir::OpRewritePattern<mlir::scf::ParallelOp> {
     mlir::ValueRange initVals = op.getInitVals();
     assert(reductionOps.size() == initVals.size());
 
-    llvm::SmallVector<mlir::Attribute> neutralValues;
+    llvm::SmallVector<mlir::TypedAttr> neutralValues;
     for (auto reduction : reductionOps) {
       auto neutralValue = getNeutralValue(reduction.getRegion().front());
       if (!neutralValue)
@@ -2493,7 +2493,7 @@ struct LowerGPUGlobalReduce
     };
 
     mlir::Value initVal = rewriter.create<mlir::arith::ConstantOp>(
-        launchLoc, initAttr->cast<mlir::TypedAttr>());
+        launchLoc, mlir::cast<mlir::TypedAttr>(*initAttr));
     auto loopOp = rewriter.create<mlir::scf::ParallelOp>(
         launchLoc, zero, numWorkGroupsExternal, one, initVal,
         finalReduceBodyBuilder);
