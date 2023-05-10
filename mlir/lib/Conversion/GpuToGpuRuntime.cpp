@@ -360,10 +360,9 @@ struct InsertGPUAllocs
 
       auto allocType = memrefType;
       if (!allocType.getLayout().isIdentity())
-        allocType = mlir::MemRefType::get(allocType.getShape(),
-                                          allocType.getElementType(),
-                                          mlir::MemRefLayoutAttrInterface{},
-                                          allocType.getMemorySpace());
+        allocType = mlir::MemRefType::get(
+            allocType.getShape(), allocType.getElementType(),
+            mlir::MemRefLayoutAttrInterface{}, allocType.getMemorySpace());
 
       bool hostShared = access.hostRead || access.hostWrite;
       auto results = numba::util::wrapEnvRegion(

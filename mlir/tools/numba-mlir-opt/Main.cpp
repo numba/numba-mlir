@@ -18,6 +18,6 @@ int main(int argc, char **argv) {
   registry.insert<gpu_runtime::GpuRuntimeDialect>();
   registry.insert<numba::ntensor::NTensorDialect>();
   registry.insert<numba::util::NumbaUtilDialect>();
-  return mlir::failed(
-      MlirOptMain(argc, argv, "numba-mlir modular optimizer driver\n", registry));
+  return mlir::failed(MlirOptMain(
+      argc, argv, "numba-mlir modular optimizer driver\n", registry));
 }

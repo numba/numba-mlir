@@ -56,7 +56,8 @@ mlir::Operation *PlierDialect::materializeConstant(mlir::OpBuilder &builder,
                                                    mlir::Type type,
                                                    mlir::Location loc) {
   if (mlir::arith::ConstantOp::isBuildableWith(value, type))
-    return builder.create<mlir::arith::ConstantOp>(loc, type, mlir::cast<mlir::TypedAttr>(value));
+    return builder.create<mlir::arith::ConstantOp>(
+        loc, type, mlir::cast<mlir::TypedAttr>(value));
 
   return nullptr;
 }

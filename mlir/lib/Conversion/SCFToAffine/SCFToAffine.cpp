@@ -64,8 +64,8 @@ public:
     for (auto &each : llvm::make_early_inc_range(*newPloop.getBody())) {
       if (auto load = dyn_cast<memref::LoadOp>(each)) {
         rewriter.setInsertionPointAfter(load);
-        rewriter.replaceOpWithNewOp<affine::AffineLoadOp>(load, load.getMemRef(),
-                                                  load.getIndices());
+        rewriter.replaceOpWithNewOp<affine::AffineLoadOp>(
+            load, load.getMemRef(), load.getIndices());
       } else if (auto store = dyn_cast<memref::StoreOp>(each)) {
         rewriter.setInsertionPointAfter(store);
         rewriter.replaceOpWithNewOp<affine::AffineStoreOp>(

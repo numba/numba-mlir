@@ -2477,7 +2477,8 @@ struct OptimizeGlobalsConstsLoad
       rewriter.replaceOpWithNewOp<mlir::complex::ConstantOp>(
           op, complexType, val.cast<mlir::ArrayAttr>());
     } else {
-      rewriter.replaceOpWithNewOp<mlir::arith::ConstantOp>(op, mlir::cast<mlir::TypedAttr>(val));
+      rewriter.replaceOpWithNewOp<mlir::arith::ConstantOp>(
+          op, mlir::cast<mlir::TypedAttr>(val));
     }
 
     return mlir::success();

@@ -301,7 +301,8 @@ struct HoistBufferAllocs
         newShape.emplace_back(mc.getValue().getSExtValue());
         auto oldShape = oldType.getShape();
         newShape.append(oldShape.begin(), oldShape.end());
-        return mlir::MemRefType::get(newShape, oldType.getElementType(), mlir::MemRefLayoutAttrInterface{},
+        return mlir::MemRefType::get(newShape, oldType.getElementType(),
+                                     mlir::MemRefLayoutAttrInterface{},
                                      oldType.getMemorySpace());
       }
       return oldType;
