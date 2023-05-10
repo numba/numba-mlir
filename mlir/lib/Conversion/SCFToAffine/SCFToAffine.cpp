@@ -31,20 +31,20 @@ public:
 
     // just for the case if we reductions
     // TODO: fill them from found scf.reduce op
-    SmallVector<LoopReduction> reductions;
+    SmallVector<affine::LoopReduction> reductions;
     auto reducedValueTypes = llvm::to_vector<4>(
-        llvm::map_range(reductions, [](const LoopReduction &red) {
+        llvm::map_range(reductions, [](const affine::LoopReduction &red) {
           return red.value.getType();
         }));
 
     auto reductionKinds = llvm::to_vector<4>(llvm::map_range(
-        reductions, [](const LoopReduction &red) { return red.kind; }));
+        reductions, [](const affine::LoopReduction &red) { return red.kind; }));
 
     auto dims = static_cast<unsigned>(op.getStep().size());
     // Creating empty affine.parallel op.
     rewriter.setInsertionPoint(op);
     auto affineMap = AffineMap::getMultiDimIdentityMap(dims, op.getContext());
-    AffineParallelOp newPloop = rewriter.create<AffineParallelOp>(
+    auto newPloop = rewriter.create<affine::AffineParallelOp>(
         op.getLoc(), reducedValueTypes, reductionKinds,
         llvm::ArrayRef(affineMap), op.getLowerBound(),
         llvm::ArrayRef(affineMap), op.getUpperBound(),
@@ -56,7 +56,7 @@ public:
     Operation *yieldOp = newPloop.getBody()->getTerminator();
     assert(yieldOp);
     rewriter.setInsertionPoint(yieldOp);
-    rewriter.replaceOpWithNewOp<AffineYieldOp>(yieldOp, ValueRange({}));
+    rewriter.replaceOpWithNewOp<affine::AffineYieldOp>(yieldOp, ValueRange({}));
 
     assert(newPloop.verifyInvariants().succeeded() &&
            "affine body is incorrectly constructed");
@@ -64,11 +64,11 @@ public:
     for (auto &each : llvm::make_early_inc_range(*newPloop.getBody())) {
       if (auto load = dyn_cast<memref::LoadOp>(each)) {
         rewriter.setInsertionPointAfter(load);
-        rewriter.replaceOpWithNewOp<AffineLoadOp>(load, load.getMemRef(),
+        rewriter.replaceOpWithNewOp<affine::AffineLoadOp>(load, load.getMemRef(),
                                                   load.getIndices());
       } else if (auto store = dyn_cast<memref::StoreOp>(each)) {
         rewriter.setInsertionPointAfter(store);
-        rewriter.replaceOpWithNewOp<AffineStoreOp>(
+        rewriter.replaceOpWithNewOp<affine::AffineStoreOp>(
             store, store.getValueToStore(), store.getMemRef(),
             store.getIndices());
       }
@@ -87,7 +87,7 @@ struct SCFToAffinePass
 
   virtual void
   getDependentDialects(mlir::DialectRegistry &registry) const override {
-    registry.insert<mlir::AffineDialect>();
+    registry.insert<mlir::affine::AffineDialect>();
     registry.insert<mlir::scf::SCFDialect>();
   }
 

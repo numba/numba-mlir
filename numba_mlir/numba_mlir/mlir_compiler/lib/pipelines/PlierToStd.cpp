@@ -85,8 +85,8 @@ struct ConstOpLowering : public mlir::OpConversionPattern<plier::ConstOp> {
         return mlir::success();
       }
 
-      if (value.isa<mlir::FloatAttr>()) {
-        rewriter.replaceOpWithNewOp<mlir::arith::ConstantOp>(op, value);
+      if (auto floatAttr = value.dyn_cast<mlir::FloatAttr>()) {
+        rewriter.replaceOpWithNewOp<mlir::arith::ConstantOp>(op, floatAttr);
         return mlir::success();
       }
 
@@ -116,7 +116,7 @@ static bool isOmittedType(mlir::Type type) {
   return type.isa<plier::OmittedType>();
 }
 
-static mlir::Attribute makeSignlessAttr(mlir::Attribute val) {
+static mlir::TypedAttr makeSignlessAttr(mlir::TypedAttr val) {
   auto type = val.cast<mlir::TypedAttr>().getType();
   if (auto intType = type.dyn_cast<mlir::IntegerType>()) {
     if (!intType.isSignless()) {
@@ -169,9 +169,9 @@ struct OmittedLowering : public mlir::OpConversionPattern<plier::CastOp> {
       return mlir::failure();
 
     auto getOmittedValue = [&](mlir::Type type,
-                               mlir::Type dstType) -> mlir::Attribute {
+                               mlir::Type dstType) -> mlir::TypedAttr {
       if (auto attr = type.dyn_cast<plier::OmittedType>())
-        return attr.getValue();
+        return mlir::cast<mlir::TypedAttr>(attr.getValue());
 
       return {};
     };

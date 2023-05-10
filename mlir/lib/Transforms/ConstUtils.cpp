@@ -7,23 +7,23 @@
 #include <mlir/IR/BuiltinTypes.h>
 #include <mlir/IR/OpDefinition.h>
 
-mlir::Attribute numba::getConstVal(mlir::Operation *op) {
+mlir::TypedAttr numba::getConstVal(mlir::Operation *op) {
   assert(op);
   if (!op->hasTrait<mlir::OpTrait::ConstantLike>())
     return {};
 
-  return op->getAttr("value");
+  return op->getAttr("value").dyn_cast<mlir::TypedAttr>();
 }
 
-mlir::Attribute numba::getConstVal(mlir::Value op) {
+mlir::TypedAttr numba::getConstVal(mlir::Value op) {
   assert(op);
-  if (auto parent_op = op.getDefiningOp())
-    return getConstVal(parent_op);
+  if (auto parentOp = op.getDefiningOp())
+    return getConstVal(parentOp);
 
   return {};
 }
 
-mlir::Attribute numba::getConstAttr(mlir::Type type, double val) {
+mlir::TypedAttr numba::getConstAttr(mlir::Type type, double val) {
   assert(type);
   if (type.isa<mlir::FloatType>())
     return mlir::FloatAttr::get(type, val);
