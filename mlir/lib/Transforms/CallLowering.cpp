@@ -65,19 +65,11 @@ numba::CallOpLowering::matchAndRewrite(plier::PyCallOp op,
   if (op.getVarargs())
     return mlir::failure();
 
-  auto funcName = op.getFuncName();
-
-  llvm::SmallVector<mlir::Value> args;
-  args.reserve(op.getArgs().size() + 1);
   auto func = op.getFunc();
-  if (func) {
-    auto getattr = func.getDefiningOp<plier::GetattrOp>();
-    if (getattr)
-      args.emplace_back(skipCasts(getattr.getOperand()));
-  }
+  if (!func || !mlir::isa<mlir::FunctionType>(func.getType()))
+    return mlir::failure();
 
-  for (auto arg : op.getArgs())
-    args.emplace_back(skipCasts(arg));
+  auto funcName = op.getFuncName();
 
   llvm::SmallVector<std::pair<llvm::StringRef, mlir::Value>> kwargs;
   for (auto it : llvm::zip(op.getKwargs(), op.getKwNames())) {
@@ -87,5 +79,5 @@ numba::CallOpLowering::matchAndRewrite(plier::PyCallOp op,
   }
 
   auto loc = op.getLoc();
-  return resolveCall(op, funcName, loc, rewriter, args, kwargs);
+  return resolveCall(op, funcName, loc, rewriter, op.getArgs(), kwargs);
 }
