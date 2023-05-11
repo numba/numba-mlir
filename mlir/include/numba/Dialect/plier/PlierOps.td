@@ -32,6 +32,8 @@ def Plier_SliceType : Plier_Type<"Slice", "slice", [], "::mlir::Type">;
 
 def Plier_BoundFunctionType : Plier_Type<"BoundFunction", "bound_function", [], "::mlir::Type">;
 
+def Plier_UndefinedType : Plier_Type<"Undefined", "undefined", [], "::mlir::Type">;
+
 def Plier_Py : Plier_Type<"Py", "pytype", [], "::mlir::Type"> {
 
   let parameters = (ins "::mlir::StringAttr":$name);
@@ -44,12 +46,6 @@ def Plier_Py : Plier_Type<"Py", "pytype", [], "::mlir::Type"> {
       return $_get(context, ::mlir::StringAttr::get(context, name));
     }]>
   ];
-
-  let extraClassDeclaration = [{
-    static PyType getUndefined(::mlir::MLIRContext *context) {
-      return PyType::get(context, "");
-    }
-  }];
 
   let assemblyFormat = "`<` $name `>`";
 }
