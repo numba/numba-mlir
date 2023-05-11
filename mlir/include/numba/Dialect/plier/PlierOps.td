@@ -32,12 +32,25 @@ def Plier_SliceType : Plier_Type<"Slice", "slice", [], "::mlir::Type">;
 
 def Plier_FunctionType : Plier_Type<"Function", "function", [], "::mlir::Type">;
 
-def Plier_BoundFunctionType : Plier_Type<"BoundFunction", "bound_function", [], "::mlir::Type">;
+def Plier_BoundFunctionType : Plier_Type<"BoundFunction", "bound_function", [], "::mlir::Type"> {
+  let parameters = (ins "::mlir::Type":$type, "::mlir::StringAttr":$name);
+
+  let builders = [
+    TypeBuilderWithInferredContext<(ins
+      "::mlir::MLIRContext *":$context,
+      "::mlir::Type":$type,
+      "::mlir::StringRef":$name
+    ), [{
+      return $_get(context, type, ::mlir::StringAttr::get(context, name));
+    }]>
+  ];
+
+  let assemblyFormat = "`<` $type `,` $name `>`";
+}
 
 def Plier_UndefinedType : Plier_Type<"Undefined", "undefined", [], "::mlir::Type">;
 
 def Plier_Py : Plier_Type<"Py", "pytype", [], "::mlir::Type"> {
-
   let parameters = (ins "::mlir::StringAttr":$name);
 
   let builders = [

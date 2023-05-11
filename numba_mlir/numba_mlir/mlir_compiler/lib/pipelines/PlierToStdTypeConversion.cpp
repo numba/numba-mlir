@@ -170,8 +170,15 @@ struct Conversion {
     if (py::isinstance(obj, functionType))
       return plier::FunctionType::get(&context);
 
-    if (py::isinstance(obj, boundFunctionType))
-      return plier::BoundFunctionType::get(&context);
+    if (py::isinstance(obj, boundFunctionType)) {
+      auto typingKey = obj.attr("typing_key").cast<py::tuple>();
+      auto type = converter.convertType(context, typingKey[0]);
+      if (!type)
+        return std::nullopt;
+
+      auto name = typingKey[1].cast<std::string>();
+      return plier::BoundFunctionType::get(&context, type, name);
+    }
 
     if (py::isinstance(obj, moduleType))
       return numba::util::OpaqueType::get(&context);
