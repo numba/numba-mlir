@@ -63,27 +63,25 @@ mlir::Operation *PlierDialect::materializeConstant(mlir::OpBuilder &builder,
 }
 
 void ConstOp::build(mlir::OpBuilder &builder, mlir::OperationState &state,
-
                     mlir::Attribute val) {
-  ConstOp::build(builder, state, PyType::getUndefined(state.getContext()), val);
+  ConstOp::build(builder, state, UndefinedType::get(state.getContext()), val);
 }
 
 void GlobalOp::build(mlir::OpBuilder &builder, mlir::OperationState &state,
                      mlir::StringRef name) {
-  GlobalOp::build(builder, state, PyType::getUndefined(state.getContext()),
-                  name);
+  GlobalOp::build(builder, state, UndefinedType::get(state.getContext()), name);
 }
 
 void BinOp::build(mlir::OpBuilder &builder, mlir::OperationState &state,
                   mlir::Value lhs, mlir::Value rhs, mlir::StringRef op) {
-  BinOp::build(builder, state, PyType::getUndefined(state.getContext()), lhs,
-               rhs, op);
+  BinOp::build(builder, state, UndefinedType::get(state.getContext()), lhs, rhs,
+               op);
 }
 
 void UnaryOp::build(mlir::OpBuilder &builder, mlir::OperationState &state,
                     mlir::Value value, mlir::StringRef op) {
-  UnaryOp::build(builder, state, PyType::getUndefined(state.getContext()),
-                 value, op);
+  UnaryOp::build(builder, state, UndefinedType::get(state.getContext()), value,
+                 op);
 }
 
 static mlir::Value propagateCasts(mlir::Value val, mlir::Type thisType);
@@ -123,7 +121,7 @@ mlir::OpFoldResult CastOp::fold(FoldAdaptor) {
   auto arg = getValue();
   auto opType = arg.getType();
   auto retType = getType();
-  if (opType == retType && opType != PyType::getUndefined(getContext()))
+  if (opType == retType && opType != UndefinedType::get(getContext()))
     return arg;
 
   if (auto res = propagateCasts(arg, retType))
@@ -166,7 +164,7 @@ void PyCallOp::build(
     llvm::StringRef func_name, mlir::ValueRange args, mlir::Value varargs,
     mlir::ArrayRef<std::pair<std::string, mlir::Value>> kwargs) {
   PyCallOp::build(builder, state,
-                  plier::PyType::getUndefined(builder.getContext()), func,
+                  plier::UndefinedType::get(builder.getContext()), func,
                   func_name, args, varargs, kwargs);
 }
 
@@ -191,55 +189,55 @@ void PyCallOp::build(
 
 void BuildTupleOp::build(mlir::OpBuilder &builder, mlir::OperationState &state,
                          ::mlir::ValueRange args) {
-  BuildTupleOp::build(builder, state, PyType::getUndefined(state.getContext()),
+  BuildTupleOp::build(builder, state, UndefinedType::get(state.getContext()),
                       args);
 }
 
 void GetItemOp::build(mlir::OpBuilder &builder, mlir::OperationState &state,
                       ::mlir::Value value, ::mlir::Value index) {
-  GetItemOp::build(builder, state, PyType::getUndefined(state.getContext()),
+  GetItemOp::build(builder, state, UndefinedType::get(state.getContext()),
                    value, index);
 }
 
 void GetiterOp::build(mlir::OpBuilder &builder, mlir::OperationState &state,
                       ::mlir::Value value) {
-  GetiterOp::build(builder, state, PyType::getUndefined(state.getContext()),
+  GetiterOp::build(builder, state, UndefinedType::get(state.getContext()),
                    value);
 }
 
 void IternextOp::build(mlir::OpBuilder &builder, mlir::OperationState &state,
                        ::mlir::Value value) {
-  IternextOp::build(builder, state, PyType::getUndefined(state.getContext()),
+  IternextOp::build(builder, state, UndefinedType::get(state.getContext()),
                     value);
 }
 
 void PairfirstOp::build(mlir::OpBuilder &builder, mlir::OperationState &state,
                         ::mlir::Value value) {
-  PairfirstOp::build(builder, state, PyType::getUndefined(state.getContext()),
+  PairfirstOp::build(builder, state, UndefinedType::get(state.getContext()),
                      value);
 }
 
 void PairsecondOp::build(mlir::OpBuilder &builder, mlir::OperationState &state,
                          ::mlir::Value value) {
-  PairsecondOp::build(builder, state, PyType::getUndefined(state.getContext()),
+  PairsecondOp::build(builder, state, UndefinedType::get(state.getContext()),
                       value);
 }
 
 void GetattrOp::build(mlir::OpBuilder &builder, mlir::OperationState &state,
                       mlir::Value value, mlir::StringRef name) {
-  GetattrOp::build(builder, state, PyType::getUndefined(state.getContext()),
+  GetattrOp::build(builder, state, UndefinedType::get(state.getContext()),
                    value, name);
 }
 
 void ExhaustIterOp::build(mlir::OpBuilder &builder, mlir::OperationState &state,
                           mlir::Value value, int64_t count) {
-  ExhaustIterOp::build(builder, state, PyType::getUndefined(state.getContext()),
+  ExhaustIterOp::build(builder, state, UndefinedType::get(state.getContext()),
                        value, builder.getI64IntegerAttr(count));
 }
 
 mlir::OpFoldResult ExhaustIterOp::fold(FoldAdaptor) {
   if (getType() == getOperand().getType() &&
-      getType() != plier::PyType::getUndefined(getContext())) {
+      getType() != plier::UndefinedType::get(getContext())) {
     return getOperand();
   }
   return nullptr;
