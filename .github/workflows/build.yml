@@ -452,7 +452,7 @@ jobs:
     env:
       CORE_ENV_FILE: scripts/core-env-linux.yml
     name: Builds Linux Numba-MLIR core
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     timeout-minutes: 450
 
     steps:
@@ -582,7 +582,7 @@ jobs:
           git checkout $LLVM_SHA || exit 1
           mkdir _build || exit 1
           cd _build || exit 1
-          source activate base
+          source activate test-env
           export CC=$CONDA_PREFIX/bin/x86_64-conda-linux-gnu-cc
           export CXX=$CONDA_PREFIX/bin/x86_64-conda-linux-gnu-c++
           cmake ../llvm                                                    \
@@ -609,11 +609,14 @@ jobs:
         run: |
           mkdir -p _build
           cd _build
+          source $CONDA/bin/activate test-env
           export EXTERNAL_LIT=${GITHUB_WORKSPACE}/scripts/runlit.py
           export TBB_PATH=/home/runner/work/tbb/oneapi-tbb-${TBB_VER}
           export LEVEL_ZERO_DIR=/home/runner/work/level-zero/level-zero/level_zero_install
           export LEVEL_ZERO_VERSION_CHECK_OFF=1
           export LLVM_DIR=/home/runner/work/llvm-mlir/_mlir_install
+          export CC=${CONDA_PREFIX}/bin/x86_64-conda-linux-gnu-cc
+          export CXX=${CONDA_PREFIX}/bin/x86_64-conda-linux-gnu-c++
           cmake ${GITHUB_WORKSPACE}                                             \
             -GNinja                                                             \
             -DCMAKE_BUILD_TYPE=Release                                          \
@@ -637,7 +640,7 @@ jobs:
 
   build_linux_python:
     name: Builds Linux Numba-MLIR
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     timeout-minutes: 450
     needs: build_linux
 
@@ -708,6 +711,7 @@ jobs:
           conda create -y -n test-env python=${{ matrix.python }} "pip>=22" numba=0.57 numpy=1.22 "setuptools<65.6" scikit-learn pytest-xdist ninja scipy pybind11 pytest tbb=${TBB_VER} cmake "mkl-devel-dpcpp>=2023.0.0" dpcpp_linux-64 -c conda-forge -c intel -c numba
           conda info
           source $CONDA/bin/activate test-env
+          conda install gxx_linux-64 -c conda-forge --override-channels
           conda list
           python -c "import numba; print('numba', numba.__version__)"
           python -c "import numpy; print(numpy.get_include())"
@@ -717,6 +721,8 @@ jobs:
           export LEVEL_ZERO_DIR=/home/runner/work/level-zero/level-zero/level_zero_install
           export LEVEL_ZERO_VERSION_CHECK_OFF=1
           export NUMBA_MLIR_USE_SYCL=ON
+          export CC=$CONDA_PREFIX/bin/x86_64-conda-linux-gnu-cc
+          export CXX=$CONDA_PREFIX/bin/x86_64-conda-linux-gnu-c++
           python setup.py develop
 
 
@@ -754,6 +760,8 @@ jobs:
           export LEVEL_ZERO_DIR=/home/runner/work/level-zero/level-zero/level_zero_install
           export LEVEL_ZERO_VERSION_CHECK_OFF=1
           export NUMBA_MLIR_USE_SYCL=ON
+          export CC=$CONDA_PREFIX/bin/x86_64-conda-linux-gnu-cc
+          export CXX=$CONDA_PREFIX/bin/x86_64-conda-linux-gnu-c++
           pip wheel --no-deps -v ../numba_mlir
           ls -l --block-size=M
           popd
@@ -882,7 +890,7 @@ jobs:
     if: ${{ github.ref == 'refs/heads/main' }}
     timeout-minutes: 450
     needs: [build_win_python, build_win_conda_package, build_linux_python, build_linux_conda_package]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     steps:
       - uses: conda-incubator/setup-miniconda@v2
         with:
@@ -915,7 +923,7 @@ jobs:
     needs: [upload_packages_preprocess]
     strategy:
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        os: [ubuntu-20.04, windows-latest]
         python: ["3.8", "3.9", "3.10"]
     runs-on: ${{ matrix.os }}
     steps:
@@ -938,7 +946,7 @@ jobs:
         run: conda install anaconda-client
 
       - name: Add conda to system path
-        if: matrix.os == 'ubuntu-latest'
+        if: matrix.os == 'ubuntu-20.04'
         run: echo $CONDA/bin >> $GITHUB_PATH
 
       - name: Upload
