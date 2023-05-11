@@ -10,6 +10,7 @@
 
 #include <mlir/Dialect/Arith/IR/Arith.h>
 #include <mlir/Dialect/Func/IR/FuncOps.h>
+#include <mlir/Dialect/GPU/IR/GPUDialect.h>
 #include <mlir/Dialect/Math/IR/Math.h>
 #include <mlir/Dialect/MemRef/IR/MemRef.h>
 #include <mlir/Dialect/SCF/IR/SCF.h>
@@ -289,6 +290,48 @@ struct ExtractStridedMetadataCast
   }
 };
 
+struct GPUGenGlobalId : public mlir::OpRewritePattern<mlir::arith::AddIOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(mlir::arith::AddIOp op,
+                  mlir::PatternRewriter &rewriter) const override {
+
+    auto getArg = [](auto op, bool rev) -> mlir::Value {
+      return rev ? op.getLhs() : op.getRhs();
+    };
+
+    mlir::gpu::Dimension dim;
+    mlir::arith::MulIOp other;
+    for (auto rev : {false, true}) {
+      auto arg1 = getArg(op, rev);
+      auto arg2 = getArg(op, !rev);
+      if (auto tid = arg1.getDefiningOp<mlir::gpu::ThreadIdOp>()) {
+        dim = tid.getDimension();
+        other = arg2.getDefiningOp<mlir::arith::MulIOp>();
+        break;
+      }
+    }
+
+    if (!other)
+      return mlir::failure();
+
+    for (auto rev : {false, true}) {
+      auto arg1 = getArg(other, rev).getDefiningOp<mlir::gpu::BlockIdOp>();
+      auto arg2 = getArg(other, !rev).getDefiningOp<mlir::gpu::BlockDimOp>();
+      if (arg1 && arg2) {
+        if (arg1.getDimension() != dim || arg2.getDimension() != dim)
+          return mlir::failure();
+
+        rewriter.replaceOpWithNewOp<mlir::gpu::GlobalIdOp>(op, dim);
+        return mlir::success();
+      }
+    }
+
+    return mlir::failure();
+  }
+};
+
 struct CommonOptsPass
     : public mlir::PassWrapper<CommonOptsPass, mlir::OperationPass<void>> {
   MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(CommonOptsPass)
@@ -327,7 +370,8 @@ void numba::populateCommonOptsPatterns(mlir::RewritePatternSet &patterns) {
       CmpiOfSelect,
       ExtractStridedMetadataUnused,
       ExtractStridedMetadataConstStrides,
-      ExtractStridedMetadataCast
+      ExtractStridedMetadataCast,
+      GPUGenGlobalId
       // clang-format on
       >(patterns.getContext());
 

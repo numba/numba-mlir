@@ -161,9 +161,8 @@ struct Module : public detail::Type<ze_module_handle_t, zeModuleDestroy> {
           std::string log;
           log.resize(size + 1);
           log[0] = '\n';
-          // TODO: need C++17 for std::string mutable data
-          CHECK_ZE_RESULT(zeModuleBuildLogGetString(
-              bl.get(), &size, const_cast<char *>(log.data()) + 1));
+          CHECK_ZE_RESULT(
+              zeModuleBuildLogGetString(bl.get(), &size, log.data() + 1));
           if (log.back() == '\0')
             log.pop_back();
           return log;
