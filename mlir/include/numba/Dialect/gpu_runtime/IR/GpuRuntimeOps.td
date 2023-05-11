@@ -22,7 +22,6 @@ def GpuRuntime_Dialect : Dialect {
     }];
   let cppNamespace = "::gpu_runtime";
 
-  let hasCanonicalizer = 1;
   let hasConstantMaterializer = 1;
   let useDefaultAttributePrinterParser = 1;
   let useDefaultTypePrinterParser = 1;
