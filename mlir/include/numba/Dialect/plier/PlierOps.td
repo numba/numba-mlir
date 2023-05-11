@@ -30,6 +30,8 @@ class Plier_Type<string name, string typeMnemonic, list<Trait> traits = [],
 
 def Plier_SliceType : Plier_Type<"Slice", "slice", [], "::mlir::Type">;
 
+def Plier_BoundFunctionType : Plier_Type<"BoundFunction", "bound_function", [], "::mlir::Type">;
+
 def Plier_Py : Plier_Type<"Py", "pytype", [], "::mlir::Type"> {
 
   let parameters = (ins "::mlir::StringAttr":$name);

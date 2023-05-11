@@ -102,6 +102,7 @@ struct Conversion {
     literalType = mod.attr("Literal");
     dispatcherType = mod.attr("Dispatcher");
     functionType = mod.attr("Function");
+    boundFunctionType = mod.attr("BoundFunction");
     numberClassType = mod.attr("NumberClass");
     omittedType = mod.attr("Omitted");
   }
@@ -168,6 +169,9 @@ struct Conversion {
     if (py::isinstance(obj, functionType))
       return mlir::FunctionType::get(&context, {}, {});
 
+    if (py::isinstance(obj, boundFunctionType))
+      return plier::BoundFunctionType::get(&context);
+
     if (py::isinstance(obj, numberClassType)) {
       auto type = converter.convertType(context, obj.attr("instance_type"));
       if (!type)
@@ -229,6 +233,7 @@ private:
   py::object literalType;
   py::object dispatcherType;
   py::object functionType;
+  py::object boundFunctionType;
   py::object numberClassType;
   py::object omittedType;
 };
