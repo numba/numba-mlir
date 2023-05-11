@@ -103,6 +103,7 @@ struct Conversion {
     dispatcherType = mod.attr("Dispatcher");
     functionType = mod.attr("Function");
     boundFunctionType = mod.attr("BoundFunction");
+    moduleType = mod.attr("Module");
     numberClassType = mod.attr("NumberClass");
     omittedType = mod.attr("Omitted");
   }
@@ -172,6 +173,9 @@ struct Conversion {
     if (py::isinstance(obj, boundFunctionType))
       return plier::BoundFunctionType::get(&context);
 
+    if (py::isinstance(obj, moduleType))
+      return numba::util::OpaqueType::get(&context);
+
     if (py::isinstance(obj, numberClassType)) {
       auto type = converter.convertType(context, obj.attr("instance_type"));
       if (!type)
@@ -234,6 +238,7 @@ private:
   py::object dispatcherType;
   py::object functionType;
   py::object boundFunctionType;
+  py::object moduleType;
   py::object numberClassType;
   py::object omittedType;
 };
