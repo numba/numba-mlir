@@ -975,7 +975,24 @@ struct NumpyCallsToNtensor : public mlir::OpConversionPattern<plier::PyCallOp> {
   mlir::LogicalResult
   matchAndRewrite(plier::PyCallOp op, plier::PyCallOp::Adaptor adaptor,
                   mlir::ConversionPatternRewriter &rewriter) const override {
-    auto funcName = op.getFuncName();
+    auto func = adaptor.getFunc();
+    if (!func || !mlir::isa<mlir::FunctionType, plier::BoundFunctionType>(
+                     func.getType()))
+      return mlir::failure();
+
+    auto getAttr = func.getDefiningOp<plier::GetattrOp>();
+    bool isAttr = getAttr && isBoundFunc(func.getType());
+
+    std::string funcName;
+    if (isAttr) {
+      if (!mlir::isa<numba::ntensor::NTensorType>(getAttr.getValue().getType()))
+        return mlir::failure();
+
+      funcName = ("array." + getAttr.getName()).str();
+    } else {
+      funcName = op.getFuncName().str();
+    }
+
     if (!resolver.hasFunc(funcName))
       return mlir::failure();
 
@@ -985,10 +1002,6 @@ struct NumpyCallsToNtensor : public mlir::OpConversionPattern<plier::PyCallOp> {
     llvm::SmallVector<mlir::Type> resTypes;
     if (mlir::failed(converter->convertTypes(op->getResultTypes(), resTypes)))
       return mlir::failure();
-
-    auto func = adaptor.getFunc();
-    auto getAttr = func.getDefiningOp<plier::GetattrOp>();
-    bool isAttr = getAttr && isBoundFunc(func.getType());
 
     llvm::SmallVector<mlir::Value> args;
     llvm::SmallVector<mlir::Attribute> argNames;
@@ -1036,14 +1049,12 @@ struct NumpyAttrsToNtensor
     if (!src.getType().isa<numba::ntensor::NTensorType>())
       return mlir::failure();
 
+    if (isBoundFunc(op.getType()))
+      return mlir::failure();
+
     auto funcName = ("array." + op.getName()).str();
     if (!resolver.hasFunc(funcName))
       return mlir::failure();
-
-    if (isBoundFunc(op.getType())) {
-      rewriter.replaceOp(op, src);
-      return mlir::success();
-    }
 
     auto converter = getTypeConverter();
     assert(converter);
@@ -1404,7 +1415,8 @@ struct PlierToNtensorPass
     target.addDynamicallyLegalOp<plier::GetattrOp>(
         [&typeConverter](plier::GetattrOp op) -> std::optional<bool> {
           auto containerType = op.getValue().getType();
-          if (isNtensor(typeConverter, containerType))
+          if (isNtensor(typeConverter, containerType) &&
+              !mlir::isa<plier::BoundFunctionType>(op.getResult().getType()))
             return false;
 
           return std::nullopt;
