@@ -168,7 +168,7 @@ struct Conversion {
       return numba::util::OpaqueType::get(&context);
 
     if (py::isinstance(obj, functionType))
-      return mlir::FunctionType::get(&context, {}, {});
+      return plier::FunctionType::get(&context);
 
     if (py::isinstance(obj, boundFunctionType))
       return plier::BoundFunctionType::get(&context);

@@ -66,7 +66,7 @@ numba::CallOpLowering::matchAndRewrite(plier::PyCallOp op,
     return mlir::failure();
 
   auto func = op.getFunc();
-  if (!func || !mlir::isa<mlir::FunctionType>(func.getType()))
+  if (!func || !mlir::isa<plier::FunctionType>(func.getType()))
     return mlir::failure();
 
   auto funcName = op.getFuncName();
