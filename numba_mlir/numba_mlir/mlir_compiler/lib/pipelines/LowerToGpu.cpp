@@ -50,6 +50,7 @@
 #include "numba/Transforms/CallLowering.hpp"
 #include "numba/Transforms/CastUtils.hpp"
 #include "numba/Transforms/CommonOpts.hpp"
+#include "numba/Transforms/CompositePass.hpp"
 #include "numba/Transforms/PipelineUtils.hpp"
 #include "numba/Transforms/RewriteWrapper.hpp"
 #include "numba/Transforms/TypeConversion.hpp"
@@ -1958,9 +1959,11 @@ static mlir::spirv::TargetEnvAttr deviceCapsMapper(mlir::gpu::GPUModuleOp op) {
 }
 
 static void commonOptPasses(mlir::OpPassManager &pm) {
-  pm.addPass(numba::createCommonOptsPass());
-  pm.addPass(mlir::createCSEPass());
-  pm.addPass(numba::createCommonOptsPass());
+  pm.addPass(numba::createCompositePass(
+      "LowerGpuCommonOptPass", [](mlir::OpPassManager &p) {
+        p.addPass(mlir::createCSEPass());
+        p.addPass(numba::createCommonOptsPass());
+      }));
 }
 
 static void populateLowerToGPUPipelineHigh(mlir::OpPassManager &pm) {
