@@ -976,7 +976,7 @@ struct NumpyCallsToNtensor : public mlir::OpConversionPattern<plier::PyCallOp> {
   matchAndRewrite(plier::PyCallOp op, plier::PyCallOp::Adaptor adaptor,
                   mlir::ConversionPatternRewriter &rewriter) const override {
     auto func = adaptor.getFunc();
-    if (!func || !mlir::isa<mlir::FunctionType, plier::BoundFunctionType>(
+    if (!func || !mlir::isa<plier::FunctionType, plier::BoundFunctionType>(
                      func.getType()))
       return mlir::failure();
 

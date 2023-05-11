@@ -30,6 +30,8 @@ class Plier_Type<string name, string typeMnemonic, list<Trait> traits = [],
 
 def Plier_SliceType : Plier_Type<"Slice", "slice", [], "::mlir::Type">;
 
+def Plier_FunctionType : Plier_Type<"Function", "function", [], "::mlir::Type">;
+
 def Plier_BoundFunctionType : Plier_Type<"BoundFunction", "bound_function", [], "::mlir::Type">;
 
 def Plier_UndefinedType : Plier_Type<"Undefined", "undefined", [], "::mlir::Type">;
