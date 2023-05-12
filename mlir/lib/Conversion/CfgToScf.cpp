@@ -11,6 +11,7 @@
 #include <mlir/Dialect/SCF/IR/SCF.h>
 #include <mlir/IR/Dominance.h>
 #include <mlir/IR/IRMapping.h>
+#include <mlir/IR/Verifier.h>
 #include <mlir/Interfaces/CallInterfaces.h>
 #include <mlir/Interfaces/SideEffectInterfaces.h>
 #include <mlir/Transforms/GreedyPatternRewriteDriver.h>
@@ -192,7 +193,8 @@ struct ScfIfRewriteOneExit
 };
 
 static llvm::SmallVector<mlir::Value>
-getDefinedValues(llvm::ArrayRef<mlir::Block *> blocks) {
+getDefinedValues(llvm::ArrayRef<mlir::Block *> blocks,
+                 mlir::Block *postBlock = nullptr) {
   llvm::SmallVector<mlir::Value> ret;
   if (blocks.empty())
     return ret;
@@ -209,7 +211,11 @@ getDefinedValues(llvm::ArrayRef<mlir::Block *> blocks) {
     }
   };
 
+  mlir::DominanceInfo dom;
   for (auto block : blocks) {
+    if (postBlock && !dom.dominates(block, postBlock))
+      continue;
+
     for (auto arg : block->getArguments())
       checkVal(arg);
 
@@ -758,7 +764,7 @@ static mlir::Block *wrapIntoRegion(mlir::PatternRewriter &rewriter,
 
   auto blocks = collectBlocks(preBlock, postBlock);
 
-  auto definedValues = getDefinedValues(blocks);
+  auto definedValues = getDefinedValues(blocks, postBlock);
 
   mlir::ValueRange definedValuesRange(definedValues);
   auto newBlock = createBlock();
@@ -1057,6 +1063,7 @@ static mlir::LogicalResult runLoopRestructuring(mlir::PatternRewriter &rewriter,
   for (auto &node : scc.nodes)
     changed = restructureLoop(rewriter, node) || changed;
 
+  (void)mlir::verify(region.getParentOp());
   return mlir::success(changed);
 }
 
