@@ -110,6 +110,8 @@ class MlirBackendBase(FunctionPass):
                 flags.fastmath = fastmath_type
 
             return (func.__module__ + "." + func.__qualname__, func, flags)
+        if isinstance(obj, types.NumberClass):
+            return ("$number." + str(obj.instance_type), None, DEFAULT_FLAGS)
         return (None, None, None)
 
     def _get_func_context(self, state):
