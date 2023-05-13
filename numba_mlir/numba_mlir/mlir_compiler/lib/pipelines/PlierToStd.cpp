@@ -743,16 +743,43 @@ static const std::pair<llvm::StringRef, func_t> builtinFuncsHandlers[] = {
     // clang-format on
 };
 
-struct BuiltinCallsLowering final : public numba::CallOpLowering {
+struct BuiltinCallsLowering final
+    : public mlir::OpRewritePattern<plier::PyCallOp> {
   BuiltinCallsLowering(mlir::MLIRContext *context)
-      : CallOpLowering(context),
+      : mlir::OpRewritePattern<plier::PyCallOp>(context),
         resolver("numba_mlir.mlir.builtin.funcs", "registry") {}
 
+  mlir::LogicalResult
+  matchAndRewrite(plier::PyCallOp op,
+                  mlir::PatternRewriter &rewriter) const override {
+    if (op.getVarargs())
+      return mlir::failure();
+
+    auto func = op.getFunc();
+    if (!func || !mlir::isa<plier::FunctionType, numba::util::TypeVarType>(
+                     func.getType()))
+      return mlir::failure();
+
+    auto funcName = op.getFuncName();
+
+    llvm::SmallVector<std::pair<llvm::StringRef, mlir::Value>> kwargs;
+    for (auto it : llvm::zip(op.getKwargs(), op.getKwNames())) {
+      auto arg = std::get<0>(it);
+      auto name = std::get<1>(it).cast<mlir::StringAttr>();
+      kwargs.emplace_back(name.getValue(), arg);
+    }
+
+    auto loc = op.getLoc();
+    return resolveCall(op, funcName, loc, rewriter, op.getArgs(), kwargs);
+  }
+
 protected:
-  virtual mlir::LogicalResult
-  resolveCall(plier::PyCallOp op, mlir::StringRef name, mlir::Location loc,
-              mlir::PatternRewriter &rewriter, mlir::ValueRange args,
-              KWargs kwargs) const override {
+  using KWargs = llvm::ArrayRef<std::pair<llvm::StringRef, mlir::Value>>;
+
+  mlir::LogicalResult resolveCall(plier::PyCallOp op, mlir::StringRef name,
+                                  mlir::Location loc,
+                                  mlir::PatternRewriter &rewriter,
+                                  mlir::ValueRange args, KWargs kwargs) const {
     for (auto &handler : builtinFuncsHandlers)
       if (handler.first == name)
         return handler.second(op, args, kwargs, rewriter);

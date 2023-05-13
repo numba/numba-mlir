@@ -34,6 +34,39 @@ def float_cast_impl(builder, arg):
     return builder.cast(arg, builder.float64)
 
 
+def _gen_casts():
+    types = [
+        "bool",
+        "int8",
+        "int16",
+        "int32",
+        "int64",
+        "uint8",
+        "uint16",
+        "uint32",
+        "uint64",
+        "float32",
+        "float64",
+        "complex64",
+        "complex128",
+    ]
+
+    def gen_cast_func(type_name):
+        def func(builder, arg):
+            t = getattr(builder, type_name)
+            return builder.cast(arg, t)
+
+        return func
+
+    for type_name in types:
+        func_name = f"$number.{type_name}"
+        register_func(func_name)(gen_cast_func(type_name))
+
+
+_gen_casts()
+del _gen_casts
+
+
 @register_func("len", len)
 def len_impl(builder, arg):
     try:

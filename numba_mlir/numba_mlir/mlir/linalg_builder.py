@@ -204,7 +204,7 @@ class FuncRegistry:
     def register_func(self, name, orig_func=None):
         def _decorator(func):
             mangled_name = name + "()"
-            assert not mangled_name in self.funcs
+            assert not mangled_name in self.funcs, mangled_name
             self.funcs[mangled_name] = func
             if not orig_func is None:
                 add_func(orig_func, name)

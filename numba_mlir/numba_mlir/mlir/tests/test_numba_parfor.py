@@ -76,7 +76,6 @@ def _gen_tests():
         "test_namedtuple2",  # namedtuple support
         "test_simple19",  # np.dot unsupported args
         "test_no_hoisting_with_member_function_call",  # set support
-        "test_parfor_dtype_type",  # dtype cast
         "test_parfor_array_access3",  # TypeError: unsupported operand type(s) for -: 'NoneType' and 'NoneType'
         "test_preparfor_canonicalize_kws",  # array.argsort
         "test_parfor_array_access4",  # np.dot unsupported args
@@ -85,7 +84,6 @@ def _gen_tests():
         "test_tuple_concat",  # enumerate
         "test_two_d_array_reduction_with_float_sizes",  # np.array
         "test_parfor_array_access_lower_slice",  # plier.getitem
-        "test_simple12",  # complex128
         "test_parfor_slice6",  # array.transpose
         "test_parfor_slice22",  # slice using array
         "test_simple13",  # complex128
