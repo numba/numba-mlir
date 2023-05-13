@@ -1452,6 +1452,94 @@ struct HoistSelects : public mlir::OpRewritePattern<mlir::scf::IfOp> {
   }
 };
 
+
+// TODO: upstream?
+struct WhileHoistFromBefore : public mlir::OpRewritePattern<mlir::scf::WhileOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(mlir::scf::WhileOp op,
+                  mlir::PatternRewriter &rewriter) const override {
+    mlir::Block &beforeBlock = op.getBefore().front();
+
+    mlir::DominanceInfo dom;
+    auto checkArg = [&](mlir::Value arg) -> bool {
+      if (dom.properlyDominates(arg, op))
+        return true;
+
+      if (auto blockArg = mlir::dyn_cast<mlir::BlockArgument>(arg))
+        return blockArg.getParentBlock() == &beforeBlock;
+
+      return false;
+    };
+    auto canBeHoisted = [&](mlir::Operation& blockOp) -> bool {
+      // TODO: hack, need to rework scf.while->scf.for conversion
+      if (!mlir::isa<mlir::arith::ArithDialect>(blockOp.getDialect()))
+        return false;
+
+      if (beforeBlock.begin() != blockOp.getIterator() && !mlir::isPure(&blockOp))
+        return false;
+
+      if (blockOp.getNumRegions() != 0)
+        return false;
+
+      return llvm::all_of(blockOp.getOperands(), checkArg);
+    };
+
+    mlir::Operation* opToHoist = nullptr;
+    for (auto &beforeOp : beforeBlock.without_terminator()) {
+      if (!canBeHoisted(beforeOp))
+        continue;
+
+      opToHoist = &beforeOp;
+      break;
+    }
+
+    if (!opToHoist)
+      return mlir::failure();
+
+    auto oldInits = op.getInits();
+    mlir::IRMapping mapping;
+    mapping.map(op.getBeforeArguments(), oldInits);
+    auto newResults = rewriter.clone(*opToHoist, mapping)->getResults();
+
+    llvm::SmallVector<mlir::Value> newInits(oldInits.begin(), oldInits.end());
+    newInits.append(newResults.begin(), newResults.end());
+
+    llvm::SmallVector<mlir::Location> newLocs(newResults.size(), rewriter.getUnknownLoc());
+    beforeBlock.addArguments(newResults.getTypes(), newLocs);
+
+    mlir::OpBuilder::InsertionGuard g(rewriter);
+    auto yield = op.getYieldOp();
+    mapping.map(op.getBeforeArguments(), yield.getResults());
+    rewriter.setInsertionPoint(yield);
+    newResults = rewriter.clone(*opToHoist, mapping)->getResults();
+    llvm::SmallVector<mlir::Value> newYieldArgs(oldInits.begin(), oldInits.end());
+    newYieldArgs.append(newResults.begin(), newResults.end());
+    rewriter.replaceOpWithNewOp<mlir::scf::YieldOp>(yield, newYieldArgs);
+    rewriter.replaceOp(opToHoist, beforeBlock.getArguments().take_back(newResults.size()));
+
+    rewriter.setInsertionPoint(op);
+
+    mlir::Block &afterBlock = op.getAfter().front();
+
+    mlir::Location loc = op.getLoc();
+    auto newWhileOp =
+        rewriter.create<mlir::scf::WhileOp>(loc, op.getResultTypes(), newInits,
+                                 /*beforeBody*/ nullptr, /*afterBody*/ nullptr);
+    mlir::Block &newBeforeBlock = newWhileOp.getBefore().front();
+    mlir::Block &newAfterBlock = newWhileOp.getAfter().front();
+
+    rewriter.mergeBlocks(&beforeBlock, &newBeforeBlock,
+                         newBeforeBlock.getArguments());
+    rewriter.mergeBlocks(&afterBlock, &newAfterBlock,
+                         newAfterBlock.getArguments());
+
+    rewriter.replaceOp(op, newWhileOp.getResults());
+    return mlir::success();
+  }
+};
+
 struct CFGToSCFPass
     : public mlir::PassWrapper<CFGToSCFPass, mlir::OperationPass<void>> {
   MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(CFGToSCFPass)
@@ -1479,7 +1567,8 @@ struct CFGToSCFPass
         WhileMoveToAfter,
         CondBrSameTarget,
         OrOfXor,
-        HoistSelects
+        HoistSelects,
+        WhileHoistFromBefore
         // clang-format on
         >(context);
 
