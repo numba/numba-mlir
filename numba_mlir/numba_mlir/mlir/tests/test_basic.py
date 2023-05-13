@@ -338,6 +338,16 @@ def _while_py_func_nested_break(a, b):
     return a
 
 
+def _range_nested_while(a, b):
+    res = 0
+    for i in range(a):
+        j = a
+        res += i
+        while j <= 25 and j < (i + 1):
+            res += j
+    return res
+
+
 @parametrize_function_variants(
     "py_func",
     [
@@ -348,6 +358,7 @@ def _while_py_func_nested_break(a, b):
         "_while_py_func_multiple_conds4",
         "_while_py_func_break_middle",
         "_while_py_func_nested_break",
+        "_range_nested_while",
     ],
 )
 def test_while(py_func):

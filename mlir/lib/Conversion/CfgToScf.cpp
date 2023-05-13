@@ -192,7 +192,8 @@ struct ScfIfRewriteOneExit
 };
 
 static llvm::SmallVector<mlir::Value>
-getDefinedValues(llvm::ArrayRef<mlir::Block *> blocks) {
+getDefinedValues(llvm::ArrayRef<mlir::Block *> blocks,
+                 mlir::Block *postBlock = nullptr) {
   llvm::SmallVector<mlir::Value> ret;
   if (blocks.empty())
     return ret;
@@ -209,7 +210,11 @@ getDefinedValues(llvm::ArrayRef<mlir::Block *> blocks) {
     }
   };
 
+  mlir::DominanceInfo dom;
   for (auto block : blocks) {
+    if (postBlock && !dom.dominates(block, postBlock))
+      continue;
+
     for (auto arg : block->getArguments())
       checkVal(arg);
 
@@ -758,7 +763,7 @@ static mlir::Block *wrapIntoRegion(mlir::PatternRewriter &rewriter,
 
   auto blocks = collectBlocks(preBlock, postBlock);
 
-  auto definedValues = getDefinedValues(blocks);
+  auto definedValues = getDefinedValues(blocks, postBlock);
 
   mlir::ValueRange definedValuesRange(definedValues);
   auto newBlock = createBlock();
@@ -1324,21 +1329,19 @@ struct WhileUndefArgs : public mlir::OpRewritePattern<mlir::scf::WhileOp> {
   mlir::LogicalResult
   matchAndRewrite(mlir::scf::WhileOp op,
                   mlir::PatternRewriter &rewriter) const override {
-    auto &afterBlock = op.getAfter().front();
-    auto yield = mlir::cast<mlir::scf::YieldOp>(afterBlock.getTerminator());
-
     bool changed = false;
+    auto yield = op.getYieldOp();
 
     llvm::SmallVector<mlir::Value> newArgs;
     for (auto &&[yieldArg, init] :
          llvm::zip(yield.getResults(), op.getInits())) {
-      if (!yieldArg.getDefiningOp<numba::util::UndefOp>()) {
-        newArgs.emplace_back(yieldArg);
+      if (yieldArg.getDefiningOp<numba::util::UndefOp>() && yieldArg != init) {
+        changed = true;
+        newArgs.emplace_back(init);
         continue;
       }
 
-      changed = true;
-      newArgs.emplace_back(init);
+      newArgs.emplace_back(yieldArg);
     }
 
     if (!changed)
@@ -1385,6 +1388,163 @@ struct CondBrSameTarget
   }
 };
 
+// TODO: upstream
+struct OrOfXor : public mlir::OpRewritePattern<mlir::arith::OrIOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(mlir::arith::OrIOp op,
+                  mlir::PatternRewriter &rewriter) const override {
+    for (bool reverse : {false, true}) {
+      auto xorOp = (reverse ? op.getLhs() : op.getRhs())
+                       .getDefiningOp<mlir::arith::XOrIOp>();
+      if (!xorOp)
+        continue;
+
+      auto arg = reverse ? op.getRhs() : op.getLhs();
+      for (bool reverseXor : {false, true}) {
+        auto arg1 = reverseXor ? xorOp.getLhs() : xorOp.getRhs();
+        auto arg2 = reverseXor ? xorOp.getRhs() : xorOp.getLhs();
+        if (arg1 != arg || !mlir::isConstantIntValue(arg2, -1))
+          continue;
+
+        rewriter.replaceOp(op, arg2);
+        return mlir::success();
+      }
+    }
+    return mlir::failure();
+  }
+};
+
+struct HoistSelects : public mlir::OpRewritePattern<mlir::scf::IfOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(mlir::scf::IfOp op,
+                  mlir::PatternRewriter &rewriter) const override {
+    bool changed = false;
+    rewriter.startRootUpdate(op);
+
+    mlir::DominanceInfo dom;
+    for (auto block : {op.thenBlock(), op.elseBlock()}) {
+      if (!block)
+        continue;
+
+      for (auto blockOp :
+           llvm::make_early_inc_range(block->getOps<mlir::arith::SelectOp>())) {
+        if (!dom.properlyDominates(blockOp.getCondition(), op) ||
+            !dom.properlyDominates(blockOp.getTrueValue(), op) ||
+            !dom.properlyDominates(blockOp.getFalseValue(), op))
+          continue;
+
+        rewriter.updateRootInPlace(blockOp, [&]() { blockOp->moveBefore(op); });
+        changed = true;
+      }
+    }
+
+    if (changed) {
+      rewriter.finalizeRootUpdate(op);
+    } else {
+      rewriter.cancelRootUpdate(op);
+    }
+    return mlir::success(changed);
+  }
+};
+
+// TODO: upstream?
+struct WhileHoistFromBefore
+    : public mlir::OpRewritePattern<mlir::scf::WhileOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(mlir::scf::WhileOp op,
+                  mlir::PatternRewriter &rewriter) const override {
+    mlir::Block &beforeBlock = op.getBefore().front();
+
+    mlir::DominanceInfo dom;
+    auto checkArg = [&](mlir::Value arg) -> bool {
+      if (dom.properlyDominates(arg, op))
+        return true;
+
+      if (auto blockArg = mlir::dyn_cast<mlir::BlockArgument>(arg))
+        return blockArg.getParentBlock() == &beforeBlock;
+
+      return false;
+    };
+    auto canBeHoisted = [&](mlir::Operation &blockOp) -> bool {
+      // TODO: hack, need to rework scf.while->scf.for conversion
+      if (!mlir::isa_and_present<mlir::arith::ArithDialect>(
+              blockOp.getDialect()))
+        return false;
+
+      if (beforeBlock.begin() != blockOp.getIterator() &&
+          !mlir::isPure(&blockOp))
+        return false;
+
+      if (blockOp.getNumRegions() != 0)
+        return false;
+
+      return llvm::all_of(blockOp.getOperands(), checkArg);
+    };
+
+    mlir::Operation *opToHoist = nullptr;
+    for (auto &beforeOp : beforeBlock.without_terminator()) {
+      if (!canBeHoisted(beforeOp))
+        continue;
+
+      opToHoist = &beforeOp;
+      break;
+    }
+
+    if (!opToHoist)
+      return mlir::failure();
+
+    auto oldInits = op.getInits();
+    mlir::IRMapping mapping;
+    mapping.map(op.getBeforeArguments(), oldInits);
+    auto newResults = rewriter.clone(*opToHoist, mapping)->getResults();
+
+    llvm::SmallVector<mlir::Value> newInits(oldInits.begin(), oldInits.end());
+    newInits.append(newResults.begin(), newResults.end());
+
+    llvm::SmallVector<mlir::Location> newLocs(newResults.size(),
+                                              rewriter.getUnknownLoc());
+    beforeBlock.addArguments(newResults.getTypes(), newLocs);
+
+    mlir::OpBuilder::InsertionGuard g(rewriter);
+    auto yield = op.getYieldOp();
+    auto yieldArgs = yield.getResults();
+    mapping.map(op.getBeforeArguments(), yieldArgs);
+    rewriter.setInsertionPoint(yield);
+    newResults = rewriter.clone(*opToHoist, mapping)->getResults();
+    llvm::SmallVector<mlir::Value> newYieldArgs(yieldArgs.begin(),
+                                                yieldArgs.end());
+    newYieldArgs.append(newResults.begin(), newResults.end());
+    rewriter.replaceOpWithNewOp<mlir::scf::YieldOp>(yield, newYieldArgs);
+    rewriter.replaceOp(opToHoist,
+                       beforeBlock.getArguments().take_back(newResults.size()));
+
+    rewriter.setInsertionPoint(op);
+
+    mlir::Block &afterBlock = op.getAfter().front();
+
+    mlir::Location loc = op.getLoc();
+    auto newWhileOp = rewriter.create<mlir::scf::WhileOp>(
+        loc, op.getResultTypes(), newInits,
+        /*beforeBody*/ nullptr, /*afterBody*/ nullptr);
+    mlir::Block &newBeforeBlock = newWhileOp.getBefore().front();
+    mlir::Block &newAfterBlock = newWhileOp.getAfter().front();
+
+    rewriter.mergeBlocks(&beforeBlock, &newBeforeBlock,
+                         newBeforeBlock.getArguments());
+    rewriter.mergeBlocks(&afterBlock, &newAfterBlock,
+                         newAfterBlock.getArguments());
+
+    rewriter.replaceOp(op, newWhileOp.getResults());
+    return mlir::success();
+  }
+};
+
 struct CFGToSCFPass
     : public mlir::PassWrapper<CFGToSCFPass, mlir::OperationPass<void>> {
   MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(CFGToSCFPass)
@@ -1410,7 +1570,10 @@ struct CFGToSCFPass
         WhileReductionSelect,
         WhileUndefArgs,
         WhileMoveToAfter,
-        CondBrSameTarget
+        CondBrSameTarget,
+        OrOfXor,
+        HoistSelects,
+        WhileHoistFromBefore
         // clang-format on
         >(context);
 
