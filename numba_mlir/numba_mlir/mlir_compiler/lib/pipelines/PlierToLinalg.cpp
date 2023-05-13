@@ -922,6 +922,35 @@ struct BinopToNtensor : public mlir::OpConversionPattern<plier::BinOp> {
   }
 };
 
+struct InplaceBinopToNtensor
+    : public mlir::OpConversionPattern<plier::InplaceBinOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(plier::InplaceBinOp op, plier::InplaceBinOp::Adaptor adaptor,
+                  mlir::ConversionPatternRewriter &rewriter) const override {
+    auto lhs = adaptor.getLhs();
+    auto rhs = adaptor.getRhs();
+    if (!lhs.getType().isa<numba::ntensor::NTensorType>() &&
+        !rhs.getType().isa<numba::ntensor::NTensorType>())
+      return mlir::failure();
+
+    auto converter = getTypeConverter();
+    assert(converter);
+    auto resultType = converter->convertType(op.getType());
+    if (!resultType)
+      return mlir::failure();
+
+    auto loc = op.getLoc();
+    auto opName = op.getOp();
+    mlir::Value res = rewriter.create<numba::ntensor::BinaryOp>(
+        loc, resultType, lhs, rhs, opName);
+    rewriter.create<numba::ntensor::CopyOp>(loc, res, lhs);
+    rewriter.replaceOp(op, res);
+    return mlir::success();
+  }
+};
+
 struct BuildSliceToNtensor
     : public mlir::OpConversionPattern<plier::BuildSliceOp> {
   using OpConversionPattern::OpConversionPattern;
@@ -1398,6 +1427,15 @@ struct PlierToNtensorPass
 
           return std::nullopt;
         });
+    target.addDynamicallyLegalOp<plier::InplaceBinOp>(
+        [&typeConverter](plier::InplaceBinOp op) -> std::optional<bool> {
+          auto lhs = op.getLhs().getType();
+          auto rhs = op.getRhs().getType();
+          if (isNtensor(typeConverter, lhs) || isNtensor(typeConverter, rhs))
+            return false;
+
+          return std::nullopt;
+        });
 
     target.addDynamicallyLegalOp<plier::PyCallOp>(
         [this, &typeConverter](plier::PyCallOp op) -> std::optional<bool> {
@@ -1454,6 +1492,7 @@ struct PlierToNtensorPass
         NtensorSetitemToNtensor,
         UnaryToNtensor,
         BinopToNtensor,
+        InplaceBinopToNtensor,
         BuildSliceToNtensor,
         BuiltinCallsToNtensor,
         CastsToNtensor,
