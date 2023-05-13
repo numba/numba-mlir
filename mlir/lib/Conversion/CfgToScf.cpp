@@ -1392,6 +1392,36 @@ struct CondBrSameTarget
   }
 };
 
+// TODO: upstream
+struct OrOfXor : public mlir::OpRewritePattern<mlir::arith::OrIOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(mlir::arith::OrIOp op,
+                  mlir::PatternRewriter &rewriter) const override {
+    auto width = op.getType().getIntOrFloatBitWidth();
+    assert(width > 0 && "invalid width");
+    for (bool reverse : {false, true}) {
+      auto xorOp = (reverse ? op.getLhs() : op.getRhs())
+                       .getDefiningOp<mlir::arith::XOrIOp>();
+      if (!xorOp)
+        continue;
+
+      auto arg = reverse ? op.getRhs() : op.getLhs();
+      for (bool reverseXor : {false, true}) {
+        auto arg1 = reverseXor ? xorOp.getLhs() : xorOp.getRhs();
+        auto arg2 = reverseXor ? xorOp.getRhs() : xorOp.getLhs();
+        if (arg1 != arg || !mlir::isConstantIntValue(arg2, -1))
+          continue;
+
+        rewriter.replaceOp(op, arg2);
+        return mlir::success();
+      }
+    }
+    return mlir::failure();
+  }
+};
+
 struct CFGToSCFPass
     : public mlir::PassWrapper<CFGToSCFPass, mlir::OperationPass<void>> {
   MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(CFGToSCFPass)
@@ -1417,7 +1447,8 @@ struct CFGToSCFPass
         WhileReductionSelect,
         WhileUndefArgs,
         WhileMoveToAfter,
-        CondBrSameTarget
+        CondBrSameTarget,
+        OrOfXor
         // clang-format on
         >(context);
 
