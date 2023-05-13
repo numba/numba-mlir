@@ -28,23 +28,22 @@ def _vectorize_reference(func, arg1):
     return ret
 
 
-_arr_dtypes = np.array(
-    [
-        bool,
-        np.int8,
-        np.uint8,
-        np.int16,
-        np.uint16,
-        np.int32,
-        np.uint32,
-        np.int64,
-        np.uint64,
-        np.float32,
-        np.float64,
-        np.complex64,
-        np.complex128,
-    ]
-)
+_arr_dtypes = [
+    bool,
+    np.int8,
+    np.uint8,
+    np.int16,
+    np.uint16,
+    np.int32,
+    np.uint32,
+    np.int64,
+    np.uint64,
+    np.float32,
+    np.float64,
+    np.complex64,
+    np.complex128,
+]
+
 _arr_1d_bool = np.array([True, False, True, True, False, True, True, True])
 _arr_1d_int32 = np.array([1, 2, 3, 4, 5, 6, 7, 8], dtype=np.int32)
 _arr_1d_int64 = np.array([1, 2, 3, 4, 5, 6, 7, 8], dtype=np.int64)
@@ -336,6 +335,29 @@ def test_transpose(a, py_func):
 def test_np_const(py_func):
     jit_func = njit(py_func)
     assert_equal(py_func(), jit_func())
+
+
+@pytest.mark.parametrize(
+    "a",
+    [
+        # -2.5, double->int64 cast mismatch
+        -1,
+        -0.0,
+        0,
+        0.0,
+        2,
+        3.5,
+        # -1 + 2j, TODO: complex casts
+        # 2.3 - 3.4j,
+    ],
+)
+@pytest.mark.parametrize("dtype", _arr_dtypes)
+def test_dtype_cast(a, dtype):
+    def py_func(val):
+        return dtype(val)
+
+    jit_func = njit(py_func)
+    assert_equal(py_func(a), jit_func(a))
 
 
 def test_staticgetitem():
