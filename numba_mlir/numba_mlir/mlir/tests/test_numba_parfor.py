@@ -115,7 +115,6 @@ def _gen_tests():
         "test_prange30",
         "test_int_arg_pndindex",
         "test_non_identity_initial",
-        "test_inplace_alias",
     }
 
     skip_tests = {

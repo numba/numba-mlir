@@ -1665,7 +1665,6 @@ def test_alias2():
     assert_equal(py_func(4), jit_func(4))
 
 
-@pytest.mark.xfail
 def test_inplace_alias():
     def py_func(a):
         a += 1
