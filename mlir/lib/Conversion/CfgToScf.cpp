@@ -1512,11 +1512,12 @@ struct WhileHoistFromBefore
 
     mlir::OpBuilder::InsertionGuard g(rewriter);
     auto yield = op.getYieldOp();
-    mapping.map(op.getBeforeArguments(), yield.getResults());
+    auto yieldArgs = yield.getResults();
+    mapping.map(op.getBeforeArguments(), yieldArgs);
     rewriter.setInsertionPoint(yield);
     newResults = rewriter.clone(*opToHoist, mapping)->getResults();
-    llvm::SmallVector<mlir::Value> newYieldArgs(oldInits.begin(),
-                                                oldInits.end());
+    llvm::SmallVector<mlir::Value> newYieldArgs(yieldArgs.begin(),
+                                                yieldArgs.end());
     newYieldArgs.append(newResults.begin(), newResults.end());
     rewriter.replaceOpWithNewOp<mlir::scf::YieldOp>(yield, newYieldArgs);
     rewriter.replaceOp(opToHoist,
