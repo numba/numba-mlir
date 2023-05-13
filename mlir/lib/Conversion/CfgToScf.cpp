@@ -1430,15 +1430,14 @@ struct HoistSelects : public mlir::OpRewritePattern<mlir::scf::IfOp> {
       if (!block)
         continue;
 
-      for (auto blockOp : llvm::make_early_inc_range(block->getOps<mlir::arith::SelectOp>())) {
+      for (auto blockOp :
+           llvm::make_early_inc_range(block->getOps<mlir::arith::SelectOp>())) {
         if (!dom.properlyDominates(blockOp.getCondition(), op) ||
             !dom.properlyDominates(blockOp.getTrueValue(), op) ||
             !dom.properlyDominates(blockOp.getFalseValue(), op))
           continue;
 
-        rewriter.updateRootInPlace(blockOp, [&](){
-          blockOp->moveBefore(op);
-        });
+        rewriter.updateRootInPlace(blockOp, [&]() { blockOp->moveBefore(op); });
         changed = true;
       }
     }
@@ -1452,9 +1451,9 @@ struct HoistSelects : public mlir::OpRewritePattern<mlir::scf::IfOp> {
   }
 };
 
-
 // TODO: upstream?
-struct WhileHoistFromBefore : public mlir::OpRewritePattern<mlir::scf::WhileOp> {
+struct WhileHoistFromBefore
+    : public mlir::OpRewritePattern<mlir::scf::WhileOp> {
   using OpRewritePattern::OpRewritePattern;
 
   mlir::LogicalResult
@@ -1472,12 +1471,13 @@ struct WhileHoistFromBefore : public mlir::OpRewritePattern<mlir::scf::WhileOp> 
 
       return false;
     };
-    auto canBeHoisted = [&](mlir::Operation& blockOp) -> bool {
+    auto canBeHoisted = [&](mlir::Operation &blockOp) -> bool {
       // TODO: hack, need to rework scf.while->scf.for conversion
       if (!mlir::isa<mlir::arith::ArithDialect>(blockOp.getDialect()))
         return false;
 
-      if (beforeBlock.begin() != blockOp.getIterator() && !mlir::isPure(&blockOp))
+      if (beforeBlock.begin() != blockOp.getIterator() &&
+          !mlir::isPure(&blockOp))
         return false;
 
       if (blockOp.getNumRegions() != 0)
@@ -1486,7 +1486,7 @@ struct WhileHoistFromBefore : public mlir::OpRewritePattern<mlir::scf::WhileOp> 
       return llvm::all_of(blockOp.getOperands(), checkArg);
     };
 
-    mlir::Operation* opToHoist = nullptr;
+    mlir::Operation *opToHoist = nullptr;
     for (auto &beforeOp : beforeBlock.without_terminator()) {
       if (!canBeHoisted(beforeOp))
         continue;
@@ -1506,7 +1506,8 @@ struct WhileHoistFromBefore : public mlir::OpRewritePattern<mlir::scf::WhileOp> 
     llvm::SmallVector<mlir::Value> newInits(oldInits.begin(), oldInits.end());
     newInits.append(newResults.begin(), newResults.end());
 
-    llvm::SmallVector<mlir::Location> newLocs(newResults.size(), rewriter.getUnknownLoc());
+    llvm::SmallVector<mlir::Location> newLocs(newResults.size(),
+                                              rewriter.getUnknownLoc());
     beforeBlock.addArguments(newResults.getTypes(), newLocs);
 
     mlir::OpBuilder::InsertionGuard g(rewriter);
@@ -1514,19 +1515,21 @@ struct WhileHoistFromBefore : public mlir::OpRewritePattern<mlir::scf::WhileOp> 
     mapping.map(op.getBeforeArguments(), yield.getResults());
     rewriter.setInsertionPoint(yield);
     newResults = rewriter.clone(*opToHoist, mapping)->getResults();
-    llvm::SmallVector<mlir::Value> newYieldArgs(oldInits.begin(), oldInits.end());
+    llvm::SmallVector<mlir::Value> newYieldArgs(oldInits.begin(),
+                                                oldInits.end());
     newYieldArgs.append(newResults.begin(), newResults.end());
     rewriter.replaceOpWithNewOp<mlir::scf::YieldOp>(yield, newYieldArgs);
-    rewriter.replaceOp(opToHoist, beforeBlock.getArguments().take_back(newResults.size()));
+    rewriter.replaceOp(opToHoist,
+                       beforeBlock.getArguments().take_back(newResults.size()));
 
     rewriter.setInsertionPoint(op);
 
     mlir::Block &afterBlock = op.getAfter().front();
 
     mlir::Location loc = op.getLoc();
-    auto newWhileOp =
-        rewriter.create<mlir::scf::WhileOp>(loc, op.getResultTypes(), newInits,
-                                 /*beforeBody*/ nullptr, /*afterBody*/ nullptr);
+    auto newWhileOp = rewriter.create<mlir::scf::WhileOp>(
+        loc, op.getResultTypes(), newInits,
+        /*beforeBody*/ nullptr, /*afterBody*/ nullptr);
     mlir::Block &newBeforeBlock = newWhileOp.getBefore().front();
     mlir::Block &newAfterBlock = newWhileOp.getAfter().front();
 
