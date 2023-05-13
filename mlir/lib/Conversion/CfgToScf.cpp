@@ -1329,21 +1329,19 @@ struct WhileUndefArgs : public mlir::OpRewritePattern<mlir::scf::WhileOp> {
   mlir::LogicalResult
   matchAndRewrite(mlir::scf::WhileOp op,
                   mlir::PatternRewriter &rewriter) const override {
-    auto &afterBlock = op.getAfter().front();
-    auto yield = mlir::cast<mlir::scf::YieldOp>(afterBlock.getTerminator());
-
     bool changed = false;
+    auto yield = op.getYieldOp();
 
     llvm::SmallVector<mlir::Value> newArgs;
     for (auto &&[yieldArg, init] :
          llvm::zip(yield.getResults(), op.getInits())) {
-      if (!yieldArg.getDefiningOp<numba::util::UndefOp>()) {
-        newArgs.emplace_back(yieldArg);
+      if (yieldArg.getDefiningOp<numba::util::UndefOp>() && yieldArg != init) {
+        changed = true;
+        newArgs.emplace_back(init);
         continue;
       }
 
-      changed = true;
-      newArgs.emplace_back(init);
+      newArgs.emplace_back(yieldArg);
     }
 
     if (!changed)
