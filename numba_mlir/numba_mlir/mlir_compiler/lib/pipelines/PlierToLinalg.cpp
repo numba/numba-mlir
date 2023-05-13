@@ -946,7 +946,7 @@ struct InplaceBinopToNtensor
     mlir::Value res = rewriter.create<numba::ntensor::BinaryOp>(
         loc, resultType, lhs, rhs, opName);
     rewriter.create<numba::ntensor::CopyOp>(loc, res, lhs);
-    rewriter.replaceOp(op, res);
+    rewriter.replaceOp(op, lhs);
     return mlir::success();
   }
 };
