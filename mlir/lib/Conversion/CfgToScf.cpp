@@ -11,7 +11,6 @@
 #include <mlir/Dialect/SCF/IR/SCF.h>
 #include <mlir/IR/Dominance.h>
 #include <mlir/IR/IRMapping.h>
-#include <mlir/IR/Verifier.h>
 #include <mlir/Interfaces/CallInterfaces.h>
 #include <mlir/Interfaces/SideEffectInterfaces.h>
 #include <mlir/Transforms/GreedyPatternRewriteDriver.h>
@@ -1063,7 +1062,6 @@ static mlir::LogicalResult runLoopRestructuring(mlir::PatternRewriter &rewriter,
   for (auto &node : scc.nodes)
     changed = restructureLoop(rewriter, node) || changed;
 
-  (void)mlir::verify(region.getParentOp());
   return mlir::success(changed);
 }
 
