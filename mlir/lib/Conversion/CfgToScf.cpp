@@ -1397,8 +1397,6 @@ struct OrOfXor : public mlir::OpRewritePattern<mlir::arith::OrIOp> {
   mlir::LogicalResult
   matchAndRewrite(mlir::arith::OrIOp op,
                   mlir::PatternRewriter &rewriter) const override {
-    auto width = op.getType().getIntOrFloatBitWidth();
-    assert(width > 0 && "invalid width");
     for (bool reverse : {false, true}) {
       auto xorOp = (reverse ? op.getLhs() : op.getRhs())
                        .getDefiningOp<mlir::arith::XOrIOp>();
