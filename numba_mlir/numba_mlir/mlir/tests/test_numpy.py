@@ -1697,6 +1697,22 @@ def test_inplace1():
     assert_equal(py_arg, jit_arg)
 
 
+def test_inplace2():
+    def py_func(a):
+        for i in range(len(a)):
+            a[i] += 1
+
+    jit_func = njit(py_func)
+
+    a = np.arange(25, dtype=np.int32)
+
+    py_arg = a.copy()
+    jit_arg = a.copy()
+    py_func(py_arg)
+    jit_func(jit_arg)
+    assert_equal(py_arg, jit_arg)
+
+
 @pytest.mark.parametrize("a", [np.array([[1, 2], [4, 5]])])
 @pytest.mark.parametrize("b", [True, False])
 def test_tensor_if(a, b):
