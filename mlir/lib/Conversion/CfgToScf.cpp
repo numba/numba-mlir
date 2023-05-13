@@ -1418,6 +1418,42 @@ struct OrOfXor : public mlir::OpRewritePattern<mlir::arith::OrIOp> {
   }
 };
 
+struct HoistSelects : public mlir::OpRewritePattern<mlir::scf::IfOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(mlir::scf::IfOp op,
+                  mlir::PatternRewriter &rewriter) const override {
+    bool changed = false;
+    rewriter.startRootUpdate(op);
+
+    mlir::DominanceInfo dom;
+    for (auto block : {op.thenBlock(), op.elseBlock()}) {
+      if (!block)
+        continue;
+
+      for (auto blockOp : llvm::make_early_inc_range(block->getOps<mlir::arith::SelectOp>())) {
+        if (!dom.properlyDominates(blockOp.getCondition(), op) ||
+            !dom.properlyDominates(blockOp.getTrueValue(), op) ||
+            !dom.properlyDominates(blockOp.getFalseValue(), op))
+          continue;
+
+        rewriter.updateRootInPlace(blockOp, [&](){
+          blockOp->moveBefore(op);
+        });
+        changed = true;
+      }
+    }
+
+    if (changed) {
+      rewriter.finalizeRootUpdate(op);
+    } else {
+      rewriter.cancelRootUpdate(op);
+    }
+    return mlir::success(changed);
+  }
+};
+
 struct CFGToSCFPass
     : public mlir::PassWrapper<CFGToSCFPass, mlir::OperationPass<void>> {
   MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(CFGToSCFPass)
@@ -1444,7 +1480,8 @@ struct CFGToSCFPass
         WhileUndefArgs,
         WhileMoveToAfter,
         CondBrSameTarget,
-        OrOfXor
+        OrOfXor,
+        HoistSelects
         // clang-format on
         >(context);
 
