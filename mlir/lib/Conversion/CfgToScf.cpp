@@ -1473,7 +1473,8 @@ struct WhileHoistFromBefore
     };
     auto canBeHoisted = [&](mlir::Operation &blockOp) -> bool {
       // TODO: hack, need to rework scf.while->scf.for conversion
-      if (!mlir::isa<mlir::arith::ArithDialect>(blockOp.getDialect()))
+      if (!mlir::isa_and_present<mlir::arith::ArithDialect>(
+              blockOp.getDialect()))
         return false;
 
       if (beforeBlock.begin() != blockOp.getIterator() &&
