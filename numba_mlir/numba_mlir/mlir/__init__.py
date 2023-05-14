@@ -5,4 +5,4 @@
 from . import array_type
 from . import dpctl_interop
 from .builtin import funcs
-from .numpy import funcs
+from .numpy import funcs, overloads
