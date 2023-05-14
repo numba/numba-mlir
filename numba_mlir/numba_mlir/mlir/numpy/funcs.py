@@ -471,19 +471,25 @@ def ones_impl(builder, shape, dtype=None):
     return _init_impl(builder, shape, dtype, 1)
 
 
+def _init_like_impl(builder, arr, shape, dtype, init=None):
+    shape = arr.shape if shape is None else shape
+    dtype = arr.dtype if dtype is None else dtype
+    return _init_impl(builder, shape, dtype, init)
+
+
 @register_func("numpy.empty_like", numpy.empty_like)
-def empty_like_impl(builder, arr):
-    return _init_impl(builder, arr.shape, arr.dtype)
+def empty_like_impl(builder, arr, dtype=None, shape=None):
+    return _init_like_impl(builder, arr, shape, dtype)
 
 
 @register_func("numpy.zeros_like", numpy.zeros_like)
-def zeros_like_impl(builder, arr):
-    return _init_impl(builder, arr.shape, arr.dtype, 0)
+def zeros_like_impl(builder, arr, dtype=None, shape=None):
+    return _init_like_impl(builder, arr, shape, dtype, 0)
 
 
 @register_func("numpy.ones_like", numpy.ones_like)
-def ones_like_impl(builder, arr):
-    return _init_impl(builder, arr.shape, arr.dtype, 1)
+def ones_like_impl(builder, arr, dtype=None, shape=None):
+    return _init_like_impl(builder, arr, shape, dtype, 1)
 
 
 _is_np_long64 = numpy.int_ == numpy.int64
