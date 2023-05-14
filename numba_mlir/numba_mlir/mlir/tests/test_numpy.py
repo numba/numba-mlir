@@ -1313,6 +1313,20 @@ def test_init_like3(shape, dtype, func):
     assert_equal(py_func(a, dtype), jit_func(a, dtype))
 
 
+@pytest.mark.parametrize("shape", [2, (3, 4), (5, 6, 7)])
+@pytest.mark.parametrize("dtype", _skip_bool([None] + _arr_dtypes))
+@pytest.mark.parametrize(
+    "func", [np.zeros_like, np.ones_like], ids=["zeros_like", "ones_like"]
+)
+def test_init_like4(shape, dtype, func):
+    def py_func(d, shape, dtype):
+        return func(d, shape=shape, dtype=dtype)
+
+    a = np.empty(shape=1, dtype=np.int32)
+    jit_func = njit(py_func)
+    assert_equal(py_func(a, shape, dtype), jit_func(a, shape, dtype))
+
+
 @parametrize_function_variants(
     "py_func",
     [
