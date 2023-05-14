@@ -441,12 +441,15 @@ def test_unituple_getitem4(index):
     assert_equal(py_func(t), jit_func(t))
 
 
-@pytest.mark.parametrize("arr", _test_arrays, ids=_test_arrays_ids)
+def _skip_not_1d(args):
+    # TODO: not supported by numba
+    mark = lambda a: pytest.param(a, marks=pytest.mark.xfail)
+    return [mark(a) if a.ndim > 1 else a for a in args]
+
+
+@pytest.mark.parametrize("arr", _skip_not_1d(_test_arrays), ids=_test_arrays_ids)
 @pytest.mark.parametrize("mask", [[True], [False], [True, False], [False, True]])
 def test_getitem_mask(arr, mask):
-    if arr.ndim > 1:
-        pytest.xfail()  # TODO: not supprted by numba
-
     def py_func(a, m):
         return a[m]
 
@@ -456,12 +459,9 @@ def test_getitem_mask(arr, mask):
     assert_equal(py_func(arr, mask), jit_func(arr, mask))
 
 
-@pytest.mark.parametrize("arr", _test_arrays, ids=_test_arrays_ids)
+@pytest.mark.parametrize("arr", _skip_not_1d(_test_arrays), ids=_test_arrays_ids)
 @pytest.mark.parametrize("offset", [[], [0], [1, 2, 3], [3, 2, 1]])
 def test_getitem_offset(arr, offset):
-    if arr.ndim > 1:
-        pytest.xfail()
-
     def py_func(a, m):
         return a[m]
 
