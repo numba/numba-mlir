@@ -365,6 +365,26 @@ mlir::Value replaceCmpfOp(mlir::PatternRewriter &rewriter, mlir::Location loc,
   return rewriter.createOrFold<mlir::arith::CmpFOp>(loc, Pred, a, b);
 }
 
+struct InplaceBinOpLowering
+    : public mlir::OpConversionPattern<plier::InplaceBinOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(plier::InplaceBinOp op, plier::InplaceBinOp::Adaptor adaptor,
+                  mlir::ConversionPatternRewriter &rewriter) const override {
+    auto converter = getTypeConverter();
+    assert(converter && "Invalid type converter");
+
+    auto resType = converter->convertType(op.getResult().getType());
+    if (!resType)
+      return mlir::failure();
+
+    rewriter.replaceOpWithNewOp<plier::BinOp>(
+        op, resType, adaptor.getLhs(), adaptor.getRhs(), adaptor.getOpAttr());
+    return mlir::success();
+  }
+};
+
 struct BinOpLowering : public mlir::OpConversionPattern<plier::BinOp> {
   using OpConversionPattern::OpConversionPattern;
 
@@ -1009,6 +1029,15 @@ void PlierToStdPass::runOnOperation() {
 
     return !isNum(lhsType) || !isNum(rhsType) || !isNum(op.getType());
   });
+  target.addDynamicallyLegalOp<plier::InplaceBinOp>(
+      [&](plier::InplaceBinOp op) {
+        auto lhsType = op.getLhs().getType();
+        auto rhsType = op.getRhs().getType();
+        if (op.getOp() == "+" && isTuple(lhsType) && isTuple(rhsType))
+          return false;
+
+        return !isNum(lhsType) || !isNum(rhsType) || !isNum(op.getType());
+      });
   target.addDynamicallyLegalOp<plier::UnaryOp>([&](plier::UnaryOp op) {
     return !isNum(op.getValue().getType()) && !isNum(op.getType());
   });
@@ -1057,6 +1086,7 @@ void PlierToStdPass::runOnOperation() {
 
   patterns.insert<
       // clang-format off
+      InplaceBinOpLowering,
       BinOpLowering,
       BinOpTupleLowering,
       UnaryOpLowering,

@@ -1665,7 +1665,6 @@ def test_alias2():
     assert_equal(py_func(4), jit_func(4))
 
 
-@pytest.mark.xfail
 def test_inplace_alias():
     def py_func(a):
         a += 1
@@ -1674,6 +1673,57 @@ def test_inplace_alias():
     jit_func = njit(py_func)
 
     a = np.ones(1)
+
+    py_arg = a.copy()
+    jit_arg = a.copy()
+    py_func(py_arg)
+    jit_func(jit_arg)
+    assert_equal(py_arg, jit_arg)
+
+
+def test_inplace1():
+    def py_func(a):
+        a += 1
+
+    jit_func = njit(py_func)
+
+    a = np.arange(25, dtype=np.int32)
+
+    py_arg = a.copy()
+    jit_arg = a.copy()
+    py_func(py_arg)
+    jit_func(jit_arg)
+    assert_equal(py_arg, jit_arg)
+
+
+def test_inplace2():
+    def py_func(a):
+        for i in range(len(a)):
+            a[i] += 1
+
+    jit_func = njit(py_func)
+
+    a = np.arange(25, dtype=np.int32)
+
+    py_arg = a.copy()
+    jit_arg = a.copy()
+    py_func(py_arg)
+    jit_func(jit_arg)
+    assert_equal(py_arg, jit_arg)
+
+
+def test_inplace3():
+    def py_func(a):
+        a += 1
+
+        for i in range(len(a)):
+            a[i] += 2
+
+        a += 3
+
+    jit_func = njit(py_func)
+
+    a = np.arange(25, dtype=np.int32)
 
     py_arg = a.copy()
     jit_arg = a.copy()

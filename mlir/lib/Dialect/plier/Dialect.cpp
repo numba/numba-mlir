@@ -78,6 +78,12 @@ void BinOp::build(mlir::OpBuilder &builder, mlir::OperationState &state,
                op);
 }
 
+void InplaceBinOp::build(mlir::OpBuilder &builder, mlir::OperationState &state,
+                         mlir::Value lhs, mlir::Value rhs, mlir::StringRef op) {
+  InplaceBinOp::build(builder, state, UndefinedType::get(state.getContext()),
+                      lhs, rhs, op);
+}
+
 void UnaryOp::build(mlir::OpBuilder &builder, mlir::OperationState &state,
                     mlir::Value value, mlir::StringRef op) {
   UnaryOp::build(builder, state, UndefinedType::get(state.getContext()), value,

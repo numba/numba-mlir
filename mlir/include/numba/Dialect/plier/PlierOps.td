@@ -95,10 +95,21 @@ def BinOp : Plier_Op<"binop", []> {
 
   let results = (outs AnyType);
 
-  let builders = [OpBuilder<(ins "::mlir::Value"
-                             : $lhs, "::mlir::Value"
-                             : $rhs, "::mlir::StringRef "
-                             : $op)>];
+  let builders = [
+    OpBuilder<(ins "::mlir::Value":$lhs,
+                   "::mlir::Value":$rhs,
+                   "::mlir::StringRef":$op)>];
+}
+
+def InplaceBinOp : Plier_Op<"inplace_binop", []> {
+  let arguments = (ins AnyType : $lhs, AnyType : $rhs, StrAttr : $op);
+
+  let results = (outs AnyType);
+
+  let builders = [
+    OpBuilder<(ins "::mlir::Value":$lhs,
+                   "::mlir::Value":$rhs,
+                   "::mlir::StringRef":$op)>];
 }
 
 def UnaryOp : Plier_Op<"unary", []> {

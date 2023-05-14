@@ -115,11 +115,12 @@ def _gen_tests():
         "test_prange30",
         "test_int_arg_pndindex",
         "test_non_identity_initial",
-        "test_inplace_alias",
     }
 
     skip_tests = {
         "test_no_warn_if_cache_set",  # Cache = True is not supported
+        "test_three_d_array_reduction",  # We intentionally do not detect data races
+        "test_two_d_array_reduction_reuse",  # We intentionally do not detect data races
     }
 
     def countParfors(test_func, args, **kws):
