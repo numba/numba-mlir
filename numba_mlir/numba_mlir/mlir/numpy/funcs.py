@@ -461,24 +461,24 @@ def empty_impl(builder, shape, dtype=None):
     return _init_impl(builder, shape, dtype)
 
 
-@register_func("numpy.empty_like", numpy.empty_like)
-def empty_like_impl(builder, arr):
-    return _init_impl(builder, arr.shape, arr.dtype)
-
-
 @register_func("numpy.zeros", numpy.zeros)
 def zeros_impl(builder, shape, dtype=None):
     return _init_impl(builder, shape, dtype, 0)
 
 
-@register_func("numpy.zeros_like", numpy.zeros_like)
-def zeros_like_impl(builder, arr):
-    return _init_impl(builder, arr.shape, arr.dtype, 0)
-
-
 @register_func("numpy.ones", numpy.ones)
 def ones_impl(builder, shape, dtype=None):
     return _init_impl(builder, shape, dtype, 1)
+
+
+@register_func("numpy.empty_like", numpy.empty_like)
+def empty_like_impl(builder, arr):
+    return _init_impl(builder, arr.shape, arr.dtype)
+
+
+@register_func("numpy.zeros_like", numpy.zeros_like)
+def zeros_like_impl(builder, arr):
+    return _init_impl(builder, arr.shape, arr.dtype, 0)
 
 
 @register_func("numpy.ones_like", numpy.ones_like)
