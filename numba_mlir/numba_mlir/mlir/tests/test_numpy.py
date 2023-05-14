@@ -1294,6 +1294,25 @@ def test_init_like2(shape, dtype, func):
     assert_equal(py_func(a, shape), jit_func(a, shape))
 
 
+def _skip_bool(dtypes):
+    mark = lambda a: pytest.param(a, marks=pytest.mark.xfail)
+    return [mark(a) if a is bool else a for a in dtypes]
+
+
+@pytest.mark.parametrize("shape", [2, (3, 4), (5, 6, 7)])
+@pytest.mark.parametrize("dtype", _skip_bool([None] + _arr_dtypes))
+@pytest.mark.parametrize(
+    "func", [np.zeros_like, np.ones_like], ids=["zeros_like", "ones_like"]
+)
+def test_init_like3(shape, dtype, func):
+    def py_func(d, dtype):
+        return func(d, dtype=dtype)
+
+    a = np.empty(shape=shape, dtype=np.int32)
+    jit_func = njit(py_func)
+    assert_equal(py_func(a, dtype), jit_func(a, dtype))
+
+
 @parametrize_function_variants(
     "py_func",
     [
