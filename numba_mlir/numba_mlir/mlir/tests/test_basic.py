@@ -7,7 +7,7 @@ import numba
 # from numba_mlir import njit
 import math
 import sys
-from numpy.testing import assert_equal  # for nans comparison
+from numpy.testing import assert_equal, assert_allclose
 from numba_mlir.mlir.passes import print_pass_ir, get_print_buffer
 
 import pytest
@@ -850,37 +850,50 @@ def test_omitted_args_none():
     assert_equal(py_func2(1), jit_func2(1))
 
 
+def _skip_builtin_funcs2_cases(args):
+    # TODO: Skip bools and negative zeros, need investigation
+    mark = lambda a: pytest.param(*a, marks=pytest.mark.xfail)
+
+    def check(a, b):
+        return isinstance(a, bool) or isinstance(b, bool)
+
+    return [mark((a, b)) if check(a, b) else (a, b) for a, b in args]
+
+
 @pytest.mark.parametrize("func", [min, max])
 @pytest.mark.parametrize(
-    "a, b", itertools.product(_test_values_no_complex, _test_values_no_complex)
+    "a, b",
+    _skip_builtin_funcs2_cases(
+        itertools.product(_test_values_no_complex, _test_values_no_complex)
+    ),
 )
 def test_builtin_funcs2(func, a, b):
-    # TODO: Skip bools and negative zeros, need investigation
-    if (
-        isinstance(a, bool)
-        or isinstance(b, bool)
-        or math.copysign(1, a) < 0
-        or math.copysign(1, b) < 0
-    ):
-        pytest.xfail()
-
     def py_func(a, b):
         return func(a, b)
 
     jit_func = njit(py_func)
 
-    assert_equal(py_func(a, b), jit_func(a, b))
+    # TODO: Allclose for signed nan comparison
+    assert_allclose(py_func(a, b), jit_func(a, b))
+
+
+def _skip_builtin_funcs3_cases(args):
+    mark = lambda a: pytest.param(*a, marks=pytest.mark.xfail)
+
+    def check(a, b, c):
+        return isinstance(a, bool) or isinstance(b, bool) or isinstance(c, bool)
+
+    return [mark((a, b, c)) if check(a, b, c) else (a, b, c) for a, b, c in args]
 
 
 @pytest.mark.parametrize("func", [min, max])
 @pytest.mark.parametrize(
     "a, b, c",
-    itertools.product(_tuple_test_values, _tuple_test_values, _tuple_test_values),
+    _skip_builtin_funcs3_cases(
+        itertools.product(_tuple_test_values, _tuple_test_values, _tuple_test_values)
+    ),
 )
 def test_builtin_funcs3(func, a, b, c):
-    if isinstance(a, bool) or isinstance(b, bool) or isinstance(c, bool):
-        pytest.xfail()
-
     def py_func(a, b, c):
         return func(a, b, c)
 
