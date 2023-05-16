@@ -78,7 +78,27 @@ class _SetDefaultLocalSizeId(ConcreteTemplate):
     ]
 
 
-def _kernel_body(global_size, local_size, body, *args):
+def _kernel_body1(global_size, local_size, body, *args):
+    x = global_size[0]
+    lx = local_size[0]
+    _set_default_local_size(lx, 1, 1)
+    for gi in _gpu_range(x):
+        for gj in _gpu_range(1):
+            for gk in _gpu_range(1):
+                body(*args)
+
+
+def _kernel_body2(global_size, local_size, body, *args):
+    x, y = global_size
+    lx, ly = local_size
+    _set_default_local_size(lx, ly, 1)
+    for gi in _gpu_range(x):
+        for gj in _gpu_range(y):
+            for gk in _gpu_range(1):
+                body(*args)
+
+
+def _kernel_body3(global_size, local_size, body, *args):
     x, y, z = global_size
     lx, ly, lz = local_size
     _set_default_local_size(lx, ly, lz)
@@ -88,7 +108,23 @@ def _kernel_body(global_size, local_size, body, *args):
                 body(*args)
 
 
-def _kernel_body_def_size(global_size, body, *args):
+def _kernel_body_def_size1(global_size, body, *args):
+    x = global_size[0]
+    for gi in _gpu_range(x):
+        for gj in _gpu_range(1):
+            for gk in _gpu_range(1):
+                body(*args)
+
+
+def _kernel_body_def_size2(global_size, body, *args):
+    x, y = global_size
+    for gi in _gpu_range(x):
+        for gj in _gpu_range(y):
+            for gk in _gpu_range(1):
+                body(*args)
+
+
+def _kernel_body_def_size3(global_size, body, *args):
     x, y, z = global_size
     for gi in _gpu_range(x):
         for gj in _gpu_range(y):
@@ -96,11 +132,8 @@ def _kernel_body_def_size(global_size, body, *args):
                 body(*args)
 
 
-def _extend_dims(dims):
-    l = len(dims)
-    if l < 3:
-        return tuple(dims + (1,) * (3 - l))
-    return dims
+def _decorate_kern_body(body, kwargs):
+    return mlir_njit(enable_gpu_pipeline=True, **kwargs)(body)
 
 
 class Kernel(KernelBase):
@@ -110,9 +143,15 @@ class Kernel(KernelBase):
         self._jit_func = mlir_njit(
             inline="always", enable_gpu_pipeline=True, gpu_fp64_truncate=fp64_truncate
         )(func)
-        self._kern_body = mlir_njit(enable_gpu_pipeline=True, **kwargs)(_kernel_body)
-        self._kern_body_def_size = mlir_njit(enable_gpu_pipeline=True, **kwargs)(
-            _kernel_body_def_size
+        self._kern_body = (
+            _decorate_kern_body(_kernel_body1, kwargs),
+            _decorate_kern_body(_kernel_body2, kwargs),
+            _decorate_kern_body(_kernel_body3, kwargs),
+        )
+        self._kern_body_def_size = (
+            _decorate_kern_body(_kernel_body_def_size1, kwargs),
+            _decorate_kern_body(_kernel_body_def_size2, kwargs),
+            _decorate_kern_body(_kernel_body_def_size3, kwargs),
         )
 
     def __call__(self, *args, **kwargs):
@@ -121,17 +160,19 @@ class Kernel(KernelBase):
         # kwargs is not supported
         check_usm_ndarray_args(args)
 
+        func_index = len(self.global_size) - 1
+        assert (
+            func_index >= 0 and func_index < 3
+        ), f"Invalid dim count: {len(self.global_size)}"
+
         local_size = self.local_size
         if len(local_size) != 0:
-            self._kern_body(
-                _extend_dims(self.global_size),
-                _extend_dims(self.local_size),
-                self._jit_func,
-                *args,
+            self._kern_body[func_index](
+                self.global_size, self.local_size, self._jit_func, *args
             )
         else:
-            self._kern_body_def_size(
-                _extend_dims(self.global_size), self._jit_func, *args
+            self._kern_body_def_size[func_index](
+                self.global_size, self._jit_func, *args
             )
 
 

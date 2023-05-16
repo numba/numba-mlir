@@ -1239,6 +1239,19 @@ struct SignCastUndefPropagate
   }
 };
 
+static mlir::Type
+getSignCastGetIntermediateType(mlir::ShapedType srcType,
+                               mlir::ShapedType intermediateType,
+                               mlir::ShapedType dstType) {
+  if (auto srcMemrefType = mlir::dyn_cast<mlir::MemRefType>(srcType)) {
+    auto dstMemref = mlir::cast<mlir::MemRefType>(dstType);
+    return mlir::MemRefType::get(
+        dstMemref.getShape(), srcMemrefType.getElementType(),
+        dstMemref.getLayout(), srcMemrefType.getMemorySpace());
+  }
+  return dstType.clone(intermediateType.getElementType());
+}
+
 template <typename CastOp>
 struct SignCastCastPropagate : public mlir::OpRewritePattern<CastOp> {
   using mlir::OpRewritePattern<CastOp>::OpRewritePattern;
@@ -1250,22 +1263,23 @@ struct SignCastCastPropagate : public mlir::OpRewritePattern<CastOp> {
     if (!signCast)
       return mlir::failure();
 
-    auto srcType = signCast.getType().template cast<mlir::ShapedType>();
-    auto dstType = op.getType().template cast<mlir::ShapedType>();
-    if (srcType.getElementType() != dstType.getElementType() ||
-        !srcType.hasRank() || !dstType.hasRank())
+    auto intermediateType = mlir::cast<mlir::ShapedType>(signCast.getType());
+    auto dstType = mlir::cast<mlir::ShapedType>(op.getType());
+
+    if (intermediateType.getElementType() != dstType.getElementType() ||
+        !intermediateType.hasRank() || !dstType.hasRank())
       return mlir::failure();
 
     auto src = signCast.getSource();
-    auto finalType = src.getType().template cast<mlir::ShapedType>();
-    auto finalElemType = finalType.getElementType();
+    auto srcType = mlir::cast<mlir::ShapedType>(src.getType());
 
-    auto newDstType = dstType.clone(finalElemType);
-    if (!CastOp::areCastCompatible(src.getType(), newDstType))
+    auto newIntermediateType =
+        getSignCastGetIntermediateType(srcType, intermediateType, dstType);
+    if (!CastOp::areCastCompatible(srcType, newIntermediateType))
       return mlir::failure();
 
     auto loc = op.getLoc();
-    mlir::Value cast = rewriter.create<CastOp>(loc, newDstType, src);
+    mlir::Value cast = rewriter.create<CastOp>(loc, newIntermediateType, src);
     rewriter.replaceOpWithNewOp<numba::util::SignCastOp>(op, dstType, cast);
 
     return mlir::success();

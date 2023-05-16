@@ -1789,6 +1789,9 @@ struct SinkGpuDims : public mlir::OpRewritePattern<mlir::gpu::LaunchOp> {
                                    op.getBlockSizeY(), op.getBlockSizeZ()};
     llvm::SmallVector<std::pair<mlir::OpOperand *, unsigned>> uses;
     for (auto &&[ind, val] : llvm::enumerate(dimArgs)) {
+      if (mlir::getConstantIntValue(val))
+        continue;
+
       auto i = static_cast<unsigned>(ind);
       auto addUse = [&](mlir::OpOperand &use) {
         if (op->isProperAncestor(use.getOwner()))
@@ -1808,7 +1811,7 @@ struct SinkGpuDims : public mlir::OpRewritePattern<mlir::gpu::LaunchOp> {
 
     std::array<mlir::Value, 6> dims = {}; // TODO: static vector
 
-    auto loc = op->getLoc();
+    auto loc = op.getLoc();
     rewriter.setInsertionPointToStart(&op.getBody().front());
     auto getDim = [&](unsigned i, mlir::Type type) -> mlir::Value {
       assert(i < dims.size());
