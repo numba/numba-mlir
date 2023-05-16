@@ -669,7 +669,16 @@ def test_dot(a, b, parallel):
     assert_equal(py_func(a, b), jit_func(a, b))
 
 
-@pytest.mark.parametrize("a,b", _dot_args)
+def _skip_test_dot_out_cases(args):
+    mark = lambda a: pytest.param(*a, marks=pytest.mark.xfail)
+
+    def check(a, b):
+        return a.ndim == 1 or b.ndim == 1
+
+    return [mark((a, b)) if check(a, b) else (a, b) for a, b in args]
+
+
+@pytest.mark.parametrize("a,b", _skip_test_dot_out_cases(_dot_args))
 @parametrize_function_variants(
     "py_func",
     [

@@ -293,7 +293,8 @@ public:
                                  size_t eventIndex) {
     assert(kernel);
     auto eventsCount = countEvents(events);
-    auto paramsCount = countUntil(params, numba::GPUParamDesc{nullptr, 0});
+    auto paramsCount = countUntil(
+        params, numba::GPUParamDesc{nullptr, 0, numba::GpuParamType::null});
 
     auto castSz = [](size_t val) { return static_cast<uint32_t>(val); };
 
