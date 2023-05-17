@@ -1048,7 +1048,8 @@ def _to_host(src, dst):
 
 @pytest.mark.smoke
 @require_dpctl
-def test_dpctl_simple1():
+@pytest.mark.parametrize("size", [1, 13, 127, 1024])
+def test_dpctl_simple1(size):
     def func(a, b, c):
         i = get_global_id(0)
         c[i] = a[i] + b[i]
@@ -1056,8 +1057,8 @@ def test_dpctl_simple1():
     sim_func = kernel_sim(func)
     gpu_func = kernel_cached(func)
 
-    a = np.arange(1024, dtype=np.float32)
-    b = np.arange(1024, dtype=np.float32) * 3
+    a = np.arange(size, dtype=np.float32)
+    b = np.arange(size, dtype=np.float32) * 3
 
     sim_res = np.zeros(a.shape, a.dtype)
     sim_func[a.shape, DEFAULT_LOCAL_SIZE](a, b, sim_res)

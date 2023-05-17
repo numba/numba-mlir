@@ -788,6 +788,39 @@ mlir::OpFoldResult numba::ntensor::CastOp::fold(FoldAdaptor) {
   return nullptr;
 }
 
+namespace {
+struct NTensorChainCast
+    : public mlir::OpRewritePattern<numba::ntensor::CastOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(numba::ntensor::CastOp op,
+                  mlir::PatternRewriter &rewriter) const override {
+    auto prev = op.getSource().getDefiningOp<numba::ntensor::CastOp>();
+    if (!prev)
+      return mlir::failure();
+
+    auto src = prev.getSource();
+    auto srcType = mlir::cast<numba::ntensor::NTensorType>(src.getType());
+    auto dstType = mlir::cast<numba::ntensor::NTensorType>(op.getType());
+    if (srcType == dstType) {
+      rewriter.replaceOp(op, src);
+      return mlir::success();
+    }
+    if (!numba::ntensor::CastOp::areCastCompatible(srcType, dstType))
+      return mlir::failure();
+
+    rewriter.replaceOpWithNewOp<numba::ntensor::CastOp>(op, dstType, src);
+    return mlir::success();
+  }
+};
+} // namespace
+
+void numba::ntensor::CastOp::getCanonicalizationPatterns(
+    ::mlir::RewritePatternSet &results, ::mlir::MLIRContext *context) {
+  results.insert<NTensorChainCast>(context);
+}
+
 bool numba::ntensor::CastOp::areCastCompatible(mlir::TypeRange inputs,
                                                mlir::TypeRange outputs) {
   if (inputs.size() != 1 || outputs.size() != 1)

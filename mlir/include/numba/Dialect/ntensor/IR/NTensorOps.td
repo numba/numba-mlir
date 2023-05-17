@@ -733,6 +733,7 @@ def CastOp : NTensor_OpBase<"cast", [
   }];
 
   let hasFolder = 1;
+  let hasCanonicalizer = 1;
 }
 
 def FromElementsOp : NTensor_OpBase<"from_elements", [
