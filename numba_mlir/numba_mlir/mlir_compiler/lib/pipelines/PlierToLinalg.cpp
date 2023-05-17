@@ -1902,7 +1902,7 @@ struct WrapParforRegionsPass
       if (auto load = mlir::dyn_cast<numba::ntensor::LoadOp>(op))
         return load.getArray().getType().getEnvironment();
 
-      if (auto store = mlir::dyn_cast<numba::ntensor::LoadOp>(op))
+      if (auto store = mlir::dyn_cast<numba::ntensor::StoreOp>(op))
         return store.getArray().getType().getEnvironment();
 
       return std::nullopt;
