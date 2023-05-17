@@ -184,6 +184,18 @@ func.func @test(%arg1: !ntensor.ntensor<?xf32>) -> !ntensor.ntensor<?xf32> {
 
 // -----
 
+func.func @test(%arg1: !ntensor.ntensor<1xf32, "test">) -> !ntensor.ntensor<?xf32, "test"> {
+  %0 = ntensor.cast %arg1 : !ntensor.ntensor<1xf32, "test"> to !ntensor.ntensor<?xf32>
+  %1 = ntensor.cast %0 : !ntensor.ntensor<?xf32> to !ntensor.ntensor<?xf32, "test">
+  return %1 : !ntensor.ntensor<?xf32, "test">
+}
+// CHECK-LABEL: func @test
+//  CHECK-SAME:   (%[[ARG:.*]]: !ntensor.ntensor<1xf32, "test">)
+//  CHECK-NEXT:   %[[RES:.*]] = ntensor.cast %[[ARG]] : !ntensor.ntensor<1xf32, "test"> to !ntensor.ntensor<?xf32, "test">
+//  CHECK-NEXT:   return %[[RES]]
+
+// -----
+
 func.func @test(%arg1: tensor<?x?xf32>) -> index {
   %0 = arith.constant 1 : index
   %1 = ntensor.from_tensor %arg1 : tensor<?x?xf32> to !ntensor.ntensor<?x?xf32>
