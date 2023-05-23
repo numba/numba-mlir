@@ -31,11 +31,11 @@ requirements:
         - mkl-devel >=2022.2
         - mkl-devel-dpcpp >=2022.2
         - setuptools
-        - numba 0.56*
+        - numba 0.57*
         - zlib
     run:
         - python
-        - numba 0.56*
+        - numba 0.57*
         - packaging
         - mkl >=2023.0
         - mkl-dpcpp >=2023.0
