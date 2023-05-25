@@ -749,8 +749,6 @@ private:
         op.erase();
         builder.create<mlir::cf::CondBranchOp>(loc, cond, trueDest, trueArgs,
                                                falseDest, falseArgs);
-      } else if (mlir::isa<mlir::func::ReturnOp>(term)) {
-        // Nothing
       } else {
         numba::reportError(llvm::Twine("Unhandled terminator: ") +
                            term->getName().getStringRef());
