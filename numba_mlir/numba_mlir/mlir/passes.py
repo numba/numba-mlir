@@ -76,6 +76,14 @@ class MlirBackendBase(FunctionPass):
             func_registry.push_active_funcs_stack()
             try:
                 res = self.run_pass_impl(state)
+            except:
+                print("=============== pass failed, func ir ==================")
+                state.func_ir.dump()
+                print(
+                    "============= pass failed, func ir end ================",
+                    flush=True,
+                )
+                raise
             finally:
                 func_registry.pop_active_funcs_stack()
             return res
