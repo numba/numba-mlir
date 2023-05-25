@@ -686,8 +686,8 @@ private:
   }
 
   void fixupPhis() {
-    auto buildArgList = [&](mlir::Block *block, auto &outgoingPhiNodes,
-                            auto &list) {
+    auto buildArgList = [&](mlir::Block *block, auto &outgoingPhiNodes) {
+      mlir::SmallVector<mlir::Value> list;
       for (auto &o : outgoingPhiNodes) {
         if (o.destBlock == block) {
           auto argIndex = o.argIndex;
@@ -702,6 +702,7 @@ private:
           list[argIndex] = val;
         }
       }
+      return list;
     };
     for (auto bb : blocks) {
       auto it = blockInfos.find(bb);
@@ -718,18 +719,15 @@ private:
       auto loc = builder.getUnknownLoc();
       if (auto op = mlir::dyn_cast<mlir::cf::BranchOp>(term)) {
         auto dest = op.getDest();
-        mlir::SmallVector<mlir::Value> args;
-        buildArgList(dest, info.outgoingPhiNodes, args);
+        auto args = buildArgList(dest, info.outgoingPhiNodes);
         op.erase();
         builder.create<mlir::cf::BranchOp>(loc, dest, args);
       } else if (auto op = mlir::dyn_cast<mlir::cf::CondBranchOp>(term)) {
         auto trueDest = op.getTrueDest();
         auto falseDest = op.getFalseDest();
         auto cond = op.getCondition();
-        mlir::SmallVector<mlir::Value> trueArgs;
-        mlir::SmallVector<mlir::Value> falseArgs;
-        buildArgList(trueDest, info.outgoingPhiNodes, trueArgs);
-        buildArgList(falseDest, info.outgoingPhiNodes, falseArgs);
+        auto trueArgs = buildArgList(trueDest, info.outgoingPhiNodes);
+        auto falseArgs = buildArgList(falseDest, info.outgoingPhiNodes);
         op.erase();
         builder.create<mlir::cf::CondBranchOp>(loc, cond, trueDest, trueArgs,
                                                falseDest, falseArgs);
