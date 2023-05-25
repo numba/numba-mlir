@@ -705,37 +705,39 @@ private:
     };
     for (auto bb : blocks) {
       auto it = blockInfos.find(bb);
-      if (blockInfos.end() != it) {
-        auto &info = it->second;
-        auto term = bb->getTerminator();
-        if (nullptr == term)
-          numba::reportError("broken ir: block without terminator");
+      if (blockInfos.end() == it)
+        continue;
 
-        builder.setInsertionPointToEnd(bb);
+      auto &info = it->second;
+      auto term = bb->getTerminator();
+      if (nullptr == term)
+        numba::reportError("broken ir: block without terminator");
 
-        if (auto op = mlir::dyn_cast<mlir::cf::BranchOp>(term)) {
-          auto dest = op.getDest();
-          mlir::SmallVector<mlir::Value> args;
-          buildArgList(dest, info.outgoingPhiNodes, args);
-          op.erase();
-          builder.create<mlir::cf::BranchOp>(builder.getUnknownLoc(), dest,
-                                             args);
-        } else if (auto op = mlir::dyn_cast<mlir::cf::CondBranchOp>(term)) {
-          auto trueDest = op.getTrueDest();
-          auto falseDest = op.getFalseDest();
-          auto cond = op.getCondition();
-          mlir::SmallVector<mlir::Value> trueArgs;
-          mlir::SmallVector<mlir::Value> falseArgs;
-          buildArgList(trueDest, info.outgoingPhiNodes, trueArgs);
-          buildArgList(falseDest, info.outgoingPhiNodes, falseArgs);
-          op.erase();
-          builder.create<mlir::cf::CondBranchOp>(builder.getUnknownLoc(), cond,
-                                                 trueDest, trueArgs, falseDest,
-                                                 falseArgs);
-        } else {
-          numba::reportError(llvm::Twine("Unhandled terminator: ") +
-                             term->getName().getStringRef());
-        }
+      builder.setInsertionPointToEnd(bb);
+
+      auto loc = builder.getUnknownLoc();
+      if (auto op = mlir::dyn_cast<mlir::cf::BranchOp>(term)) {
+        auto dest = op.getDest();
+        mlir::SmallVector<mlir::Value> args;
+        buildArgList(dest, info.outgoingPhiNodes, args);
+        op.erase();
+        builder.create<mlir::cf::BranchOp>(loc, dest, args);
+      } else if (auto op = mlir::dyn_cast<mlir::cf::CondBranchOp>(term)) {
+        auto trueDest = op.getTrueDest();
+        auto falseDest = op.getFalseDest();
+        auto cond = op.getCondition();
+        mlir::SmallVector<mlir::Value> trueArgs;
+        mlir::SmallVector<mlir::Value> falseArgs;
+        buildArgList(trueDest, info.outgoingPhiNodes, trueArgs);
+        buildArgList(falseDest, info.outgoingPhiNodes, falseArgs);
+        op.erase();
+        builder.create<mlir::cf::CondBranchOp>(loc, cond, trueDest, trueArgs,
+                                               falseDest, falseArgs);
+      } else if (mlir::isa<mlir::func::ReturnOp>(term)) {
+        // Nothing
+      } else {
+        numba::reportError(llvm::Twine("Unhandled terminator: ") +
+                           term->getName().getStringRef());
       }
     }
   }
