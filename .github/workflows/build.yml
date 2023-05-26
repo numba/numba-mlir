@@ -15,7 +15,7 @@ env:
   LEVEL_ZERO_VER: v1.6.2
   TBB_URL_PREFIX: https://github.com/oneapi-src/oneTBB/releases/download/
   LLVM_SHA_FILE: llvm-sha.txt
-  NUMPY_VER: "1.23"
+  NUMPY_VER: "1.22"
 
 jobs:
   build_win:
