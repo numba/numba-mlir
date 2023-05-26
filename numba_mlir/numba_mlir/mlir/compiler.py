@@ -10,8 +10,6 @@ from .lowering import mlir_NativeLowering
 
 import functools
 
-from numba.core.typed_passes import AnnotateTypes, IRLegalization
-
 from numba_mlir.mlir.passes import MlirDumpPlier, MlirBackend, get_gpu_backend
 from numba.core.compiler_machinery import PassManager
 from numba.core.compiler import CompilerBase as orig_CompilerBase
@@ -19,6 +17,7 @@ from numba.core.compiler import DefaultPassBuilder as orig_DefaultPassBuilder
 from numba.core.typed_passes import NativeLowering as orig_NativeLowering
 from numba.core.typed_passes import NativeParforLowering as orig_NativeParforLowering
 from numba.core.typed_passes import (
+    NopythonTypeInference,
     PreParforPass,
     ParforPass,
     DumpParforDiagnostics,
@@ -62,9 +61,9 @@ class mlir_PassBuilder(orig_DefaultPassBuilder):
 
         if numba_mlir.mlir.settings.USE_MLIR:
             if enable_gpu_pipeline:
-                pm.add_pass_after(get_gpu_backend(fp64_truncate), AnnotateTypes)
+                pm.add_pass_after(get_gpu_backend(fp64_truncate), NopythonTypeInference)
             else:
-                pm.add_pass_after(MlirBackend, AnnotateTypes)
+                pm.add_pass_after(MlirBackend, NopythonTypeInference)
             pm.passes, replaced = _replace_pass(
                 pm.passes, orig_NativeLowering, mlir_NativeLowering
             )
@@ -89,7 +88,7 @@ class mlir_PassBuilder(orig_DefaultPassBuilder):
             )
 
         if numba_mlir.mlir.settings.DUMP_PLIER:
-            pm.add_pass_after(MlirDumpPlier, AnnotateTypes)
+            pm.add_pass_after(MlirDumpPlier, NopythonTypeInference)
 
         pm.finalize()
         return pm
