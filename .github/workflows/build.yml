@@ -774,8 +774,8 @@ jobs:
         run: |
           mkdir numba_mlir_conda
           pushd numba_mlir_conda
-          source $CONDA/bin/activate test-env
-          conda install conda-build conda-verify boa -c intel -c conda-forge
+          conda create -y -n conda-build-env python=${{ matrix.python }} conda-build conda-verify boa -c conda-forge
+          source $CONDA/bin/activate conda-build-env
           export TBB_PATH=/home/runner/work/tbb/oneapi-tbb-${TBB_VER}
           export LLVM_PATH=/home/runner/work/llvm-mlir/_mlir_install
           export LEVEL_ZERO_DIR=/home/runner/work/level-zero/level-zero/level_zero_install
