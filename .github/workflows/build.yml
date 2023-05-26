@@ -55,6 +55,7 @@ jobs:
           auto-update-conda: true
           use-only-tar-bz2: true
           run-post: false
+          mamba-version: "*"
           activate-environment: test-env
           environment-file: ${{ env.CORE_ENV_FILE }}
 
@@ -228,6 +229,7 @@ jobs:
           auto-update-conda: true
           use-only-tar-bz2: true
           run-post: false
+          mamba-version: "*"
 
       - name: Checkout repo
         uses: actions/checkout@v2
@@ -354,6 +356,7 @@ jobs:
           auto-update-conda: true
           use-only-tar-bz2: true
           run-post: false
+          mamba-version: "*"
 
       - name: Checkout repo
         uses: actions/checkout@v2
@@ -815,6 +818,7 @@ jobs:
           run-post: false
           auto-activate-base: true
           activate-environment: ""
+          mamba-version: "*"
 
       - name: Add conda to system path
         run: echo $CONDA/bin >> $GITHUB_PATH
@@ -853,6 +857,8 @@ jobs:
           run-post: false
           auto-activate-base: true
           activate-environment: ""
+          mamba-version: "*"
+
       - name: Install anaconda-client
         run: conda install anaconda-client
 
