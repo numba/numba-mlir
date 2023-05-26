@@ -329,14 +329,6 @@ jobs:
           ls *.whl | Foreach-Object { pip install $_.FullName }
           python "$env:GITHUB_WORKSPACE/scripts/run_package_tests.py" verbose smoke
 
-      - name: Upload artifact
-        if: matrix.is_main
-        uses: actions/upload-artifact@v2
-        with:
-          name: numba-mlir ${{ runner.os }} Python ${{ matrix.python }} SHA ${{ github.sha }}
-          path: numba_mlir_conda/win-64/*.tar.bz2
-          retention-days: 30
-
 
   build_win_conda_package:
     name: Builds Numba-MLIR conda package on Windows
@@ -347,6 +339,8 @@ jobs:
     strategy:
       matrix:
         python: ["3.8", "3.9", "3.10"]
+        is_main:
+          - ${{ github.ref == 'refs/heads/main' }}
 
     steps:
       - name: Cancel Previous Runs
@@ -644,6 +638,8 @@ jobs:
     strategy:
       matrix:
         python: ["3.8", "3.9", "3.10"]
+        is_main:
+          - ${{ github.ref == 'refs/heads/main' }}
 
     steps:
       - name: Cancel Previous Runs
