@@ -211,13 +211,6 @@ jobs:
     strategy:
       matrix:
         python: ["3.8", "3.9", "3.10"]
-        is_main:
-          - ${{ github.ref == 'refs/heads/main' }}
-        exclude:
-          - is_main: false
-            python: "3.8"
-          - is_main: false
-            python: "3.9"
 
     steps:
       - uses: ilammy/msvc-dev-cmd@v1
@@ -354,13 +347,6 @@ jobs:
     strategy:
       matrix:
         python: ["3.8", "3.9", "3.10"]
-        is_main:
-          - ${{ github.ref == 'refs/heads/main' }}
-        exclude:
-          - is_main: false
-            python: "3.8"
-          - is_main: false
-            python: "3.9"
 
     steps:
       - name: Cancel Previous Runs
@@ -658,13 +644,6 @@ jobs:
     strategy:
       matrix:
         python: ["3.8", "3.9", "3.10"]
-        is_main:
-          - ${{ github.ref == 'refs/heads/main' }}
-        exclude:
-          - is_main: false
-            python: "3.8"
-          - is_main: false
-            python: "3.9"
 
     steps:
       - name: Cancel Previous Runs

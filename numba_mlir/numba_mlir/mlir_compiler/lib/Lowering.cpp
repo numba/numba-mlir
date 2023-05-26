@@ -197,6 +197,25 @@ private:
 
   PyTypeConverter &typeConverter;
 
+  void insertBlock(int id, mlir::Block *block) {
+    assert(block && "Invalid block");
+    if (blocksMap.count(id))
+      numba::reportError(llvm::Twine("Duplicated block id: ") +
+                         llvm::Twine(id));
+
+    blocks.emplace_back(block);
+    blocksMap.insert(std::pair{id, block});
+  }
+
+  mlir::Block *getBlock(py::handle id) const {
+    auto i = id.cast<int>();
+    auto it = blocksMap.find(i);
+    if (it == blocksMap.end())
+      numba::reportError(llvm::Twine("Invalid block id: ") + llvm::Twine(i));
+
+    return it->second;
+  }
+
   mlir::func::FuncOp createFunc(const py::object &compilationContext,
                                 mlir::ModuleOp mod) {
     assert(!func);
@@ -256,8 +275,7 @@ private:
     blocks.reserve(irBlocks.size());
     for (auto &&[i, irBlock] : llvm::enumerate(irBlocks)) {
       auto block = (0 == i ? func.addEntryBlock() : func.addBlock());
-      blocks.emplace_back(block);
-      blocksMap[irBlock.first] = block;
+      insertBlock(irBlock.first, block);
     }
 
     for (auto &&[i, irBlock] : llvm::enumerate(irBlocks))
@@ -441,7 +459,7 @@ private:
 
     for (auto i : llvm::seq<size_t>(0, incomingVals.size())) {
       auto var = incomingVals[i].attr("name").cast<std::string>();
-      auto block = blocksMap.find(incomingBlocks[i].cast<int>())->second;
+      auto block = getBlock(incomingBlocks[i]);
       blockInfos[block].outgoingPhiNodes.push_back(
           {currentBlock, std::move(var), argIndex});
     }
@@ -643,8 +661,8 @@ private:
 
   void branch(py::handle cond, py::handle tr, py::handle fl) {
     auto c = loadvar(cond);
-    auto trBlock = blocksMap.find(tr.cast<int>())->second;
-    auto flBlock = blocksMap.find(fl.cast<int>())->second;
+    auto trBlock = getBlock(tr);
+    auto flBlock = getBlock(fl);
     auto condVal = builder.create<plier::CastOp>(
         getCurrentLoc(), mlir::IntegerType::get(&ctx, 1), c);
     builder.create<mlir::cf::CondBranchOp>(getCurrentLoc(), condVal, trBlock,
@@ -652,7 +670,7 @@ private:
   }
 
   void jump(py::handle target) {
-    auto block = blocksMap.find(target.cast<int>())->second;
+    auto block = getBlock(target);
     builder.create<mlir::cf::BranchOp>(getCurrentLoc(), std::nullopt, block);
   }
 
@@ -686,8 +704,8 @@ private:
   }
 
   void fixupPhis() {
-    auto buildArgList = [&](mlir::Block *block, auto &outgoingPhiNodes,
-                            auto &list) {
+    auto buildArgList = [&](mlir::Block *block, auto &outgoingPhiNodes) {
+      mlir::SmallVector<mlir::Value> list;
       for (auto &o : outgoingPhiNodes) {
         if (o.destBlock == block) {
           auto argIndex = o.argIndex;
@@ -702,40 +720,38 @@ private:
           list[argIndex] = val;
         }
       }
+      return list;
     };
     for (auto bb : blocks) {
       auto it = blockInfos.find(bb);
-      if (blockInfos.end() != it) {
-        auto &info = it->second;
-        auto term = bb->getTerminator();
-        if (nullptr == term)
-          numba::reportError("broken ir: block without terminator");
+      if (blockInfos.end() == it)
+        continue;
 
-        builder.setInsertionPointToEnd(bb);
+      auto &info = it->second;
+      auto term = bb->getTerminator();
+      if (nullptr == term)
+        numba::reportError("broken ir: block without terminator");
 
-        if (auto op = mlir::dyn_cast<mlir::cf::BranchOp>(term)) {
-          auto dest = op.getDest();
-          mlir::SmallVector<mlir::Value> args;
-          buildArgList(dest, info.outgoingPhiNodes, args);
-          op.erase();
-          builder.create<mlir::cf::BranchOp>(builder.getUnknownLoc(), dest,
-                                             args);
-        } else if (auto op = mlir::dyn_cast<mlir::cf::CondBranchOp>(term)) {
-          auto trueDest = op.getTrueDest();
-          auto falseDest = op.getFalseDest();
-          auto cond = op.getCondition();
-          mlir::SmallVector<mlir::Value> trueArgs;
-          mlir::SmallVector<mlir::Value> falseArgs;
-          buildArgList(trueDest, info.outgoingPhiNodes, trueArgs);
-          buildArgList(falseDest, info.outgoingPhiNodes, falseArgs);
-          op.erase();
-          builder.create<mlir::cf::CondBranchOp>(builder.getUnknownLoc(), cond,
-                                                 trueDest, trueArgs, falseDest,
-                                                 falseArgs);
-        } else {
-          numba::reportError(llvm::Twine("Unhandled terminator: ") +
-                             term->getName().getStringRef());
-        }
+      builder.setInsertionPointToEnd(bb);
+
+      auto loc = builder.getUnknownLoc();
+      if (auto op = mlir::dyn_cast<mlir::cf::BranchOp>(term)) {
+        auto dest = op.getDest();
+        auto args = buildArgList(dest, info.outgoingPhiNodes);
+        op.erase();
+        builder.create<mlir::cf::BranchOp>(loc, dest, args);
+      } else if (auto op = mlir::dyn_cast<mlir::cf::CondBranchOp>(term)) {
+        auto trueDest = op.getTrueDest();
+        auto falseDest = op.getFalseDest();
+        auto cond = op.getCondition();
+        auto trueArgs = buildArgList(trueDest, info.outgoingPhiNodes);
+        auto falseArgs = buildArgList(falseDest, info.outgoingPhiNodes);
+        op.erase();
+        builder.create<mlir::cf::CondBranchOp>(loc, cond, trueDest, trueArgs,
+                                               falseDest, falseArgs);
+      } else {
+        numba::reportError(llvm::Twine("Unhandled terminator: ") +
+                           term->getName().getStringRef());
       }
     }
   }
