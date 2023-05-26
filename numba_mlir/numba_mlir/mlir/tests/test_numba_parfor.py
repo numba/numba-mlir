@@ -125,6 +125,7 @@ def _gen_tests():
         "test_three_d_array_reduction",  # We intentionally do not detect data races
         "test_two_d_array_reduction_reuse",  # We intentionally do not detect data races
         "test_two_d_array_reduction",  # We intentionally do not detect data races
+        "test_two_d_array_reduction_prod",  # We intentionally do not detect data races
         "test_parfor_slice27",  # Invalid phi in input IR
         "test_parfor_array_access2",  # Invalid phi in input IR
         "test_prange_nested_reduction1",  # Invalid phi in input IR
