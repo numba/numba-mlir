@@ -18,14 +18,12 @@ requirements:
     build:
         - {{ compiler('cxx') }}
         - {{ compiler('dpcpp') }}  >=2023.0  # [not osx]
-        - sysroot_linux-64 >=2.28  # [linux]
     host:
         - cmake >=3.23
         - mkl-devel >=2023.0
         - mkl-devel-dpcpp >=2023.0
         - ninja
-        - numba 0.57*
-        - numpy
+        - numba =0.57
         - pybind11
         - python
         - setuptools
