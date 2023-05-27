@@ -18,8 +18,6 @@ requirements:
     build:
         - {{ compiler('cxx') }}
         - {{ compiler('dpcpp') }}  >=2023.0  # [not osx]
-        - mkl-devel >=2023.0
-        - mkl-devel-dpcpp >=2023.0
     host:
         - cmake >=3.23
         - mkl-devel >=2023.0
