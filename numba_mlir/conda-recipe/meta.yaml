@@ -18,27 +18,25 @@ requirements:
     build:
         - {{ compiler('cxx') }}
         - {{ compiler('dpcpp') }}  >=2023.0  # [not osx]
-        - python
-        - ninja
-        - cmake
-        - pybind11
+        - sysroot_linux-64 >=2.28  # [linux]
+    host:
+        - cmake >=3.23
         - mkl-devel >=2023.0
         - mkl-devel-dpcpp >=2023.0
-        - setuptools
-        - zlib
-    host:
-        - python
-        - mkl-devel >=2022.2
-        - mkl-devel-dpcpp >=2022.2
-        - setuptools
+        - ninja
         - numba 0.57*
+        - numpy
+        - pybind11
+        - python
+        - setuptools
+        - wheel
         - zlib
     run:
-        - python
-        - numba 0.57*
-        - packaging
         - mkl >=2023.0
         - mkl-dpcpp >=2023.0
+        - numba =0.57
+        - packaging
+        - python
         - tbb >=2021.6.0
 
 test:
