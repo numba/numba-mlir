@@ -233,6 +233,10 @@ jobs:
           Rename-Item -Path "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\Common7\Tools\vsdevcmd\ext\perf_tools.bat" -NewName "perf_tools.bat.bak"
           Rename-Item -Path "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\Common7\Tools\vsdevcmd\ext\vssdk.bat" -NewName "vssdk.bat.bak"
 
+      - uses: ilammy/msvc-dev-cmd@v1
+        with:
+          vsversion : "2019"
+
       - name: Checkout repo
         uses: actions/checkout@v2
         with:
