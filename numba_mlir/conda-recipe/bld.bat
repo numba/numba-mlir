@@ -1,7 +1,10 @@
-copy /y "%RECIPE_DIR%"\MKLConfig.cmake "%BUILD_PREFIX%"\Library\lib\cmake\mkl
+echo %CONDA_PREFIX%
+echo %BUILD_PREFIX%
+
+copy /y "%RECIPE_DIR%"\MKLConfig.cmake "%CONDA_PREFIX%"\Library\lib\cmake\mkl
 if errorlevel 1 exit 1
 
-set "LIB=%BUILD_PREFIX%\Library\lib;%BUILD_PREFIX%\compiler\lib;%LIB%"
+set "LIB=%CONDA_PREFIX%\Library\lib;%CONDA_PREFIX%\compiler\lib;%LIB%"
 set "INCLUDE=%BUILD_PREFIX%\include;%INCLUDE%"
 
 pushd numba_mlir
