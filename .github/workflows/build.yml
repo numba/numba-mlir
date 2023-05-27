@@ -326,7 +326,7 @@ jobs:
       - name: Test wheels
         run: |
           cd numba_mlir_wheels
-          conda env create -y -n wheels-test-env --file="$env:PYTHON_ENV_FILE" python=${{ matrix.python }}
+          conda env create -n wheels-test-env --file="$env:PYTHON_ENV_FILE" python=${{ matrix.python }}
           conda info
           conda deactivate
           conda activate wheels-test-env
@@ -774,7 +774,7 @@ jobs:
 
         run: |
           cd numba_mlir_wheels
-          conda env create -y -n wheels-test-env --file=${PYTHON_ENV_FILE} python=${{ matrix.python }}
+          conda env create -n wheels-test-env --file=${PYTHON_ENV_FILE} python=${{ matrix.python }}
           conda info
           conda deactivate
           conda activate wheels-test-env
