@@ -238,6 +238,7 @@ jobs:
           use-only-tar-bz2: true
           run-post: false
           mamba-version: "*"
+          channels: intel, conda-forge
           activate-environment: test-env
           environment-file: ${{ env.PYTHON_ENV_FILE }}
           python-version: ${{ matrix.python }}
@@ -671,6 +672,7 @@ jobs:
           use-only-tar-bz2: true
           run-post: false
           mamba-version: "*"
+          channels: intel, conda-forge
           activate-environment: test-env
           environment-file: ${{ env.PYTHON_ENV_FILE }}
           python-version: ${{ matrix.python }}
