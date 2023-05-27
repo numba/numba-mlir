@@ -18,5 +18,4 @@ dependencies:
   - setuptools
   - tbb >=2021.6.0
   - zlib
-  - gxx_linux-64
   - dpcpp_linux-64

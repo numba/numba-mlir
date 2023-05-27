@@ -18,5 +18,4 @@ dependencies:
   - setuptools
   - tbb >=2021.6.0
   - zlib
-  - vs2019_win-64
   - dpcpp_win-64
