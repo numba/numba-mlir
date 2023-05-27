@@ -460,10 +460,6 @@ jobs:
         with:
           access_token: ${{ github.token }}
 
-      - name: Set pkgs_dirs
-        run: |
-          echo "pkgs_dirs: [~/.conda/pkgs]" >> ~/.condarc
-
       - name: Checkout repo
         uses: actions/checkout@v2
         with:
@@ -478,13 +474,16 @@ jobs:
           key:
             ${{ runner.os }}-conda-${{ env.CACHE_NUMBER }}-${{ hashFiles(env.CORE_ENV_FILE) }}
 
-      - name: Add conda to system path
-        run: echo $CONDA/bin >> $GITHUB_PATH
-
-      - name: Setup Environment
-        run: |
-          conda env update -n base -f $CORE_ENV_FILE --prune
-          conda list
+      - name: Setup conda
+        uses: conda-incubator/setup-miniconda@v2
+        with:
+          miniconda-version: "latest"
+          auto-update-conda: true
+          use-only-tar-bz2: true
+          run-post: false
+          mamba-version: "*"
+          activate-environment: test-env
+          environment-file: ${{ env.CORE_ENV_FILE }}
 
       - name: Setup Cache Vars
         run: |
@@ -652,12 +651,14 @@ jobs:
         with:
           access_token: ${{ github.token }}
 
-      - name: Set pkgs_dirs
-        run: |
-          echo "pkgs_dirs: [~/.conda/pkgs]" >> ~/.condarc
-
-      - name: Add conda to system path
-        run: echo $CONDA/bin >> $GITHUB_PATH
+      - name: Setup conda
+        uses: conda-incubator/setup-miniconda@v2
+        with:
+          auto-update-conda: true
+          use-only-tar-bz2: true
+          run-post: false
+          mamba-version: "*"
+          channels: intel,conda-forge
 
       - name: Checkout repo
         uses: actions/checkout@v2
