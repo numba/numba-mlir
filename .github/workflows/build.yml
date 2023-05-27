@@ -217,14 +217,21 @@ jobs:
         python: ["3.8", "3.9", "3.10"]
 
     steps:
-      - uses: ilammy/msvc-dev-cmd@v1
-        with:
-          vsversion : "2019"
 
       - name: Cancel Previous Runs
         uses: styfle/cancel-workflow-action@0.6.0
         with:
           access_token: ${{ github.token }}
+
+      - name: Cleanup vs files
+        run: |
+          Rename-Item -Path "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\Common7\Tools\vsdevcmd\ext\vsicvars.bat" -NewName "vsicvars.bat.bak"
+          Rename-Item -Path "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\Common7\Tools\vsdevcmd\ext\ConnectionManagerExe.bat" -NewName "ConnectionManagerExe.bat.bak"
+          Rename-Item -Path "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\Common7\Tools\vsdevcmd\ext\clang_cl.bat" -NewName "clang_cl.bat.bak"
+          Rename-Item -Path "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\Common7\Tools\vsdevcmd\ext\fsharp.bat" -NewName "fsharp.bat.bak"
+          Rename-Item -Path "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\Common7\Tools\vsdevcmd\ext\html_help.bat" -NewName "html_help.bat.bak"
+          Rename-Item -Path "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\Common7\Tools\vsdevcmd\ext\perf_tools.bat" -NewName "perf_tools.bat.bak"
+          Rename-Item -Path "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\Common7\Tools\vsdevcmd\ext\vssdk.bat" -NewName "vssdk.bat.bak"
 
       - name: Checkout repo
         uses: actions/checkout@v2
