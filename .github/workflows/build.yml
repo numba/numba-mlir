@@ -20,7 +20,7 @@ jobs:
   build_win:
     env:
       CORE_ENV_FILE: scripts/core-env-win.yml
-    name: Builds Numba-MLIR core on Windows
+    name: Builds Windows Numba-MLIR core
     runs-on: windows-2019
     timeout-minutes: 450
 
@@ -205,7 +205,7 @@ jobs:
           ninja check-numba-mlir
 
   build_win_python:
-    name: Builds Numba-MLIR on Windows
+    name: Builds Windows Numba-MLIR
     runs-on: windows-2019
     timeout-minutes: 450
     needs: build_win
@@ -335,7 +335,7 @@ jobs:
 
 
   build_win_conda_package:
-    name: Builds Numba-MLIR conda package on Windows
+    name: Builds Windows Numba-MLIR conda package
     runs-on: windows-2019
     timeout-minutes: 450
     needs: build_win
@@ -451,7 +451,7 @@ jobs:
   build_linux:
     env:
       CORE_ENV_FILE: scripts/core-env-linux.yml
-    name: Builds Numba-MLIR core on Linux
+    name: Builds Linux Numba-MLIR core
     runs-on: ubuntu-latest
     timeout-minutes: 450
 
@@ -636,7 +636,7 @@ jobs:
 
 
   build_linux_python:
-    name: Builds Numba-MLIR on Linux
+    name: Builds Linux Numba-MLIR
     runs-on: ubuntu-latest
     timeout-minutes: 450
     needs: build_linux
@@ -773,7 +773,7 @@ jobs:
 
 
   build_linux_conda_package:
-    name: Builds Numba-MLIR conda package on Linux
+    name: Builds Linux Numba-MLIR conda package
     runs-on: ubuntu-latest
     timeout-minutes: 450
     needs: build_linux
