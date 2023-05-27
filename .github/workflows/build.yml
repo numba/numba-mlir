@@ -226,6 +226,11 @@ jobs:
         with:
           access_token: ${{ github.token }}
 
+      - name: Checkout repo
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+
       - name: Setup conda
         uses: conda-incubator/setup-miniconda@v2
         with:
@@ -236,11 +241,6 @@ jobs:
           activate-environment: test-env
           environment-file: ${{ env.PYTHON_ENV_FILE }}
           python-version: ${{ matrix.python }}
-
-      - name: Checkout repo
-        uses: actions/checkout@v2
-        with:
-          fetch-depth: 0
 
       - name: Setup Cache Vars
         run: |
@@ -659,6 +659,11 @@ jobs:
         with:
           access_token: ${{ github.token }}
 
+      - name: Checkout repo
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+
       - name: Setup conda
         uses: conda-incubator/setup-miniconda@v2
         with:
@@ -669,11 +674,6 @@ jobs:
           activate-environment: test-env
           environment-file: ${{ env.PYTHON_ENV_FILE }}
           python-version: ${{ matrix.python }}
-
-      - name: Checkout repo
-        uses: actions/checkout@v2
-        with:
-          fetch-depth: 0
 
       - name: Setup Cache Vars
         run: |
