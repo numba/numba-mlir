@@ -736,7 +736,6 @@ jobs:
 
         run: |
           cd numba_mlir
-          source $CONDA/bin/activate test-env
           python $GITHUB_WORKSPACE/scripts/run_package_tests.py verbose
 
 
@@ -745,7 +744,6 @@ jobs:
 
         run: |
           cd numba_mlir
-          source $CONDA/bin/activate test-env
           conda install greenlet dpctl -c intel -c conda-forge
           conda list
           export NUMBA_MLIR_GPU_RUNTIME=sycl
@@ -759,7 +757,6 @@ jobs:
         run: |
           mkdir numba_mlir_wheels
           pushd numba_mlir_wheels
-          source $CONDA/bin/activate test-env
           export TBB_PATH=/home/runner/work/tbb/oneapi-tbb-${TBB_VER}
           export LLVM_PATH=/home/runner/work/llvm-mlir/_mlir_install
           export LEVEL_ZERO_DIR=/home/runner/work/level-zero/level-zero/level_zero_install
