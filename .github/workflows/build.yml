@@ -18,9 +18,9 @@ env:
 
 jobs:
   build_win:
+    name: Builds Windows Numba-MLIR core
     env:
       CORE_ENV_FILE: scripts/core-env-win.yml
-    name: Builds Windows Numba-MLIR core
     runs-on: windows-2019
     timeout-minutes: 450
 
@@ -206,6 +206,8 @@ jobs:
 
   build_win_python:
     name: Builds Windows Numba-MLIR
+    env:
+      PYTHON_ENV_FILE: scripts/python-env-win.yml
     runs-on: windows-2019
     timeout-minutes: 450
     needs: build_win
@@ -231,7 +233,9 @@ jobs:
           use-only-tar-bz2: true
           run-post: false
           mamba-version: "*"
-          channels: intel,conda-forge
+          activate-environment: test-env
+          environment-file: ${{ env.PYTHON_ENV_FILE }}
+          python-version: ${{ matrix.python }}
 
       - name: Checkout repo
         uses: actions/checkout@v2
@@ -276,9 +280,7 @@ jobs:
       - name: Build Python frontend
         run: |
           cd numba_mlir
-          conda create -y -n test-env python=${{ matrix.python }} "pip>=22" numba=0.57 numpy=1.22 "setuptools<65.6" scikit-learn pytest-xdist ninja scipy pybind11 pytest "tbb=$env:TBB_VER" cmake "mkl-devel-dpcpp>=2023.0.0" zlib dpcpp_win-64 -c conda-forge -c intel -c numba
           conda info
-          conda activate test-env
           echo "Conda prefix: $env:CONDA_PREFIX"
           echo "Patch broken Windows MKLConfig.cmake"
           cp "$env:GITHUB_WORKSPACE/numba_mlir/conda-recipe/MKLConfig.cmake" "$env:CONDA_PREFIX/Library/lib/cmake/mkl" -Force
@@ -300,14 +302,12 @@ jobs:
       - name: Test Python frontend
         run: |
           cd numba_mlir
-          conda activate test-env
           python "$env:GITHUB_WORKSPACE/scripts/run_package_tests.py" verbose
 
       - name: Build wheels
         run: |
           mkdir numba_mlir_wheels
           pushd numba_mlir_wheels
-          conda activate test-env
           $env:TBB_PATH=(Resolve-Path "$env:WORKSPACE/tbb/oneapi-tbb-$env:TBB_VER")
           $env:LEVEL_ZERO_DIR=(Resolve-Path "$env:WORKSPACE/level-zero/level-zero/level_zero_install")
           $env:LEVEL_ZERO_VERSION_CHECK_OFF="1"
@@ -327,6 +327,7 @@ jobs:
           cd numba_mlir_wheels
           conda create -y -n wheels-test-env python=${{ matrix.python }} numba=0.57 numpy=1.22 "setuptools<65.6" scikit-learn pytest-xdist ninja scipy pybind11 pytest "tbb=$env:TBB_VER" cmake "mkl-devel-dpcpp>=2023.0.0" dpcpp_win-64 -c conda-forge -c intel -c numba
           conda info
+          conda deactivate
           conda activate wheels-test-env
           conda list
           ls .
@@ -449,9 +450,9 @@ jobs:
 
 
   build_linux:
+    name: Builds Linux Numba-MLIR core
     env:
       CORE_ENV_FILE: scripts/core-env-linux.yml
-    name: Builds Linux Numba-MLIR core
     runs-on: ubuntu-20.04
     timeout-minutes: 450
 
@@ -640,6 +641,8 @@ jobs:
 
   build_linux_python:
     name: Builds Linux Numba-MLIR
+    env:
+      PYTHON_ENV_FILE: scripts/python-env-linux.yml
     runs-on: ubuntu-20.04
     timeout-minutes: 450
     needs: build_linux
@@ -663,7 +666,9 @@ jobs:
           use-only-tar-bz2: true
           run-post: false
           mamba-version: "*"
-          channels: intel,conda-forge
+          activate-environment: test-env
+          environment-file: ${{ env.PYTHON_ENV_FILE }}
+          python-version: ${{ matrix.python }}
 
       - name: Checkout repo
         uses: actions/checkout@v2
@@ -708,9 +713,7 @@ jobs:
 
         run: |
           cd numba_mlir
-          conda create -y -n test-env python=${{ matrix.python }} "pip>=22" numba=0.57 numpy=1.22 "setuptools<65.6" scikit-learn pytest-xdist ninja scipy pybind11 pytest tbb=${TBB_VER} cmake "mkl-devel-dpcpp>=2023.0.0" dpcpp_linux-64 -c conda-forge -c intel -c numba
           conda info
-          source $CONDA/bin/activate test-env
           conda install gxx_linux-64 -c conda-forge --override-channels
           conda list
           python -c "import numba; print('numba', numba.__version__)"
@@ -774,7 +777,8 @@ jobs:
           cd numba_mlir_wheels
           conda create -y -n wheels-test-env python=${{ matrix.python }} numba=0.57 numpy=1.22 "setuptools<65.6" scikit-learn pytest-xdist ninja scipy pybind11 pytest tbb=${TBB_VER} cmake "mkl-devel-dpcpp>=2023.0.0" dpcpp_linux-64 -c conda-forge -c intel -c numba
           conda info
-          source $CONDA/bin/activate wheels-test-env
+          conda deactivate
+          conda activate wheels-test-env
           conda list
           pip install *.whl
           python $GITHUB_WORKSPACE/scripts/run_package_tests.py verbose smoke

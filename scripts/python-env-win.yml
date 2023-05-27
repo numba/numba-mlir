@@ -1,0 +1,22 @@
+name: dev
+channels:
+  - intel
+  - conda-forge
+  - numba
+dependencies:
+  - cmake >=3.23
+  - lit
+  - mkl-devel-dpcpp >=2023.0.0
+  - ninja
+  - numba 0.57
+  - numpy 1.22
+  - pybind11
+  - pytest
+  - pytest-xdist
+  - scikit-learn
+  - scipy
+  - setuptools
+  - tbb >= 2021.6.0
+  - zlib
+  - vs2019_win-64
+  - dpcpp_win-64
