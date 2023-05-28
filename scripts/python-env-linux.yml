@@ -9,7 +9,8 @@ dependencies:
   - lit
   - mkl-devel-dpcpp >=2023.0.0
   - ninja
-  - numba =0.57
+  - numba::numba =0.57
+  - numba::llvmlite
   - intel::numpy =1.22
   - pybind11
   - pytest
