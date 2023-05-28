@@ -4,6 +4,7 @@ channels:
   - intel
   - numba
 dependencies:
+  - intelpython
   - cmake >=3.23
   - lit
   - mkl-devel-dpcpp >=2023.0.0
