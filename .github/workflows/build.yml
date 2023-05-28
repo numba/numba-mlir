@@ -324,11 +324,12 @@ jobs:
 
       - name: Test wheels
         run: |
-          cd numba_mlir_wheels
-          conda env create -n wheels-test-env --file="$env:PYTHON_ENV_FILE" python=${{ matrix.python }}
           conda info
+          cd numba_mlir_wheels
+          conda create -n wheels-test-env python=${{ matrix.python }} -c conda-forge
           conda deactivate
           conda activate wheels-test-env
+          conda env update --file --file="$env:PYTHON_ENV_FILE" --prune
           conda list
           ls .
           ls *.whl | Foreach-Object { pip install $_.FullName }
@@ -771,11 +772,13 @@ jobs:
         shell: bash -l {0}
 
         run: |
-          cd numba_mlir_wheels
-          conda env create -n wheels-test-env --file=${PYTHON_ENV_FILE} python=${{ matrix.python }}
           conda info
+          cd numba_mlir_wheels
+          conda create -n wheels-test-env python=${{ matrix.python }} -c conda-forge
+          conda activate conda-test-env
           conda deactivate
           conda activate wheels-test-env
+          conda env update --file --file=${PYTHON_ENV_FILE} --prune
           conda list
           pip install *.whl
           python $GITHUB_WORKSPACE/scripts/run_package_tests.py verbose smoke
