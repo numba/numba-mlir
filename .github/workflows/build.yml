@@ -283,6 +283,7 @@ jobs:
         run: |
           cd numba_mlir
           conda info
+          conda remove -y libopenblas -c conda-forge -c intel
           echo "Conda prefix: $env:CONDA_PREFIX"
           echo "Patch broken Windows MKLConfig.cmake"
           cp "$env:GITHUB_WORKSPACE/numba_mlir/conda-recipe/MKLConfig.cmake" "$env:CONDA_PREFIX/Library/lib/cmake/mkl" -Force
