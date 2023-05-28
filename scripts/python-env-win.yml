@@ -3,6 +3,7 @@ channels:
   - conda-forge
   - intel
   - numba
+  - nodefaults
 dependencies:
   - cmake >=3.23
   - lit
