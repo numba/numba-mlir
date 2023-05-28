@@ -56,7 +56,6 @@ jobs:
           use-only-tar-bz2: true
           run-post: false
           mamba-version: "*"
-          channels: conda-forge, intel
           activate-environment: test-env
           environment-file: ${{ env.CORE_ENV_FILE }}
           python-version: "3.10"
@@ -239,7 +238,6 @@ jobs:
           use-only-tar-bz2: true
           run-post: false
           mamba-version: "*"
-          channels: conda-forge, intel
           activate-environment: test-env
           environment-file: ${{ env.PYTHON_ENV_FILE }}
           python-version: ${{ matrix.python }}
@@ -488,7 +486,6 @@ jobs:
           use-only-tar-bz2: true
           run-post: false
           mamba-version: "*"
-          channels: conda-forge, intel
           activate-environment: test-env
           environment-file: ${{ env.CORE_ENV_FILE }}
           python-version: "3.10"
@@ -676,7 +673,6 @@ jobs:
           use-only-tar-bz2: true
           run-post: false
           mamba-version: "*"
-          channels: conda-forge, intel
           activate-environment: test-env
           environment-file: ${{ env.PYTHON_ENV_FILE }}
           python-version: ${{ matrix.python }}
