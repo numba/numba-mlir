@@ -325,12 +325,12 @@ jobs:
       - name: Test wheels
         run: |
           conda info
-          cd numba_mlir_wheels
           conda create -n wheels-test-env python=${{ matrix.python }} -c conda-forge
           conda deactivate
           conda activate wheels-test-env
           conda env update --name wheels-test-env --file="$env:PYTHON_ENV_FILE" --prune
           conda list
+          cd numba_mlir_wheels
           ls .
           ls *.whl | Foreach-Object { pip install $_.FullName }
           python "$env:GITHUB_WORKSPACE/scripts/run_package_tests.py" verbose smoke
@@ -431,11 +431,11 @@ jobs:
 
       - name: Test conda package
         run: |
-          cd numba_mlir_conda/win-64
           conda create -y -n conda-test-env python=${{ matrix.python }} numba=0.57 numpy=1.22 scikit-learn pytest-xdist scipy pytest "tbb=$env:TBB_VER" "mkl-dpcpp>=2023.1.0" -c conda-forge -c intel -c numba
           conda info
           conda activate conda-test-env
           conda list
+          cd numba_mlir_conda/win-64
           ls .
           ls *.tar.bz2 | Foreach-Object { conda install $_.FullName }
           python "$env:GITHUB_WORKSPACE/scripts/run_package_tests.py" verbose smoke
@@ -773,12 +773,12 @@ jobs:
 
         run: |
           conda info
-          cd numba_mlir_wheels
           conda create -n wheels-test-env python=${{ matrix.python }} -c conda-forge
           conda deactivate
           conda activate wheels-test-env
           conda env update --name wheels-test-env --file=${PYTHON_ENV_FILE} --prune
           conda list
+          cd numba_mlir_wheels
           pip install *.whl
           python $GITHUB_WORKSPACE/scripts/run_package_tests.py verbose smoke
 
@@ -871,11 +871,11 @@ jobs:
         shell: bash -l {0}
 
         run: |
-          cd numba_mlir_conda/linux-64
           conda create -y -n conda-test-env python=${{ matrix.python }} numba=0.57 numpy=1.22 scikit-learn pytest-xdist scipy pytest tbb=${TBB_VER} "mkl-dpcpp>=2023.1.0" -c conda-forge -c intel -c numba
           conda info
           conda activate conda-test-env
           conda list
+          cd numba_mlir_conda/linux-64
           conda install numba-mlir-*.tar.bz2
           python $GITHUB_WORKSPACE/scripts/run_package_tests.py verbose smoke
 
