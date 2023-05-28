@@ -3,7 +3,6 @@ channels:
   - conda-forge
   - intel
   - numba
-  - nodefaults
 dependencies:
   - cmake >=3.23
   - lit
@@ -15,7 +14,7 @@ dependencies:
   - pybind11
   - pytest
   - pytest-xdist
-  - intel::scikit-learn
+  - scikit-learn
   - scipy
   - setuptools
   - tbb >=2021.6.0
