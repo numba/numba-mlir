@@ -56,6 +56,7 @@ jobs:
           use-only-tar-bz2: true
           run-post: false
           mamba-version: "*"
+          channels: conda-forge, intel
           activate-environment: test-env
           environment-file: ${{ env.CORE_ENV_FILE }}
           python-version: "3.10"
@@ -238,6 +239,7 @@ jobs:
           use-only-tar-bz2: true
           run-post: false
           mamba-version: "*"
+          channels: conda-forge, intel
           activate-environment: test-env
           environment-file: ${{ env.PYTHON_ENV_FILE }}
           python-version: ${{ matrix.python }}
@@ -361,7 +363,7 @@ jobs:
           use-only-tar-bz2: true
           run-post: false
           mamba-version: "*"
-          channels: intel,conda-forge
+          channels: conda-forge, intel
 
       - name: Checkout repo
         uses: actions/checkout@v2
@@ -485,6 +487,7 @@ jobs:
           use-only-tar-bz2: true
           run-post: false
           mamba-version: "*"
+          channels: conda-forge, intel
           activate-environment: test-env
           environment-file: ${{ env.CORE_ENV_FILE }}
           python-version: "3.10"
@@ -672,6 +675,7 @@ jobs:
           use-only-tar-bz2: true
           run-post: false
           mamba-version: "*"
+          channels: conda-forge, intel
           activate-environment: test-env
           environment-file: ${{ env.PYTHON_ENV_FILE }}
           python-version: ${{ matrix.python }}
@@ -808,7 +812,7 @@ jobs:
           use-only-tar-bz2: true
           run-post: false
           mamba-version: "*"
-          channels: intel,conda-forge
+          channels: conda-forge, intel
 
       - name: Checkout repo
         uses: actions/checkout@v2
@@ -903,7 +907,7 @@ jobs:
           auto-activate-base: true
           activate-environment: ""
           mamba-version: "*"
-          channels: intel,conda-forge
+          channels: conda-forge, intel
 
       - name: Add conda to system path
         run: echo $CONDA/bin >> $GITHUB_PATH
@@ -943,7 +947,7 @@ jobs:
           auto-activate-base: true
           activate-environment: ""
           mamba-version: "*"
-          channels: intel,conda-forge
+          channels: conda-forge, intel
 
       - name: Install anaconda-client
         run: conda install anaconda-client
