@@ -18,7 +18,7 @@ requirements:
     build:
         - {{ compiler('cxx') }}
         - {{ compiler('dpcpp') }}  >=2023.1  # [not osx]
-        - sysroot_linux-64 >=2.28  # [linux]
+        - sysroot_linux-64 >=2.17  # [linux]
     host:
         - cmake >=3.23
         - mkl-devel >=2023.1
