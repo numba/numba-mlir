@@ -2,7 +2,6 @@ name: dev
 channels:
   - intel
   - conda-forge
-  - numba
 dependencies:
   - cmake >=3.23
   - lit
