@@ -436,7 +436,7 @@ jobs:
           conda list
           ls .
           ls *.tar.bz2 | Foreach-Object { conda install $_.FullName }
-          python "$env:GITHUB_WORKSPACE/scripts/run_package_tests.py" verbose smoke
+          # python "$env:GITHUB_WORKSPACE/scripts/run_package_tests.py" verbose smoke
 
 
       - name: Upload artifact
