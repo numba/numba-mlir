@@ -430,13 +430,13 @@ jobs:
       - name: Test conda package
         run: |
           cd numba_mlir_conda/win-64
-          conda create -y -n conda-test-env python=${{ matrix.python }} numba=0.57 numpy=1.22 "setuptools<65.6" scikit-learn pytest-xdist ninja scipy pybind11 pytest "tbb=$env:TBB_VER" cmake "mkl-devel-dpcpp>=2023.0.0" dpcpp_win-64 -c conda-forge -c intel -c numba
+          conda create -y -n conda-test-env python=${{ matrix.python }} numba=0.57 numpy=1.22 scikit-learn pytest-xdist scipy pytest "tbb=$env:TBB_VER" "mkl-dpcpp>=2023.1.0" -c intel -c conda-forge -c numba
           conda info
           conda activate conda-test-env
           conda list
           ls .
           ls *.tar.bz2 | Foreach-Object { conda install $_.FullName }
-          # python "$env:GITHUB_WORKSPACE/scripts/run_package_tests.py" verbose smoke
+          python "$env:GITHUB_WORKSPACE/scripts/run_package_tests.py" verbose smoke
 
 
       - name: Upload artifact
@@ -869,7 +869,7 @@ jobs:
 
         run: |
           cd numba_mlir_conda/linux-64
-          conda create -y -n conda-test-env python=${{ matrix.python }} numba=0.57 numpy=1.22 "setuptools<65.6" scikit-learn pytest-xdist ninja scipy pybind11 pytest tbb=${TBB_VER} cmake "mkl-devel-dpcpp>=2023.0.0" dpcpp_linux-64 -c conda-forge -c intel -c numba
+          conda create -y -n conda-test-env python=${{ matrix.python }} numba=0.57 numpy=1.22 scikit-learn pytest-xdist scipy pytest tbb=${TBB_VER} "mkl-dpcpp>=2023.1.0" -c intel -c conda-forge -c numba
           conda info
           source $CONDA/bin/activate conda-test-env
           conda list
