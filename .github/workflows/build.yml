@@ -430,7 +430,7 @@ jobs:
       - name: Test conda package
         run: |
           cd numba_mlir_conda/win-64
-          conda create -y -n conda-test-env python=${{ matrix.python }} numba=0.57 numpy=1.22 scikit-learn pytest-xdist scipy pytest "tbb=$env:TBB_VER" "mkl-dpcpp>=2023.1.0" -c intel -c conda-forge -c numba
+          conda create -y -n conda-test-env python=${{ matrix.python }} numba=0.57 numpy=1.22 scikit-learn pytest-xdist scipy pytest "tbb=$env:TBB_VER" "mkl-dpcpp>=2023.1.0" -c conda-forge -c intel -c numba
           conda info
           conda activate conda-test-env
           conda list
@@ -869,7 +869,7 @@ jobs:
 
         run: |
           cd numba_mlir_conda/linux-64
-          conda create -y -n conda-test-env python=${{ matrix.python }} numba=0.57 numpy=1.22 scikit-learn pytest-xdist scipy pytest tbb=${TBB_VER} "mkl-dpcpp>=2023.1.0" -c intel -c conda-forge -c numba
+          conda create -y -n conda-test-env python=${{ matrix.python }} numba=0.57 numpy=1.22 scikit-learn pytest-xdist scipy pytest tbb=${TBB_VER} "mkl-dpcpp>=2023.1.0" -c conda-forge -c intel -c numba
           conda info
           source $CONDA/bin/activate conda-test-env
           conda list
