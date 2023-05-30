@@ -163,6 +163,7 @@ def build_runtime(install_dir):
         "-DNUMBA_MLIR_ENABLE_NUMBA_FE=ON",
         "-DNUMBA_MLIR_ENABLE_TBB_SUPPORT=ON",
         "-DLLVM_ENABLE_ZSTD=OFF",
+        "-DPYBIND11_FINDPYTHON=ON",
     ]
 
     if NUMBA_MLIR_USE_SYCL is not None:
