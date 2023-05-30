@@ -165,7 +165,7 @@ def build_runtime(install_dir):
         "-DNUMBA_MLIR_ENABLE_NUMBA_FE=ON",
         "-DNUMBA_MLIR_ENABLE_TBB_SUPPORT=ON",
         "-DLLVM_ENABLE_ZSTD=OFF",
-        f'-DPYTHON_EXECUTABLE="{python_path}"',
+        f"-DPYTHON_EXECUTABLE={python_path}",
     ]
 
     if NUMBA_MLIR_USE_SYCL is not None:
