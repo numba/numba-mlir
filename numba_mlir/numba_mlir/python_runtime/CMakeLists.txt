@@ -4,7 +4,8 @@
 
 project(numba-mlir-python-runtime LANGUAGES CXX C)
 
-find_package (Python3 COMPONENTS Development REQUIRED)
+# Use pybind11 cmake as it more robust than find_package(Python3)
+find_package(pybind11 REQUIRED)
 
 include(GenerateExportHeader)
 
@@ -19,7 +20,7 @@ set(HEADERS_LIST
 add_library(${PROJECT_NAME} SHARED ${SOURCES_LIST} ${HEADERS_LIST})
 generate_export_header(${PROJECT_NAME})
 
-target_link_libraries(${PROJECT_NAME} PRIVATE Python3::Python)
+target_link_libraries(${PROJECT_NAME} PRIVATE pybind11::module)
 
 if (NOT Python3_NumPy_INCLUDE_DIRS)
     message(FATAL_ERROR "Python3_NumPy_INCLUDE_DIRS is not set")
