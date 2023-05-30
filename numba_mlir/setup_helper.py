@@ -2,6 +2,7 @@
 #
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+import sys
 import os
 import shutil
 import tempfile
@@ -152,6 +153,7 @@ def build_runtime(install_dir):
 
     NUMPY_INCLUDE_DIR = numpy.get_include()
 
+    python_path = sys.executable
     cmake_cmd += [
         "-DCMAKE_BUILD_TYPE=Release",
         "-DLLVM_DIR=" + LLVM_DIR,
@@ -163,6 +165,7 @@ def build_runtime(install_dir):
         "-DNUMBA_MLIR_ENABLE_NUMBA_FE=ON",
         "-DNUMBA_MLIR_ENABLE_TBB_SUPPORT=ON",
         "-DLLVM_ENABLE_ZSTD=OFF",
+        f"-DPYTHON_EXECUTABLE={python_path}",
     ]
 
     if NUMBA_MLIR_USE_SYCL is not None:
