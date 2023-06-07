@@ -1096,7 +1096,6 @@ def test_array_bounds3():
         assert ir.count("cmpi") == 0, ir
 
 
-@pytest.mark.xfail(reason="Need to improve CmpLoopBoundsSimplify")
 def test_array_bounds4():
     def py_func(a):
         res = 0

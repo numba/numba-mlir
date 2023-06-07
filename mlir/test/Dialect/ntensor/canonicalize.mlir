@@ -73,18 +73,15 @@ func.func @resolve_slice_propagate(%arg: index) -> (index, index, index, index) 
 }
 // CHECK-LABEL: func @resolve_slice_propagate
 //  CHECK-SAME:   (%[[ARG:.*]]: index)
-//  CHECK-NEXT:   %[[C2:.*]] = arith.constant 2 : index
+//  CHECK-NEXT:   %[[C8:.*]] = arith.constant -8 : index
 //  CHECK-NEXT:   %[[BEGIN:.*]] = arith.constant 10 : index
 //  CHECK-NEXT:   %[[END:.*]] = arith.constant 20 : index
 //  CHECK-NEXT:   %[[STEP:.*]] = arith.constant 3 : index
-//  CHECK-NEXT:   %[[CMP1:.*]] = arith.cmpi sle, %[[ARG]], %[[BEGIN]] : index
-//  CHECK-NEXT:   %[[BEGIN2:.*]] = arith.select %[[CMP1]], %[[ARG]], %[[BEGIN]] : index
 //  CHECK-NEXT:   %[[CMP2:.*]] = arith.cmpi sle, %[[ARG]], %[[END]] : index
 //  CHECK-NEXT:   %[[END2:.*]] = arith.select %[[CMP2]], %[[ARG]], %[[END]] : index
-//  CHECK-NEXT:   %[[V4:.*]] = arith.subi %[[END2]], %1 : index
-//  CHECK-NEXT:   %[[V5:.*]] = arith.addi %[[V4]], %[[C2]] : index
+//  CHECK-NEXT:   %[[V5:.*]] = arith.addi %[[END2]], %[[C8]] : index
 //  CHECK-NEXT:   %[[COUNT:.*]] = arith.divui %[[V5]], %[[STEP]] : index
-//  CHECK-NEXT:   return %[[BEGIN2]], %[[END2]], %[[STEP]], %[[COUNT]] : index, index, index, index
+//  CHECK-NEXT:   return %[[BEGIN]], %[[END2]], %[[STEP]], %[[COUNT]] : index, index, index, index
 
 // -----
 
@@ -96,9 +93,7 @@ func.func @resolve_index_propagate(%arg: index) -> index{
 // CHECK-LABEL: func @resolve_index_propagate
 //  CHECK-SAME:   (%[[ARG:.*]]: index)
 //  CHECK-NEXT:   %[[BEGIN:.*]] = arith.constant 10 : index
-//  CHECK-NEXT:   %[[CMP1:.*]] = arith.cmpi sle, %[[ARG]], %[[BEGIN]] : index
-//  CHECK-NEXT:   %[[BEGIN2:.*]] = arith.select %[[CMP1]], %[[ARG]], %[[BEGIN]] : index
-//  CHECK-NEXT:   return %[[BEGIN2]] : index
+//  CHECK-NEXT:   return %[[BEGIN]] : index
 
 // -----
 
