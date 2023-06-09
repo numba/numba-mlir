@@ -858,9 +858,8 @@ protected:
     auto kwn = op.getKwNames();
     llvm::SmallVector<llvm::StringRef> kwNames;
     kwNames.reserve(kwn.size());
-    for (auto name : kwn.getAsValueRange<mlir::StringAttr>()) {
+    for (auto name : kwn.getAsValueRange<mlir::StringAttr>())
       kwNames.emplace_back(name);
-    }
 
     auto mod = op->getParentOfType<mlir::ModuleOp>();
     assert(mod);
