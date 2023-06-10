@@ -240,14 +240,35 @@ struct UpliftMinMax : public mlir::OpRewritePattern<mlir::arith::SelectOp> {
   }
 };
 
+template <typename Op> static bool isValidForFMA(Op op) {
+  return static_cast<bool>(op.getFastmath() &
+                           mlir::arith::FastMathFlags::contract);
+}
+
+static mlir::arith::FastMathFlags fmfIntersect(mlir::arith::FastMathFlags a,
+                                               mlir::arith::FastMathFlags b) {
+  auto res = mlir::arith::FastMathFlags::none;
+  const mlir::arith::FastMathFlags flags[] = {
+      mlir::arith::FastMathFlags::reassoc, mlir::arith::FastMathFlags::nnan,
+      mlir::arith::FastMathFlags::ninf,    mlir::arith::FastMathFlags::nsz,
+      mlir::arith::FastMathFlags::arcp,    mlir::arith::FastMathFlags::contract,
+      mlir::arith::FastMathFlags::afn,
+  };
+
+  for (auto flag : flags)
+    if (static_cast<bool>(a & flag) && static_cast<bool>(b & flag))
+      res = res | flag;
+
+  return res;
+}
+
 struct UpliftFma : public mlir::OpRewritePattern<mlir::arith::AddFOp> {
   using OpRewritePattern::OpRewritePattern;
 
   mlir::LogicalResult
   matchAndRewrite(mlir::arith::AddFOp op,
                   mlir::PatternRewriter &rewriter) const override {
-    auto func = op->getParentOfType<mlir::func::FuncOp>();
-    if (!func || !func->hasAttr(numba::util::attributes::getFastmathName()))
+    if (!isValidForFMA(op))
       return mlir::failure();
 
     mlir::Value c;
@@ -260,9 +281,13 @@ struct UpliftFma : public mlir::OpRewritePattern<mlir::arith::AddFOp> {
       return mlir::failure();
     }
 
+    if (!isValidForFMA(ab))
+      return mlir::failure();
+
     auto a = ab.getLhs();
     auto b = ab.getRhs();
-    rewriter.replaceOpWithNewOp<mlir::math::FmaOp>(op, a, b, c);
+    auto fmf = fmfIntersect(op.getFastmath(), ab.getFastmath());
+    rewriter.replaceOpWithNewOp<mlir::math::FmaOp>(op, a, b, c, fmf);
     return mlir::success();
   }
 };
