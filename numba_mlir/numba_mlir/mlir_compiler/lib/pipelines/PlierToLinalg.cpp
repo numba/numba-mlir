@@ -2021,6 +2021,34 @@ struct MarkInputShapesRanges
   }
 };
 
+struct PropagateFastmathFlags
+    : public mlir::PassWrapper<PropagateFastmathFlags,
+                               mlir::OperationPass<mlir::func::FuncOp>> {
+  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(PropagateFastmathFlags)
+
+  virtual void
+  getDependentDialects(mlir::DialectRegistry &registry) const override {
+    registry.insert<numba::util::NumbaUtilDialect>();
+  }
+
+  void runOnOperation() override {
+    auto func = getOperation();
+    if (!func->hasAttr(numba::util::attributes::getFastmathName()))
+      return markAllAnalysesPreserved();
+
+    auto newFmf = mlir::arith::FastMathFlagsAttr::get(
+        &getContext(), mlir::arith::FastMathFlags::fast);
+    auto visitor = [&](mlir::arith::ArithFastMathInterface fmi) {
+      if (fmi.getFastMathFlagsAttr() == newFmf)
+        return;
+
+      auto attrName = fmi.getFastMathAttrName();
+      fmi->setAttr(attrName, newFmf);
+    };
+    func->walk(visitor);
+  }
+};
+
 struct ResolveNumpyFuncsPass
     : public mlir::PassWrapper<ResolveNumpyFuncsPass,
                                mlir::OperationPass<void>> {
@@ -3298,6 +3326,8 @@ static void populatePlierToLinalgOptPipeline(mlir::OpPassManager &pm) {
 
   pm.addPass(numba::createShapeIntegerRangePropagationPass());
   pm.addPass(std::make_unique<MarkArgsRestrictPass>());
+  pm.addNestedPass<mlir::func::FuncOp>(
+      std::make_unique<PropagateFastmathFlags>());
   pm.addPass(numba::createCompositePass(
       "PostLinalgOptPass", [](mlir::OpPassManager &p) {
         p.addPass(numba::createNormalizeMemrefArgsPass());
@@ -3315,6 +3345,8 @@ static void populatePlierToLinalgOptPipeline(mlir::OpPassManager &pm) {
         p.addPass(numba::createRemoveUnusedArgsPass());
       }));
 
+  pm.addNestedPass<mlir::func::FuncOp>(
+      std::make_unique<PropagateFastmathFlags>());
   // Uplifting FMAs con interfere with other optimizations, like loop reduction
   // uplifting. Move it after main optimization pass.
   pm.addNestedPass<mlir::func::FuncOp>(numba::createUpliftFMAPass());
