@@ -408,6 +408,20 @@ def test_indirect_call_inline():
         assert ir.count("call @") == 0, ir
 
 
+@pytest.mark.parametrize("arg", [(), (1,), (1, 2), (1, 2.5)])
+def test_indirect_call_tuple(arg):
+    def inner_func(a):
+        return a
+
+    def func(func, a):
+        return func(a)
+
+    jit_inner_func = njit(inner_func)
+    jit_func = njit(func)
+
+    assert_equal(func(inner_func, arg), jit_func(jit_inner_func, arg))
+
+
 def test_none_args():
     def py_func(a, b, c, d):
         return b + d

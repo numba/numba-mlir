@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 from numba.core.untyped_passes import ReconstructSSA
-from numba.core.typed_passes import NopythonTypeInference, AnnotateTypes
+from numba.core.typed_passes import NopythonTypeInference
 from numba.core.compiler import (
     CompilerBase,
     DefaultPassBuilder,
@@ -26,7 +26,6 @@ class MlirTempCompiler(CompilerBase):  # custom compiler extends from CompilerBa
 
         pm.add_pass(ReconstructSSA, "ssa")
         pm.add_pass(NopythonTypeInference, "nopython frontend")
-        pm.add_pass(AnnotateTypes, "annotate types")
         pm.add_pass(MlirBackendInner, "mlir backend")
 
         pm.finalize()

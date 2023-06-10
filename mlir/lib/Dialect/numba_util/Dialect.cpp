@@ -1597,7 +1597,7 @@ struct SignCastIfPropagate : public mlir::OpRewritePattern<mlir::scf::IfOp> {
     auto thenYield = op.thenYield();
     auto elseYield = op.elseYield();
 
-    unsigned idx;
+    unsigned idx = 0;
     CastOp castOp;
     numba::util::UndefOp undefOp;
     for (auto &&[i, args] : llvm::enumerate(
