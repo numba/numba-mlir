@@ -96,15 +96,16 @@ static py::object mapType(const py::handle &typesMod, mlir::Type type) {
   }
 
   if (auto t = type.dyn_cast<mlir::TupleType>()) {
-    py::tuple ret(t.size());
+    py::tuple types(t.size());
     for (auto &&[i, val] : llvm::enumerate(t.getTypes())) {
       auto inner = mapType(typesMod, val);
       if (!inner)
         return {};
 
-      ret[i] = std::move(inner);
+      types[i] = std::move(inner);
     }
-    return std::move(ret);
+    auto tupleType = typesMod.attr("Tuple");
+    return tupleType(types);
   }
 
   if (auto dtype = type.dyn_cast<numba::util::TypeVarType>()) {
