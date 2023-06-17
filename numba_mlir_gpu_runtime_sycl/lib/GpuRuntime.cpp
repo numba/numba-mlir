@@ -81,7 +81,7 @@ class Stream : public numba::GPUStreamInterface {
 public:
   Stream(size_t eventsCount, const char *devName)
       : deviceName(devName ? devName : "") {
-    queue = sycl::queue{sycl::device{getDeviceSelector(devName)}};
+    queue = sycl::queue{sycl::device{getDeviceSelector(deviceName)}};
 
     if (eventsCount > 0)
       events = std::make_unique<sycl::event[]>(eventsCount);
