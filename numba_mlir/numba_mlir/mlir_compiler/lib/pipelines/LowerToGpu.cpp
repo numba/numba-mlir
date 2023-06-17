@@ -1884,137 +1884,6 @@ struct GPUToLLVMPass
   }
 };
 
-static bool isI32IndexCast(mlir::Operation *op) {
-  assert(op);
-  auto cast = mlir::dyn_cast<mlir::arith::IndexCastOp>(op);
-  if (!cast)
-    return false;
-
-  auto resType = mlir::dyn_cast<mlir::IntegerType>(cast.getResult().getType());
-  return resType && resType.getWidth() <= 32;
-}
-
-template <typename IdOp>
-struct GPUGetIdRangeReduce : public mlir::OpRewritePattern<IdOp> {
-  using mlir::OpRewritePattern<IdOp>::OpRewritePattern;
-
-  mlir::LogicalResult
-  matchAndRewrite(IdOp op, mlir::PatternRewriter &rewriter) const override {
-    auto val = op.getResult();
-    mlir::Value newCastOp;
-    auto loc = op.getLoc();
-    for (auto &use : val.getUses()) {
-      auto owner = use.getOwner();
-      if (isI32IndexCast(owner))
-        continue;
-
-      if (!newCastOp) {
-        mlir::OpBuilder::InsertionGuard g(rewriter);
-        rewriter.setInsertionPointAfter(op);
-        auto i32 = rewriter.getI32Type();
-        mlir::Value newVal =
-            rewriter.create<mlir::arith::IndexCastOp>(loc, i32, val);
-        newCastOp = rewriter.create<mlir::arith::IndexCastOp>(
-            loc, val.getType(), newVal);
-      }
-
-      rewriter.updateRootInPlace(owner, [&] { use.set(newCastOp); });
-    }
-    return mlir::success(static_cast<bool>(newCastOp));
-  }
-};
-
-struct CmpIOfIndexCast : public mlir::OpRewritePattern<mlir::arith::CmpIOp> {
-  using OpRewritePattern::OpRewritePattern;
-
-  mlir::LogicalResult
-  matchAndRewrite(mlir::arith::CmpIOp op,
-                  mlir::PatternRewriter &rewriter) const override {
-    auto rhs = op.getRhs();
-    if (!mlir::isa<mlir::IndexType>(rhs.getType()))
-      return mlir::failure();
-
-    auto lhs = op.getLhs();
-
-    mlir::Type newType;
-    if (auto cast = rhs.getDefiningOp<mlir::arith::IndexCastOp>()) {
-      newType = cast.getIn().getType();
-    } else if (auto cast = lhs.getDefiningOp<mlir::arith::IndexCastOp>()) {
-      newType = cast.getIn().getType();
-    } else {
-      return mlir::failure();
-    }
-
-    auto loc = op.getLoc();
-    rhs = rewriter.create<mlir::arith::IndexCastOp>(loc, newType, rhs);
-    lhs = rewriter.create<mlir::arith::IndexCastOp>(loc, newType, lhs);
-    rewriter.replaceOpWithNewOp<mlir::arith::CmpIOp>(op, op.getPredicate(), lhs,
-                                                     rhs);
-    return mlir::success();
-  }
-};
-
-struct IndexCastOfIndexcast
-    : public mlir::OpRewritePattern<mlir::arith::IndexCastOp> {
-  using OpRewritePattern::OpRewritePattern;
-
-  mlir::LogicalResult
-  matchAndRewrite(mlir::arith::IndexCastOp op,
-                  mlir::PatternRewriter &rewriter) const override {
-    auto mid = op.getIn();
-    if (!mlir::isa<mlir::IndexType>(mid.getType()))
-      return mlir::failure();
-
-    auto prevCast = mid.getDefiningOp<mlir::arith::IndexCastOp>();
-    if (!prevCast)
-      return mlir::failure();
-
-    auto src = prevCast.getIn();
-
-    auto srcType = mlir::dyn_cast<mlir::IntegerType>(src.getType());
-    if (!srcType)
-      return mlir::failure();
-
-    auto dstType = mlir::dyn_cast<mlir::IntegerType>(op.getResult().getType());
-    if (!dstType)
-      return mlir::failure();
-
-    if (srcType.getWidth() < dstType.getWidth()) {
-      rewriter.replaceOpWithNewOp<mlir::arith::ExtSIOp>(op, dstType, src);
-    } else if (srcType.getWidth() > dstType.getWidth()) {
-      rewriter.replaceOpWithNewOp<mlir::arith::TruncIOp>(op, dstType, src);
-    } else {
-      rewriter.replaceOp(op, src);
-    }
-    return mlir::success();
-  }
-};
-
-struct GPURangeOptPass
-    : public mlir::PassWrapper<GPURangeOptPass, mlir::OperationPass<void>> {
-  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(GPURangeOptPass)
-
-  void runOnOperation() override {
-    auto *ctx = &getContext();
-    mlir::RewritePatternSet patterns(ctx);
-
-    patterns.insert<GPUGetIdRangeReduce<mlir::gpu::GlobalIdOp>,
-                    GPUGetIdRangeReduce<mlir::gpu::BlockIdOp>,
-                    GPUGetIdRangeReduce<mlir::gpu::ThreadIdOp>,
-                    GPUGetIdRangeReduce<mlir::gpu::GridDimOp>,
-                    GPUGetIdRangeReduce<mlir::gpu::BlockDimOp>, CmpIOfIndexCast,
-                    IndexCastOfIndexcast>(ctx);
-
-    const unsigned supportedBitWidths[] = {8, 16, 32};
-    mlir::arith::populateArithIntNarrowingPatterns(patterns,
-                                                   {supportedBitWidths});
-
-    if (mlir::failed(mlir::applyPatternsAndFoldGreedily(getOperation(),
-                                                        std::move(patterns))))
-      return signalPassFailure();
-  }
-};
-
 static std::optional<mlir::spirv::Version> mapSpirvVersion(uint16_t major,
                                                            uint16_t minor) {
   if (major == 1) {
@@ -2100,15 +1969,6 @@ static void commonOptPasses(mlir::OpPassManager &pm) {
       }));
 }
 
-static void commonGpuFuncOptPasses(mlir::OpPassManager &pm) {
-  pm.addPass(
-      numba::createCompositePass("GpuFuncOptPass", [](mlir::OpPassManager &p) {
-        p.addPass(mlir::createCSEPass());
-        p.addPass(numba::createCommonOptsPass());
-        p.addPass(std::make_unique<GPURangeOptPass>());
-      }));
-}
-
 static void populateLowerToGPUPipelineHigh(mlir::OpPassManager &pm) {
   pm.addNestedPass<mlir::func::FuncOp>(std::make_unique<MarkGpuArraysInputs>());
   pm.addPass(std::make_unique<LowerGpuRangePass>());
@@ -2157,8 +2017,7 @@ static void populateLowerToGPUPipelineMed(mlir::OpPassManager &pm) {
   gpuFuncPM.addPass(mlir::arith::createArithExpandOpsPass());
   gpuFuncPM.addPass(std::make_unique<FlattenScfPass>());
   gpuFuncPM.addPass(std::make_unique<LowerGpuBuiltins3Pass>());
-
-  commonGpuFuncOptPasses(gpuFuncPM);
+  commonOptPasses(gpuFuncPM);
   gpuFuncPM.addPass(std::make_unique<AssumeGpuIdRangePass>());
 
   pm.addNestedPass<mlir::gpu::GPUModuleOp>(gpu_runtime::createAbiAttrsPass());
