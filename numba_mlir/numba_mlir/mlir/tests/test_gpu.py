@@ -1269,6 +1269,44 @@ def test_cfd_indirect():
 
 
 @require_dpctl
+def test_cfd_f64_truncate():
+    def py_func(a, b, c):
+        c[:] = a + b
+
+    jit_func1 = njit(py_func, gpu_fp64_truncate=True)
+    jit_func2 = njit(py_func, gpu_fp64_truncate=True)
+
+    a = np.arange(1024, dtype=np.float32)
+    b = 2.5
+
+    sim_res = np.zeros(a.shape, a.dtype)
+    py_func(a, b, sim_res)
+
+    da = _from_host(a, buffer="device")
+
+    gpu_res = np.zeros(a.shape, a.dtype)
+    dgpu_res = _from_host(gpu_res, buffer="device")
+
+    pattern = "arith.addf %[0-9a-zA-Z]+, %[0-9a-zA-Z]+ : f32"
+
+    with print_pass_ir(["TruncateF64ForGPUPass"], []):
+        jit_func1(da, b, dgpu_res)
+        ir = get_print_buffer()
+        assert re.search(pattern, ir) is None, ir
+
+    _to_host(dgpu_res, gpu_res)
+    assert_equal(gpu_res, sim_res)
+
+    with print_pass_ir([], ["TruncateF64ForGPUPass"]):
+        jit_func2(da, b, dgpu_res)
+        ir = get_print_buffer()
+        assert re.search(pattern, ir), ir
+
+    _to_host(dgpu_res, gpu_res)
+    assert_equal(gpu_res, sim_res)
+
+
+@require_dpctl
 def test_cfd_reshape():
     def py_func1(a):
         b = a.reshape(17, 23, 56)
