@@ -2,6 +2,8 @@
 #
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+import functools
+
 from numba.core.untyped_passes import ReconstructSSA
 from numba.core.typed_passes import NopythonTypeInference
 from numba.core.compiler import (
@@ -14,30 +16,38 @@ from numba.core.compiler_machinery import PassManager
 from numba.core.registry import cpu_target
 from numba.core import typing, cpu
 
-from numba_mlir.mlir.passes import MlirBackendInner, get_mlir_func
+from numba_mlir.mlir.passes import get_inner_backend, get_mlir_func
 
 
-class MlirTempCompiler(CompilerBase):  # custom compiler extends from CompilerBase
-    def define_pipelines(self):
-        dpb = DefaultPassBuilder
-        pm = PassManager("MlirTempCompiler")
-        untyped_passes = dpb.define_untyped_pipeline(self.state)
-        pm.passes.extend(untyped_passes.passes)
+@functools.lru_cache
+def get_temp_backend(fp64_trunc):
+    backend = get_inner_backend(fp64_trunc)
 
-        pm.add_pass(ReconstructSSA, "ssa")
-        pm.add_pass(NopythonTypeInference, "nopython frontend")
-        pm.add_pass(MlirBackendInner, "mlir backend")
+    class MlirTempCompiler(CompilerBase):  # custom compiler extends from CompilerBase
+        def define_pipelines(self):
+            dpb = DefaultPassBuilder
+            pm = PassManager("MlirTempCompiler")
+            untyped_passes = dpb.define_untyped_pipeline(self.state)
+            pm.passes.extend(untyped_passes.passes)
 
-        pm.finalize()
-        return [pm]
+            pm.add_pass(ReconstructSSA, "ssa")
+            pm.add_pass(NopythonTypeInference, "nopython frontend")
+            pm.add_pass(backend, "mlir backend")
+
+            pm.finalize()
+            return [pm]
+
+    return MlirTempCompiler
 
 
 def _compile_isolated(func, args, return_type=None, flags=DEFAULT_FLAGS, locals={}):
     typingctx = cpu_target.typing_context
     targetctx = cpu_target.target_context
-    # typingctx = typing.Context()
-    # targetctx = cpu.CPUContext(typingctx)
-    # with cpu_target.nested_context(typingctx, targetctx):
+    if hasattr(flags, "fp64_truncate"):
+        pipeline = get_temp_backend(flags.fp64_truncate)
+    else:
+        pipeline = get_temp_backend(False)
+
     return compile_extra(
         typingctx,
         targetctx,
@@ -46,7 +56,7 @@ def _compile_isolated(func, args, return_type=None, flags=DEFAULT_FLAGS, locals=
         return_type,
         flags,
         locals,
-        pipeline_class=MlirTempCompiler,
+        pipeline_class=pipeline,
     )
 
 

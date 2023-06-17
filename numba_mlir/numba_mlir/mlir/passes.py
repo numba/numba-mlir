@@ -5,7 +5,7 @@
 import functools
 
 from numba.core import types
-from numba.core.compiler import DEFAULT_FLAGS, compile_result
+from numba.core.compiler import Flags, compile_result
 from numba.core.compiler_machinery import FunctionPass, register_pass
 from numba.core.funcdesc import qualifying_prefix
 from numba.np.ufunc.parallel import get_thread_count
@@ -64,6 +64,13 @@ _mlir_last_compiled_func = None
 _mlir_active_module = None
 
 
+def _create_flags(fp64_truncate):
+    flags = Flags()
+    flags.nrt = True
+    setattr(flags, "fp64_truncate", fp64_truncate)
+    return flags
+
+
 class MlirBackendBase(FunctionPass):
     def __init__(self, push_func_stack):
         self._push_func_stack = push_func_stack
@@ -91,11 +98,11 @@ class MlirBackendBase(FunctionPass):
     def _resolve_func_impl(self, obj):
         if isinstance(obj, types.Function):
             func = obj.typing_key
-            return (self._get_func_name(func), None, DEFAULT_FLAGS)
+            return (self._get_func_name(func), None, _create_flags(self._fp64_truncate))
         if isinstance(obj, types.BoundFunction):
-            return (str(obj.typing_key), None, DEFAULT_FLAGS)
+            return (str(obj.typing_key), None, _create_flags(self._fp64_truncate))
         if isinstance(obj, numba.core.types.functions.Dispatcher):
-            flags = DEFAULT_FLAGS
+            flags = _create_flags(self._fp64_truncate)
             func = obj.dispatcher.py_func
             inline_type = obj.dispatcher.targetoptions.get("inline", None)
             if inline_type is not None:
@@ -111,7 +118,11 @@ class MlirBackendBase(FunctionPass):
 
             return (func.__module__ + "." + func.__qualname__, func, flags)
         if isinstance(obj, types.NumberClass):
-            return ("$number." + str(obj.instance_type), None, DEFAULT_FLAGS)
+            return (
+                "$number." + str(obj.instance_type),
+                None,
+                _create_flags(self._fp64_truncate),
+            )
         return (None, None, None)
 
     def _get_func_context(self, state):
@@ -236,3 +247,27 @@ class MlirBackendInner(MlirBackendBase):
         )
         state.cr = compile_result()
         return True
+
+
+@functools.lru_cache
+def get_inner_backend(fp64_trunc):
+    class MlirBackendInner(MlirBackendBase):
+        _name = "mlir_backend_inner"
+
+        def __init__(self):
+            MlirBackendBase.__init__(self, push_func_stack=False)
+            self._fp64_truncate = fp64_trunc
+
+        def run_pass_impl(self, state):
+            global _mlir_active_module
+            module = _mlir_active_module
+            assert not module is None
+            global _mlir_last_compiled_func
+            ctx = self._get_func_context(state)
+            _mlir_last_compiled_func = mlir_compiler.lower_function(
+                ctx, module, state.func_ir
+            )
+            state.cr = compile_result()
+            return True
+
+    return register_pass(mutates_CFG=True, analysis_only=False)(MlirBackendInner)

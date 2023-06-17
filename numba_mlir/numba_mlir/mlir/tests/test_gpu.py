@@ -9,6 +9,7 @@ import numpy as np
 import math
 import numba
 import itertools
+import re
 
 from numba_mlir.mlir.dpctl_interop import get_default_device_name
 from numba_mlir.mlir.utils import readenv
@@ -225,6 +226,43 @@ def test_empty_kernel():
         gpu_func[a.shape, DEFAULT_LOCAL_SIZE](a)
         ir = get_print_buffer()
         assert ir.count("gpu.launch blocks") == 0, ir
+
+
+@require_gpu
+def test_f64_truncate():
+    def func(a, b, c):
+        i = get_global_id(0)
+        j = get_global_id(1)
+        k = get_global_id(2)
+        c[i, j, k] = a[i, j, k] + b[i, j, k]
+
+    sim_func = kernel_sim(func)
+    gpu_func1 = kernel(gpu_fp64_truncate=True)(func)
+    gpu_func2 = kernel(gpu_fp64_truncate=True)(func)
+
+    a = np.array([[[1, 2, 3], [4, 5, 6]]], np.float64)
+    b = np.array([[[7, 8, 9], [10, 11, 12]]], np.float64)
+
+    sim_res = np.zeros(a.shape, a.dtype)
+    sim_func[a.shape, DEFAULT_LOCAL_SIZE](a, b, sim_res)
+
+    gpu_res1 = np.zeros(a.shape, a.dtype)
+    gpu_res2 = np.zeros(a.shape, a.dtype)
+
+    pattern = "arith.addf %[0-9a-zA-Z]+, %[0-9a-zA-Z]+ : f32"
+
+    with print_pass_ir(["TruncateF64ForGPUPass"], []):
+        gpu_func1[a.shape, DEFAULT_LOCAL_SIZE](a, b, gpu_res1)
+        ir = get_print_buffer()
+        assert re.search(pattern, ir) is None, ir
+
+    with print_pass_ir([], ["TruncateF64ForGPUPass"]):
+        gpu_func2[a.shape, DEFAULT_LOCAL_SIZE](a, b, gpu_res2)
+        ir = get_print_buffer()
+        assert re.search(pattern, ir), ir
+
+    assert_equal(gpu_res1, sim_res)
+    assert_equal(gpu_res2, sim_res)
 
 
 @require_gpu
@@ -1225,6 +1263,87 @@ def test_cfd_indirect():
             > 0
         ), ir
         assert ir.count("gpu.launch blocks") > 0, ir
+
+    _to_host(dgpu_res, gpu_res)
+    assert_equal(gpu_res, sim_res)
+
+
+@require_dpctl
+def test_cfd_f64_truncate():
+    def py_func(a, b, c):
+        c[:] = a + b
+
+    jit_func1 = njit(py_func, gpu_fp64_truncate=True)
+    jit_func2 = njit(py_func, gpu_fp64_truncate=True)
+
+    a = np.arange(1024, dtype=np.float32)
+    b = 2.5
+
+    sim_res = np.zeros(a.shape, a.dtype)
+    py_func(a, b, sim_res)
+
+    da = _from_host(a, buffer="device")
+
+    gpu_res = np.zeros(a.shape, a.dtype)
+    dgpu_res = _from_host(gpu_res, buffer="device")
+
+    pattern = "arith.addf %[0-9a-zA-Z]+, %[0-9a-zA-Z]+ : f32"
+
+    with print_pass_ir(["TruncateF64ForGPUPass"], []):
+        jit_func1(da, b, dgpu_res)
+        ir = get_print_buffer()
+        assert re.search(pattern, ir) is None, ir
+
+    _to_host(dgpu_res, gpu_res)
+    assert_equal(gpu_res, sim_res)
+
+    with print_pass_ir([], ["TruncateF64ForGPUPass"]):
+        jit_func2(da, b, dgpu_res)
+        ir = get_print_buffer()
+        assert re.search(pattern, ir), ir
+
+    _to_host(dgpu_res, gpu_res)
+    assert_equal(gpu_res, sim_res)
+
+
+@require_dpctl
+def test_cfd_f64_truncate_indirect():
+    def py_func_inner(a, b, c):
+        c[:] = a + b
+
+    jit_func_inner = njit_orig(py_func_inner, gpu_fp64_truncate=True)
+
+    def py_func(a, b, c):
+        jit_func_inner(a, b, c)
+
+    jit_func1 = njit_orig(py_func, gpu_fp64_truncate=True)
+    jit_func2 = njit_orig(py_func, gpu_fp64_truncate=True)
+
+    a = np.arange(1024, dtype=np.float32)
+    b = 2.5
+
+    sim_res = np.zeros(a.shape, a.dtype)
+    py_func(a, b, sim_res)
+
+    da = _from_host(a, buffer="device")
+
+    gpu_res = np.zeros(a.shape, a.dtype)
+    dgpu_res = _from_host(gpu_res, buffer="device")
+
+    pattern = "arith.addf %[0-9a-zA-Z]+, %[0-9a-zA-Z]+ : f32"
+
+    with print_pass_ir(["TruncateF64ForGPUPass"], []):
+        jit_func1(da, b, dgpu_res)
+        ir = get_print_buffer()
+        assert re.search(pattern, ir) is None, ir
+
+    _to_host(dgpu_res, gpu_res)
+    assert_equal(gpu_res, sim_res)
+
+    with print_pass_ir([], ["TruncateF64ForGPUPass"]):
+        jit_func2(da, b, dgpu_res)
+        ir = get_print_buffer()
+        assert re.search(pattern, ir), ir
 
     _to_host(dgpu_res, gpu_res)
     assert_equal(gpu_res, sim_res)
