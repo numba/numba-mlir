@@ -242,7 +242,8 @@ struct ExtractStridedMetadataConstStrides
   mlir::LogicalResult
   matchAndRewrite(mlir::memref::ExtractStridedMetadataOp op,
                   mlir::PatternRewriter &rewriter) const override {
-    auto srcType = op.getSource().getType().cast<mlir::MemRefType>();
+    auto src = op.getSource();
+    mlir::MemRefType srcType = src.getType();
 
     int64_t offset;
     llvm::SmallVector<int64_t> strides;
@@ -258,15 +259,33 @@ struct ExtractStridedMetadataConstStrides
       changed = true;
       mlir::Value constVal =
           rewriter.create<mlir::arith::ConstantIndexOp>(loc, val);
-      for (auto &use : llvm::make_early_inc_range(res.getUses())) {
-        mlir::Operation *owner = use.getOwner();
-        rewriter.updateRootInPlace(owner, [&] { use.set(constVal); });
-      }
+      rewriter.replaceAllUsesWith(res, constVal);
     };
 
+    auto origStrides = op.getStrides();
     replaceUses(op.getOffset(), offset);
-    for (auto &&[strideRes, strideVal] : llvm::zip(op.getStrides(), strides))
+    for (auto &&[strideRes, strideVal] : llvm::zip(origStrides, strides))
       replaceUses(strideRes, strideVal);
+
+    bool isIdentity = srcType.getLayout().isIdentity();
+    if (isIdentity &&
+        llvm::any_of(origStrides, [](auto s) { return !s.use_empty(); })) {
+      auto rank = srcType.getRank();
+      mlir::Value stride =
+          rewriter.create<mlir::arith::ConstantIndexOp>(loc, 1);
+      rewriter.replaceAllUsesWith(origStrides[rank - 1], stride);
+      for (auto i : llvm::seq<int64_t>(0, rank - 1)) {
+        mlir::Value size =
+            rewriter.create<mlir::memref::DimOp>(loc, src, rank - i - 1);
+        if (i == 0) {
+          stride = size;
+        } else {
+          stride = rewriter.create<mlir::arith::MulIOp>(loc, stride, size);
+        }
+        rewriter.replaceAllUsesWith(origStrides[rank - i - 2], stride);
+      }
+      changed = true;
+    }
 
     return mlir::success(changed);
   }
