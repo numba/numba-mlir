@@ -717,7 +717,6 @@ def test_prange_lowering():
         assert ir.count("numba_util.parallel") == 1, ir
 
 
-@pytest.mark.skip()
 def test_prange_lowering_indirect():
     def py_func1(arr):
         res = 0
