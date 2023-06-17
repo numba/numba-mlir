@@ -106,6 +106,9 @@ struct InsertGPUAllocs
 
   void runOnOperation() override {
     auto func = getOperation();
+    auto mod = func->getParentOfType<mlir::ModuleOp>();
+    assert(mod);
+
     auto &funcBody = func.getBody();
     if (funcBody.empty()) {
       return;
@@ -242,6 +245,26 @@ struct InsertGPUAllocs
       return region.getEnvironment();
     };
 
+    mlir::StringAttr devFuncAttr;
+    auto isDeviceFuncCall = [&](mlir::func::CallOp call) -> bool {
+      if (call->getParentOfType<mlir::gpu::LaunchOp>())
+        return true;
+
+      auto funcName = call.getCallee();
+      auto origFunc = mod.lookupSymbol<mlir::func::FuncOp>(funcName);
+      if (!origFunc) {
+        call->emitError("Cannot resolve callee symbol");
+        signalPassFailure();
+        return false;
+      }
+
+      if (!devFuncAttr)
+        devFuncAttr = mlir::StringAttr::get(
+            &getContext(), gpu_runtime::getDeviceFuncAttrName());
+
+      return origFunc->hasAttr(devFuncAttr);
+    };
+
     auto getAccessType =
         [&](mlir::Value memref) -> mlir::FailureOr<AccessType> {
       AccessType ret;
@@ -287,8 +310,8 @@ struct InsertGPUAllocs
 
             continue;
           }
-          if (mlir::isa<mlir::func::CallOp>(user)) {
-            bool onDevice = user->getParentOfType<mlir::gpu::LaunchOp>();
+          if (auto call = mlir::dyn_cast<mlir::func::CallOp>(user)) {
+            bool onDevice = isDeviceFuncCall(call);
             (onDevice ? ret.deviceRead : ret.hostRead) = true;
             (onDevice ? ret.deviceWrite : ret.hostWrite) = true;
 
@@ -1589,8 +1612,8 @@ struct ExpandDeviceFuncCallOp
     if (!origFunc)
       return mlir::failure();
 
-    auto deviceFuncAttr =
-        origFunc->getAttrOfType<mlir::StringAttr>("device_func");
+    auto deviceFuncAttr = origFunc->getAttrOfType<mlir::StringAttr>(
+        gpu_runtime::getDeviceFuncAttrName());
     if (!deviceFuncAttr)
       return mlir::failure();
 
@@ -1625,7 +1648,8 @@ struct ExpandDeviceFuncCallOp
     newArgs.emplace_back(*stream);
     newArgs.append(oldArgs.begin(), oldArgs.end());
 
-    rewriter.replaceOpWithNewOp<mlir::func::CallOp>(op, deviceFunc, newArgs);
+    auto call = rewriter.replaceOpWithNewOp<mlir::func::CallOp>(op, deviceFunc,
+                                                                newArgs);
     return mlir::success();
   }
 };
