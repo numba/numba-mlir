@@ -309,6 +309,43 @@ struct ExtractStridedMetadataCast
   }
 };
 
+// TODO: upstream
+struct IndexCastOfIndexCast
+    : public mlir::OpRewritePattern<mlir::arith::IndexCastOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(mlir::arith::IndexCastOp op,
+                  mlir::PatternRewriter &rewriter) const override {
+    auto mid = op.getIn();
+    if (!mlir::isa<mlir::IndexType>(mid.getType()))
+      return mlir::failure();
+
+    auto prevCast = mid.getDefiningOp<mlir::arith::IndexCastOp>();
+    if (!prevCast)
+      return mlir::failure();
+
+    auto src = prevCast.getIn();
+
+    auto srcType = mlir::dyn_cast<mlir::IntegerType>(src.getType());
+    if (!srcType)
+      return mlir::failure();
+
+    auto dstType = mlir::dyn_cast<mlir::IntegerType>(op.getResult().getType());
+    if (!dstType)
+      return mlir::failure();
+
+    if (srcType.getWidth() < dstType.getWidth()) {
+      rewriter.replaceOpWithNewOp<mlir::arith::ExtSIOp>(op, dstType, src);
+    } else if (srcType.getWidth() > dstType.getWidth()) {
+      rewriter.replaceOpWithNewOp<mlir::arith::TruncIOp>(op, dstType, src);
+    } else {
+      rewriter.replaceOp(op, src);
+    }
+    return mlir::success();
+  }
+};
+
 struct GPUGenGlobalId : public mlir::OpRewritePattern<mlir::arith::AddIOp> {
   using OpRewritePattern::OpRewritePattern;
 
@@ -390,6 +427,7 @@ void numba::populateCommonOptsPatterns(mlir::RewritePatternSet &patterns) {
       ExtractStridedMetadataUnused,
       ExtractStridedMetadataConstStrides,
       ExtractStridedMetadataCast,
+      IndexCastOfIndexCast,
       GPUGenGlobalId
       // clang-format on
       >(patterns.getContext());
