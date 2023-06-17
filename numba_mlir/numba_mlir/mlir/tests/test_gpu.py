@@ -9,6 +9,7 @@ import numpy as np
 import math
 import numba
 import itertools
+import re
 
 from numba_mlir.mlir.dpctl_interop import get_default_device_name
 from numba_mlir.mlir.utils import readenv
@@ -225,6 +226,43 @@ def test_empty_kernel():
         gpu_func[a.shape, DEFAULT_LOCAL_SIZE](a)
         ir = get_print_buffer()
         assert ir.count("gpu.launch blocks") == 0, ir
+
+
+@require_gpu
+def test_f64_truncate():
+    def func(a, b, c):
+        i = get_global_id(0)
+        j = get_global_id(1)
+        k = get_global_id(2)
+        c[i, j, k] = a[i, j, k] + b[i, j, k]
+
+    sim_func = kernel_sim(func)
+    gpu_func1 = kernel(gpu_fp64_truncate=True)(func)
+    gpu_func2 = kernel(gpu_fp64_truncate=True)(func)
+
+    a = np.array([[[1, 2, 3], [4, 5, 6]]], np.float64)
+    b = np.array([[[7, 8, 9], [10, 11, 12]]], np.float64)
+
+    sim_res = np.zeros(a.shape, a.dtype)
+    sim_func[a.shape, DEFAULT_LOCAL_SIZE](a, b, sim_res)
+
+    gpu_res1 = np.zeros(a.shape, a.dtype)
+    gpu_res2 = np.zeros(a.shape, a.dtype)
+
+    pattern = "arith.addf %[0-9a-zA-Z]+, %[0-9a-zA-Z]+ : f32"
+
+    with print_pass_ir(["TruncateF64ForGPUPass"], []):
+        gpu_func1[a.shape, DEFAULT_LOCAL_SIZE](a, b, gpu_res1)
+        ir = get_print_buffer()
+        assert re.search(pattern, ir) is None, ir
+
+    with print_pass_ir([], ["TruncateF64ForGPUPass"]):
+        gpu_func2[a.shape, DEFAULT_LOCAL_SIZE](a, b, gpu_res2)
+        ir = get_print_buffer()
+        assert re.search(pattern, ir), ir
+
+    assert_equal(gpu_res1, sim_res)
+    assert_equal(gpu_res2, sim_res)
 
 
 @require_gpu
