@@ -1648,8 +1648,7 @@ struct ExpandDeviceFuncCallOp
     newArgs.emplace_back(*stream);
     newArgs.append(oldArgs.begin(), oldArgs.end());
 
-    auto call = rewriter.replaceOpWithNewOp<mlir::func::CallOp>(op, deviceFunc,
-                                                                newArgs);
+    rewriter.replaceOpWithNewOp<mlir::func::CallOp>(op, deviceFunc, newArgs);
     return mlir::success();
   }
 };
