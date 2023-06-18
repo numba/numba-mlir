@@ -581,7 +581,7 @@ def _mkl_gemm(builder, a, b, alpha, beta, shape1, shape2):
     c = builder.init_tensor(res_shape, dtype)
 
     return builder.external_call(
-        func_name, (a, b), c, attrs={"device_func": device_func_name}
+        func_name, (a, b), c, attrs={"gpu_runtime.device_func": device_func_name}
     )
 
 
