@@ -542,9 +542,86 @@ struct HoistScfIfChecks : public mlir::OpRewritePattern<mlir::scf::IfOp> {
   }
 };
 
+struct MergeNestedScfIf : public mlir::OpRewritePattern<mlir::scf::IfOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(mlir::scf::IfOp op,
+                  mlir::PatternRewriter &rewriter) const override {
+    if (!op.elseBlock())
+      return mlir::failure();
+
+    for (bool inverse : {false, true}) {
+      auto body1 = inverse ? op.elseBlock() : op.thenBlock();
+      auto body2 = inverse ? op.thenBlock() : op.elseBlock();
+
+      if (!llvm::hasSingleElement(body1->without_terminator()) ||
+          !body2->without_terminator().empty())
+        continue;
+
+      auto nestedIf = mlir::dyn_cast<mlir::scf::IfOp>(body1->front());
+      if (!nestedIf || !nestedIf.elseBlock())
+        continue;
+
+      auto yield1 = mlir::cast<mlir::scf::YieldOp>(body1->getTerminator());
+      if (yield1.getResults() != nestedIf.getResults())
+        continue;
+
+      auto yield2 = mlir::cast<mlir::scf::YieldOp>(body2->getTerminator());
+      for (bool inverseInner : {false, true}) {
+        auto nestedBody2 =
+            inverseInner ? nestedIf.thenBlock() : nestedIf.elseBlock();
+
+        if (!nestedBody2->without_terminator().empty())
+          continue;
+
+        auto nestedYield2 =
+            mlir::cast<mlir::scf::YieldOp>(nestedBody2->getTerminator());
+        if (nestedYield2.getResults() != yield2.getResults())
+          continue;
+
+        auto loc = op.getLoc();
+        mlir::Value one;
+        auto getInverse = [&](mlir::Value val) -> mlir::Value {
+          if (!one)
+            one = rewriter.create<mlir::arith::ConstantIntOp>(loc, /*value*/ 1,
+                                                              /*width*/ 1);
+
+          return rewriter.create<mlir::arith::XOrIOp>(loc, val, one);
+        };
+
+        mlir::Value cond1 = op.getCondition();
+        if (inverse)
+          cond1 = getInverse(cond1);
+
+        mlir::Value cond2 = nestedIf.getCondition();
+        if (inverseInner)
+          cond2 = getInverse(cond2);
+
+        mlir::Value newCond =
+            rewriter.create<mlir::arith::AndIOp>(loc, cond1, cond2);
+        auto newIf = rewriter.create<mlir::scf::IfOp>(loc, op->getResultTypes(),
+                                                      newCond);
+        auto &oldRegion1 =
+            inverseInner ? nestedIf.getElseRegion() : nestedIf.getThenRegion();
+        auto &oldRegion2 =
+            inverseInner ? nestedIf.getThenRegion() : nestedIf.getElseRegion();
+        auto &newRegion1 = newIf.getThenRegion();
+        auto &newRegion2 = newIf.getElseRegion();
+        rewriter.inlineRegionBefore(oldRegion1, newRegion1, newRegion1.end());
+        rewriter.inlineRegionBefore(oldRegion2, newRegion2, newRegion2.end());
+        rewriter.replaceOp(op, newIf.getResults());
+        return mlir::success();
+      }
+    }
+
+    return mlir::failure();
+  }
+};
+
 struct FlattenScfPass
     : public numba::RewriteWrapperPass<FlattenScfPass, void, void, FlattenScfIf,
-                                       HoistScfIfChecks> {};
+                                       HoistScfIfChecks, MergeNestedScfIf> {};
 
 static mlir::LogicalResult processAllocUser(mlir::Operation *user,
                                             mlir::Operation *allocParent,
