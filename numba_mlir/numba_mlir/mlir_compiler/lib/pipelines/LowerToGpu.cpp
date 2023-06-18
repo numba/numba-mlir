@@ -494,8 +494,57 @@ struct FlattenScfIf : public mlir::OpRewritePattern<mlir::scf::IfOp> {
   }
 };
 
-struct FlattenScfPass : public numba::RewriteWrapperPass<FlattenScfPass, void,
-                                                         void, FlattenScfIf> {};
+struct HoistScfIfChecks : public mlir::OpRewritePattern<mlir::scf::IfOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(mlir::scf::IfOp op,
+                  mlir::PatternRewriter &rewriter) const override {
+    bool changed = false;
+
+    llvm::SmallVector<mlir::Operation *> opsToMove;
+    const size_t MAX_OPS_TO_MOVE = 16;
+    auto copyOps = [&](auto &&ops) {
+      opsToMove.clear();
+      for (auto &innerOp : ops) {
+        if (opsToMove.size() >= MAX_OPS_TO_MOVE)
+          return;
+
+        if (!mlir::isa<mlir::arith::ArithDialect>(innerOp.getDialect()))
+          return;
+
+        opsToMove.emplace_back(&innerOp);
+      }
+
+      for (auto innerOp : opsToMove) {
+        rewriter.updateRootInPlace(innerOp, [&] { innerOp->moveBefore(op); });
+      }
+      changed = true;
+    };
+
+    for (mlir::Block *body : {op.thenBlock(), op.elseBlock()}) {
+      if (!body)
+        continue;
+
+      auto ops = body->without_terminator();
+      // Must have at nested scf.if and al least one additional op.
+      if (!llvm::hasNItemsOrMore(ops, 2))
+        continue;
+
+      ops = {ops.begin(), std::prev(ops.end())};
+      if (!mlir::isa<mlir::scf::IfOp>(*ops.end()))
+        continue;
+
+      copyOps(ops);
+    }
+
+    return mlir::success(changed);
+  }
+};
+
+struct FlattenScfPass
+    : public numba::RewriteWrapperPass<FlattenScfPass, void, void, FlattenScfIf,
+                                       HoistScfIfChecks> {};
 
 static mlir::LogicalResult processAllocUser(mlir::Operation *user,
                                             mlir::Operation *allocParent,
