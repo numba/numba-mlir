@@ -196,6 +196,45 @@ struct CmpiOfSelect : public mlir::OpRewritePattern<mlir::arith::CmpIOp> {
 };
 
 // TODO: upstream
+struct XorOfCmpF : public mlir::OpRewritePattern<mlir::arith::XOrIOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(mlir::arith::XOrIOp op,
+                  mlir::PatternRewriter &rewriter) const override {
+    auto cmp = op.getLhs().getDefiningOp<mlir::arith::CmpFOp>();
+    if (!cmp || !llvm::hasSingleElement(cmp->getUses()) ||
+        !mlir::isConstantIntValue(op.getRhs(), -1))
+      return mlir::failure();
+
+    // TODO: properly handle NaNs
+    using Pred = mlir::arith::CmpFPredicate;
+    const std::pair<Pred, Pred> mapping[] = {
+        // clang-format off
+      {Pred::OEQ, Pred::ONE},
+      {Pred::ONE, Pred::OEQ},
+      {Pred::OGE, Pred::OLT},
+      {Pred::OGT, Pred::OLE},
+      {Pred::OLE, Pred::OGT},
+      {Pred::OLT, Pred::OGE},
+        // clang-format on
+    };
+
+    auto pred = cmp.getPredicate();
+    for (auto &&[oldPred, newPred] : mapping) {
+      if (pred != oldPred)
+        continue;
+
+      rewriter.replaceOpWithNewOp<mlir::arith::CmpFOp>(
+          op, newPred, cmp.getLhs(), cmp.getRhs());
+      return mlir::success();
+    }
+
+    return mlir::failure();
+  }
+};
+
+// TODO: upstream
 struct ExtractStridedMetadataUnused
     : public mlir::OpRewritePattern<mlir::memref::ExtractStridedMetadataOp> {
   using OpRewritePattern::OpRewritePattern;
@@ -424,6 +463,7 @@ void numba::populateCommonOptsPatterns(mlir::RewritePatternSet &patterns) {
       PowSimplify,
       AndConflictSimplify,
       CmpiOfSelect,
+      XorOfCmpF,
       ExtractStridedMetadataUnused,
       ExtractStridedMetadataConstStrides,
       ExtractStridedMetadataCast,
