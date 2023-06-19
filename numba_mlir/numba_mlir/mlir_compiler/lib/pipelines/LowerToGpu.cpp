@@ -1725,51 +1725,27 @@ struct LowerGpuBuiltins2Pass
           ConvertGroupOpsToSubgroup, LowerBuiltinCalls> {};
 
 class ConvertLocalArrayAllocOps
-    : public mlir::OpRewritePattern<mlir::func::CallOp> {
+    : public mlir::OpRewritePattern<mlir::memref::AllocaOp> {
 public:
   using OpRewritePattern::OpRewritePattern;
 
   mlir::LogicalResult
-  matchAndRewrite(mlir::func::CallOp op,
+  matchAndRewrite(mlir::memref::AllocaOp op,
                   mlir::PatternRewriter &rewriter) const override {
-    auto name = op.getCallee();
-
-    if (!name.startswith("local_array_"))
-      return mlir::failure();
-
-    if (op->getNumResults() != 1)
-      return mlir::failure();
 
     auto mod = op->getParentOfType<mlir::gpu::GPUModuleOp>();
     if (!mod)
       return mlir::failure();
 
-    auto oldType = op->getResult(0).getType().dyn_cast<mlir::MemRefType>();
-    if (!oldType)
+    auto oldType = mlir::dyn_cast<mlir::MemRefType>(op.getType());
+    if (!oldType || !oldType.hasStaticShape())
       return mlir::failure();
 
-    auto operands = op.getOperands();
-    auto operandsCount = static_cast<unsigned>(operands.size());
-    if (operandsCount != static_cast<unsigned>(oldType.getRank()))
+    auto addrSpace = mlir::dyn_cast_if_present<mlir::gpu::AddressSpaceAttr>(
+        oldType.getMemorySpace());
+    if (!addrSpace || addrSpace.getValue() !=
+                          mlir::gpu::GPUDialect::getWorkgroupAddressSpace())
       return mlir::failure();
-
-    llvm::SmallVector<int64_t> shape(operandsCount);
-    for (auto i : llvm::seq(0u, operandsCount)) {
-      auto val = mlir::getConstantIntValue(operands[i]);
-      if (!val)
-        return mlir::failure();
-
-      shape[i] = *val;
-    }
-
-    auto type = mlir::MemRefType::get(shape, oldType.getElementType());
-
-    auto addrSpace = mlir::gpu::GPUDialect::getWorkgroupAddressSpace();
-
-    auto storageClass =
-        mlir::gpu::AddressSpaceAttr::get(rewriter.getContext(), addrSpace);
-    auto typeLocal = mlir::MemRefType::get(shape, type.getElementType(),
-                                           nullptr, storageClass);
 
     auto global = [&]() -> mlir::StringRef {
       auto *block = mod.getBody();
@@ -1790,7 +1766,7 @@ public:
       auto global = rewriter.create<mlir::memref::GlobalOp>(
           loc, name,
           /*sym_visibility=*/rewriter.getStringAttr("private"),
-          /*type=*/typeLocal,
+          /*type=*/oldType,
           /*initial_value=*/nullptr,
           /*constant=*/false,
           /*alignment=*/nullptr);
@@ -1799,12 +1775,7 @@ public:
 
     auto loc = op->getLoc();
     mlir::Value newArray =
-        rewriter.create<mlir::memref::GetGlobalOp>(loc, typeLocal, global);
-
-    newArray = rewriter.create<numba::util::SignCastOp>(loc, type, newArray);
-
-    if (type != oldType)
-      newArray = rewriter.create<mlir::memref::CastOp>(loc, oldType, newArray);
+        rewriter.create<mlir::memref::GetGlobalOp>(loc, oldType, global);
 
     rewriter.replaceOp(op, newArray);
     return mlir::success();
