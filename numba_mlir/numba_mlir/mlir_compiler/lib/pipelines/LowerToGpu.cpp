@@ -1782,71 +1782,9 @@ public:
   }
 };
 
-class ConvertPrivateArrayAllocOps
-    : public mlir::OpRewritePattern<mlir::func::CallOp> {
-public:
-  using OpRewritePattern::OpRewritePattern;
-
-  mlir::LogicalResult
-  matchAndRewrite(mlir::func::CallOp op,
-                  mlir::PatternRewriter &rewriter) const override {
-    auto name = op.getCallee();
-
-    if (!name.startswith("private_array_"))
-      return mlir::failure();
-
-    if (op->getNumResults() != 1)
-      return mlir::failure();
-
-    auto mod = op->getParentOfType<mlir::gpu::GPUModuleOp>();
-    if (!mod)
-      return mlir::failure();
-
-    auto oldType = op->getResult(0).getType().dyn_cast<mlir::MemRefType>();
-    if (!oldType)
-      return mlir::failure();
-
-    auto operands = op.getOperands();
-    auto operandsCount = static_cast<unsigned>(operands.size());
-    if (operandsCount != static_cast<unsigned>(oldType.getRank()))
-      return mlir::failure();
-
-    llvm::SmallVector<int64_t> shape(operandsCount);
-    for (auto i : llvm::seq(0u, operandsCount)) {
-      auto val = mlir::getConstantIntValue(operands[i]);
-      if (!val)
-        return mlir::failure();
-
-      shape[i] = *val;
-    }
-
-    auto type = mlir::MemRefType::get(shape, oldType.getElementType());
-
-    auto addrSpace = mlir::gpu::GPUDialect::getPrivateAddressSpace();
-
-    auto storageClass =
-        mlir::gpu::AddressSpaceAttr::get(rewriter.getContext(), addrSpace);
-    auto typeLocal = mlir::MemRefType::get(shape, type.getElementType(),
-                                           nullptr, storageClass);
-
-    auto loc = op.getLoc();
-    mlir::Value newArray =
-        rewriter.create<mlir::memref::AllocaOp>(loc, typeLocal);
-
-    newArray = rewriter.create<numba::util::SignCastOp>(loc, type, newArray);
-
-    if (type != oldType)
-      newArray = rewriter.create<mlir::memref::CastOp>(loc, oldType, newArray);
-
-    rewriter.replaceOp(op, newArray);
-    return mlir::success();
-  }
-};
-
 struct LowerGpuBuiltins3Pass
     : public numba::RewriteWrapperPass<LowerGpuBuiltins3Pass, void, void,
-                                       ConvertLocalArrayAllocOps,
-                                       ConvertPrivateArrayAllocOps> {};
+                                       ConvertLocalArrayAllocOps> {};
 
 class GpuLaunchSinkOpsPass
     : public mlir::PassWrapper<GpuLaunchSinkOpsPass,
