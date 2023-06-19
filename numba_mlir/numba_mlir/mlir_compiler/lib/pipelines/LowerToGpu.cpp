@@ -1333,6 +1333,25 @@ struct LowerBuiltinCalls : public mlir::OpRewritePattern<mlir::func::CallOp> {
   }
 };
 
+static bool isValidArraySig(mlir::func::CallOp op) {
+  if (op->getNumResults() != 1)
+    return false;
+
+  auto res = op.getResult(0);
+  auto resType = mlir::dyn_cast<numba::ntensor::NTensorType>(res.getType());
+  if (!resType)
+    return false;
+
+  mlir::TypeRange types = op.getOperandTypes();
+  if (types.size() == 1 && llvm::isa<mlir::TupleType>(types.front()))
+    types = llvm::cast<mlir::TupleType>(types.front()).getTypes();
+
+  if (types.size() != resType.getShape().size())
+    return false;
+
+  return llvm::all_of(types, [](auto t) { return t.isIntOrIndex(); });
+}
+
 struct LowerKernelAllocCalls
     : public mlir::OpRewritePattern<mlir::func::CallOp> {
   using OpRewritePattern::OpRewritePattern;
@@ -1340,18 +1359,11 @@ struct LowerKernelAllocCalls
   mlir::LogicalResult
   matchAndRewrite(mlir::func::CallOp op,
                   mlir::PatternRewriter &rewriter) const override {
-    if (op->getNumResults() != 1)
+    if (!isValidArraySig(op))
       return mlir::failure();
 
     auto res = op.getResult(0);
-    auto resType = mlir::dyn_cast<numba::ntensor::NTensorType>(res.getType());
-    if (!resType || resType.getRank() != op.getNumOperands())
-      return mlir::failure();
-
-    if (llvm::any_of(op->getOperandTypes(),
-                     [](auto t) { return !t.isIntOrIndex(); }))
-      return mlir::failure();
-
+    auto resType = mlir::cast<numba::ntensor::NTensorType>(res.getType());
     bool isLocal; // Othewise private;
     auto name = op.getCallee();
     if (name.starts_with("local_array_")) {
@@ -1381,7 +1393,6 @@ struct LowerKernelAllocCalls
     auto memrefGenericType = mlir::MemRefType::get(shape, type);
 
     auto loc = op.getLoc();
-    llvm::SmallVector<mlir::Value> castedArgs(op.getNumOperands());
     auto indexType = rewriter.getIndexType();
     auto indexCast = [&](mlir::Value val) -> mlir::Value {
       auto type = val.getType();
@@ -1398,11 +1409,29 @@ struct LowerKernelAllocCalls
       return rewriter.create<mlir::arith::IndexCastOp>(loc, indexType, val);
     };
 
-    for (auto &&[i, arg] : llvm::enumerate(op.getOperands()))
-      castedArgs[i] = indexCast(arg);
+    llvm::SmallVector<mlir::Value> args;
+    if (op->getNumOperands() == 1 &&
+        llvm::isa<mlir::TupleType>(op.getOperand(0).getType())) {
+      auto arg = op.getOperand(0);
+      auto tupleType = mlir::cast<mlir::TupleType>(arg.getType());
+      args.resize(tupleType.size());
+      for (auto &&[ind, type] : llvm::enumerate(tupleType)) {
+        auto i = static_cast<int64_t>(ind);
+        mlir::Value idx = rewriter.create<mlir::arith::ConstantIndexOp>(loc, i);
+        mlir::Value val =
+            rewriter.create<numba::util::TupleExtractOp>(loc, type, arg, idx);
+        args[i] = val;
+      }
+    } else {
+      auto a = op.getOperands();
+      args.assign(a.begin(), a.end());
+    }
+
+    for (auto &&[i, arg] : llvm::enumerate(args))
+      args[i] = indexCast(arg);
 
     mlir::Value alloc =
-        rewriter.create<mlir::memref::AllocaOp>(loc, memrefType, castedArgs);
+        rewriter.create<mlir::memref::AllocaOp>(loc, memrefType, args);
 
     alloc =
         rewriter.create<numba::util::SignCastOp>(loc, memrefGenericType, alloc);
