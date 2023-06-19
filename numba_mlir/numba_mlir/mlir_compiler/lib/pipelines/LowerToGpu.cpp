@@ -97,6 +97,19 @@ static void moveOpsIntoParallel(mlir::scf::ParallelOp outer, int depth = 0) {
   moveOpsIntoParallel(parallelOp, depth);
 }
 
+static gpu_runtime::GPURegionDescAttr getGpuRegionEnv(mlir::Operation *op) {
+  assert(op && "Invalid op");
+  while (auto region =
+             op->getParentOfType<numba::util::EnvironmentRegionOp>()) {
+    if (auto env = mlir::dyn_cast<gpu_runtime::GPURegionDescAttr>(
+            region.getEnvironment()))
+      return env;
+
+    op = region;
+  }
+  return {};
+}
+
 static bool isGpuRegion(numba::util::EnvironmentRegionOp op) {
   return op.getEnvironment().isa<gpu_runtime::GPURegionDescAttr>();
 }
@@ -1320,9 +1333,93 @@ struct LowerBuiltinCalls : public mlir::OpRewritePattern<mlir::func::CallOp> {
   }
 };
 
+struct LowerKernelAllocCalls
+    : public mlir::OpRewritePattern<mlir::func::CallOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(mlir::func::CallOp op,
+                  mlir::PatternRewriter &rewriter) const override {
+    if (op->getNumResults() != 1)
+      return mlir::failure();
+
+    auto res = op.getResult(0);
+    auto resType = mlir::dyn_cast<numba::ntensor::NTensorType>(res.getType());
+    if (!resType || resType.getRank() != op.getNumOperands())
+      return mlir::failure();
+
+    if (llvm::any_of(op->getOperandTypes(),
+                     [](auto t) { return !t.isIntOrIndex(); }))
+      return mlir::failure();
+
+    bool isLocal; // Othewise private;
+    auto name = op.getCallee();
+    if (name.starts_with("local_array_")) {
+      isLocal = true;
+    } else if (name.starts_with("private_array_")) {
+      isLocal = false;
+    } else {
+      return mlir::failure();
+    }
+
+    auto origResType = resType;
+    auto shape = resType.getShape();
+    auto type = resType.getElementType();
+    if (!resType.getEnvironment()) {
+      if (auto env = getGpuRegionEnv(op)) {
+        auto layout = resType.getLayout();
+        resType = numba::ntensor::NTensorType::get(shape, type, env, layout);
+      }
+    }
+
+    auto memSpace = mlir::gpu::AddressSpaceAttr::get(
+        rewriter.getContext(),
+        isLocal ? mlir::gpu::GPUDialect::getWorkgroupAddressSpace()
+                : mlir::gpu::GPUDialect::getPrivateAddressSpace());
+    auto memrefType = mlir::MemRefType::get(
+        shape, type, mlir::MemRefLayoutAttrInterface{}, memSpace);
+    auto memrefGenericType = mlir::MemRefType::get(shape, type);
+
+    auto loc = op.getLoc();
+    llvm::SmallVector<mlir::Value> castedArgs(op.getNumOperands());
+    auto indexType = rewriter.getIndexType();
+    auto indexCast = [&](mlir::Value val) -> mlir::Value {
+      auto type = val.getType();
+      if (mlir::isa<mlir::IndexType>(type))
+        return val;
+
+      auto intType = mlir::cast<mlir::IntegerType>(type);
+      if (!intType.isSignless()) {
+        intType =
+            mlir::IntegerType::get(intType.getContext(), intType.getWidth());
+        val = rewriter.create<numba::util::SignCastOp>(loc, intType, val);
+      }
+
+      return rewriter.create<mlir::arith::IndexCastOp>(loc, indexType, val);
+    };
+
+    for (auto &&[i, arg] : llvm::enumerate(op.getOperands()))
+      castedArgs[i] = indexCast(arg);
+
+    mlir::Value alloc =
+        rewriter.create<mlir::memref::AllocaOp>(loc, memrefType, castedArgs);
+
+    alloc =
+        rewriter.create<numba::util::SignCastOp>(loc, memrefGenericType, alloc);
+    alloc = rewriter.create<numba::ntensor::FromMemrefOp>(loc, resType, alloc);
+    if (resType != origResType)
+      alloc = rewriter.create<numba::ntensor::CastOp>(loc, origResType, alloc);
+
+    rewriter.replaceOp(op, alloc);
+    return mlir::success();
+  }
+};
+
 struct LowerGpuBuiltinsPass
-    : public numba::RewriteWrapperPass<LowerGpuBuiltinsPass, void, void,
-                                       LowerPlierCalls> {};
+    : public numba::RewriteWrapperPass<
+          LowerGpuBuiltinsPass, void,
+          numba::DependentDialectsList<mlir::gpu::GPUDialect>, LowerPlierCalls,
+          LowerKernelAllocCalls> {};
 
 static std::optional<gpu_runtime::FenceFlags>
 getFenceFlags(mlir::OpFoldResult arg) {
