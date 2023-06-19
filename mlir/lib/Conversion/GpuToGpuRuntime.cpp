@@ -208,9 +208,10 @@ struct InsertGPUAllocs
                                   numba::util::EnvironmentRegionOp>(op))
                       // Ignore
                       continue;
-                    if (mlir::isa<mlir::memref::AllocOp,
+                    if (mlir::isa<mlir::memref::AllocOp, mlir::memref::AllocaOp,
                                   mlir::memref::GetGlobalOp>(op)) {
-                      gpuBufferAllocs.insert({op, {}});
+                      if (!op->getParentOfType<mlir::gpu::LaunchOp>())
+                        gpuBufferAllocs.insert({op, {}});
                     } else {
                       op->emitError("Unhandled memref producer");
                       return mlir::WalkResult::interrupt();
@@ -438,6 +439,9 @@ struct InsertGPUAllocs
             });
         alloc->replaceAllUsesWith(results);
         alloc.erase();
+      } else if (auto alloca = mlir::dyn_cast<mlir::memref::AllocaOp>(op)) {
+        alloca->emitError("Alloca is not supported yet");
+        return signalPassFailure();
       } else if (auto getGlobal =
                      mlir::dyn_cast<mlir::memref::GetGlobalOp>(op)) {
         builder.setInsertionPointAfter(getGlobal);
