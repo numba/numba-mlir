@@ -1921,7 +1921,7 @@ struct WrapParforRegionsPass
       std::optional<mlir::Attribute> env;
       auto innerVisitor = [&](mlir::Operation *innerOp) -> mlir::WalkResult {
         auto opEnv = getOpEnv(innerOp);
-        if (!opEnv)
+        if (!opEnv || !*opEnv)
           return mlir::WalkResult::advance();
 
         if (!env) {

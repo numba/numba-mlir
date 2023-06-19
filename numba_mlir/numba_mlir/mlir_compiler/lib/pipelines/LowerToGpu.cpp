@@ -97,6 +97,19 @@ static void moveOpsIntoParallel(mlir::scf::ParallelOp outer, int depth = 0) {
   moveOpsIntoParallel(parallelOp, depth);
 }
 
+static gpu_runtime::GPURegionDescAttr getGpuRegionEnv(mlir::Operation *op) {
+  assert(op && "Invalid op");
+  while (auto region =
+             op->getParentOfType<numba::util::EnvironmentRegionOp>()) {
+    if (auto env = mlir::dyn_cast<gpu_runtime::GPURegionDescAttr>(
+            region.getEnvironment()))
+      return env;
+
+    op = region;
+  }
+  return {};
+}
+
 static bool isGpuRegion(numba::util::EnvironmentRegionOp op) {
   return op.getEnvironment().isa<gpu_runtime::GPURegionDescAttr>();
 }
@@ -1320,9 +1333,122 @@ struct LowerBuiltinCalls : public mlir::OpRewritePattern<mlir::func::CallOp> {
   }
 };
 
+static bool isValidArraySig(mlir::func::CallOp op) {
+  if (op->getNumResults() != 1)
+    return false;
+
+  auto res = op.getResult(0);
+  auto resType = mlir::dyn_cast<numba::ntensor::NTensorType>(res.getType());
+  if (!resType)
+    return false;
+
+  mlir::TypeRange types = op.getOperandTypes();
+  if (types.size() == 1 && llvm::isa<mlir::TupleType>(types.front()))
+    types = llvm::cast<mlir::TupleType>(types.front()).getTypes();
+
+  if (types.size() != resType.getShape().size())
+    return false;
+
+  return llvm::all_of(types, [](auto t) { return t.isIntOrIndex(); });
+}
+
+struct LowerKernelAllocCalls
+    : public mlir::OpRewritePattern<mlir::func::CallOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(mlir::func::CallOp op,
+                  mlir::PatternRewriter &rewriter) const override {
+    if (!isValidArraySig(op))
+      return mlir::failure();
+
+    auto res = op.getResult(0);
+    auto resType = mlir::cast<numba::ntensor::NTensorType>(res.getType());
+    bool isLocal; // Othewise private;
+    auto name = op.getCallee();
+    if (name.starts_with("local_array_")) {
+      isLocal = true;
+    } else if (name.starts_with("private_array_")) {
+      isLocal = false;
+    } else {
+      return mlir::failure();
+    }
+
+    auto origResType = resType;
+    auto shape = resType.getShape();
+    auto type = resType.getElementType();
+    if (!resType.getEnvironment()) {
+      if (auto env = getGpuRegionEnv(op)) {
+        auto layout = resType.getLayout();
+        resType = numba::ntensor::NTensorType::get(shape, type, env, layout);
+      }
+    }
+
+    auto memSpace = mlir::gpu::AddressSpaceAttr::get(
+        rewriter.getContext(),
+        isLocal ? mlir::gpu::GPUDialect::getWorkgroupAddressSpace()
+                : mlir::gpu::GPUDialect::getPrivateAddressSpace());
+    auto memrefType = mlir::MemRefType::get(
+        shape, type, mlir::MemRefLayoutAttrInterface{}, memSpace);
+    auto memrefGenericType = mlir::MemRefType::get(shape, type);
+
+    auto loc = op.getLoc();
+    auto indexType = rewriter.getIndexType();
+    auto indexCast = [&](mlir::Value val) -> mlir::Value {
+      auto type = val.getType();
+      if (mlir::isa<mlir::IndexType>(type))
+        return val;
+
+      auto intType = mlir::cast<mlir::IntegerType>(type);
+      if (!intType.isSignless()) {
+        intType =
+            mlir::IntegerType::get(intType.getContext(), intType.getWidth());
+        val = rewriter.create<numba::util::SignCastOp>(loc, intType, val);
+      }
+
+      return rewriter.create<mlir::arith::IndexCastOp>(loc, indexType, val);
+    };
+
+    llvm::SmallVector<mlir::Value> args;
+    if (op->getNumOperands() == 1 &&
+        llvm::isa<mlir::TupleType>(op.getOperand(0).getType())) {
+      auto arg = op.getOperand(0);
+      auto tupleType = mlir::cast<mlir::TupleType>(arg.getType());
+      args.resize(tupleType.size());
+      for (auto &&[ind, type] : llvm::enumerate(tupleType)) {
+        auto i = static_cast<int64_t>(ind);
+        mlir::Value idx = rewriter.create<mlir::arith::ConstantIndexOp>(loc, i);
+        mlir::Value val =
+            rewriter.create<numba::util::TupleExtractOp>(loc, type, arg, idx);
+        args[i] = val;
+      }
+    } else {
+      auto a = op.getOperands();
+      args.assign(a.begin(), a.end());
+    }
+
+    for (auto &&[i, arg] : llvm::enumerate(args))
+      args[i] = indexCast(arg);
+
+    mlir::Value alloc =
+        rewriter.create<mlir::memref::AllocaOp>(loc, memrefType, args);
+
+    alloc =
+        rewriter.create<numba::util::SignCastOp>(loc, memrefGenericType, alloc);
+    alloc = rewriter.create<numba::ntensor::FromMemrefOp>(loc, resType, alloc);
+    if (resType != origResType)
+      alloc = rewriter.create<numba::ntensor::CastOp>(loc, origResType, alloc);
+
+    rewriter.replaceOp(op, alloc);
+    return mlir::success();
+  }
+};
+
 struct LowerGpuBuiltinsPass
-    : public numba::RewriteWrapperPass<LowerGpuBuiltinsPass, void, void,
-                                       LowerPlierCalls> {};
+    : public numba::RewriteWrapperPass<
+          LowerGpuBuiltinsPass, void,
+          numba::DependentDialectsList<mlir::gpu::GPUDialect>, LowerPlierCalls,
+          LowerKernelAllocCalls> {};
 
 static std::optional<gpu_runtime::FenceFlags>
 getFenceFlags(mlir::OpFoldResult arg) {
@@ -1628,51 +1754,27 @@ struct LowerGpuBuiltins2Pass
           ConvertGroupOpsToSubgroup, LowerBuiltinCalls> {};
 
 class ConvertLocalArrayAllocOps
-    : public mlir::OpRewritePattern<mlir::func::CallOp> {
+    : public mlir::OpRewritePattern<mlir::memref::AllocaOp> {
 public:
   using OpRewritePattern::OpRewritePattern;
 
   mlir::LogicalResult
-  matchAndRewrite(mlir::func::CallOp op,
+  matchAndRewrite(mlir::memref::AllocaOp op,
                   mlir::PatternRewriter &rewriter) const override {
-    auto name = op.getCallee();
-
-    if (!name.startswith("local_array_"))
-      return mlir::failure();
-
-    if (op->getNumResults() != 1)
-      return mlir::failure();
 
     auto mod = op->getParentOfType<mlir::gpu::GPUModuleOp>();
     if (!mod)
       return mlir::failure();
 
-    auto oldType = op->getResult(0).getType().dyn_cast<mlir::MemRefType>();
-    if (!oldType)
+    auto oldType = mlir::dyn_cast<mlir::MemRefType>(op.getType());
+    if (!oldType || !oldType.hasStaticShape())
       return mlir::failure();
 
-    auto operands = op.getOperands();
-    auto operandsCount = static_cast<unsigned>(operands.size());
-    if (operandsCount != static_cast<unsigned>(oldType.getRank()))
+    auto addrSpace = mlir::dyn_cast_if_present<mlir::gpu::AddressSpaceAttr>(
+        oldType.getMemorySpace());
+    if (!addrSpace || addrSpace.getValue() !=
+                          mlir::gpu::GPUDialect::getWorkgroupAddressSpace())
       return mlir::failure();
-
-    llvm::SmallVector<int64_t> shape(operandsCount);
-    for (auto i : llvm::seq(0u, operandsCount)) {
-      auto val = mlir::getConstantIntValue(operands[i]);
-      if (!val)
-        return mlir::failure();
-
-      shape[i] = *val;
-    }
-
-    auto type = mlir::MemRefType::get(shape, oldType.getElementType());
-
-    auto addrSpace = mlir::gpu::GPUDialect::getWorkgroupAddressSpace();
-
-    auto storageClass =
-        mlir::gpu::AddressSpaceAttr::get(rewriter.getContext(), addrSpace);
-    auto typeLocal = mlir::MemRefType::get(shape, type.getElementType(),
-                                           nullptr, storageClass);
 
     auto global = [&]() -> mlir::StringRef {
       auto *block = mod.getBody();
@@ -1693,7 +1795,7 @@ public:
       auto global = rewriter.create<mlir::memref::GlobalOp>(
           loc, name,
           /*sym_visibility=*/rewriter.getStringAttr("private"),
-          /*type=*/typeLocal,
+          /*type=*/oldType,
           /*initial_value=*/nullptr,
           /*constant=*/false,
           /*alignment=*/nullptr);
@@ -1702,73 +1804,7 @@ public:
 
     auto loc = op->getLoc();
     mlir::Value newArray =
-        rewriter.create<mlir::memref::GetGlobalOp>(loc, typeLocal, global);
-
-    newArray = rewriter.create<numba::util::SignCastOp>(loc, type, newArray);
-
-    if (type != oldType)
-      newArray = rewriter.create<mlir::memref::CastOp>(loc, oldType, newArray);
-
-    rewriter.replaceOp(op, newArray);
-    return mlir::success();
-  }
-};
-
-class ConvertPrivateArrayAllocOps
-    : public mlir::OpRewritePattern<mlir::func::CallOp> {
-public:
-  using OpRewritePattern::OpRewritePattern;
-
-  mlir::LogicalResult
-  matchAndRewrite(mlir::func::CallOp op,
-                  mlir::PatternRewriter &rewriter) const override {
-    auto name = op.getCallee();
-
-    if (!name.startswith("private_array_"))
-      return mlir::failure();
-
-    if (op->getNumResults() != 1)
-      return mlir::failure();
-
-    auto mod = op->getParentOfType<mlir::gpu::GPUModuleOp>();
-    if (!mod)
-      return mlir::failure();
-
-    auto oldType = op->getResult(0).getType().dyn_cast<mlir::MemRefType>();
-    if (!oldType)
-      return mlir::failure();
-
-    auto operands = op.getOperands();
-    auto operandsCount = static_cast<unsigned>(operands.size());
-    if (operandsCount != static_cast<unsigned>(oldType.getRank()))
-      return mlir::failure();
-
-    llvm::SmallVector<int64_t> shape(operandsCount);
-    for (auto i : llvm::seq(0u, operandsCount)) {
-      auto val = mlir::getConstantIntValue(operands[i]);
-      if (!val)
-        return mlir::failure();
-
-      shape[i] = *val;
-    }
-
-    auto type = mlir::MemRefType::get(shape, oldType.getElementType());
-
-    auto addrSpace = mlir::gpu::GPUDialect::getPrivateAddressSpace();
-
-    auto storageClass =
-        mlir::gpu::AddressSpaceAttr::get(rewriter.getContext(), addrSpace);
-    auto typeLocal = mlir::MemRefType::get(shape, type.getElementType(),
-                                           nullptr, storageClass);
-
-    auto loc = op.getLoc();
-    mlir::Value newArray =
-        rewriter.create<mlir::memref::AllocaOp>(loc, typeLocal);
-
-    newArray = rewriter.create<numba::util::SignCastOp>(loc, type, newArray);
-
-    if (type != oldType)
-      newArray = rewriter.create<mlir::memref::CastOp>(loc, oldType, newArray);
+        rewriter.create<mlir::memref::GetGlobalOp>(loc, oldType, global);
 
     rewriter.replaceOp(op, newArray);
     return mlir::success();
@@ -1777,8 +1813,7 @@ public:
 
 struct LowerGpuBuiltins3Pass
     : public numba::RewriteWrapperPass<LowerGpuBuiltins3Pass, void, void,
-                                       ConvertLocalArrayAllocOps,
-                                       ConvertPrivateArrayAllocOps> {};
+                                       ConvertLocalArrayAllocOps> {};
 
 class GpuLaunchSinkOpsPass
     : public mlir::PassWrapper<GpuLaunchSinkOpsPass,

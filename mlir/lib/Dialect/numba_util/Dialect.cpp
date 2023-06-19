@@ -1382,10 +1382,21 @@ struct SignCastAllocPropagate
     if (!alloc || !alloc->hasOneUse())
       return mlir::failure();
 
-    auto dstType = op.getType().cast<mlir::MemRefType>();
-    rewriter.replaceOpWithNewOp<Op>(op, dstType, alloc.getDynamicSizes(),
-                                    alloc.getSymbolOperands(),
-                                    alloc.getAlignmentAttr());
+    auto origType = mlir::cast<mlir::MemRefType>(alloc.getResult().getType());
+    auto dstType = mlir::cast<mlir::MemRefType>(op.getType());
+    if (origType.getElementType() == dstType.getElementType())
+      return mlir::failure();
+
+    auto allocDstType =
+        mlir::MemRefType::get(dstType.getShape(), dstType.getElementType(),
+                              dstType.getLayout(), origType.getMemorySpace());
+    mlir::Value res = rewriter.create<Op>(
+        alloc.getLoc(), allocDstType, alloc.getDynamicSizes(),
+        alloc.getSymbolOperands(), alloc.getAlignmentAttr());
+    if (allocDstType != dstType)
+      res = rewriter.create<numba::util::SignCastOp>(op.getLoc(), dstType, res);
+
+    rewriter.replaceOp(op, res);
     rewriter.eraseOp(alloc);
     return mlir::success();
   }
