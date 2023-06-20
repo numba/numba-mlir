@@ -1456,25 +1456,27 @@ struct SignCastTensorCollapseShapePropagate
   }
 };
 
-template <typename BuffOp>
-struct SignCastBuferizationPropagate : public mlir::OpRewritePattern<BuffOp> {
-  using mlir::OpRewritePattern<BuffOp>::OpRewritePattern;
+struct SignCastTensorExtractPropagate
+    : public mlir::OpRewritePattern<mlir::tensor::ExtractOp> {
+  using OpRewritePattern::OpRewritePattern;
 
   mlir::LogicalResult
-  matchAndRewrite(BuffOp op, mlir::PatternRewriter &rewriter) const override {
-    auto signCast =
-        op->getOperand(0).template getDefiningOp<numba::util::SignCastOp>();
+  matchAndRewrite(mlir::tensor::ExtractOp op,
+                  mlir::PatternRewriter &rewriter) const override {
+    auto signCast = op.getTensor().getDefiningOp<numba::util::SignCastOp>();
     if (!signCast)
       return mlir::failure();
 
-    auto src = signCast.getSource();
-    auto srcType = src.getType().template cast<mlir::ShapedType>();
-    auto dstType = op.getType().template cast<mlir::ShapedType>();
-    auto newDstType = dstType.clone(srcType.getElementType());
-
     auto loc = op.getLoc();
-    auto res = rewriter.create<BuffOp>(loc, newDstType, src);
-    rewriter.replaceOpWithNewOp<numba::util::SignCastOp>(op, dstType, res);
+    auto src = signCast.getSource();
+    auto newOp = rewriter.createOrFold<mlir::tensor::ExtractOp>(
+        loc, src, op.getIndices());
+
+    if (newOp.getType() != op.getType())
+      newOp =
+          rewriter.create<numba::util::SignCastOp>(loc, op.getType(), newOp);
+
+    rewriter.replaceOp(op, newOp);
     return mlir::success();
   }
 };
@@ -1491,10 +1493,16 @@ struct SignCastSubviewPropagate : public mlir::OpRewritePattern<ViewOp> {
       return mlir::failure();
 
     auto src = signCast.getSource();
-    auto srcType = src.getType().template cast<ArrType>();
-    auto dstType = op.getType().template cast<ArrType>();
-    auto newDstType =
-        dstType.clone(srcType.getElementType()).template cast<ArrType>();
+    auto srcType = mlir::cast<ArrType>(src.getType());
+    auto dstType = mlir::cast<ArrType>(op.getType());
+    ArrType newDstType;
+    if constexpr (std::is_same<ArrType, mlir::MemRefType>::value) {
+      newDstType =
+          mlir::MemRefType::get(dstType.getShape(), srcType.getElementType(),
+                                dstType.getLayout(), srcType.getMemorySpace());
+    } else {
+      newDstType = mlir::cast<ArrType>(dstType.clone(srcType.getElementType()));
+    }
 
     auto loc = op.getLoc();
     auto res =
@@ -1678,8 +1686,7 @@ void SignCastOp::getCanonicalizationPatterns(::mlir::RewritePatternSet &results,
       SignCastStorePropagate, SignCastAllocPropagate<mlir::memref::AllocOp>,
       SignCastAllocPropagate<mlir::memref::AllocaOp>,
       SignCastTensorFromElementsPropagate, SignCastTensorCollapseShapePropagate,
-      SignCastBuferizationPropagate<mlir::bufferization::ToMemrefOp>,
-      SignCastBuferizationPropagate<mlir::bufferization::ToTensorOp>,
+      SignCastTensorExtractPropagate,
       SignCastSubviewPropagate<mlir::tensor::ExtractSliceOp,
                                mlir::RankedTensorType>,
       SignCastSubviewPropagate<mlir::memref::SubViewOp, mlir::MemRefType>,
