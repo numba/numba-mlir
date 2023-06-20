@@ -1334,7 +1334,7 @@ struct LowerBuiltinCalls : public mlir::OpRewritePattern<mlir::func::CallOp> {
 };
 
 static bool isValidArraySig(mlir::func::CallOp op) {
-  if (op->getNumResults() != 1)
+  if (op.getNumResults() != 1)
     return false;
 
   auto res = op.getResult(0);
@@ -1444,11 +1444,90 @@ struct LowerKernelAllocCalls
   }
 };
 
+static bool isValidAtomicSig(mlir::func::CallOp op) {
+  if (op.getNumResults() != 1 || op.getNumOperands() != 2)
+    return false;
+
+  auto res = op.getResult(0);
+  auto arr = op.getOperand(0);
+  auto val = op.getOperand(1);
+
+  auto arrType = mlir::dyn_cast<numba::ntensor::NTensorType>(arr.getType());
+  if (!arrType)
+    return false;
+
+  auto elemType = arrType.getElementType();
+  return res.getType() == elemType && val.getType() == elemType;
+}
+
+struct LowerKernelAtomicCalls
+    : public mlir::OpRewritePattern<mlir::func::CallOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(mlir::func::CallOp op,
+                  mlir::PatternRewriter &rewriter) const override {
+    if (!isValidAtomicSig(op))
+      return mlir::failure();
+
+    using RMWK = mlir::arith::AtomicRMWKind;
+
+    const std::tuple<mlir::StringRef, RMWK, RMWK> handlers[] = {
+        {"atomic_add_", RMWK::addi, RMWK::addf}};
+
+    auto val = op.getOperand(1);
+    auto kind = [&]() -> std::optional<RMWK> {
+      auto name = op.getCallee();
+      for (auto &&[funcName, iKind, fKind] : handlers) {
+        if (name.starts_with(funcName)) {
+          bool isFloat = mlir::isa<mlir::FloatType>(val.getType());
+          return isFloat ? fKind : iKind;
+        }
+      }
+      return std::nullopt;
+    }();
+    if (!kind)
+      return mlir::failure();
+
+    auto arr = op.getOperand(0);
+
+    auto arrType = mlir::cast<numba::ntensor::NTensorType>(arr.getType());
+    auto memrefType =
+        mlir::MemRefType::get(arrType.getShape(), arrType.getElementType());
+    auto signlessMemerefType = numba::makeSignlessType(memrefType);
+
+    auto loc = op.getLoc();
+    mlir::Value memref =
+        rewriter.create<numba::ntensor::ToMemrefOp>(loc, memrefType, arr);
+    if (memrefType != signlessMemerefType)
+      memref = rewriter.create<numba::util::SignCastOp>(
+          loc, signlessMemerefType, memref);
+
+    auto signelessElemType = signlessMemerefType.getElementType();
+    if (val.getType() != signelessElemType)
+      val =
+          rewriter.create<numba::util::SignCastOp>(loc, signelessElemType, val);
+
+    mlir::Value zero = rewriter.create<mlir::arith::ConstantIndexOp>(loc, 0);
+    llvm::SmallVector<mlir::Value> indices(memrefType.getRank(), zero);
+
+    mlir::Value newRes = rewriter.create<mlir::memref::AtomicRMWOp>(
+        loc, *kind, val, memref, indices);
+
+    auto resType = op.getResult(0).getType();
+    if (newRes.getType() != resType)
+      newRes = rewriter.create<numba::util::SignCastOp>(loc, resType, newRes);
+
+    rewriter.replaceOp(op, newRes);
+    return mlir::success();
+  }
+};
+
 struct LowerGpuBuiltinsPass
     : public numba::RewriteWrapperPass<
           LowerGpuBuiltinsPass, void,
           numba::DependentDialectsList<mlir::gpu::GPUDialect>, LowerPlierCalls,
-          LowerKernelAllocCalls> {};
+          LowerKernelAllocCalls, LowerKernelAtomicCalls> {};
 
 static std::optional<gpu_runtime::FenceFlags>
 getFenceFlags(mlir::OpFoldResult arg) {

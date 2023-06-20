@@ -1123,6 +1123,23 @@ struct ChangeLayoutEnvRegion
   }
 };
 
+struct ChangeLayoutAtomicRMW
+    : public mlir::OpRewritePattern<mlir::memref::AtomicRMWOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(mlir::memref::AtomicRMWOp op,
+                  mlir::PatternRewriter &rewriter) const override {
+    auto cl = op.getMemref().getDefiningOp<numba::util::ChangeLayoutOp>();
+    if (!cl)
+      return mlir::failure();
+
+    rewriter.replaceOpWithNewOp<mlir::memref::AtomicRMWOp>(
+        op, op.getKind(), op.getValue(), cl.getSource(), op.getIndices());
+    return mlir::success();
+  }
+};
+
 } // namespace
 
 void ChangeLayoutOp::getCanonicalizationPatterns(
@@ -1134,7 +1151,7 @@ void ChangeLayoutOp::getCanonicalizationPatterns(
               ChangeLayoutLinalgGeneric, ChangeLayoutLinalgFill, ChangeLayoutIf,
               ChangeLayout1DReshape, ChangeLayoutSliceGetItem, ChangeLayoutCopy,
               ChangeLayoutExpandShape, ChangeLayoutSelect,
-              ChangeLayoutEnvRegion>(context);
+              ChangeLayoutEnvRegion, ChangeLayoutAtomicRMW>(context);
 }
 
 bool ChangeLayoutOp::areCastCompatible(mlir::TypeRange inputs,
@@ -1456,25 +1473,64 @@ struct SignCastTensorCollapseShapePropagate
   }
 };
 
-template <typename BuffOp>
-struct SignCastBuferizationPropagate : public mlir::OpRewritePattern<BuffOp> {
-  using mlir::OpRewritePattern<BuffOp>::OpRewritePattern;
+struct SignCastTensorExtractPropagate
+    : public mlir::OpRewritePattern<mlir::tensor::ExtractOp> {
+  using OpRewritePattern::OpRewritePattern;
 
   mlir::LogicalResult
-  matchAndRewrite(BuffOp op, mlir::PatternRewriter &rewriter) const override {
-    auto signCast =
-        op->getOperand(0).template getDefiningOp<numba::util::SignCastOp>();
+  matchAndRewrite(mlir::tensor::ExtractOp op,
+                  mlir::PatternRewriter &rewriter) const override {
+    auto signCast = op.getTensor().getDefiningOp<numba::util::SignCastOp>();
     if (!signCast)
       return mlir::failure();
 
+    auto loc = op.getLoc();
     auto src = signCast.getSource();
-    auto srcType = src.getType().template cast<mlir::ShapedType>();
-    auto dstType = op.getType().template cast<mlir::ShapedType>();
-    auto newDstType = dstType.clone(srcType.getElementType());
+    auto newOp = rewriter.createOrFold<mlir::tensor::ExtractOp>(
+        loc, src, op.getIndices());
+
+    if (newOp.getType() != op.getType())
+      newOp =
+          rewriter.create<numba::util::SignCastOp>(loc, op.getType(), newOp);
+
+    rewriter.replaceOp(op, newOp);
+    return mlir::success();
+  }
+};
+
+struct SignCastMemrefAtomicRMWPropagate
+    : public mlir::OpRewritePattern<mlir::memref::AtomicRMWOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(mlir::memref::AtomicRMWOp op,
+                  mlir::PatternRewriter &rewriter) const override {
+    auto signCast = op.getMemref().getDefiningOp<numba::util::SignCastOp>();
+    if (!signCast)
+      return mlir::failure();
 
     auto loc = op.getLoc();
-    auto res = rewriter.create<BuffOp>(loc, newDstType, src);
-    rewriter.replaceOpWithNewOp<numba::util::SignCastOp>(op, dstType, res);
+    auto src = signCast.getSource();
+
+    auto memrefType = mlir::cast<mlir::MemRefType>(src.getType());
+    auto newElemType = memrefType.getElementType();
+    if (auto intType = mlir::dyn_cast<mlir::IntegerType>(newElemType))
+      if (!intType.isSignless())
+        return mlir::failure();
+
+    auto val = op.getValue();
+
+    if (val.getType() != newElemType)
+      val = rewriter.create<numba::util::SignCastOp>(loc, newElemType, val);
+
+    mlir::Value newOp = rewriter.create<mlir::memref::AtomicRMWOp>(
+        loc, op.getKind(), val, src, op.getIndices());
+
+    if (newOp.getType() != op.getType())
+      newOp =
+          rewriter.create<numba::util::SignCastOp>(loc, op.getType(), newOp);
+
+    rewriter.replaceOp(op, newOp);
     return mlir::success();
   }
 };
@@ -1491,10 +1547,16 @@ struct SignCastSubviewPropagate : public mlir::OpRewritePattern<ViewOp> {
       return mlir::failure();
 
     auto src = signCast.getSource();
-    auto srcType = src.getType().template cast<ArrType>();
-    auto dstType = op.getType().template cast<ArrType>();
-    auto newDstType =
-        dstType.clone(srcType.getElementType()).template cast<ArrType>();
+    auto srcType = mlir::cast<ArrType>(src.getType());
+    auto dstType = mlir::cast<ArrType>(op.getType());
+    ArrType newDstType;
+    if constexpr (std::is_same<ArrType, mlir::MemRefType>::value) {
+      newDstType =
+          mlir::MemRefType::get(dstType.getShape(), srcType.getElementType(),
+                                dstType.getLayout(), srcType.getMemorySpace());
+    } else {
+      newDstType = mlir::cast<ArrType>(dstType.clone(srcType.getElementType()));
+    }
 
     auto loc = op.getLoc();
     auto res =
@@ -1678,8 +1740,7 @@ void SignCastOp::getCanonicalizationPatterns(::mlir::RewritePatternSet &results,
       SignCastStorePropagate, SignCastAllocPropagate<mlir::memref::AllocOp>,
       SignCastAllocPropagate<mlir::memref::AllocaOp>,
       SignCastTensorFromElementsPropagate, SignCastTensorCollapseShapePropagate,
-      SignCastBuferizationPropagate<mlir::bufferization::ToMemrefOp>,
-      SignCastBuferizationPropagate<mlir::bufferization::ToTensorOp>,
+      SignCastTensorExtractPropagate, SignCastMemrefAtomicRMWPropagate,
       SignCastSubviewPropagate<mlir::tensor::ExtractSliceOp,
                                mlir::RankedTensorType>,
       SignCastSubviewPropagate<mlir::memref::SubViewOp, mlir::MemRefType>,

@@ -813,6 +813,59 @@ private:
   }
 };
 
+/// Try to match the kind of a memref.atomic_rmw to determine whether to use a
+/// lowering to llvm.atomicrmw or fallback to llvm.cmpxchg.
+static std::optional<mlir::LLVM::AtomicBinOp>
+matchSimpleAtomicOp(mlir::memref::AtomicRMWOp atomicOp) {
+  using namespace mlir;
+  switch (atomicOp.getKind()) {
+  case arith::AtomicRMWKind::addf:
+    return LLVM::AtomicBinOp::fadd;
+  case arith::AtomicRMWKind::addi:
+    return LLVM::AtomicBinOp::add;
+  case arith::AtomicRMWKind::assign:
+    return LLVM::AtomicBinOp::xchg;
+  case arith::AtomicRMWKind::maxs:
+    return LLVM::AtomicBinOp::max;
+  case arith::AtomicRMWKind::maxu:
+    return LLVM::AtomicBinOp::umax;
+  case arith::AtomicRMWKind::mins:
+    return LLVM::AtomicBinOp::min;
+  case arith::AtomicRMWKind::minu:
+    return LLVM::AtomicBinOp::umin;
+  case arith::AtomicRMWKind::ori:
+    return LLVM::AtomicBinOp::_or;
+  case arith::AtomicRMWKind::andi:
+    return LLVM::AtomicBinOp::_and;
+  default:
+    return std::nullopt;
+  }
+  llvm_unreachable("Invalid AtomicRMWKind");
+}
+
+// TODO: upstream fixes
+struct AtomicRMWOpLowering
+    : public mlir::ConvertOpToLLVMPattern<mlir::memref::AtomicRMWOp> {
+  using ConvertOpToLLVMPattern::ConvertOpToLLVMPattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(mlir::memref::AtomicRMWOp atomicOp,
+                  mlir::memref::AtomicRMWOp::Adaptor adaptor,
+                  mlir::ConversionPatternRewriter &rewriter) const override {
+    auto maybeKind = matchSimpleAtomicOp(atomicOp);
+    if (!maybeKind)
+      return mlir::failure();
+    auto memRefType = atomicOp.getMemRefType();
+    auto dataPtr =
+        getStridedElementPtr(atomicOp.getLoc(), memRefType, adaptor.getMemref(),
+                             adaptor.getIndices(), rewriter);
+    rewriter.replaceOpWithNewOp<mlir::LLVM::AtomicRMWOp>(
+        atomicOp, *maybeKind, dataPtr, adaptor.getValue(),
+        mlir::LLVM::AtomicOrdering::acq_rel);
+    return mlir::success();
+  }
+};
+
 struct AllocOpLowering : public mlir::AllocLikeOpLLVMLowering {
   AllocOpLowering(mlir::LLVMTypeConverter &converter)
       : AllocLikeOpLLVMLowering(mlir::memref::AllocOp::getOperationName(),
@@ -1515,12 +1568,12 @@ struct LLVMLoweringPass
     arith::populateArithToLLVMConversionPatterns(typeConverter, patterns);
     populateComplexToLLVMConversionPatterns(typeConverter, patterns);
 
-    patterns.insert<AllocOpLowering, DeallocOpLowering, LowerRetainOp>(
-        typeConverter);
+    patterns.insert<AllocOpLowering, DeallocOpLowering, LowerRetainOp,
+                    AtomicRMWOpLowering>(typeConverter);
 
     LLVMConversionTarget target(context);
     target.addIllegalDialect<mlir::func::FuncDialect>();
-    target.addIllegalOp<numba::util::RetainOp>();
+    target.addIllegalOp<numba::util::RetainOp, mlir::memref::AtomicRMWOp>();
 
     if (failed(applyPartialConversion(m, target, std::move(patterns))))
       signalPassFailure();

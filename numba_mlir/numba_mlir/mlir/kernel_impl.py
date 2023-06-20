@@ -247,16 +247,28 @@ class atomic(Stub):
 def _define_atomic_funcs():
     funcs = ["add", "sub"]
 
-    def get_func(func_name):
-        def api_func_impl(builder, arr, idx, val):
-            if not (isinstance(idx, int) and idx == 0):
-                arr = builder.subview(arr, idx)
+    def get_func(func_name, sub):
+        if sub:
 
-            dtype = arr.dtype
-            val = builder.cast(val, dtype)
-            return builder.external_call(
-                f"{func_name}_{dtype_str(builder, dtype)}", (arr, val), val
-            )
+            def api_func_impl(builder, arr, idx, val):
+                if not (isinstance(idx, int) and literal(idx) == 0):
+                    arr = builder.subview(arr, idx)
+
+                dtype = arr.dtype
+                val = builder.cast(-val, dtype)
+                fname = f"atomic_add_{dtype_str(builder, dtype)}"
+                return builder.external_call(fname, (arr, val), val)
+
+        else:
+
+            def api_func_impl(builder, arr, idx, val):
+                if not (isinstance(idx, int) and literal(idx) == 0):
+                    arr = builder.subview(arr, idx)
+
+                dtype = arr.dtype
+                val = builder.cast(val, dtype)
+                fname = f"{func_name}_{dtype_str(builder, dtype)}"
+                return builder.external_call(fname, (arr, val), val)
 
         return api_func_impl
 
@@ -282,7 +294,7 @@ def _define_atomic_funcs():
         setattr(this_module, func_name, func)
 
         infer_global(func)(_AtomicId)
-        registry.register_func(func_name, func)(get_func(func_name))
+        registry.register_func(func_name, func)(get_func(func_name, name == "sub"))
         setattr(atomic, name, func)
 
 

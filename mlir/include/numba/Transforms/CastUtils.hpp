@@ -10,6 +10,7 @@ class Location;
 class OpBuilder;
 class Type;
 class IntegerType;
+class MemRefType;
 } // namespace mlir
 
 namespace numba {
@@ -20,6 +21,7 @@ mlir::Value indexCast(mlir::OpBuilder &builder, mlir::Location loc,
 
 mlir::Type makeSignlessType(mlir::Type type);
 mlir::IntegerType makeSignlessType(mlir::IntegerType type);
+mlir::MemRefType makeSignlessType(mlir::MemRefType type);
 
 bool canConvert(mlir::Type srcType, mlir::Type dstType);
 mlir::Value doConvert(mlir::OpBuilder &rewriter, mlir::Location loc,
