@@ -136,6 +136,8 @@ struct InsertGPUAllocs
         return {{load.getMemref()}};
       } else if (auto store = mlir::dyn_cast<mlir::memref::StoreOp>(op)) {
         return {{store.getMemref()}};
+      } else if (auto atomic = mlir::dyn_cast<mlir::memref::AtomicRMWOp>(op)) {
+        return {{atomic.getMemref()}};
       } else if (auto call = mlir::dyn_cast<mlir::func::CallOp>(op)) {
         mlir::SmallVector<mlir::Value, 4> ret;
         for (auto arg : call.getOperands()) {
@@ -150,6 +152,10 @@ struct InsertGPUAllocs
     };
 
     auto hasMemAccess = [](mlir::Operation *op) -> bool {
+      // TODO: Add MemoryEffectOpInterface to AtomicRMWOp.
+      if (mlir::isa<mlir::memref::AtomicRMWOp>(op))
+        return true;
+
       if (auto memInterface =
               mlir::dyn_cast<mlir::MemoryEffectOpInterface>(op)) {
         if (memInterface.hasEffect<mlir::MemoryEffects::Read>() ||
@@ -311,6 +317,28 @@ struct InsertGPUAllocs
 
             continue;
           }
+
+          if (auto atomic = mlir::dyn_cast<mlir::memref::AtomicRMWOp>(user)) {
+            // TODO: Add MemoryEffectOpInterface to AtomicRMWOp.
+            bool onDevice = user->getParentOfType<mlir::gpu::LaunchOp>();
+            (onDevice ? ret.deviceRead : ret.hostRead) = true;
+            (onDevice ? ret.deviceWrite : ret.hostWrite) = true;
+
+            if (onDevice) {
+              auto env = getEnv(user);
+              if (mlir::succeeded(env)) {
+                assert(*env && "Invalid device");
+                if (!ret.env) {
+                  ret.env = *env;
+                } else if (ret.env != *env) {
+                  return user->emitError("Device conflict: ")
+                         << ret.env << " and " << *env;
+                }
+              }
+            }
+            continue;
+          }
+
           if (auto call = mlir::dyn_cast<mlir::func::CallOp>(user)) {
             bool onDevice = isDeviceFuncCall(call);
             (onDevice ? ret.deviceRead : ret.hostRead) = true;
