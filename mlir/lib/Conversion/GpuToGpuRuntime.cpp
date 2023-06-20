@@ -880,97 +880,67 @@ public:
 
 template <typename Op>
 static mlir::Value lowerIntAtomic(mlir::OpBuilder &builder, mlir::Location loc,
-                                  mlir::Value ptr, mlir::Value val) {
-  return builder.create<Op>(loc, ptr, mlir::spirv::Scope::Device,
-                            mlir::spirv::MemorySemantics::None, val);
+                                  mlir::Value ptr, mlir::Value val,
+                                  mlir::spirv::Scope scope) {
+  return builder.create<Op>(
+      loc, ptr, scope, mlir::spirv::MemorySemantics::SequentiallyConsistent,
+      val);
 }
 
-static mlir::Value lowerFloatAddAtomic(mlir::OpBuilder &builder,
-                                       mlir::Location loc, mlir::Value ptr,
-                                       mlir::Value val) {
-  return builder.create<mlir::spirv::EXTAtomicFAddOp>(
-      loc, val.getType(), ptr, mlir::spirv::Scope::Device,
-      mlir::spirv::MemorySemantics::None, val);
+template <typename Op>
+static mlir::Value lowerFloatAtomic(mlir::OpBuilder &builder,
+                                    mlir::Location loc, mlir::Value ptr,
+                                    mlir::Value val, mlir::spirv::Scope scope) {
+  return builder.create<Op>(
+      loc, val.getType(), ptr, scope,
+      mlir::spirv::MemorySemantics::SequentiallyConsistent, val);
 }
 
-static mlir::Value lowerFloatSubAtomic(mlir::OpBuilder &builder,
-                                       mlir::Location loc, mlir::Value ptr,
-                                       mlir::Value val) {
-  auto neg = builder.create<mlir::spirv::FNegateOp>(loc, val).getResult();
-  return builder.create<mlir::spirv::EXTAtomicFAddOp>(
-      loc, neg.getType(), ptr, mlir::spirv::Scope::Device,
-      mlir::spirv::MemorySemantics::None, neg);
-}
-
-class ConvertAtomicOps : public mlir::OpConversionPattern<mlir::func::CallOp> {
-public:
-  ConvertAtomicOps(mlir::TypeConverter &typeConverter,
-                   mlir::MLIRContext *context)
-      : mlir::OpConversionPattern<mlir::func::CallOp>(typeConverter, context,
-                                                      /*benefit*/ 10) {}
+struct ConvertAtomicRMW
+    : public mlir::OpConversionPattern<mlir::memref::AtomicRMWOp> {
+  using OpConversionPattern::OpConversionPattern;
 
   mlir::LogicalResult
-  matchAndRewrite(mlir::func::CallOp op, mlir::func::CallOp::Adaptor adaptor,
+  matchAndRewrite(mlir::memref::AtomicRMWOp op,
+                  mlir::memref::AtomicRMWOp::Adaptor adaptor,
                   mlir::ConversionPatternRewriter &rewriter) const override {
-    auto operands = adaptor.getOperands();
-    if (operands.size() != 2)
+    if (!llvm::all_of(op.getIndices(),
+                      [](auto v) { return mlir::isConstantIntValue(v, 0); }))
       return mlir::failure();
 
-    if (op.getNumResults() != 1)
+    auto mem = adaptor.getMemref();
+    auto memType = mlir::dyn_cast<mlir::spirv::PointerType>(mem.getType());
+    if (!mem)
       return mlir::failure();
 
-    auto ptr = operands[0];
-    auto ptrType = ptr.getType().dyn_cast<mlir::spirv::PointerType>();
-    if (!ptrType)
-      return mlir::failure();
+    auto storageClass = memType.getStorageClass();
+    auto scope = mlir::spirv::StorageClass::Workgroup == storageClass
+                     ? mlir::spirv::Scope::Workgroup
+                     : mlir::spirv::Scope::Device;
 
-    auto val = operands[1];
-    auto valType = val.getType();
-    if (ptrType.getPointeeType() != valType)
-      return mlir::failure();
+    auto val = adaptor.getValue();
 
-    bool isInt;
-    if (valType.isSignlessInteger())
-      isInt = true;
-    else if (valType.isa<mlir::FloatType>())
-      isInt = false;
-    else
-      return mlir::failure();
+    using func_t =
+        mlir::Value (*)(mlir::OpBuilder &, mlir::Location, mlir::Value,
+                        mlir::Value, mlir::spirv::Scope);
 
-    auto funcName = op.getCallee();
-
-    using func_t = mlir::Value (*)(mlir::OpBuilder &, mlir::Location,
-                                   mlir::Value, mlir::Value);
-
-    struct Desc {
-      mlir::StringRef name;
-      func_t intOp;
-      func_t floatOp;
+    using RMWK = mlir::arith::AtomicRMWKind;
+    const std::pair<RMWK, func_t> handlers[] = {
+        {RMWK::addi, &lowerIntAtomic<mlir::spirv::AtomicIAddOp>},
+        {RMWK::addf, &lowerFloatAtomic<mlir::spirv::EXTAtomicFAddOp>},
     };
 
-    const Desc handlers[] = {
-        {"atomic_add", &lowerIntAtomic<mlir::spirv::AtomicIAddOp>,
-         &lowerFloatAddAtomic},
-        {"atomic_sub", &lowerIntAtomic<mlir::spirv::AtomicISubOp>,
-         &lowerFloatSubAtomic},
-    };
+    auto kind = adaptor.getKind();
+    for (auto &&[k, h] : handlers) {
+      if (k == kind) {
+        mlir::Value res = h(rewriter, op.getLoc(), mem, val, scope);
+        if (!res)
+          continue;
 
-    auto handler = [&]() -> func_t {
-      for (auto &h : handlers) {
-        if (funcName.consume_front(h.name))
-          return (isInt ? h.intOp : h.floatOp);
-      }
-      return nullptr;
-    }();
-
-    if (handler) {
-      auto res = handler(rewriter, op.getLoc(), ptr, val);
-      if (res) {
         rewriter.replaceOp(op, res);
         return mlir::success();
       }
     }
-
     return mlir::failure();
   }
 };
@@ -1318,7 +1288,7 @@ struct GPUToSpirvPass
           ConvertReinterpretCastOp, ConvertCastOp<mlir::memref::CastOp>,
           ConvertBitcastOp<numba::util::BitcastOp>,
           ConvertBitcastOp<numba::util::MemrefBitcastOp>, ConvertLoadOp,
-          ConvertStoreOp, ConvertAtomicOps, AllocaOpPattern, ConvertFunc,
+          ConvertStoreOp, ConvertAtomicRMW, AllocaOpPattern, ConvertFunc,
           ConvertAssert, ConvertBarrierOp, ConvertMemFenceOp, ConvertUndef,
           ConvertGlobalOp, ConvertGetGlobalOp>(typeConverter, context);
 
