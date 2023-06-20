@@ -1498,6 +1498,43 @@ struct SignCastTensorExtractPropagate
   }
 };
 
+struct SignCastMemrefAtomicRMWPropagate
+    : public mlir::OpRewritePattern<mlir::memref::AtomicRMWOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(mlir::memref::AtomicRMWOp op,
+                  mlir::PatternRewriter &rewriter) const override {
+    auto signCast = op.getMemref().getDefiningOp<numba::util::SignCastOp>();
+    if (!signCast)
+      return mlir::failure();
+
+    auto loc = op.getLoc();
+    auto src = signCast.getSource();
+
+    auto memrefType = mlir::cast<mlir::MemRefType>(src.getType());
+    auto newElemType = memrefType.getElementType();
+    if (auto intType = mlir::dyn_cast<mlir::IntegerType>(newElemType))
+      if (!intType.isSignless())
+        return mlir::failure();
+
+    auto val = op.getValue();
+
+    if (val.getType() != newElemType)
+      val = rewriter.create<numba::util::SignCastOp>(loc, newElemType, val);
+
+    mlir::Value newOp = rewriter.create<mlir::memref::AtomicRMWOp>(
+        loc, op.getKind(), val, src, op.getIndices());
+
+    if (newOp.getType() != op.getType())
+      newOp =
+          rewriter.create<numba::util::SignCastOp>(loc, op.getType(), newOp);
+
+    rewriter.replaceOp(op, newOp);
+    return mlir::success();
+  }
+};
+
 template <typename ViewOp, typename ArrType>
 struct SignCastSubviewPropagate : public mlir::OpRewritePattern<ViewOp> {
   using mlir::OpRewritePattern<ViewOp>::OpRewritePattern;
@@ -1703,7 +1740,7 @@ void SignCastOp::getCanonicalizationPatterns(::mlir::RewritePatternSet &results,
       SignCastStorePropagate, SignCastAllocPropagate<mlir::memref::AllocOp>,
       SignCastAllocPropagate<mlir::memref::AllocaOp>,
       SignCastTensorFromElementsPropagate, SignCastTensorCollapseShapePropagate,
-      SignCastTensorExtractPropagate,
+      SignCastTensorExtractPropagate, SignCastMemrefAtomicRMWPropagate,
       SignCastSubviewPropagate<mlir::tensor::ExtractSliceOp,
                                mlir::RankedTensorType>,
       SignCastSubviewPropagate<mlir::memref::SubViewOp, mlir::MemRefType>,
