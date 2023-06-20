@@ -48,12 +48,24 @@ mlir::Type numba::makeSignlessType(mlir::Type type) {
   if (auto intType = type.dyn_cast<mlir::IntegerType>())
     return makeSignlessType(intType);
 
+  if (auto memrefType = type.dyn_cast<mlir::MemRefType>())
+    return makeSignlessType(memrefType);
+
   return type;
 }
 
 mlir::IntegerType numba::makeSignlessType(mlir::IntegerType type) {
   if (!type.isSignless())
     return mlir::IntegerType::get(type.getContext(), type.getWidth());
+
+  return type;
+}
+
+mlir::MemRefType numba::makeSignlessType(mlir::MemRefType type) {
+  auto oldElemType = type.getElementType();
+  auto newElemType = makeSignlessType(oldElemType);
+  if (newElemType != oldElemType)
+    return mlir::cast<mlir::MemRefType>(type.clone(newElemType));
 
   return type;
 }
