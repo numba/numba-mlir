@@ -1123,6 +1123,23 @@ struct ChangeLayoutEnvRegion
   }
 };
 
+struct ChangeLayoutAtomicRMW
+    : public mlir::OpRewritePattern<mlir::memref::AtomicRMWOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(mlir::memref::AtomicRMWOp op,
+                  mlir::PatternRewriter &rewriter) const override {
+    auto cl = op.getMemref().getDefiningOp<numba::util::ChangeLayoutOp>();
+    if (!cl)
+      return mlir::failure();
+
+    rewriter.replaceOpWithNewOp<mlir::memref::AtomicRMWOp>(
+        op, op.getKind(), op.getValue(), cl.getSource(), op.getIndices());
+    return mlir::success();
+  }
+};
+
 } // namespace
 
 void ChangeLayoutOp::getCanonicalizationPatterns(
@@ -1134,7 +1151,7 @@ void ChangeLayoutOp::getCanonicalizationPatterns(
               ChangeLayoutLinalgGeneric, ChangeLayoutLinalgFill, ChangeLayoutIf,
               ChangeLayout1DReshape, ChangeLayoutSliceGetItem, ChangeLayoutCopy,
               ChangeLayoutExpandShape, ChangeLayoutSelect,
-              ChangeLayoutEnvRegion>(context);
+              ChangeLayoutEnvRegion, ChangeLayoutAtomicRMW>(context);
 }
 
 bool ChangeLayoutOp::areCastCompatible(mlir::TypeRange inputs,
