@@ -18,6 +18,7 @@
 #include <mlir/Dialect/Bufferization/IR/Bufferization.h>
 #include <mlir/Dialect/GPU/IR/GPUDialect.h>
 #include <mlir/Dialect/Linalg/IR/Linalg.h>
+#include <mlir/Dialect/Math/IR/Math.h>
 #include <mlir/Dialect/MemRef/IR/MemRef.h>
 #include <mlir/Dialect/SCF/IR/SCF.h>
 #include <mlir/Dialect/SPIRV/IR/SPIRVOps.h>
@@ -1726,6 +1727,32 @@ struct SignCastIfPropagate : public mlir::OpRewritePattern<mlir::scf::IfOp> {
   }
 };
 
+struct SignCastChainPropagate
+    : public mlir::OpRewritePattern<numba::util::SignCastOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(numba::util::SignCastOp op,
+                  mlir::PatternRewriter &rewriter) const override {
+    auto prev = op.getSource().getDefiningOp<numba::util::SignCastOp>();
+    if (!prev)
+      return mlir::failure();
+
+    auto src = prev.getSource();
+    auto srcType = src.getType();
+    auto dstType = op.getType();
+    if (srcType == dstType) {
+      rewriter.replaceOp(op, src);
+      return mlir::success();
+    }
+    if (!numba::util::SignCastOp::areCastCompatible(srcType, dstType))
+      return mlir::failure();
+
+    rewriter.replaceOpWithNewOp<numba::util::SignCastOp>(op, dstType, src);
+    return mlir::success();
+  }
+};
+
 } // namespace
 
 void SignCastOp::getCanonicalizationPatterns(::mlir::RewritePatternSet &results,
@@ -1745,7 +1772,14 @@ void SignCastOp::getCanonicalizationPatterns(::mlir::RewritePatternSet &results,
                                mlir::RankedTensorType>,
       SignCastSubviewPropagate<mlir::memref::SubViewOp, mlir::MemRefType>,
       SignCastForPropagate, SignCastIfPropagate<numba::util::SignCastOp>,
-      SignCastIfPropagate<mlir::memref::CastOp>>(context);
+      SignCastIfPropagate<mlir::memref::CastOp>, SignCastChainPropagate>(
+      context);
+}
+
+bool SignCastOp::areCastCompatible(mlir::TypeRange /*inputs*/,
+                                   mlir::TypeRange /*outputs*/) {
+  // TODO: actually check something.
+  return true;
 }
 
 void TakeContextOp::build(mlir::OpBuilder &b, mlir::OperationState &result,
@@ -2179,11 +2213,35 @@ struct SelectOfUndef : public mlir::OpRewritePattern<mlir::arith::SelectOp> {
     return mlir::success();
   }
 };
+
+struct ReplaceUndefUse : public mlir::OpRewritePattern<numba::util::UndefOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(numba::util::UndefOp op,
+                  mlir::PatternRewriter &rewriter) const override {
+    bool changed = false;
+    for (auto &use : llvm::make_early_inc_range(op->getUses())) {
+      auto owner = use.getOwner();
+      if (!mlir::isa<mlir::arith::ArithDialect, mlir::math::MathDialect>(
+              owner->getDialect()))
+        continue;
+
+      if (owner->getNumOperands() != 1 || owner->getNumResults() != 1)
+        continue;
+
+      auto resType = owner->getResult(0).getType();
+      rewriter.replaceOpWithNewOp<numba::util::UndefOp>(owner, resType);
+      changed = true;
+    }
+    return mlir::success(changed);
+  }
+};
 } // namespace
 
 void UndefOp::getCanonicalizationPatterns(mlir::RewritePatternSet &results,
                                           mlir::MLIRContext *context) {
-  results.insert<MergeUndefs, SelectOfUndef>(context);
+  results.insert<MergeUndefs, SelectOfUndef, ReplaceUndefUse>(context);
 }
 
 } // namespace util

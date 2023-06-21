@@ -212,6 +212,34 @@ def test_scalar(val, dtype):
 
 
 @require_gpu
+@pytest.mark.parametrize("val", _test_values)
+@pytest.mark.parametrize("dtype", [np.int32, np.int64, np.float32, np.float64])
+def test_scalar_cature(val, dtype):
+    get_id = get_global_id
+
+    def func(a, c):
+        i = get_id(0)
+        c[i] = a[i] + val
+
+    sim_func = kernel_sim(func)
+    gpu_func = kernel_cached(func)
+
+    a = np.arange(-6, 6, dtype=dtype)
+
+    sim_res = np.zeros(a.shape, a.dtype)
+    sim_func[a.shape, DEFAULT_LOCAL_SIZE](a, sim_res)
+
+    gpu_res = np.zeros(a.shape, a.dtype)
+
+    with print_pass_ir([], ["ConvertParallelLoopToGpu"]):
+        gpu_func[a.shape, DEFAULT_LOCAL_SIZE](a, gpu_res)
+        ir = get_print_buffer()
+        assert ir.count("gpu.launch blocks") == 1, ir
+
+    assert_equal(gpu_res, sim_res)
+
+
+@require_gpu
 def test_empty_kernel():
     def func(a):
         pass
@@ -1129,6 +1157,80 @@ def test_parfor_simple1():
     def py_func(a, b, c):
         for i in numba.prange(len(a)):
             c[i] = a[i] + b[i]
+
+    gpu_func = njit(py_func)
+
+    a = np.arange(1024, dtype=np.float32)
+    b = np.arange(1024, dtype=np.float32) * 3
+
+    sim_res = np.zeros(a.shape, a.dtype)
+    py_func(a, b, sim_res)
+
+    da = _from_host(a, buffer="device")
+    db = _from_host(b, buffer="shared")
+
+    gpu_res = np.zeros(a.shape, a.dtype)
+    dgpu_res = _from_host(gpu_res, buffer="device")
+
+    filter_string = dgpu_res.device.sycl_device.filter_string
+    with print_pass_ir([], ["ConvertParallelLoopToGpu"]):
+        gpu_func(da, db, dgpu_res)
+        ir = get_print_buffer()
+        assert (
+            ir.count(
+                f'numba_util.env_region #gpu_runtime.region_desc<device = "{filter_string}">'
+            )
+            > 0
+        ), ir
+        assert ir.count("gpu.launch blocks") == 1, ir
+
+    _to_host(dgpu_res, gpu_res)
+    assert_equal(gpu_res, sim_res)
+
+
+@require_dpctl
+@pytest.mark.parametrize("val", _test_values)
+def test_parfor_scalar(val):
+    def py_func(a, b, c, d):
+        for i in numba.prange(len(a)):
+            c[i] = a[i] + b[i] + d
+
+    gpu_func = njit(py_func)
+
+    a = np.arange(1024, dtype=np.float32)
+    b = np.arange(1024, dtype=np.float32) * 3
+
+    sim_res = np.zeros(a.shape, a.dtype)
+    py_func(a, b, sim_res, val)
+
+    da = _from_host(a, buffer="device")
+    db = _from_host(b, buffer="shared")
+
+    gpu_res = np.zeros(a.shape, a.dtype)
+    dgpu_res = _from_host(gpu_res, buffer="device")
+
+    filter_string = dgpu_res.device.sycl_device.filter_string
+    with print_pass_ir([], ["ConvertParallelLoopToGpu"]):
+        gpu_func(da, db, dgpu_res, val)
+        ir = get_print_buffer()
+        assert (
+            ir.count(
+                f'numba_util.env_region #gpu_runtime.region_desc<device = "{filter_string}">'
+            )
+            > 0
+        ), ir
+        assert ir.count("gpu.launch blocks") == 1, ir
+
+    _to_host(dgpu_res, gpu_res)
+    assert_equal(gpu_res, sim_res)
+
+
+@require_dpctl
+@pytest.mark.parametrize("val", _test_values)
+def test_parfor_scalar_capture(val):
+    def py_func(a, b, c):
+        for i in numba.prange(len(a)):
+            c[i] = a[i] + b[i] + val
 
     gpu_func = njit(py_func)
 

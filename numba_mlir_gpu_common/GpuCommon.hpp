@@ -38,6 +38,7 @@ enum class GpuAllocType { Device = 0, Shared = 1, Local = 2 };
 
 enum class GpuParamType : int32_t {
   null = 0,
+  bool_,
   int8,
   int16,
   int32,

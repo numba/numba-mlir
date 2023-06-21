@@ -286,6 +286,7 @@ private:
     using HandlerPtrT =
         bool (*)(sycl::handler &, uint32_t, const numba::GPUParamDesc &);
     const HandlerPtrT handlers[] = {
+        &setKernelArgImpl<numba::GpuParamType::bool_, bool>,
         &setKernelArgImpl<numba::GpuParamType::int8, int8_t>,
         &setKernelArgImpl<numba::GpuParamType::int16, int16_t>,
         &setKernelArgImpl<numba::GpuParamType::int32, int32_t>,

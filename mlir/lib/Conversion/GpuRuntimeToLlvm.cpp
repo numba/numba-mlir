@@ -429,6 +429,7 @@ static std::optional<mlir::TypedAttr> getGpuParamType(mlir::Type type) {
   using PType = numba::GpuParamType;
   const std::pair<CheckFuncT, PType> handlers[] = {
       // clang-format off
+      {&isInt<1>,    PType::bool_},
       {&isInt<8>,    PType::int8},
       {&isInt<16>,   PType::int16},
       {&isInt<32>,   PType::int32},
@@ -546,9 +547,13 @@ private:
         rewriter.create<mlir::LLVM::UndefOp>(loc, paramsArrayType);
 
     for (auto i : llvm::seq(0u, paramsCount)) {
-      auto typeAttr = getGpuParamType(getKernelParamType(i));
+      auto origParamType = getKernelParamType(i);
+      auto typeAttr = getGpuParamType(origParamType);
       if (!typeAttr)
-        return mlir::failure();
+        return rewriter.notifyMatchFailure(op, [&](mlir::Diagnostic &diag) {
+          diag << "Wasn't able to convert param " << i << " of type "
+               << origParamType;
+        });
 
       auto param = getKernelParam(i);
       mlir::Value ptr;

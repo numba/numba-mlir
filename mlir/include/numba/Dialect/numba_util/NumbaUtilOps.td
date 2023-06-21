@@ -164,7 +164,10 @@ def ChangeLayoutOp : NumbaUtil_Op<"change_layout", [
   }];
 }
 
-def SignCastOp : NumbaUtil_Op<"sign_cast", [Pure]> {
+def SignCastOp : NumbaUtil_Op<"sign_cast", [
+  DeclareOpInterfaceMethods<CastOpInterface>,
+  ViewLikeOpInterface,
+  Pure]> {
   let arguments = (ins AnyType:$source);
 
   let results = (outs AnyType:$dest);
@@ -172,6 +175,10 @@ def SignCastOp : NumbaUtil_Op<"sign_cast", [Pure]> {
   let hasCanonicalizer = 1;
 
   let assemblyFormat = "$source attr-dict `:` type($source) `to` type($dest)";
+
+  let extraClassDeclaration = [{
+      ::mlir::Value getViewSource() { return getSource(); }
+  }];
 }
 
 def TakeContextOp : NumbaUtil_Op<"take_context"> {
