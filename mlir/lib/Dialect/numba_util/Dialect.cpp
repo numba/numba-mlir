@@ -18,6 +18,7 @@
 #include <mlir/Dialect/Bufferization/IR/Bufferization.h>
 #include <mlir/Dialect/GPU/IR/GPUDialect.h>
 #include <mlir/Dialect/Linalg/IR/Linalg.h>
+#include <mlir/Dialect/Math/IR/Math.h>
 #include <mlir/Dialect/MemRef/IR/MemRef.h>
 #include <mlir/Dialect/SCF/IR/SCF.h>
 #include <mlir/Dialect/SPIRV/IR/SPIRVOps.h>
@@ -2212,11 +2213,35 @@ struct SelectOfUndef : public mlir::OpRewritePattern<mlir::arith::SelectOp> {
     return mlir::success();
   }
 };
+
+struct ReplaceUndefUse : public mlir::OpRewritePattern<numba::util::UndefOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(numba::util::UndefOp op,
+                  mlir::PatternRewriter &rewriter) const override {
+    bool changed = false;
+    for (auto &use : llvm::make_early_inc_range(op->getUses())) {
+      auto owner = use.getOwner();
+      if (!mlir::isa<mlir::arith::ArithDialect, mlir::math::MathDialect>(
+              owner->getDialect()))
+        continue;
+
+      if (owner->getNumOperands() != 1 || owner->getNumResults() != 1)
+        continue;
+
+      auto resType = owner->getResult(0).getType();
+      rewriter.replaceOpWithNewOp<numba::util::UndefOp>(owner, resType);
+      changed = true;
+    }
+    return mlir::success(changed);
+  }
+};
 } // namespace
 
 void UndefOp::getCanonicalizationPatterns(mlir::RewritePatternSet &results,
                                           mlir::MLIRContext *context) {
-  results.insert<MergeUndefs, SelectOfUndef>(context);
+  results.insert<MergeUndefs, SelectOfUndef, ReplaceUndefUse>(context);
 }
 
 } // namespace util
