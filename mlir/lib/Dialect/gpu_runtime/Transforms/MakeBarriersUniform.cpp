@@ -217,16 +217,16 @@ static mlir::LogicalResult convertBlockingOp(mlir::Operation *op,
       rewriter.create<mlir::scf::IfOp>(ifLoc, cond, emptyBodyBuilder);
   rewriter.mergeBlocks(afterBlock, afterIf.thenBlock());
 
-  for (auto &op : *afterIf.thenBlock()) {
-    for (mlir::OpOperand &arg : op.getOpOperands()) {
+  afterIf.thenBlock()->walk([&](mlir::Operation *innerOp) {
+    for (mlir::OpOperand &arg : innerOp->getOpOperands()) {
       auto val = arg.get();
       auto it = yieldArgsMap.find(val);
       if (it != yieldArgsMap.end()) {
         auto newVal = getBeforeIfResult(it->second);
-        rewriter.updateRootInPlace(&op, [&]() { arg.set(newVal); });
+        rewriter.updateRootInPlace(innerOp, [&]() { arg.set(newVal); });
       }
     }
-  }
+  });
 
   rewriter.eraseOp(ifOp);
   return mlir::success();

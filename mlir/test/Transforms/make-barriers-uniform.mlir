@@ -236,3 +236,46 @@ func.func @test() {
 //       CHECK: }
 //       CHECK: gpu.terminator
 //       CHECK: return
+
+// -----
+
+func.func @test() {
+  %c1 = arith.constant 1 : index
+  %c10 = arith.constant 10 : index
+  gpu.launch blocks(%bx, %by, %bz) in (%grid_x = %c1, %grid_y = %c1, %grid_z = %c1)
+             threads(%tx, %ty, %tz) in (%block_x = %c1, %block_y = %c1, %block_z = %c1) {
+    %cond = "test.test1"() : () -> i1
+    scf.if %cond {
+      "test.test2"() : () -> ()
+      %1 = "test.test3"() : () -> i32
+      gpu.barrier
+      scf.for %i0 = %c1 to %c10 step %c1 {
+        "test.test4"() : () -> ()
+        "test.test5"(%1) : (i32) -> ()
+      }
+    }
+    gpu.terminator
+  }
+  return
+}
+
+// CHECK-LABEL: func @test
+//       CHECK: gpu.launch blocks
+//       CHECK: %[[COND:.*]] = "test.test1"() : () -> i1
+//       CHECK: %[[RES1:.*]] = scf.if %[[COND]] -> (i32) {
+//       CHECK: "test.test2"() : () -> ()
+//       CHECK: %[[V1:.*]] = "test.test3"() : () -> i32
+//       CHECK: scf.yield %[[V1]] : i32
+//       CHECK: } else {
+//       CHECK: %[[V2:.*]] = numba_util.undef : i32
+//       CHECK: scf.yield %[[V2]] : i32
+//       CHECK: }
+//       CHECK: gpu.barrier
+//       CHECK: scf.if %[[COND]] {
+//       CHECK: scf.for %{{.*}} = %{{.*}} to %{{.*}} step %{{.*}} {
+//       CHECK: "test.test4"() : () -> ()
+//       CHECK: "test.test5"(%[[RES1]]) : (i32) -> ()
+//       CHECK: }
+//       CHECK: }
+//       CHECK: gpu.terminator
+//       CHECK: return
