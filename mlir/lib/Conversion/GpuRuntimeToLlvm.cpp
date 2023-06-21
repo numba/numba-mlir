@@ -429,6 +429,7 @@ static std::optional<mlir::TypedAttr> getGpuParamType(mlir::Type type) {
   using PType = numba::GpuParamType;
   const std::pair<CheckFuncT, PType> handlers[] = {
       // clang-format off
+      {&isInt<1>,    PType::bool_},
       {&isInt<8>,    PType::int8},
       {&isInt<16>,   PType::int16},
       {&isInt<32>,   PType::int32},
