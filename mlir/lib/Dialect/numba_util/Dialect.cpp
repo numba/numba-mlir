@@ -1726,6 +1726,32 @@ struct SignCastIfPropagate : public mlir::OpRewritePattern<mlir::scf::IfOp> {
   }
 };
 
+struct SignCastChainPropagate
+    : public mlir::OpRewritePattern<numba::util::SignCastOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(numba::util::SignCastOp op,
+                  mlir::PatternRewriter &rewriter) const override {
+    auto prev = op.getSource().getDefiningOp<numba::util::SignCastOp>();
+    if (!prev)
+      return mlir::failure();
+
+    auto src = prev.getSource();
+    auto srcType = src.getType();
+    auto dstType = op.getType();
+    if (srcType == dstType) {
+      rewriter.replaceOp(op, src);
+      return mlir::success();
+    }
+    if (!numba::util::SignCastOp::areCastCompatible(srcType, dstType))
+      return mlir::failure();
+
+    rewriter.replaceOpWithNewOp<numba::util::SignCastOp>(op, dstType, src);
+    return mlir::success();
+  }
+};
+
 } // namespace
 
 void SignCastOp::getCanonicalizationPatterns(::mlir::RewritePatternSet &results,
@@ -1745,7 +1771,14 @@ void SignCastOp::getCanonicalizationPatterns(::mlir::RewritePatternSet &results,
                                mlir::RankedTensorType>,
       SignCastSubviewPropagate<mlir::memref::SubViewOp, mlir::MemRefType>,
       SignCastForPropagate, SignCastIfPropagate<numba::util::SignCastOp>,
-      SignCastIfPropagate<mlir::memref::CastOp>>(context);
+      SignCastIfPropagate<mlir::memref::CastOp>, SignCastChainPropagate>(
+      context);
+}
+
+bool SignCastOp::areCastCompatible(mlir::TypeRange /*inputs*/,
+                                   mlir::TypeRange /*outputs*/) {
+  // TODO: actually check something.
+  return true;
 }
 
 void TakeContextOp::build(mlir::OpBuilder &b, mlir::OperationState &result,
