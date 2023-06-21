@@ -546,9 +546,13 @@ private:
         rewriter.create<mlir::LLVM::UndefOp>(loc, paramsArrayType);
 
     for (auto i : llvm::seq(0u, paramsCount)) {
-      auto typeAttr = getGpuParamType(getKernelParamType(i));
+      auto origParamType = getKernelParamType(i);
+      auto typeAttr = getGpuParamType(origParamType);
       if (!typeAttr)
-        return mlir::failure();
+        return rewriter.notifyMatchFailure(op, [&](mlir::Diagnostic &diag) {
+          diag << "Wasn't able to convert param " << i << " of type "
+               << origParamType;
+        });
 
       auto param = getKernelParam(i);
       mlir::Value ptr;
