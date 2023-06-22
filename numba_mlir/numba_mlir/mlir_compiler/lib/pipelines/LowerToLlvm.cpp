@@ -1363,6 +1363,7 @@ struct LowerParallelToCFGPass
   virtual void
   getDependentDialects(mlir::DialectRegistry &registry) const override {
     registry.insert<mlir::LLVM::LLVMDialect>();
+    registry.insert<mlir::cf::ControlFlowDialect>();
     registry.insert<mlir::func::FuncDialect>();
   }
 

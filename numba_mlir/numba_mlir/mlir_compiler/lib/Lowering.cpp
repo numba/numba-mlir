@@ -159,6 +159,7 @@ struct PlierLowerer final {
   PlierLowerer(mlir::MLIRContext &context, PyTypeConverter &conv)
       : ctx(context), builder(&ctx), typeConverter(conv) {
     ctx.loadDialect<gpu_runtime::GpuRuntimeDialect>();
+    ctx.loadDialect<mlir::cf::ControlFlowDialect>();
     ctx.loadDialect<mlir::func::FuncDialect>();
     ctx.loadDialect<numba::ntensor::NTensorDialect>();
     ctx.loadDialect<numba::util::NumbaUtilDialect>();
