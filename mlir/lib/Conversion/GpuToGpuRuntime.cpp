@@ -992,15 +992,8 @@ static bool isAllocationSupported(mlir::Operation *allocOp,
     return false;
   }
 
-  // Currently only support static shape and int or float or vector of int or
-  // float element type.
-  if (!type.hasStaticShape())
-    return false;
-
-  mlir::Type elementType = type.getElementType();
-  if (auto vecType = elementType.dyn_cast<mlir::VectorType>())
-    elementType = vecType.getElementType();
-  return elementType.isIntOrFloat();
+  // Currently only support static shape.
+  return type.hasStaticShape();
 }
 
 /// Converts memref.alloca to SPIR-V Function variables.
@@ -1012,15 +1005,39 @@ public:
   mlir::LogicalResult
   matchAndRewrite(mlir::memref::AllocaOp allocaOp, OpAdaptor adaptor,
                   mlir::ConversionPatternRewriter &rewriter) const override {
-    mlir::MemRefType allocType = allocaOp.getType();
-    if (!isAllocationSupported(allocaOp, allocType))
+    mlir::MemRefType memrefType = allocaOp.getType();
+    if (!isAllocationSupported(allocaOp, memrefType))
       return rewriter.notifyMatchFailure(allocaOp, "unhandled allocation type");
 
-    // Get the SPIR-V type for the allocation.
-    mlir::Type spirvType = getTypeConverter()->convertType(allocType);
-    rewriter.replaceOpWithNewOp<mlir::spirv::VariableOp>(
-        allocaOp, spirvType, mlir::spirv::StorageClass::Function,
+    assert(getTypeConverter() && "Invalid type converter");
+    mlir::TypeConverter &converter = *getTypeConverter();
+
+    auto elemType = converter.convertType(memrefType.getElementType());
+    if (!elemType)
+      return rewriter.notifyMatchFailure(allocaOp, [&](mlir::Diagnostic &diag) {
+        diag << "unsupported element type " << memrefType.getElementType();
+      });
+
+    auto resType = mlir::dyn_cast_if_present<mlir::spirv::PointerType>(
+        converter.convertType(memrefType));
+    if (!resType)
+      return rewriter.notifyMatchFailure(allocaOp, "unhandled return type");
+
+    auto count = memrefType.getNumElements();
+    mlir::Type arrayType =
+        (count == 1 ? elemType : mlir::spirv::ArrayType::get(elemType, count));
+    auto allocType =
+        mlir::spirv::PointerType::get(arrayType, resType.getStorageClass());
+
+    auto loc = allocaOp.getLoc();
+    mlir::Value res = rewriter.create<mlir::spirv::VariableOp>(
+        loc, allocType, mlir::spirv::StorageClass::Function,
         /*initializer=*/nullptr);
+
+    if (res.getType() != resType)
+      res = rewriter.create<mlir::spirv::BitcastOp>(loc, resType, res);
+
+    rewriter.replaceOp(allocaOp, res);
     return mlir::success();
   }
 };

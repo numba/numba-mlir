@@ -1056,6 +1056,41 @@ def test_private_memory2(blocksize):
 
 
 @require_gpu
+@pytest.mark.parametrize("blocksize", [1, 10, 17, 64, 67, 101])
+@pytest.mark.parametrize("priv_size", [1, 11, 27])
+def test_private_memory3(blocksize, priv_size):
+    private_array = private.array
+
+    def func(A):
+        i = get_global_id(0)
+        prvt_mem = private_array(shape=priv_size, dtype=np.float32)
+        for j in range(priv_size):
+            prvt_mem[j] = j + i
+
+        res = 0
+        for j in range(priv_size):
+            res += prvt_mem[(j + i) % priv_size]
+
+        A[i] = res
+
+    sim_func = kernel_sim(func)
+    gpu_func = kernel_cached(func)
+
+    arr = np.zeros(blocksize).astype(np.float32)
+
+    sim_res = arr.copy()
+    sim_func[blocksize, blocksize](sim_res)
+
+    with print_pass_ir([], ["ConvertParallelLoopToGpu"]):
+        gpu_res = arr.copy()
+        gpu_func[blocksize, blocksize](gpu_res)
+        ir = get_print_buffer()
+        assert ir.count("gpu.launch blocks") == 1, ir
+
+    assert_allclose(sim_res, gpu_res)
+
+
+@require_gpu
 @pytest.mark.parametrize(
     "group_op", [group.reduce_add, group.reduce_mul, group.reduce_min, group.reduce_max]
 )
