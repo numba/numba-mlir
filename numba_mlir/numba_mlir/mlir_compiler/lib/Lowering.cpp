@@ -830,7 +830,7 @@ static void createPipeline(numba::PipelineRegistry &registry,
 struct DialectReg {
   mlir::DialectRegistry registry;
   DialectReg() {
-    // TODO: remove this garbage.
+    // TODO: remove this.
     mlir::func::registerInlinerExtension(registry);
   }
 };
