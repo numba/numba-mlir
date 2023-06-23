@@ -210,9 +210,13 @@ struct InsertGPUAllocs
                   if (op) {
                     if (mlir::isa<mlir::scf::SCFDialect>(op->getDialect()) ||
                         mlir::isa<mlir::ViewLikeOpInterface,
+                                  mlir::memref::ExtractStridedMetadataOp,
                                   mlir::arith::SelectOp, mlir::func::CallOp,
                                   numba::util::EnvironmentRegionOp>(op))
-                      // Ignore
+                      // TODO: Add ViewLikeOpInterface to
+                      // ExtractStridedMetadataOp
+
+                      // Ignore Op
                       continue;
                     if (mlir::isa<mlir::memref::AllocOp, mlir::memref::AllocaOp,
                                   mlir::memref::GetGlobalOp>(op)) {
