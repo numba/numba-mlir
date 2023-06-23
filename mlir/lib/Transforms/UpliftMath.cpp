@@ -238,58 +238,6 @@ struct UpliftMinMax : public mlir::OpRewritePattern<mlir::arith::SelectOp> {
   }
 };
 
-template <typename Op> static bool isValidForFMA(Op op) {
-  return static_cast<bool>(op.getFastmath() &
-                           mlir::arith::FastMathFlags::contract);
-}
-
-static mlir::arith::FastMathFlags fmfIntersect(mlir::arith::FastMathFlags a,
-                                               mlir::arith::FastMathFlags b) {
-  auto res = mlir::arith::FastMathFlags::none;
-  const mlir::arith::FastMathFlags flags[] = {
-      mlir::arith::FastMathFlags::reassoc, mlir::arith::FastMathFlags::nnan,
-      mlir::arith::FastMathFlags::ninf,    mlir::arith::FastMathFlags::nsz,
-      mlir::arith::FastMathFlags::arcp,    mlir::arith::FastMathFlags::contract,
-      mlir::arith::FastMathFlags::afn,
-  };
-
-  for (auto flag : flags)
-    if (static_cast<bool>(a & flag) && static_cast<bool>(b & flag))
-      res = res | flag;
-
-  return res;
-}
-
-struct UpliftFma : public mlir::OpRewritePattern<mlir::arith::AddFOp> {
-  using OpRewritePattern::OpRewritePattern;
-
-  mlir::LogicalResult
-  matchAndRewrite(mlir::arith::AddFOp op,
-                  mlir::PatternRewriter &rewriter) const override {
-    if (!isValidForFMA(op))
-      return mlir::failure();
-
-    mlir::Value c;
-    mlir::arith::MulFOp ab;
-    if ((ab = op.getLhs().getDefiningOp<mlir::arith::MulFOp>())) {
-      c = op.getRhs();
-    } else if ((ab = op.getRhs().getDefiningOp<mlir::arith::MulFOp>())) {
-      c = op.getLhs();
-    } else {
-      return mlir::failure();
-    }
-
-    if (!isValidForFMA(ab))
-      return mlir::failure();
-
-    auto a = ab.getLhs();
-    auto b = ab.getRhs();
-    auto fmf = fmfIntersect(op.getFastmath(), ab.getFastmath());
-    rewriter.replaceOpWithNewOp<mlir::math::FmaOp>(op, a, b, c, fmf);
-    return mlir::success();
-  }
-};
-
 struct UpliftMathPass
     : public mlir::PassWrapper<UpliftMathPass, mlir::OperationPass<>> {
   MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(UpliftMathPass)
@@ -310,25 +258,6 @@ struct UpliftMathPass
       return signalPassFailure();
   }
 };
-
-struct UpliftFMAPass
-    : public mlir::PassWrapper<UpliftFMAPass, mlir::OperationPass<>> {
-  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(UpliftFMAPass)
-
-  virtual void
-  getDependentDialects(mlir::DialectRegistry &registry) const override {
-    registry.insert<mlir::arith::ArithDialect>();
-    registry.insert<mlir::math::MathDialect>();
-  }
-
-  void runOnOperation() override {
-    mlir::RewritePatternSet patterns(&getContext());
-    numba::populateUpliftFMAPatterns(patterns);
-    if (mlir::failed(mlir::applyPatternsAndFoldGreedily(getOperation(),
-                                                        std::move(patterns))))
-      return signalPassFailure();
-  }
-};
 } // namespace
 
 void numba::populateUpliftMathPatterns(mlir::RewritePatternSet &patterns) {
@@ -336,14 +265,6 @@ void numba::populateUpliftMathPatterns(mlir::RewritePatternSet &patterns) {
                   UpliftMinMax, UpliftComplexCalls>(patterns.getContext());
 }
 
-void numba::populateUpliftFMAPatterns(mlir::RewritePatternSet &patterns) {
-  patterns.insert<UpliftFma>(patterns.getContext());
-}
-
 std::unique_ptr<mlir::Pass> numba::createUpliftMathPass() {
   return std::make_unique<UpliftMathPass>();
-}
-
-std::unique_ptr<mlir::Pass> numba::createUpliftFMAPass() {
-  return std::make_unique<UpliftFMAPass>();
 }

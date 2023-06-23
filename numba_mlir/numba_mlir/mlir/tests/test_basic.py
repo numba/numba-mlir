@@ -261,14 +261,14 @@ def test_math_uplifting_fma(py_func):
     y = 3.0
     z = 4.0
 
-    with print_pass_ir([], ["UpliftFMAPass"]):
+    with print_pass_ir([], ["MathUpliftToFMA"]):
         jit_func = njit(py_func, fastmath=False)
 
         assert_equal(py_func(x, y, z), jit_func(x, y, z))
         ir = get_print_buffer()
         assert ir.count(f"math.fma") == 0, ir
 
-    with print_pass_ir([], ["UpliftFMAPass"]):
+    with print_pass_ir([], ["MathUpliftToFMA"]):
         jit_func = njit(py_func, fastmath=True)
 
         assert_equal(py_func(x, y, z), jit_func(x, y, z))
