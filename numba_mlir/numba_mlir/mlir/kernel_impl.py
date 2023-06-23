@@ -256,7 +256,7 @@ def _define_atomic_funcs():
 
                 dtype = arr.dtype
                 val = builder.cast(-val, dtype)
-                fname = f"atomic_add_{dtype_str(builder, dtype)}"
+                fname = f"atomic_add_{dtype_str(builder, dtype)}_{len(arr.shape)}"
                 return builder.external_call(fname, (arr, val), val)
 
         else:
@@ -267,7 +267,7 @@ def _define_atomic_funcs():
 
                 dtype = arr.dtype
                 val = builder.cast(val, dtype)
-                fname = f"{func_name}_{dtype_str(builder, dtype)}"
+                fname = f"{func_name}_{dtype_str(builder, dtype)}_{len(arr.shape)}"
                 return builder.external_call(fname, (arr, val), val)
 
         return api_func_impl
