@@ -19,6 +19,7 @@
 #include <mlir/Dialect/Linalg/Passes.h>
 #include <mlir/Dialect/Linalg/Transforms/Transforms.h>
 #include <mlir/Dialect/Math/IR/Math.h>
+#include <mlir/Dialect/Math/Transforms/Passes.h>
 #include <mlir/Dialect/MemRef/IR/MemRef.h>
 #include <mlir/Dialect/SCF/IR/SCF.h>
 #include <mlir/Dialect/SCF/Transforms/Passes.h>
@@ -3349,7 +3350,7 @@ static void populatePlierToLinalgOptPipeline(mlir::OpPassManager &pm) {
       std::make_unique<PropagateFastmathFlags>());
   // Uplifting FMAs con interfere with other optimizations, like loop reduction
   // uplifting. Move it after main optimization pass.
-  pm.addNestedPass<mlir::func::FuncOp>(numba::createUpliftFMAPass());
+  pm.addNestedPass<mlir::func::FuncOp>(mlir::math::createMathUpliftToFMA());
   pm.addNestedPass<mlir::func::FuncOp>(mlir::createCanonicalizerPass());
   pm.addNestedPass<mlir::func::FuncOp>(
       std::make_unique<FixDeallocPlacementPass>());
