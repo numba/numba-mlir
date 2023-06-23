@@ -15,6 +15,7 @@
 #include <mlir/Dialect/Arith/IR/Arith.h>
 #include <mlir/Dialect/Complex/IR/Complex.h>
 #include <mlir/Dialect/ControlFlow/IR/ControlFlowOps.h>
+#include <mlir/Dialect/Func/Extensions/InlinerExtension.h>
 #include <mlir/Dialect/Func/IR/FuncOps.h>
 #include <mlir/IR/Builders.h>
 #include <mlir/IR/BuiltinOps.h>
@@ -159,6 +160,7 @@ struct PlierLowerer final {
   PlierLowerer(mlir::MLIRContext &context, PyTypeConverter &conv)
       : ctx(context), builder(&ctx), typeConverter(conv) {
     ctx.loadDialect<gpu_runtime::GpuRuntimeDialect>();
+    ctx.loadDialect<mlir::cf::ControlFlowDialect>();
     ctx.loadDialect<mlir::func::FuncDialect>();
     ctx.loadDialect<numba::ntensor::NTensorDialect>();
     ctx.loadDialect<numba::util::NumbaUtilDialect>();
@@ -825,13 +827,22 @@ static void createPipeline(numba::PipelineRegistry &registry,
   }
 }
 
+struct DialectReg {
+  mlir::DialectRegistry registry;
+  DialectReg() {
+    // TODO: remove this.
+    mlir::func::registerInlinerExtension(registry);
+  }
+};
+
 struct Module {
+  DialectReg dialectReg;
   mlir::MLIRContext context;
   numba::PipelineRegistry registry;
   mlir::ModuleOp module;
   PyTypeConverter typeConverter;
 
-  Module(const ModuleSettings &settings) {
+  Module(const ModuleSettings &settings) : context(dialectReg.registry) {
     createPipeline(registry, typeConverter, settings);
   }
 };
@@ -919,9 +930,9 @@ py::capsule initCompiler(py::dict settings) {
     llvm::BumpPtrAllocator alloc;
     auto types = alloc.Allocate<const char *>(debugTypeSize);
     llvm::StringSaver strSaver(alloc);
-    for (size_t i = 0; i < debugTypeSize; ++i) {
+    for (size_t i = 0; i < debugTypeSize; ++i)
       types[i] = strSaver.save(debugType[i].cast<std::string>()).data();
-    }
+
     llvm::setCurrentDebugTypes(types, static_cast<unsigned>(debugTypeSize));
   }
 

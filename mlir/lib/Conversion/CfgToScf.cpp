@@ -1551,6 +1551,7 @@ struct CFGToSCFPass
 
   virtual void
   getDependentDialects(mlir::DialectRegistry &registry) const override {
+    registry.insert<mlir::cf::ControlFlowDialect>();
     registry.insert<mlir::scf::SCFDialect>();
     registry.insert<numba::util::NumbaUtilDialect>();
   }

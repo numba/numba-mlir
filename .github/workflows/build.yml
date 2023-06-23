@@ -582,7 +582,6 @@ jobs:
           git checkout $LLVM_SHA || exit 1
           mkdir _build || exit 1
           cd _build || exit 1
-          source activate test-env
           export CC=$CONDA_PREFIX/bin/x86_64-conda-linux-gnu-cc
           export CXX=$CONDA_PREFIX/bin/x86_64-conda-linux-gnu-c++
           cmake ../llvm                                                    \

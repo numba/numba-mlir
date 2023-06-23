@@ -230,7 +230,7 @@ def TupleExtractOp : NumbaUtil_Op<"tuple_extract", [Pure]> {
 
   let extraClassDeclaration = [{
     /// Helper function to get the index as a simple integer if it is constant.
-    ::llvm::Optional<int64_t> getConstantIndex();
+    ::std::optional<int64_t> getConstantIndex();
   }];
 
   let hasFolder = 1;

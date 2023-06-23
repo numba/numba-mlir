@@ -87,7 +87,7 @@ def NTensor_Tensor : NTensor_Type<"NTensor", "ntensor", [ShapedTypeInterface],
       "::llvm::ArrayRef<int64_t>":$shape,
       "::mlir::Type":$elementType,
       CArg<"::mlir::Attribute", "{}">:$environment,
-      CArg<"::llvm::Optional<::llvm::StringRef>", "std::nullopt">:$layout
+      CArg<"::std::optional<::llvm::StringRef>", "std::nullopt">:$layout
     ), [{
       auto ctx = elementType.getContext();
       auto l = layout ? ::mlir::StringAttr::get(ctx, *layout) : ::mlir::StringAttr{};
@@ -317,7 +317,7 @@ def SubviewOp : NTensor_OpWithOffsetSizesAndStrides<"subview", [
 
     /// Compute the rank-reduction mask that can be applied to map the source
     /// tensor type to the result tensor type by dropping unit dims.
-    llvm::Optional<llvm::SmallDenseSet<unsigned>>
+    ::std::optional<llvm::SmallDenseSet<unsigned>>
     computeRankReductionMask() {
       return ::mlir::computeRankReductionMask(getSourceType().getShape(),
                                               getType().getShape());
@@ -510,7 +510,7 @@ def DimOp : NTensor_OpBase<"dim", [
 
   let extraClassDeclaration = [{
     /// Helper function to get the index as a simple integer if it is constant.
-    ::llvm::Optional<int64_t> getConstantIndex();
+    ::std::optional<int64_t> getConstantIndex();
 
     /// Interface method of ShapedDimOpInterface: Return the source tensor.
     ::mlir::Value getShapedValue() { return getSource(); }

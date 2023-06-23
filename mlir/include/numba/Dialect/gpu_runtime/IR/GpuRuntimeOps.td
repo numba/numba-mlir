@@ -162,15 +162,15 @@ def GPUSuggestBlockSizeOp : GpuRuntime_Op<"suggest_block_size",
 
   let builders = [
     OpBuilder<(ins
-      "::llvm::Optional<::mlir::Value>":$stream,
+      "::std::optional<::mlir::Value>":$stream,
       "::mlir::ValueRange":$gridSize,
       "::mlir::Value":$kernel)>,
     OpBuilder<(ins
-      "::llvm::Optional<::mlir::Value>":$stream,
+      "::std::optional<::mlir::Value>":$stream,
       "::mlir::ValueRange":$gridSize,
       "::mlir::SymbolRefAttr":$kernel)>,
     OpBuilder<(ins
-      "::llvm::Optional<::mlir::Value>":$stream,
+      "::std::optional<::mlir::Value>":$stream,
       "::mlir::ValueRange":$gridSize)>
   ];
 
