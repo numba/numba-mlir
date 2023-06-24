@@ -807,6 +807,34 @@ def test_atomics_multidim(funci):
 
 
 @require_gpu
+def test_atomics_different_dims():
+    atomic_op = atomic.add
+    dtype = "int32"
+
+    def func(a, b, c):
+        i = get_global_id(0)
+        j = get_global_id(1)
+        atomic_op(a, (i, j), c[i, j])
+        atomic_op(b, (i), c[i, j])
+
+    sim_func = kernel_sim(func)
+    gpu_func = kernel_cached(func)
+
+    c = np.array([[1, 2, 3], [4, 5, 6]], dtype)
+    a_sim = np.zeros(c.shape, dtype)
+    a_gpu = np.zeros(c.shape, dtype)
+
+    b_sim = np.zeros(c.shape[0], dtype)
+    b_gpu = np.zeros(c.shape[0], dtype)
+
+    sim_func[c.shape, DEFAULT_LOCAL_SIZE](a_sim, b_sim, c)
+    gpu_func[c.shape, DEFAULT_LOCAL_SIZE](a_gpu, b_gpu, c)
+
+    assert_equal(a_gpu, a_sim)
+    assert_equal(b_gpu, b_sim)
+
+
+@require_gpu
 def test_fastmath():
     def func(a, b, c, res):
         i = get_global_id(0)
