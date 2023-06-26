@@ -70,7 +70,7 @@ static void moveOpsIntoParallel(mlir::scf::ParallelOp outer, int depth = 0) {
   while (true) {
     bool first = (it == begin);
     auto &op = *it;
-    auto isParallelOpOperand = [&](mlir::Operation &op) {
+    auto isParallelOpOperand = [&](mlir::Operation &op) -> bool {
       auto operands = parallelOp->getOperands();
       for (auto r : op.getResults())
         if (llvm::is_contained(operands, r))
@@ -79,7 +79,17 @@ static void moveOpsIntoParallel(mlir::scf::ParallelOp outer, int depth = 0) {
       return false;
     };
 
-    if (!mlir::isMemoryEffectFree(&op) || isParallelOpOperand(op))
+    auto isUsedOutside = [&](mlir::Operation &op) -> bool {
+      auto &region = parallelOp.getLoopBody();
+      for (auto user : op.getUsers())
+        if (!region.isAncestor(user->getParentRegion()))
+          return true;
+
+      return false;
+    };
+
+    if (!mlir::isMemoryEffectFree(&op) || isParallelOpOperand(op) ||
+        isUsedOutside(op))
       break;
 
     if (first) {

@@ -1153,6 +1153,43 @@ def test_group_func(group_op, global_size, local_size, dtype):
     assert_allclose(gpu_res, sim_res, rtol=1e-5)
 
 
+@require_gpu
+def test_pairwise():
+    def func(X1, X2, D):
+        i = get_global_id(0)
+        j = get_global_id(1)
+
+        X1_cols = X1.shape[1]
+
+        d = 0.0
+        for k in range(X1_cols):
+            tmp = X1[i, k] - X2[j, k]
+            d += tmp * tmp
+        D[i, j] = np.sqrt(d)
+
+    sim_func = kernel_sim(func)
+    gpu_func = kernel_cached(func)
+
+    dims = 3
+    npoints = 128
+    dtype = np.float32
+
+    a = np.arange(npoints * dims, dtype=dtype).reshape(npoints, dims)
+    b = a + 5
+
+    sim_res = np.zeros((npoints, npoints), dtype=dtype)
+    sim_func[(a.shape[0], b.shape[0]), DEFAULT_LOCAL_SIZE](a, b, sim_res)
+
+    gpu_res = np.zeros((npoints, npoints), dtype=dtype)
+
+    with print_pass_ir([], ["ConvertParallelLoopToGpu"]):
+        gpu_func[(a.shape[0], b.shape[0]), DEFAULT_LOCAL_SIZE](a, b, gpu_res)
+        ir = get_print_buffer()
+        assert ir.count("gpu.launch blocks") == 1, ir
+
+    assert_allclose(gpu_res, sim_res, rtol=1e-5)
+
+
 def _from_host(arr, buffer):
     if arr.flags["C_CONTIGUOUS"]:
         order = "C"
