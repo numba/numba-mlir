@@ -2645,6 +2645,8 @@ struct LowerGPUGlobalReducePass
   }
 };
 
+/// The general idea of this transform is to assign weight to each scf.parallel
+/// index arg and sort idices according to this weight.
 struct SortSCFParallel : public mlir::OpRewritePattern<mlir::scf::ParallelOp> {
   using OpRewritePattern::OpRewritePattern;
 
@@ -2655,7 +2657,7 @@ struct SortSCFParallel : public mlir::OpRewritePattern<mlir::scf::ParallelOp> {
       return rewriter.notifyMatchFailure(op, "must be a top-level parallel op");
 
     if (!isInsideGPURegion(op))
-      return rewriter.notifyMatchFailure(op, "must inside GPU region");
+      return rewriter.notifyMatchFailure(op, "must be inside GPU region");
 
     using Arg = std::pair<unsigned, int>;
 
@@ -2687,14 +2689,16 @@ struct SortSCFParallel : public mlir::OpRewritePattern<mlir::scf::ParallelOp> {
         return;
       }
 
+      // Only process identity (c-contigious) memrefs for now.
       if (!mlir::cast<mlir::MemRefType>(memref.getType())
                .getLayout()
                .isIdentity())
         return;
 
+      // Assign more weight to the rightmost indices, so linear accesses more
+      // likely to be mapped to loop 0 (which is mapped to get_global_id(0)).
       auto numDims = static_cast<int>(indices.size());
       for (auto i : llvm::seq(0, numDims)) {
-        // Assign more weight to rightmost indices.
         auto weight = (i + 1) * 10 - (numDims - 1) * 10;
         addWeight(indices[static_cast<unsigned>(i)], weight);
       }
