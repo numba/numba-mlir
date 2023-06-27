@@ -1154,7 +1154,7 @@ def test_group_func(group_op, global_size, local_size, dtype):
 
 
 @require_gpu
-def test_pairwise():
+def test_pairwise1():
     def func(X1, X2, D):
         i = get_global_id(0)
         j = get_global_id(1)
@@ -1722,6 +1722,55 @@ def test_l2_norm():
     filter_string = dgpu_res.device.sycl_device.filter_string
     with print_pass_ir([], ["ConvertParallelLoopToGpu"]):
         jit_func(gpu_src, dgpu_res)
+        ir = get_print_buffer()
+        assert (
+            ir.count(
+                f'numba_util.env_region #gpu_runtime.region_desc<device = "{filter_string}">'
+            )
+            > 0
+        ), ir
+        assert ir.count("gpu.launch blocks") > 0, ir
+
+    _to_host(dgpu_res, gpu_res)
+    assert_allclose(res, gpu_res, rtol=1e-5)
+
+
+@require_dpctl
+def test_pairwise2():
+    def py_func(X1, X2, D):
+        X1_rows = X1.shape[0]
+        X2_rows = X2.shape[0]
+        X1_cols = X1.shape[1]
+
+        for i in numba.prange(X1_rows):
+            for j in numba.prange(X2_rows):
+                d = 0.0
+                for k in range(X1_cols):
+                    tmp = X1[i, k] - X2[j, k]
+                    d += tmp * tmp
+                D[i, j] = np.sqrt(d)
+
+    jit_func = njit(py_func)
+
+    dims = 3
+    npoints = 128
+    dtype = np.float32
+
+    a = np.arange(npoints * dims, dtype=dtype).reshape(npoints, dims)
+    b = a + 5
+
+    res = np.zeros((npoints, npoints), dtype=dtype)
+    gpu_res = np.zeros_like(res)
+
+    py_func(a, b, res)
+
+    gpu_a = _from_host(a, buffer="device")
+    gpu_b = _from_host(b, buffer="device")
+    dgpu_res = _from_host(gpu_res, buffer="device")
+
+    filter_string = dgpu_res.device.sycl_device.filter_string
+    with print_pass_ir([], ["ConvertParallelLoopToGpu"]):
+        jit_func(gpu_a, gpu_b, dgpu_res)
         ir = get_print_buffer()
         assert (
             ir.count(

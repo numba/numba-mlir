@@ -65,40 +65,42 @@ static void moveOpsIntoParallel(mlir::scf::ParallelOp outer, int depth = 0) {
 
   auto parallelOp = mlir::cast<mlir::scf::ParallelOp>(*parallelIt);
   auto &parallelOpBody = parallelOp.getLoopBody().front();
-  auto it = std::prev(parallelIt);
-  auto begin = outerBody.begin();
-  while (true) {
-    bool first = (it == begin);
-    auto &op = *it;
-    auto isParallelOpOperand = [&](mlir::Operation &op) -> bool {
-      auto operands = parallelOp->getOperands();
-      for (auto r : op.getResults())
-        if (llvm::is_contained(operands, r))
-          return true;
+  if (parallelIt != outerBody.begin()) {
+    auto it = std::prev(parallelIt);
+    auto begin = outerBody.begin();
+    while (true) {
+      bool first = (it == begin);
+      auto &op = *it;
+      auto isParallelOpOperand = [&](mlir::Operation &op) -> bool {
+        auto operands = parallelOp->getOperands();
+        for (auto r : op.getResults())
+          if (llvm::is_contained(operands, r))
+            return true;
 
-      return false;
-    };
+        return false;
+      };
 
-    auto isUsedOutside = [&](mlir::Operation &op) -> bool {
-      auto &region = parallelOp.getLoopBody();
-      for (auto user : op.getUsers())
-        if (!region.isAncestor(user->getParentRegion()))
-          return true;
+      auto isUsedOutside = [&](mlir::Operation &op) -> bool {
+        auto &region = parallelOp.getLoopBody();
+        for (auto user : op.getUsers())
+          if (!region.isAncestor(user->getParentRegion()))
+            return true;
 
-      return false;
-    };
+        return false;
+      };
 
-    if (!mlir::isMemoryEffectFree(&op) || isParallelOpOperand(op) ||
-        isUsedOutside(op))
-      break;
+      if (!mlir::isMemoryEffectFree(&op) || isParallelOpOperand(op) ||
+          isUsedOutside(op))
+        break;
 
-    if (first) {
+      if (first) {
+        op.moveBefore(&parallelOpBody.front());
+        break;
+      }
+
+      --it;
       op.moveBefore(&parallelOpBody.front());
-      break;
     }
-
-    --it;
-    op.moveBefore(&parallelOpBody.front());
   }
   depth += outer.getStep().size();
   if (depth >= 6)
