@@ -867,6 +867,47 @@ void numba::ntensor::ElementwiseOp::build(
   }
 }
 
+void numba::ntensor::BroadcastOp::build(::mlir::OpBuilder &odsBuilder,
+                                        ::mlir::OperationState &odsState,
+                                        ::mlir::ValueRange inputs) {
+  if (inputs.empty())
+    return build(odsBuilder, odsState, /*types*/ {}, /*inputs*/ {});
+
+  if (inputs.size() == 1)
+    return build(odsBuilder, odsState, inputs.front().getType(), inputs);
+
+  auto isDynamicOrUnit = [](int64_t v) {
+    return mlir::ShapedType::isDynamic(v) || v == 1;
+  };
+
+  auto areDimsBroadcastable = [&](int64_t a, int64_t b) {
+    return isDynamicOrUnit(a) || isDynamicOrUnit(b) || a == b;
+  };
+  (void)areDimsBroadcastable;
+
+  llvm::SmallVector<int64_t> newShape;
+  for (auto &&arg : inputs) {
+    auto type = mlir::cast<mlir::ShapedType>(arg.getType());
+    auto shape = type.getShape();
+    if (shape.size() > newShape.size())
+      newShape.resize(shape.size(), mlir::ShapedType::kDynamic);
+
+    for (auto &&[i, dim] : llvm::enumerate(shape)) {
+      auto oldDim = newShape[i];
+      assert(areDimsBroadcastable(oldDim, dim));
+      auto newDim = isDynamicOrUnit(oldDim) ? dim : oldDim;
+      newShape[i] = newDim;
+    }
+  }
+
+  mlir::SmallVector<mlir::Type> resultTypes(inputs.size());
+  for (auto &&[i, arg] : llvm::enumerate(inputs)) {
+    auto type = mlir::cast<mlir::ShapedType>(arg.getType());
+    resultTypes[i] = type.clone(newShape);
+  }
+  build(odsBuilder, odsState, resultTypes, inputs);
+}
+
 mlir::LogicalResult numba::ntensor::BroadcastOp::fold(
     FoldAdaptor, llvm::SmallVectorImpl<mlir::OpFoldResult> &results) {
   assert(getInputs().size() == getResults().size());
