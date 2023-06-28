@@ -536,18 +536,15 @@ struct ConvertBroadcastOp
     assert(inputs.size() == results.size());
 
     for (auto &&[src, dst] : llvm::zip(inputs, results))
-      if (src.getType().cast<mlir::ShapedType>().getElementType() !=
-          dst.getType().cast<mlir::ShapedType>().getElementType())
+      if (mlir::cast<mlir::ShapedType>(src.getType()).getElementType() !=
+          mlir::cast<mlir::ShapedType>(dst.getType()).getElementType())
         return mlir::failure();
 
-    auto env = inputs.front()
-                   .getType()
-                   .cast<numba::ntensor::NTensorType>()
+    auto env = mlir::cast<numba::ntensor::NTensorType>(inputs.front().getType())
                    .getEnvironment();
     for (auto args : {inputs.drop_front(), results})
       for (auto arg : args)
-        if (arg.getType()
-                .cast<numba::ntensor::NTensorType>()
+        if (mlir::cast<numba::ntensor::NTensorType>(arg.getType())
                 .getEnvironment() != env)
           return mlir::failure();
 
@@ -626,10 +623,13 @@ struct ConvertBroadcastOp
                 builder.create<mlir::linalg::YieldOp>(loc, res);
               };
               result = rewriter
-                           .create<mlir::linalg::GenericOp>(
-                               loc, resultTensorType, result, init, maps,
-                               iterators, body)
+                           .create<mlir::linalg::GenericOp>(loc, init.getType(),
+                                                            result, init, maps,
+                                                            iterators, body)
                            .getResult(0);
+              if (result.getType() != resultTensorType)
+                result = rewriter.create<mlir::tensor::CastOp>(
+                    loc, resultTensorType, result);
             }
 
             result = rewriter.create<numba::ntensor::FromTensorOp>(
