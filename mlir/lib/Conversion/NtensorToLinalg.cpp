@@ -600,7 +600,8 @@ struct ConvertBroadcastOp
             auto srcRank = static_cast<unsigned>(srcType.getRank());
             auto result = expandDims(rewriter, loc, input, srcRank, retShape);
 
-            auto resultType = results[i].getType().cast<mlir::ShapedType>();
+            auto resultType =
+                mlir::cast<mlir::ShapedType>(results[i].getType());
             if (srcRank != dstRank) {
               auto elementType = srcType.getElementType();
               auto resultTensorType = toTensorType(resultType);
@@ -630,6 +631,13 @@ struct ConvertBroadcastOp
               if (result.getType() != resultTensorType)
                 result = rewriter.create<mlir::tensor::CastOp>(
                     loc, resultTensorType, result);
+            }
+            auto tempResultType =
+                mlir::cast<mlir::ShapedType>(result.getType());
+            if (tempResultType.getShape() != resultType.getShape()) {
+              auto tempTensorType = tempResultType.clone(resultType.getShape());
+              result = rewriter.create<mlir::tensor::CastOp>(
+                  loc, tempTensorType, result);
             }
 
             result = rewriter.create<numba::ntensor::FromTensorOp>(
