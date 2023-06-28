@@ -312,7 +312,9 @@ def test_broadcast(a, b):
     assert_equal(py_func(a, b), jit_func(a, b))
 
 
-@pytest.mark.parametrize("a_shape, b_shape", [((2, 3, 4), (2, 1, 4))])
+@pytest.mark.parametrize(
+    "a_shape, b_shape", [((2, 3, 4), (2, 1, 4)), ((1, 2, 3), (1, 1))]
+)
 def test_broadcast_setitem(a_shape, b_shape):
     def py_func(a, b):
         a[:] = b
