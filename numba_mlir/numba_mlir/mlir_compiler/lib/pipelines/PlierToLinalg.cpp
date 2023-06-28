@@ -2855,6 +2855,25 @@ struct BufferizeMixedGeneric
   }
 };
 
+struct BufferizeSignCast
+    : public mlir::OpConversionPattern<numba::util::SignCastOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(numba::util::SignCastOp op,
+                  numba::util::SignCastOp::Adaptor adaptor,
+                  mlir::ConversionPatternRewriter &rewriter) const override {
+    assert(getTypeConverter() && "Invalid type converter");
+    auto resType = getTypeConverter()->convertType(op.getType());
+    if (!resType)
+      return mlir::failure();
+
+    rewriter.replaceOpWithNewOp<numba::util::SignCastOp>(op, resType,
+                                                         adaptor.getSource());
+    return mlir::success();
+  }
+};
+
 struct FixDeallocPlacement
     : public mlir::OpRewritePattern<mlir::memref::DeallocOp> {
   using mlir::OpRewritePattern<mlir::memref::DeallocOp>::OpRewritePattern;
@@ -2938,15 +2957,17 @@ struct AdditionalBufferize
     target
         .addIllegalOp<mlir::tensor::ReshapeOp, mlir::tensor::ExtractSliceOp>();
     target.addLegalOp<mlir::memref::ReshapeOp>();
+    target.addDynamicallyLegalOp<numba::util::SignCastOp>(
+        [&](mlir::Operation *op) { return typeConverter.isLegal(op); });
 
     target.addDynamicallyLegalOp<mlir::linalg::GenericOp>(
         [](mlir::linalg::GenericOp op) {
           return op.hasTensorSemantics() || op.hasBufferSemantics();
         });
 
-    patterns
-        .insert<BufferizeReshape, BufferizeExtractSlice, BufferizeMixedGeneric>(
-            typeConverter, context);
+    patterns.insert<BufferizeReshape, BufferizeExtractSlice,
+                    BufferizeMixedGeneric, BufferizeSignCast>(typeConverter,
+                                                              context);
 
     if (failed(applyPartialConversion(getOperation(), target,
                                       std::move(patterns))))
