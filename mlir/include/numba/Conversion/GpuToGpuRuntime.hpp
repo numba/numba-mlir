@@ -51,4 +51,8 @@ std::unique_ptr<mlir::Pass> createInsertGPUGlobalReducePass();
 /// global memory accesses. Intended to be run before gpu kernel outlining.
 std::unique_ptr<mlir::Pass> createLowerGPUGlobalReducePass();
 
+/// This pass tries to rearrange nested stc.parallel loops for more gpu-friendly
+/// memory access.
+std::unique_ptr<mlir::Pass> createSortParallelLoopsForGPU();
+
 } // namespace gpu_runtime

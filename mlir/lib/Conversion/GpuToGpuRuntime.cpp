@@ -1706,6 +1706,13 @@ static std::optional<mlir::TypedAttr> getNeutralValue(mlir::Block &block) {
   return mlir::linalg::getNeutralElement(&(*body.begin()));
 }
 
+static bool isInsideGPURegion(mlir::Operation *op) {
+  assert(op && "Invalid op");
+  auto envOp = op->getParentOfType<numba::util::EnvironmentRegionOp>();
+  return envOp &&
+         mlir::isa<gpu_runtime::GPURegionDescAttr>(envOp.getEnvironment());
+}
+
 struct TileParallelOp : public mlir::OpRewritePattern<mlir::scf::ParallelOp> {
   using OpRewritePattern::OpRewritePattern;
 
@@ -1713,8 +1720,7 @@ struct TileParallelOp : public mlir::OpRewritePattern<mlir::scf::ParallelOp> {
   matchAndRewrite(mlir::scf::ParallelOp op,
                   mlir::PatternRewriter &rewriter) const override {
     // Process only loops inside gpu region.
-    auto envOp = op->getParentOfType<numba::util::EnvironmentRegionOp>();
-    if (!envOp || !envOp.getEnvironment().isa<gpu_runtime::GPURegionDescAttr>())
+    if (!isInsideGPURegion(op))
       return mlir::failure();
 
     // Process only outermost loops without mappings.
@@ -2638,6 +2644,133 @@ struct LowerGPUGlobalReducePass
       return signalPassFailure();
   }
 };
+
+/// The general idea of this transform is to assign weight to each scf.parallel
+/// index arg and sort idices according to this weight.
+struct SortSCFParallel : public mlir::OpRewritePattern<mlir::scf::ParallelOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(mlir::scf::ParallelOp op,
+                  mlir::PatternRewriter &rewriter) const override {
+    if (op->getParentOfType<mlir::scf::ParallelOp>())
+      return rewriter.notifyMatchFailure(op, "must be a top-level parallel op");
+
+    if (!isInsideGPURegion(op))
+      return rewriter.notifyMatchFailure(op, "must be inside GPU region");
+
+    using Arg = std::pair<unsigned, int>;
+
+    llvm::SmallVector<Arg> args(op.getNumLoops());
+    mlir::ValueRange indVars = op.getInductionVars();
+    for (auto &&[i, arg] : llvm::enumerate(indVars))
+      args[i] = std::pair(static_cast<unsigned>(i), 0);
+
+    auto addWeight = [&](mlir::Value idx, int weight) {
+      for (auto &&[argi, w] : args) {
+        auto var = indVars[argi];
+        if (var == idx) {
+          w += weight;
+          return;
+        }
+      }
+    };
+
+    auto visitor = [&](mlir::Operation *bodyOp) {
+      mlir::Value memref;
+      mlir::ValueRange indices;
+      if (auto store = mlir::dyn_cast<mlir::memref::StoreOp>(bodyOp)) {
+        memref = store.getMemRef();
+        indices = store.getIndices();
+      } else if (auto load = mlir::dyn_cast<mlir::memref::LoadOp>(bodyOp)) {
+        memref = load.getMemRef();
+        indices = load.getIndices();
+      } else {
+        return;
+      }
+
+      // Only process identity (c-contigious) memrefs for now.
+      if (!mlir::cast<mlir::MemRefType>(memref.getType())
+               .getLayout()
+               .isIdentity())
+        return;
+
+      // Assign more weight to the rightmost indices, so linear accesses more
+      // likely to be mapped to loop 0 (which is mapped to get_global_id(0)).
+      auto numDims = static_cast<int>(indices.size());
+      for (auto i : llvm::seq(0, numDims)) {
+        auto weight = (i + 1) * 10 - (numDims - 1) * 10;
+        addWeight(indices[static_cast<unsigned>(i)], weight);
+      }
+    };
+    op.walk(visitor);
+
+    std::stable_sort(args.begin(), args.end(),
+                     [](auto &a, auto &b) { return a.second > b.second; });
+
+    auto isSame = [&]() -> bool {
+      for (auto &&[i, arg] : llvm::enumerate(indVars))
+        if (indVars[args[i].first] != arg)
+          return false;
+
+      return true;
+    }();
+
+    if (isSame)
+      return mlir::failure();
+
+    auto numVars = static_cast<unsigned>(indVars.size());
+    llvm::SmallVector<mlir::Value> newLowerBounds(numVars);
+    llvm::SmallVector<mlir::Value> newUpperBounds(numVars);
+    llvm::SmallVector<mlir::Value> newSteps(numVars);
+    for (auto i : llvm::seq(0u, numVars)) {
+      auto m = args[i].first;
+      newLowerBounds[i] = op.getLowerBound()[m];
+      newUpperBounds[i] = op.getUpperBound()[m];
+      newSteps[i] = op.getStep()[m];
+    }
+
+    auto loc = op.getLoc();
+    auto newOp = rewriter.create<mlir::scf::ParallelOp>(
+        loc, newLowerBounds, newUpperBounds, newSteps, op.getInitVals());
+    auto &newBody = newOp.getLoopBody().front();
+    rewriter.eraseOp(newBody.getTerminator());
+
+    llvm::SmallVector<mlir::Value> indVarMapped(numVars);
+    for (auto i : llvm::seq(0u, numVars)) {
+      auto m = args[i].first;
+      indVarMapped[i] = newOp.getInductionVars()[m];
+    }
+
+    auto &oldBody = op.getLoopBody().front();
+    rewriter.mergeBlocks(&oldBody, &newBody, indVarMapped);
+    rewriter.replaceOp(op, newOp.getResults());
+    return mlir::success();
+  }
+};
+
+struct SortParallelLoosForGPU
+    : public mlir::PassWrapper<SortParallelLoosForGPU,
+                               mlir::OperationPass<void>> {
+  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(SortParallelLoosForGPU)
+
+  virtual void
+  getDependentDialects(mlir::DialectRegistry &registry) const override {
+    registry.insert<mlir::memref::MemRefDialect>();
+    registry.insert<mlir::scf::SCFDialect>();
+  }
+
+  void runOnOperation() override {
+    auto *ctx = &getContext();
+    mlir::RewritePatternSet patterns(ctx);
+
+    patterns.insert<SortSCFParallel>(ctx);
+
+    if (mlir::failed(mlir::applyPatternsAndFoldGreedily(getOperation(),
+                                                        std::move(patterns))))
+      return signalPassFailure();
+  }
+};
 } // namespace
 
 // Expose the passes to the outside world
@@ -2696,4 +2829,8 @@ std::unique_ptr<mlir::Pass> gpu_runtime::createInsertGPUGlobalReducePass() {
 
 std::unique_ptr<mlir::Pass> gpu_runtime::createLowerGPUGlobalReducePass() {
   return std::make_unique<LowerGPUGlobalReducePass>();
+}
+
+std::unique_ptr<mlir::Pass> gpu_runtime::createSortParallelLoopsForGPU() {
+  return std::make_unique<SortParallelLoosForGPU>();
 }
