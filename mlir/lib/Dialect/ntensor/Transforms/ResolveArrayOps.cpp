@@ -278,6 +278,10 @@ struct SetitemOpLowering
         return rewriter.create<numba::ntensor::CreateArrayOp>(
             loc, dstType, dynamicDims, dstVal);
       }();
+      mlir::Value broadcastArgs[] = {newArray, dst};
+      auto broadcast =
+          rewriter.create<numba::ntensor::BroadcastOp>(loc, broadcastArgs);
+      newArray = broadcast.getResult(0);
       rewriter.replaceOpWithNewOp<numba::ntensor::CopyOp>(op, newArray, dst);
     } else {
       // Is single element
