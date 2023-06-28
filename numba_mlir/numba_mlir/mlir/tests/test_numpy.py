@@ -313,7 +313,8 @@ def test_broadcast(a, b):
 
 
 @pytest.mark.parametrize(
-    "a_shape, b_shape", [((2, 3, 4), (2, 1, 4)), ((1, 2, 3), (1, 1))]
+    "a_shape, b_shape",
+    [((2, 3, 4), (2, 1, 4)), ((1, 2, 3), (1, 1)), ((2, 3, 4), (3, 4))],
 )
 def test_broadcast_setitem(a_shape, b_shape):
     def py_func(a, b):
