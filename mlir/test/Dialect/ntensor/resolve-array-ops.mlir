@@ -116,7 +116,8 @@ func.func @test(%arg1: !ntensor.ntensor<?xf32>, %arg2: !ntensor.slice, %arg3: f3
 //  CHECK-NEXT:   %[[RES:.*]] = ntensor.subview %[[ARG1]][%[[BEGIN]]] [%[[COUNT]]] [%[[STEP]]] : !ntensor.ntensor<?xf32> to !ntensor.ntensor<?xf32>
 //  CHECK-NEXT:   %[[DIM2:.*]] = ntensor.dim %[[RES]], %[[C0]] : !ntensor.ntensor<?xf32>
 //  CHECK-NEXT:   %[[RES2:.*]] = ntensor.create(%[[DIM2]]) = (%[[ARG3]] : f32) : !ntensor.ntensor<?xf32>
-//  CHECK-NEXT:   ntensor.copy %[[RES2]], %[[RES]] : !ntensor.ntensor<?xf32> to !ntensor.ntensor<?xf32>
+//  CHECK-NEXT:   %[[BC:.*]]:2 = ntensor.broadcast(%[[RES2]], %[[RES]]) : !ntensor.ntensor<?xf32>, !ntensor.ntensor<?xf32> -> !ntensor.ntensor<?xf32>, !ntensor.ntensor<?xf32>
+//  CHECK-NEXT:   ntensor.copy %[[BC]]#0, %[[RES]] : !ntensor.ntensor<?xf32> to !ntensor.ntensor<?xf32>
 //  CHECK-NEXT:   return
 
 // -----
@@ -169,7 +170,8 @@ func.func @test(%arg1: !ntensor.ntensor<?xf32>, %arg2: !ntensor.slice, %arg3: !n
 //  CHECK-NEXT:   %[[DIM:.*]] = ntensor.dim %[[ARG1]], %[[C0]] : !ntensor.ntensor<?xf32>
 //  CHECK-NEXT:   %[[BEGIN:.*]], %[[END:.*]], %[[STEP:.*]], %[[COUNT:.*]] = ntensor.resolve_slice %[[ARG2]], %[[DIM]]
 //  CHECK-NEXT:   %[[RES:.*]] = ntensor.subview %[[ARG1]][%[[BEGIN]]] [%[[COUNT]]] [%[[STEP]]] : !ntensor.ntensor<?xf32> to !ntensor.ntensor<?xf32>
-//  CHECK-NEXT:   ntensor.copy %[[ARG3]], %[[RES]] : !ntensor.ntensor<?xf32> to !ntensor.ntensor<?xf32>
+//  CHECK-NEXT:   %[[BC:.*]]:2 = ntensor.broadcast(%[[ARG3]], %[[RES]]) : !ntensor.ntensor<?xf32>, !ntensor.ntensor<?xf32> -> !ntensor.ntensor<?xf32>, !ntensor.ntensor<?xf32>
+//  CHECK-NEXT:   ntensor.copy %[[BC]]#0, %[[RES]] : !ntensor.ntensor<?xf32> to !ntensor.ntensor<?xf32>
 //  CHECK-NEXT:   return
 
 // -----
@@ -190,7 +192,8 @@ func.func @test(%arg1: !ntensor.ntensor<?x?xf32>, %arg2: tuple<!ntensor.slice, i
 //  CHECK-NEXT:   %[[IDX3:.*]] = ntensor.resolve_index %[[IDX2]], %[[DIM2]]
 //  CHECK-NEXT:   %[[RES1:.*]] = ntensor.subview %[[ARG1]][%[[BEGIN]], %[[IDX3]]] [%[[COUNT]], 1] [%[[STEP]], 1] : !ntensor.ntensor<?x?xf32> to !ntensor.ntensor<?x1xf32>
 //  CHECK-NEXT:   %[[RES2:.*]]  = ntensor.subview %[[RES1]][0, 0] [%[[COUNT]], 1] [1, 1] : !ntensor.ntensor<?x1xf32> to !ntensor.ntensor<?xf32>
-//  CHECK-NEXT:   ntensor.copy %[[ARG3]], %[[RES2]] : !ntensor.ntensor<?xf32> to !ntensor.ntensor<?xf32>
+//  CHECK-NEXT:   %[[BC:.*]]:2 = ntensor.broadcast(%[[ARG3]], %[[RES2]]) : !ntensor.ntensor<?xf32>, !ntensor.ntensor<?xf32> -> !ntensor.ntensor<?xf32>, !ntensor.ntensor<?xf32>
+//  CHECK-NEXT:   ntensor.copy %[[BC]]#0, %[[RES2]] : !ntensor.ntensor<?xf32> to !ntensor.ntensor<?xf32>
 //  CHECK-NEXT:   return
 
 
@@ -230,7 +233,8 @@ func.func @test(%arg1: !ntensor.ntensor<?xf64>, %arg2: !ntensor.slice, %arg3: !n
 //  CHECK-NEXT:   %[[V:.*]] = arith.extf %[[ARG4]] : f32 to f64
 //  CHECK-NEXT:   ntensor.elementwise_yield %[[V]]  : f64
 //  CHECK-NEXT:   }
-//  CHECK-NEXT:   ntensor.copy %[[RES1]], %[[RES]] : !ntensor.ntensor<?xf64> to !ntensor.ntensor<?xf64>
+//  CHECK-NEXT:   %[[BC:.*]]:2 = ntensor.broadcast(%[[RES1]], %[[RES]]) : !ntensor.ntensor<?xf64>, !ntensor.ntensor<?xf64> -> !ntensor.ntensor<?xf64>, !ntensor.ntensor<?xf64>
+//  CHECK-NEXT:   ntensor.copy %[[BC]]#0, %[[RES]] : !ntensor.ntensor<?xf64> to !ntensor.ntensor<?xf64>
 //  CHECK-NEXT:   return
 
 // -----
@@ -248,7 +252,8 @@ func.func @test(%arg1: !ntensor.ntensor<?xf64>, %arg2: !ntensor.slice, %arg3: f3
 //  CHECK-NEXT:   %[[DIM2:.*]] = ntensor.dim %[[RES]], %[[C0]] : !ntensor.ntensor<?xf64>
 //  CHECK-NEXT:   %[[CONV:.*]] = arith.extf %[[ARG3]] : f32 to f64
 //  CHECK-NEXT:   %[[RES2:.*]] = ntensor.create(%[[DIM2]]) = (%[[CONV]] : f64) : !ntensor.ntensor<?xf64>
-//  CHECK-NEXT:   ntensor.copy %[[RES2]], %[[RES]] : !ntensor.ntensor<?xf64> to !ntensor.ntensor<?xf64>
+//  CHECK-NEXT:   %[[BC:.*]]:2 = ntensor.broadcast(%[[RES2]], %[[RES]]) : !ntensor.ntensor<?xf64>, !ntensor.ntensor<?xf64> -> !ntensor.ntensor<?xf64>, !ntensor.ntensor<?xf64>
+//  CHECK-NEXT:   ntensor.copy %[[BC]]#0, %[[RES]] : !ntensor.ntensor<?xf64> to !ntensor.ntensor<?xf64>
 //  CHECK-NEXT:   return
 
 // -----
