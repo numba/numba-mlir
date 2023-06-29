@@ -2506,18 +2506,14 @@ struct OptimizeGlobalsConstsLoad
     mlir::SymbolTable symbolTable(mod);
 
     llvm::SmallVector<uint64_t> indices(op.getIndices().size());
-    for (auto it : llvm::enumerate(op.getIndices())) {
-      auto constIndex =
-          it.value().getDefiningOp<mlir::arith::ConstantIndexOp>();
-      if (!constIndex)
+    for (auto &&[i, ind] : llvm::enumerate(op.getIndices())) {
+      auto val = mlir::getConstantIntValue(ind);
+      if (!val || *val < 0)
         return mlir::failure();
 
-      auto val = constIndex.value();
-      if (val < 0)
-        return mlir::failure();
-
-      indices[it.index()] = static_cast<uint64_t>(val);
+      indices[i] = static_cast<uint64_t>(*val);
     }
+
     auto getGlobal = op.getMemref().getDefiningOp<mlir::memref::GetGlobalOp>();
     if (!getGlobal)
       return mlir::failure();
