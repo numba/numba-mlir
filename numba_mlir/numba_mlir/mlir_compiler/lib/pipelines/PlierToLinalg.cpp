@@ -2506,18 +2506,14 @@ struct OptimizeGlobalsConstsLoad
     mlir::SymbolTable symbolTable(mod);
 
     llvm::SmallVector<uint64_t> indices(op.getIndices().size());
-    for (auto it : llvm::enumerate(op.getIndices())) {
-      auto constIndex =
-          it.value().getDefiningOp<mlir::arith::ConstantIndexOp>();
-      if (!constIndex)
+    for (auto &&[i, ind] : llvm::enumerate(op.getIndices())) {
+      auto val = mlir::getConstantIntValue(ind);
+      if (!val || *val < 0)
         return mlir::failure();
 
-      auto val = constIndex.value();
-      if (val < 0)
-        return mlir::failure();
-
-      indices[it.index()] = static_cast<uint64_t>(val);
+      indices[i] = static_cast<uint64_t>(*val);
     }
+
     auto getGlobal = op.getMemref().getDefiningOp<mlir::memref::GetGlobalOp>();
     if (!getGlobal)
       return mlir::failure();
@@ -3105,10 +3101,10 @@ void PostLinalgOptInnerPass::runOnOperation() {
     signalPassFailure();
 }
 
-struct MoveArithIntoRegionPass
-    : public mlir::PassWrapper<MoveArithIntoRegionPass,
+struct MoveTrivialIntoRegionPass
+    : public mlir::PassWrapper<MoveTrivialIntoRegionPass,
                                mlir::OperationPass<void>> {
-  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(MoveArithIntoRegionPass)
+  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(MoveTrivialIntoRegionPass)
 
   virtual void
   getDependentDialects(mlir::DialectRegistry &registry) const override {
@@ -3120,14 +3116,26 @@ struct MoveArithIntoRegionPass
   void runOnOperation() override {
     auto root = getOperation();
 
+    auto checkOp = [](mlir::Operation *op) -> bool {
+      if (op->hasTrait<mlir::OpTrait::IsTerminator>() || !mlir::isPure(op) ||
+          !op->getRegions().empty())
+        return false;
+
+      if (mlir::isa<mlir::ViewLikeOpInterface>(op))
+        return true;
+
+      auto dialect = op->getDialect();
+      if (mlir::isa<mlir::arith::ArithDialect, mlir::math::MathDialect,
+                    numba::util::NumbaUtilDialect>(dialect))
+        return true;
+
+      return false;
+    };
+
     llvm::SmallVector<mlir::Operation *> opsToCheck;
     root->walk([&](mlir::Operation *op) {
-      auto dialect = op->getDialect();
-      if (!mlir::isa<mlir::arith::ArithDialect, mlir::math::MathDialect>(
-              dialect))
-        return;
-
-      opsToCheck.emplace_back(op);
+      if (checkOp(op))
+        opsToCheck.emplace_back(op);
     });
 
     for (auto *op : llvm::reverse(opsToCheck)) {
@@ -3241,6 +3249,8 @@ struct MakeGenericReduceInnermostPass
 static void populateCommonOptPass(mlir::OpPassManager &pm) {
   pm.addPass(numba::createCompositePass(
       "PlierToLinalgCommonOptPass", [](mlir::OpPassManager &p) {
+        p.addNestedPass<mlir::func::FuncOp>(
+            std::make_unique<MoveTrivialIntoRegionPass>());
         p.addNestedPass<mlir::func::FuncOp>(mlir::createCSEPass());
         p.addNestedPass<mlir::func::FuncOp>(mlir::createCanonicalizerPass());
       }));
@@ -3354,7 +3364,7 @@ static void populatePlierToLinalgOptPipeline(mlir::OpPassManager &pm) {
       "PostLinalgOptPass", [](mlir::OpPassManager &p) {
         p.addPass(numba::createNormalizeMemrefArgsPass());
         p.addNestedPass<mlir::func::FuncOp>(
-            std::make_unique<MoveArithIntoRegionPass>());
+            std::make_unique<MoveTrivialIntoRegionPass>());
         p.addNestedPass<mlir::func::FuncOp>(mlir::createCSEPass());
         p.addNestedPass<mlir::func::FuncOp>(
             numba::createCanonicalizeReductionsPass());

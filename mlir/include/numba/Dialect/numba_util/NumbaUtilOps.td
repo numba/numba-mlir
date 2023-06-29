@@ -65,7 +65,7 @@ def IndexRangeAttr
   let assemblyFormat = "`<` `[` $min `,` $max `]` `>`";
 }
 
-def EnforceShapeOp : NumbaUtil_Op<"enforce_shape"> {
+def EnforceShapeOp : NumbaUtil_Op<"enforce_shape", [Pure]> {
 
   let arguments = (ins AnyShaped:$value, Variadic<Index>:$sizes);
   let results = (outs AnyShaped:$result);
