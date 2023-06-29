@@ -143,8 +143,8 @@ public:
 
     if (auto fromElements = mlir::dyn_cast<mlir::tensor::FromElementsOp>(op)) {
       assert(results.size() == 1);
-      auto tensorType =
-          fromElements.getResult().getType().cast<mlir::RankedTensorType>();
+      auto tensorType = mlir::cast<mlir::RankedTensorType>(
+          fromElements.getResult().getType());
       if (tensorType.getRank() != 1 ||
           mlir::ShapedType::isDynamic(tensorType.getShape().front()))
         return;
@@ -234,7 +234,7 @@ public:
         return;
 
       auto result = op->getResult(0);
-      auto shaped = result.getType().dyn_cast<mlir::ShapedType>();
+      auto shaped = mlir::dyn_cast<mlir::ShapedType>(result.getType());
       if (!shaped)
         return;
 
@@ -293,12 +293,12 @@ public:
 
     if (auto enforceShape = mlir::dyn_cast<numba::util::EnforceShapeOp>(op)) {
       auto srcShaped =
-          enforceShape.getValue().getType().dyn_cast<mlir::ShapedType>();
+          mlir::dyn_cast<mlir::ShapedType>(enforceShape.getValue().getType());
       if (!srcShaped)
         return;
 
       auto dstShaped =
-          enforceShape.getResult().getType().dyn_cast<mlir::ShapedType>();
+          mlir::dyn_cast<mlir::ShapedType>(enforceShape.getResult().getType());
       if (!dstShaped)
         return;
 
@@ -367,7 +367,7 @@ public:
 
       ShapeValue newVal(ranges);
 
-      auto shaped = empty.getResult().getType().cast<mlir::ShapedType>();
+      auto shaped = mlir::cast<mlir::ShapedType>(empty.getResult().getType());
       newVal = ShapeValue::intersect(newVal, {shaped});
 
       LLVM_DEBUG(llvm::dbgs()
@@ -407,7 +407,7 @@ public:
 
       ShapeValue newVal(ranges);
 
-      auto shaped = empty.getResult().getType().cast<mlir::ShapedType>();
+      auto shaped = mlir::cast<mlir::ShapedType>(empty.getResult().getType());
       newVal = ShapeValue::intersect(newVal, {shaped});
 
       LLVM_DEBUG(llvm::dbgs()
@@ -440,11 +440,11 @@ public:
       ShapeValue newVal;
       for (auto arg : op->getOperands())
         newVal = ShapeValue::intersect(
-            newVal, {arg.getType().cast<mlir::ShapedType>()});
+            newVal, {mlir::cast<mlir::ShapedType>(arg.getType())});
 
       for (auto result : op->getResults())
         newVal = ShapeValue::intersect(
-            newVal, {result.getType().cast<mlir::ShapedType>()});
+            newVal, {mlir::cast<mlir::ShapedType>(result.getType())});
 
       for (auto input : operands) {
         auto inpuLatticeVal = input->getValue();
@@ -511,7 +511,7 @@ public:
     }
 
     for (auto &&[res, resultLattice] : llvm::zip(op->getResults(), results)) {
-      auto shaped = res.getType().dyn_cast<mlir::ShapedType>();
+      auto shaped = mlir::dyn_cast<mlir::ShapedType>(res.getType());
       if (!shaped)
         continue;
 
@@ -541,7 +541,7 @@ public:
       auto &body = func.getFunctionBody();
       assert(!body.empty());
       for (auto &&[i, arg] : llvm::enumerate(body.front().getArguments())) {
-        auto shaped = arg.getType().dyn_cast<mlir::ShapedType>();
+        auto shaped = mlir::dyn_cast<mlir::ShapedType>(arg.getType());
         if (!shaped)
           continue;
 
