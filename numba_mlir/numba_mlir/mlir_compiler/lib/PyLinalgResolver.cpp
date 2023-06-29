@@ -672,21 +672,14 @@ static py::object broadcastImpl(py::capsule context, py::tuple args,
     mlirArgs[i] = val;
   }
 
-  llvm::SmallVector<mlir::Type> resTypes(args.size());
-  llvm::SmallVector<int64_t> resShape(rank >= 0 ? static_cast<size_t>(rank) : 0,
-                                      mlir::ShapedType::kDynamic);
-  for (auto &&[i, arg] : llvm::enumerate(mlirArgs))
-    resTypes[i] = arg.getType().cast<mlir::ShapedType>().clone(resShape);
-
-  auto broadcast =
-      builder.create<numba::ntensor::BroadcastOp>(loc, resTypes, mlirArgs);
+  auto broadcast = builder.create<numba::ntensor::BroadcastOp>(loc, mlirArgs);
 
   llvm::SmallVector<mlir::Value> results(broadcast->getNumResults());
   if (!resultType.is_none()) {
     auto resType = unwrapType(resultType);
     for (auto &&[i, res] :
          llvm::enumerate(mlir::ValueRange(broadcast.getResults()))) {
-      auto srcType = res.getType().cast<mlir::ShapedType>();
+      auto srcType = mlir::cast<mlir::ShapedType>(res.getType());
       auto dstType = srcType.clone(resType);
       if (srcType != dstType) {
         if (!numba::canConvert(srcType.getElementType(), resType))

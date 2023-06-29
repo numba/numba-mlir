@@ -771,6 +771,10 @@ def BroadcastOp : NTensor_OpBase<"broadcast", [
   let assemblyFormat =
     "attr-dict `(` $inputs `)` `:`  qualified(type($inputs)) `->` qualified(type($results))";
 
+  let builders = [
+    OpBuilder<(ins "::mlir::ValueRange":$inputs)>
+  ];
+
   let hasFolder = 1;
   let hasCanonicalizer = 1;
 }

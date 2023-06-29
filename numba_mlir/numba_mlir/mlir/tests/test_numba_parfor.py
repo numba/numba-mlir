@@ -112,7 +112,6 @@ def _gen_tests():
         "test_tuple_for_pndindex",
         "test_tuple_of_literal_nonliteral",
         "test_if_not_else_reduction",
-        "test_prange30",
         "test_int_arg_pndindex",
         "test_non_identity_initial",
         "test_prange_optional",

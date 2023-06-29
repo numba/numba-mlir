@@ -162,39 +162,6 @@ struct AndConflictSimplify
   }
 };
 
-struct CmpiOfSelect : public mlir::OpRewritePattern<mlir::arith::CmpIOp> {
-  using OpRewritePattern::OpRewritePattern;
-
-  mlir::LogicalResult
-  matchAndRewrite(mlir::arith::CmpIOp op,
-                  mlir::PatternRewriter &rewriter) const override {
-    using Pred = mlir::arith::CmpIPredicate;
-    auto predicate = op.getPredicate();
-    if (predicate != Pred::eq && predicate != Pred::ne)
-      return mlir::failure();
-
-    for (bool reverse1 : {false, true}) {
-      auto select = (reverse1 ? op.getRhs() : op.getLhs())
-                        .getDefiningOp<mlir::arith::SelectOp>();
-      if (!select)
-        continue;
-
-      auto other = (reverse1 ? op.getLhs() : op.getRhs());
-      for (bool reverse2 : {false, true}) {
-        auto selectArg(reverse2 ? select.getFalseValue()
-                                : select.getTrueValue());
-        if (other != selectArg)
-          continue;
-
-        bool res = static_cast<int64_t>(reverse2 != (predicate == Pred::ne));
-        rewriter.replaceOpWithNewOp<mlir::arith::ConstantIntOp>(op, res, 1);
-        return mlir::success();
-      }
-    }
-    return mlir::failure();
-  }
-};
-
 // TODO: upstream
 struct XorOfCmpF : public mlir::OpRewritePattern<mlir::arith::XOrIOp> {
   using OpRewritePattern::OpRewritePattern;
@@ -462,7 +429,6 @@ void numba::populateCommonOptsPatterns(mlir::RewritePatternSet &patterns) {
       SubviewStorePropagate,
       PowSimplify,
       AndConflictSimplify,
-      CmpiOfSelect,
       XorOfCmpF,
       ExtractStridedMetadataUnused,
       ExtractStridedMetadataConstStrides,

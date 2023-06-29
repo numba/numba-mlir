@@ -867,6 +867,59 @@ void numba::ntensor::ElementwiseOp::build(
   }
 }
 
+void numba::ntensor::BroadcastOp::build(::mlir::OpBuilder &odsBuilder,
+                                        ::mlir::OperationState &odsState,
+                                        ::mlir::ValueRange inputs) {
+  if (inputs.empty())
+    return build(odsBuilder, odsState, /*types*/ {}, /*inputs*/ {});
+
+  if (inputs.size() == 1)
+    return build(odsBuilder, odsState, inputs.front().getType(), inputs);
+
+  auto isDynamicOrUnit = [](int64_t v) {
+    return mlir::ShapedType::isDynamic(v) || v == 1;
+  };
+
+  auto areDimsBroadcastable = [&](int64_t a, int64_t b) {
+    return isDynamicOrUnit(a) || isDynamicOrUnit(b) || a == b;
+  };
+
+  auto broadcastDim = [&](int64_t a, int64_t b) {
+    if (!areDimsBroadcastable(a, b))
+      return mlir::ShapedType::kDynamic; // Will be caught later
+
+    if (mlir::ShapedType::isDynamic(a) || mlir::ShapedType::isDynamic(b))
+      return mlir::ShapedType::kDynamic;
+
+    return a == 1 ? b : a;
+  };
+
+  llvm::SmallVector<int64_t> newShape;
+  for (auto &&arg : inputs) {
+    auto type = mlir::cast<mlir::ShapedType>(arg.getType());
+    auto shape = type.getShape();
+    if (shape.size() > newShape.size()) {
+      size_t diff = shape.size() - newShape.size();
+      newShape.insert(newShape.begin(), diff, mlir::ShapedType::kDynamic);
+    }
+
+    for (auto &&[i, dim] : llvm::enumerate(shape)) {
+      auto diff =
+          shape.size() < newShape.size() ? newShape.size() - shape.size() : 0;
+      auto oldDim = newShape[diff + i];
+      auto newDim = broadcastDim(dim, oldDim);
+      newShape[diff + i] = newDim;
+    }
+  }
+
+  mlir::SmallVector<mlir::Type> resultTypes(inputs.size());
+  for (auto &&[i, arg] : llvm::enumerate(inputs)) {
+    auto type = mlir::cast<mlir::ShapedType>(arg.getType());
+    resultTypes[i] = type.clone(newShape);
+  }
+  build(odsBuilder, odsState, resultTypes, inputs);
+}
+
 mlir::LogicalResult numba::ntensor::BroadcastOp::fold(
     FoldAdaptor, llvm::SmallVectorImpl<mlir::OpFoldResult> &results) {
   assert(getInputs().size() == getResults().size());
