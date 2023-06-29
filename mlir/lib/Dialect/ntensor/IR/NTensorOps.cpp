@@ -983,6 +983,30 @@ void numba::ntensor::BroadcastOp::getCanonicalizationPatterns(
   results.insert<BroadcastSameStaticShape>(context);
 }
 
+mlir::Value numba::ntensor::CreateArrayOp::getDynamicSize(unsigned idx) {
+  assert(getType().isDynamicDim(idx) && "expected dynamic dim");
+  unsigned ctr = 0;
+  for (int64_t i = 0; i < static_cast<int64_t>(idx); ++i)
+    if (getType().isDynamicDim(i))
+      ++ctr;
+  return getDynamicSizes()[ctr];
+}
+
+llvm::SmallVector<mlir::OpFoldResult>
+numba::ntensor::CreateArrayOp::getMixedSizes() {
+  llvm::SmallVector<mlir::OpFoldResult> result;
+  unsigned ctr = 0;
+  mlir::OpBuilder b(getContext());
+  for (int64_t i = 0; i < getType().getRank(); ++i) {
+    if (getType().isDynamicDim(i)) {
+      result.push_back(getDynamicSizes()[ctr++]);
+    } else {
+      result.push_back(b.getIndexAttr(getType().getShape()[i]));
+    }
+  }
+  return result;
+}
+
 static mlir::LogicalResult parseShape(mlir::AsmParser &parser,
                                       llvm::SmallVector<int64_t> &shape,
                                       mlir::Type &type) {

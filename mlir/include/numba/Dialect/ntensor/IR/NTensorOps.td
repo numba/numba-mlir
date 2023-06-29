@@ -595,6 +595,15 @@ def CreateArrayOp : NTensor_OpBase<"create", [AttrSizedOperandSegments, Pure]> {
   let results = (outs Res<NTensor_Tensor, "", [MemAlloc<DefaultResource>]>:$result);
 
   let assemblyFormat = "`(`$dynamicSizes`)` (`=` `(` $initValue^ `:` type($initValue) `)`)? attr-dict `:` qualified(type($result))";
+
+    let extraClassDeclaration = [{
+    // Return both static and dynamic sizes as a list of `OpFoldResult`.
+    ::llvm::SmallVector<::mlir::OpFoldResult> getMixedSizes();
+
+    // Return the Value of the dynamic size of the tensor at dimension `idx`.
+    // Asserts that the shape is dynamic at that `idx`.
+    ::mlir::Value getDynamicSize(unsigned idx);
+  }];
 }
 
 def FromTensorOp : NTensor_OpBase<"from_tensor",
