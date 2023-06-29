@@ -883,7 +883,16 @@ void numba::ntensor::BroadcastOp::build(::mlir::OpBuilder &odsBuilder,
   auto areDimsBroadcastable = [&](int64_t a, int64_t b) {
     return isDynamicOrUnit(a) || isDynamicOrUnit(b) || a == b;
   };
-  (void)areDimsBroadcastable;
+
+  auto broadcastDim = [&](int64_t a, int64_t b) {
+    if (!areDimsBroadcastable(a, b))
+      return mlir::ShapedType::kDynamic; // Will be caught later
+
+    if (mlir::ShapedType::isDynamic(a) || mlir::ShapedType::isDynamic(b))
+      return mlir::ShapedType::kDynamic;
+
+    return a == 1 ? b : a;
+  };
 
   llvm::SmallVector<int64_t> newShape;
   for (auto &&arg : inputs) {
@@ -898,8 +907,7 @@ void numba::ntensor::BroadcastOp::build(::mlir::OpBuilder &odsBuilder,
       auto diff =
           shape.size() < newShape.size() ? newShape.size() - shape.size() : 0;
       auto oldDim = newShape[diff + i];
-      assert(areDimsBroadcastable(oldDim, dim));
-      auto newDim = isDynamicOrUnit(oldDim) ? dim : oldDim;
+      auto newDim = broadcastDim(dim, oldDim);
       newShape[diff + i] = newDim;
     }
   }
