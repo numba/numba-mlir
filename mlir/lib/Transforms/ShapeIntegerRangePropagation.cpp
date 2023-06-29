@@ -324,8 +324,11 @@ public:
       newVal = ShapeValue::intersect(newVal, {srcShaped});
       newVal = ShapeValue::intersect(newVal, {dstShaped});
 
-      auto inputLattice = operands.front();
-      newVal = ShapeValue::intersect(newVal, inputLattice->getValue());
+      auto inputLatticeVal = operands.front()->getValue();
+      if (inputLatticeVal.isUninitialized())
+        return;
+
+      newVal = ShapeValue::intersect(newVal, inputLatticeVal);
 
       LLVM_DEBUG(llvm::dbgs()
                  << "ShapeValueAnalysis: New enforce shape result: " << newVal
@@ -377,6 +380,46 @@ public:
       return;
     }
 
+    if (auto empty = mlir::dyn_cast<numba::ntensor::CreateArrayOp>(op)) {
+      assert(results.size() == 1);
+      auto mixedSizes = empty.getMixedSizes();
+
+      llvm::SmallVector<mlir::ConstantIntRanges> ranges;
+      ranges.reserve(mixedSizes.size());
+      for (auto size : mixedSizes) {
+        if (auto val = mlir::getConstantIntValue(size)) {
+          ranges.emplace_back(getFixedDimRange(*val));
+        } else {
+          assert(size.is<mlir::Value>());
+          auto state = getOrCreateFor<mlir::dataflow::IntegerValueRangeLattice>(
+              op, size.get<mlir::Value>());
+
+          if (!state)
+            return;
+
+          auto value = state->getValue();
+          if (value.isUninitialized())
+            return;
+
+          ranges.emplace_back(value.getValue());
+        }
+      }
+
+      ShapeValue newVal(ranges);
+
+      auto shaped = empty.getResult().getType().cast<mlir::ShapedType>();
+      newVal = ShapeValue::intersect(newVal, {shaped});
+
+      LLVM_DEBUG(llvm::dbgs()
+                 << "ShapeValueAnalysis: New CreateArrayOp shape result: "
+                 << newVal << "\n");
+
+      auto resultLattice = results.front();
+      auto changed = resultLattice->join(newVal);
+      propagateIfChanged(resultLattice, changed);
+      return;
+    }
+
     // TODO: not yet possible due to gow BranchOpInterface works.
     if (auto generic = mlir::dyn_cast<mlir::linalg::GenericOp>(op)) {
       if (generic->getNumResults() == 0)
@@ -403,8 +446,13 @@ public:
         newVal = ShapeValue::intersect(
             newVal, {result.getType().cast<mlir::ShapedType>()});
 
-      for (auto input : operands)
-        newVal = ShapeValue::intersect(newVal, input->getValue());
+      for (auto input : operands) {
+        auto inpuLatticeVal = input->getValue();
+        if (inpuLatticeVal.isUninitialized())
+          return;
+
+        newVal = ShapeValue::intersect(newVal, inpuLatticeVal);
+      }
 
       LLVM_DEBUG(llvm::dbgs() << "ShapeValueAnalysis: Shaped linalg generic: "
                               << newVal << "\n");
@@ -420,12 +468,16 @@ public:
       assert(operands.size() == 1);
       assert(results.size() == 1);
 
+      auto inputLatticeVal = operands.front()->getValue();
+      if (inputLatticeVal.isUninitialized())
+        return;
+
       auto srcShaped =
           mlir::cast<mlir::ShapedType>(op->getOperand(0).getType());
       auto dstShaped = mlir::cast<mlir::ShapedType>(op->getResult(0).getType());
       auto res =
           ShapeValue::intersect(ShapeValue{srcShaped}, ShapeValue{dstShaped});
-      res = ShapeValue::intersect(operands.front()->getValue(), res);
+      res = ShapeValue::intersect(inputLatticeVal, res);
 
       LLVM_DEBUG(llvm::dbgs()
                  << "ShapeValueAnalysis: Shaped cast: " << res << "\n");
@@ -442,9 +494,12 @@ public:
 
       assert(operands.size() == 3);
       assert(results.size() == 1);
-      auto lhs = operands[1];
-      auto rhs = operands[2];
-      auto newVal = ShapeValue::join(lhs->getValue(), rhs->getValue());
+      auto lhs = operands[1]->getValue();
+      auto rhs = operands[2]->getValue();
+      if (lhs.isUninitialized() || rhs.isUninitialized())
+        return;
+
+      auto newVal = ShapeValue::join(lhs, rhs);
 
       LLVM_DEBUG(llvm::dbgs()
                  << "ShapeValueAnalysis: select: " << newVal << "\n");
@@ -556,6 +611,7 @@ public:
           return std::nullopt;
 
         auto shape = shapeVal.getShape();
+
         auto indexVal = *index;
         if (indexVal < 0 || indexVal >= static_cast<int64_t>(shape.size()))
           return std::nullopt;
