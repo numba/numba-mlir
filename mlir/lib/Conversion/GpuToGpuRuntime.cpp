@@ -63,7 +63,7 @@ struct ParallelLoopGPUMappingPass
   void runOnOperation() override {
     auto func = getOperation();
     func->walk([&](numba::util::EnvironmentRegionOp envOp) {
-      if (!envOp.getEnvironment().isa<gpu_runtime::GPURegionDescAttr>())
+      if (!mlir::isa<gpu_runtime::GPURegionDescAttr>(envOp.getEnvironment()))
         return;
 
       auto &region = envOp.getRegion();
@@ -141,7 +141,7 @@ struct InsertGPUAllocs
       } else if (auto call = mlir::dyn_cast<mlir::func::CallOp>(op)) {
         mlir::SmallVector<mlir::Value, 4> ret;
         for (auto arg : call.getOperands()) {
-          if (arg.getType().isa<mlir::MemRefType>())
+          if (mlir::isa<mlir::MemRefType>(arg.getType()))
             ret.emplace_back(arg);
         }
         return std::move(ret);
@@ -164,7 +164,7 @@ struct InsertGPUAllocs
       }
       if (auto call = mlir::dyn_cast<mlir::func::CallOp>(op)) {
         for (auto arg : call.getOperands()) {
-          if (arg.getType().isa<mlir::MemRefType>())
+          if (mlir::isa<mlir::MemRefType>(arg.getType()))
             return true;
         }
       }
@@ -250,7 +250,7 @@ struct InsertGPUAllocs
       assert(op && "Invalid op");
       auto region = op->getParentOfType<numba::util::EnvironmentRegionOp>();
       if (!region ||
-          !region.getEnvironment().isa<gpu_runtime::GPURegionDescAttr>())
+          !mlir::isa<gpu_runtime::GPURegionDescAttr>(region.getEnvironment()))
         return mlir::failure();
 
       return region.getEnvironment();
@@ -1302,7 +1302,7 @@ struct GPUToSpirvPass
           [&typeConverter](mlir::MemRefType type) -> std::optional<mlir::Type> {
             auto srcElemType = type.getElementType();
             if (!srcElemType.isIntOrFloat() &&
-                !srcElemType.isa<mlir::VectorType>())
+                !mlir::isa<mlir::VectorType>(srcElemType))
               return mlir::Type(nullptr);
 
             auto elemType = typeConverter.convertType(srcElemType);
@@ -1613,8 +1613,8 @@ struct ExpandDeviceFuncCallOp
   matchAndRewrite(mlir::func::CallOp op,
                   mlir::PatternRewriter &rewriter) const override {
     auto region = op->getParentOfType<numba::util::EnvironmentRegionOp>();
-    if (!region || !region.getEnvironment()
-                        .isa_and_nonnull<gpu_runtime::GPURegionDescAttr>())
+    if (!region || !mlir::isa_and_nonnull<gpu_runtime::GPURegionDescAttr>(
+                       region.getEnvironment()))
       return mlir::failure();
 
     auto mod = op->getParentOfType<mlir::ModuleOp>();
@@ -2168,7 +2168,8 @@ struct TruncateF64ForGPUPass
         return builder.create<mlir::arith::TruncFOp>(loc, dstType, src)
             .getResult();
 
-      if (srcType.isa<mlir::MemRefType>() && dstType.isa<mlir::MemRefType>())
+      if (mlir::isa<mlir::MemRefType>(srcType) &&
+          mlir::isa<mlir::MemRefType>(dstType))
         return builder.create<numba::util::MemrefBitcastOp>(loc, dstType, src)
             .getResult();
 
@@ -2261,8 +2262,8 @@ struct TruncateF64ForGPUPass
               mlir::Value newVal =
                   builder.create<mlir::arith::TruncFOp>(loc, newType, origArg);
               newArgs.emplace_back(newVal);
-            } else if (origType.isa<mlir::MemRefType>() &&
-                       newType.isa<mlir::MemRefType>()) {
+            } else if (mlir::isa<mlir::MemRefType>(origType) &&
+                       mlir::isa<mlir::MemRefType>(newType)) {
               auto loc = launch.getLoc();
               mlir::Value newVal = builder.create<numba::util::MemrefBitcastOp>(
                   loc, newType, origArg);

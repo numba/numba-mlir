@@ -474,7 +474,7 @@ private:
     auto paramsArrayPtrType = getLLVMPointerType(paramsArrayType);
 
     auto getKernelParamType = [&](unsigned i) -> mlir::Type {
-      if (op.getKernelOperands()[i].getType().isa<mlir::MemRefType>()) {
+      if (mlir::isa<mlir::MemRefType>(op.getKernelOperands()[i].getType())) {
         mlir::MemRefDescriptor desc(kernelParams[i]);
         return desc.getElementPtrType();
       }
