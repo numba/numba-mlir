@@ -63,7 +63,7 @@ struct ParallelLoopGPUMappingPass
   void runOnOperation() override {
     auto func = getOperation();
     func->walk([&](numba::util::EnvironmentRegionOp envOp) {
-      if (!envOp.getEnvironment().isa<gpu_runtime::GPURegionDescAttr>())
+      if (!mlir::isa<gpu_runtime::GPURegionDescAttr>(envOp.getEnvironment()))
         return;
 
       auto &region = envOp.getRegion();
@@ -141,7 +141,7 @@ struct InsertGPUAllocs
       } else if (auto call = mlir::dyn_cast<mlir::func::CallOp>(op)) {
         mlir::SmallVector<mlir::Value, 4> ret;
         for (auto arg : call.getOperands()) {
-          if (arg.getType().isa<mlir::MemRefType>())
+          if (mlir::isa<mlir::MemRefType>(arg.getType()))
             ret.emplace_back(arg);
         }
         return std::move(ret);
@@ -164,7 +164,7 @@ struct InsertGPUAllocs
       }
       if (auto call = mlir::dyn_cast<mlir::func::CallOp>(op)) {
         for (auto arg : call.getOperands()) {
-          if (arg.getType().isa<mlir::MemRefType>())
+          if (mlir::isa<mlir::MemRefType>(arg.getType()))
             return true;
         }
       }
@@ -172,8 +172,8 @@ struct InsertGPUAllocs
     };
 
     auto gpuAccessibleArg = [&]() -> llvm::SmallVector<bool> {
-      auto gpuAttr = func->getAttr(gpu_runtime::getGpuAccessibleAttrName())
-                         .dyn_cast_or_null<mlir::ArrayAttr>();
+      auto gpuAttr = func->getAttrOfType<mlir::ArrayAttr>(
+          gpu_runtime::getGpuAccessibleAttrName());
       if (!gpuAttr)
         return {};
 
@@ -250,7 +250,7 @@ struct InsertGPUAllocs
       assert(op && "Invalid op");
       auto region = op->getParentOfType<numba::util::EnvironmentRegionOp>();
       if (!region ||
-          !region.getEnvironment().isa<gpu_runtime::GPURegionDescAttr>())
+          !mlir::isa<gpu_runtime::GPURegionDescAttr>(region.getEnvironment()))
         return mlir::failure();
 
       return region.getEnvironment();
@@ -730,8 +730,8 @@ static std::optional<mlir::Value> getGpuStream(mlir::OpBuilder &builder,
 
   mlir::Attribute device;
   if (auto envRegion = op->getParentOfType<numba::util::EnvironmentRegionOp>())
-    if (auto desc = envRegion.getEnvironment()
-                        .dyn_cast<gpu_runtime::GPURegionDescAttr>())
+    if (auto desc = mlir::dyn_cast<gpu_runtime::GPURegionDescAttr>(
+            envRegion.getEnvironment()))
       device = desc.getDevice();
 
   auto &block = func.getFunctionBody().front();
@@ -754,7 +754,7 @@ static std::optional<unsigned> getTypeSize(mlir::Type type) {
   if (type.isIntOrFloat())
     return type.getIntOrFloatBitWidth() / 8;
 
-  if (auto vec = type.dyn_cast<mlir::VectorType>()) {
+  if (auto vec = mlir::dyn_cast<mlir::VectorType>(type)) {
     if (!vec.hasStaticShape())
       return std::nullopt;
 
@@ -798,7 +798,7 @@ public:
 
     auto loc = op.getLoc();
     auto getValue = [&](mlir::OpFoldResult src) -> mlir::Value {
-      if (auto val = src.dyn_cast<mlir::Value>())
+      if (auto val = mlir::dyn_cast<mlir::Value>(src))
         return val;
 
       auto attr = src.get<mlir::Attribute>();
@@ -983,13 +983,13 @@ struct ConvertAtomicRMW
 static bool isAllocationSupported(mlir::Operation *allocOp,
                                   mlir::MemRefType type) {
   if (mlir::isa<mlir::memref::AllocOp, mlir::memref::DeallocOp>(allocOp)) {
-    auto sc =
-        type.getMemorySpace().dyn_cast_or_null<mlir::spirv::StorageClassAttr>();
+    auto sc = mlir::dyn_cast_or_null<mlir::spirv::StorageClassAttr>(
+        type.getMemorySpace());
     if (!sc || sc.getValue() != mlir::spirv::StorageClass::Workgroup)
       return false;
   } else if (mlir::isa<mlir::memref::AllocaOp>(allocOp)) {
-    auto sc =
-        type.getMemorySpace().dyn_cast_or_null<mlir::gpu::AddressSpaceAttr>();
+    auto sc = mlir::dyn_cast_or_null<mlir::gpu::AddressSpaceAttr>(
+        type.getMemorySpace());
     if (!sc || sc.getValue() != mlir::gpu::GPUDialect::getPrivateAddressSpace())
       return false;
   } else {
@@ -1117,16 +1117,7 @@ public:
 
 static std::optional<mlir::spirv::StorageClass>
 convertStorageClass(mlir::Attribute src) {
-  // TODO: Fix storage class upstream
-  //  auto attr = src.dyn_cast_or_null<gpu_runtime::StorageClassAttr>();
-  //  if (!attr)
-  //    return std::nullopt;
-
-  //  auto sc = attr.getValue();
-  //  if (sc == gpu_runtime::StorageClass::local)
-  //    return mlir::spirv::StorageClass::Workgroup;
-
-  if (auto attr = src.dyn_cast_or_null<mlir::gpu::AddressSpaceAttr>()) {
+  if (auto attr = mlir::dyn_cast_or_null<mlir::gpu::AddressSpaceAttr>(src)) {
     if (attr.getValue() == mlir::gpu::GPUDialect::getWorkgroupAddressSpace())
       return mlir::spirv::StorageClass::Workgroup;
 
@@ -1189,7 +1180,7 @@ public:
   matchAndRewrite(mlir::memref::GetGlobalOp op,
                   mlir::memref::GetGlobalOp::Adaptor adaptor,
                   mlir::ConversionPatternRewriter &rewriter) const override {
-    auto memrefType = op.getType().dyn_cast<mlir::MemRefType>();
+    auto memrefType = mlir::dyn_cast<mlir::MemRefType>(op.getType());
     if (!memrefType)
       return mlir::failure();
 
@@ -1311,7 +1302,7 @@ struct GPUToSpirvPass
           [&typeConverter](mlir::MemRefType type) -> std::optional<mlir::Type> {
             auto srcElemType = type.getElementType();
             if (!srcElemType.isIntOrFloat() &&
-                !srcElemType.isa<mlir::VectorType>())
+                !mlir::isa<mlir::VectorType>(srcElemType))
               return mlir::Type(nullptr);
 
             auto elemType = typeConverter.convertType(srcElemType);
@@ -1622,8 +1613,8 @@ struct ExpandDeviceFuncCallOp
   matchAndRewrite(mlir::func::CallOp op,
                   mlir::PatternRewriter &rewriter) const override {
     auto region = op->getParentOfType<numba::util::EnvironmentRegionOp>();
-    if (!region || !region.getEnvironment()
-                        .isa_and_nonnull<gpu_runtime::GPURegionDescAttr>())
+    if (!region || !mlir::isa_and_nonnull<gpu_runtime::GPURegionDescAttr>(
+                       region.getEnvironment()))
       return mlir::failure();
 
     auto mod = op->getParentOfType<mlir::ModuleOp>();
@@ -2080,7 +2071,7 @@ public:
       return mlir::failure();
 
     auto memref = adaptor.getMemref();
-    auto memrefType = memref.getType().dyn_cast<mlir::MemRefType>();
+    auto memrefType = mlir::dyn_cast<mlir::MemRefType>(memref.getType());
     if (!memrefType)
       return mlir::failure();
 
@@ -2105,8 +2096,8 @@ public:
     auto converter = getTypeConverter();
     assert(converter && "Invalid type converter");
 
-    auto resType = converter->convertType(op.getType())
-                       .dyn_cast_or_null<mlir::MemRefType>();
+    auto resType = mlir::dyn_cast_or_null<mlir::MemRefType>(
+        converter->convertType(op.getType()));
     if (!resType)
       return mlir::failure();
 
@@ -2177,7 +2168,8 @@ struct TruncateF64ForGPUPass
         return builder.create<mlir::arith::TruncFOp>(loc, dstType, src)
             .getResult();
 
-      if (srcType.isa<mlir::MemRefType>() && dstType.isa<mlir::MemRefType>())
+      if (mlir::isa<mlir::MemRefType>(srcType) &&
+          mlir::isa<mlir::MemRefType>(dstType))
         return builder.create<numba::util::MemrefBitcastOp>(loc, dstType, src)
             .getResult();
 
@@ -2270,8 +2262,8 @@ struct TruncateF64ForGPUPass
               mlir::Value newVal =
                   builder.create<mlir::arith::TruncFOp>(loc, newType, origArg);
               newArgs.emplace_back(newVal);
-            } else if (origType.isa<mlir::MemRefType>() &&
-                       newType.isa<mlir::MemRefType>()) {
+            } else if (mlir::isa<mlir::MemRefType>(origType) &&
+                       mlir::isa<mlir::MemRefType>(newType)) {
               auto loc = launch.getLoc();
               mlir::Value newVal = builder.create<numba::util::MemrefBitcastOp>(
                   loc, newType, origArg);
