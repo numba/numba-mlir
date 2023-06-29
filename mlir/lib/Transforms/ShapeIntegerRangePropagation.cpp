@@ -420,8 +420,9 @@ public:
       assert(operands.size() == 1);
       assert(results.size() == 1);
 
-      auto srcShaped = op->getOperand(0).getType().cast<mlir::ShapedType>();
-      auto dstShaped = op->getResult(0).getType().cast<mlir::ShapedType>();
+      auto srcShaped =
+          mlir::cast<mlir::ShapedType>(op->getOperand(0).getType());
+      auto dstShaped = mlir::cast<mlir::ShapedType>(op->getResult(0).getType());
       auto res =
           ShapeValue::intersect(ShapeValue{srcShaped}, ShapeValue{dstShaped});
       res = ShapeValue::intersect(operands.front()->getValue(), res);
