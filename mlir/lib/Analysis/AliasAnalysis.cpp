@@ -8,7 +8,7 @@
 
 /// Check if value is function argument.
 static bool isFuncArg(mlir::Value val) {
-  auto blockArg = val.dyn_cast<mlir::BlockArgument>();
+  auto blockArg = mlir::dyn_cast<mlir::BlockArgument>(val);
   if (!blockArg)
     return false;
 

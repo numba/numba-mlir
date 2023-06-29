@@ -18,11 +18,11 @@ mlir::TypedAttr getConstVal(mlir::Operation *op);
 mlir::TypedAttr getConstVal(mlir::Value op);
 
 template <typename T> T getConstVal(mlir::Operation *op) {
-  return getConstVal(op).dyn_cast_or_null<T>();
+  return mlir::dyn_cast_or_null<T>(getConstVal(op));
 }
 
 template <typename T> T getConstVal(mlir::Value op) {
-  return getConstVal(op).dyn_cast_or_null<T>();
+  return mlir::dyn_cast_or_null<T>(getConstVal(op));
 }
 
 mlir::TypedAttr getConstAttr(mlir::Type type, double val);

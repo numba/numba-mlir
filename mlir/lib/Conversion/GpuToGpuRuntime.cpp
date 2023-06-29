@@ -172,8 +172,8 @@ struct InsertGPUAllocs
     };
 
     auto gpuAccessibleArg = [&]() -> llvm::SmallVector<bool> {
-      auto gpuAttr = func->getAttr(gpu_runtime::getGpuAccessibleAttrName())
-                         .dyn_cast_or_null<mlir::ArrayAttr>();
+      auto gpuAttr = func->getAttrOfType<mlir::ArrayAttr>(
+          gpu_runtime::getGpuAccessibleAttrName());
       if (!gpuAttr)
         return {};
 
@@ -730,8 +730,8 @@ static std::optional<mlir::Value> getGpuStream(mlir::OpBuilder &builder,
 
   mlir::Attribute device;
   if (auto envRegion = op->getParentOfType<numba::util::EnvironmentRegionOp>())
-    if (auto desc = envRegion.getEnvironment()
-                        .dyn_cast<gpu_runtime::GPURegionDescAttr>())
+    if (auto desc = mlir::dyn_cast<gpu_runtime::GPURegionDescAttr>(
+            envRegion.getEnvironment()))
       device = desc.getDevice();
 
   auto &block = func.getFunctionBody().front();
@@ -754,7 +754,7 @@ static std::optional<unsigned> getTypeSize(mlir::Type type) {
   if (type.isIntOrFloat())
     return type.getIntOrFloatBitWidth() / 8;
 
-  if (auto vec = type.dyn_cast<mlir::VectorType>()) {
+  if (auto vec = mlir::dyn_cast<mlir::VectorType>(type)) {
     if (!vec.hasStaticShape())
       return std::nullopt;
 

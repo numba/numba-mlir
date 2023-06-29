@@ -245,7 +245,8 @@ private:
     if (!eventsCount)
       return mlir::failure();
 
-    auto device = adaptor.getDeviceAttr().dyn_cast_or_null<mlir::StringAttr>();
+    auto device =
+        mlir::dyn_cast_or_null<mlir::StringAttr>(adaptor.getDeviceAttr());
 
     auto eventsCountAttr = rewriter.getIntegerAttr(llvmIndexType, *eventsCount);
     auto loc = op.getLoc();
@@ -515,7 +516,7 @@ private:
     auto getKernelParam =
         [&](unsigned i) -> std::pair<mlir::Value, mlir::Value> {
       auto memrefType =
-          op.getKernelOperands()[i].getType().dyn_cast<mlir::MemRefType>();
+          mlir::dyn_cast<mlir::MemRefType>(op.getKernelOperands()[i].getType());
       auto paramType = paramsStorage[i].getType();
       if (memrefType) {
         mlir::MemRefDescriptor desc(kernelParams[i]);
