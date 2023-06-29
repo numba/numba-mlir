@@ -889,14 +889,18 @@ void numba::ntensor::BroadcastOp::build(::mlir::OpBuilder &odsBuilder,
   for (auto &&arg : inputs) {
     auto type = mlir::cast<mlir::ShapedType>(arg.getType());
     auto shape = type.getShape();
-    if (shape.size() > newShape.size())
-      newShape.resize(shape.size(), mlir::ShapedType::kDynamic);
+    if (shape.size() > newShape.size()) {
+      size_t diff = shape.size() - newShape.size();
+      newShape.insert(newShape.begin(), diff, mlir::ShapedType::kDynamic);
+    }
 
     for (auto &&[i, dim] : llvm::enumerate(shape)) {
-      auto oldDim = newShape[i];
+      auto diff =
+          shape.size() < newShape.size() ? newShape.size() - shape.size() : 0;
+      auto oldDim = newShape[diff + i];
       assert(areDimsBroadcastable(oldDim, dim));
       auto newDim = isDynamicOrUnit(oldDim) ? dim : oldDim;
-      newShape[i] = newDim;
+      newShape[diff + i] = newDim;
     }
   }
 
