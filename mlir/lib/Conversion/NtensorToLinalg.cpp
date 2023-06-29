@@ -26,6 +26,11 @@ static mlir::RankedTensorType toTensorType(mlir::ShapedType type) {
 }
 
 namespace {
+template <typename Op>
+static numba::ntensor::NTensorType getNTensorType(Op op) {
+  return mlir::dyn_cast<numba::ntensor::NTensorType>(op.getType());
+}
+
 struct ConvertCreateOp
     : public mlir::OpRewritePattern<numba::ntensor::CreateArrayOp> {
   using OpRewritePattern::OpRewritePattern;
@@ -36,7 +41,7 @@ struct ConvertCreateOp
     if (!op->hasAttr(kReadonly))
       return mlir::failure();
 
-    auto dstType = op.getType().dyn_cast<numba::ntensor::NTensorType>();
+    auto dstType = getNTensorType(op);
     if (!dstType)
       return mlir::failure();
 
@@ -73,12 +78,12 @@ struct ConvertCopyOp : public mlir::OpRewritePattern<numba::ntensor::CopyOp> {
   matchAndRewrite(numba::ntensor::CopyOp op,
                   mlir::PatternRewriter &rewriter) const override {
     auto src = op.getSource();
-    auto srcType = src.getType().dyn_cast<numba::ntensor::NTensorType>();
+    auto srcType = getNTensorType(src);
     if (!srcType)
       return mlir::failure();
 
     auto dst = op.getTarget();
-    auto dstType = dst.getType().dyn_cast<numba::ntensor::NTensorType>();
+    auto dstType = getNTensorType(dst);
     if (!dstType)
       return mlir::failure();
 
@@ -239,11 +244,11 @@ struct ConvertCastOp : public mlir::OpRewritePattern<numba::ntensor::CastOp> {
   matchAndRewrite(numba::ntensor::CastOp op,
                   mlir::PatternRewriter &rewriter) const override {
     auto src = op.getSource();
-    auto srcType = src.getType().dyn_cast<numba::ntensor::NTensorType>();
+    auto srcType = getNTensorType(src);
     if (!srcType)
       return mlir::failure();
 
-    auto dstType = op.getType().dyn_cast<numba::ntensor::NTensorType>();
+    auto dstType = getNTensorType(op);
     if (!dstType)
       return mlir::failure();
 
@@ -279,7 +284,7 @@ struct ConvertFromElementsOp
   mlir::LogicalResult
   matchAndRewrite(numba::ntensor::FromElementsOp op,
                   mlir::PatternRewriter &rewriter) const override {
-    auto dstType = op.getType().dyn_cast<numba::ntensor::NTensorType>();
+    auto dstType = getNTensorType(op);
     if (!dstType)
       return mlir::failure();
 
@@ -315,11 +320,11 @@ struct ConvertSubviewOp
       return mlir::failure();
 
     auto src = op.getSource();
-    auto srcType = src.getType().dyn_cast<numba::ntensor::NTensorType>();
+    auto srcType = getNTensorType(src);
     if (!srcType)
       return mlir::failure();
 
-    auto dstType = op.getType().dyn_cast<numba::ntensor::NTensorType>();
+    auto dstType = getNTensorType(op);
     if (!dstType)
       return mlir::failure();
 
@@ -360,7 +365,7 @@ struct ConvertLoadOp : public mlir::OpRewritePattern<numba::ntensor::LoadOp> {
   matchAndRewrite(numba::ntensor::LoadOp op,
                   mlir::PatternRewriter &rewriter) const override {
     auto src = op.getArray();
-    auto srcType = src.getType().dyn_cast<numba::ntensor::NTensorType>();
+    auto srcType = getNTensorType(src);
     if (!srcType || op.getType() != srcType.getElementType())
       return mlir::failure();
 
@@ -388,7 +393,7 @@ struct ConvertDimOp : public mlir::OpRewritePattern<numba::ntensor::DimOp> {
   matchAndRewrite(numba::ntensor::DimOp op,
                   mlir::PatternRewriter &rewriter) const override {
     auto src = op.getSource();
-    auto srcType = src.getType().dyn_cast<numba::ntensor::NTensorType>();
+    auto srcType = getNTensorType(src);
     if (!srcType)
       return mlir::failure();
 

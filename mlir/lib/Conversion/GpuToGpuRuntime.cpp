@@ -798,7 +798,7 @@ public:
 
     auto loc = op.getLoc();
     auto getValue = [&](mlir::OpFoldResult src) -> mlir::Value {
-      if (auto val = src.dyn_cast<mlir::Value>())
+      if (auto val = mlir::dyn_cast<mlir::Value>(src))
         return val;
 
       auto attr = src.get<mlir::Attribute>();
@@ -983,13 +983,13 @@ struct ConvertAtomicRMW
 static bool isAllocationSupported(mlir::Operation *allocOp,
                                   mlir::MemRefType type) {
   if (mlir::isa<mlir::memref::AllocOp, mlir::memref::DeallocOp>(allocOp)) {
-    auto sc =
-        type.getMemorySpace().dyn_cast_or_null<mlir::spirv::StorageClassAttr>();
+    auto sc = mlir::dyn_cast_or_null<mlir::spirv::StorageClassAttr>(
+        type.getMemorySpace());
     if (!sc || sc.getValue() != mlir::spirv::StorageClass::Workgroup)
       return false;
   } else if (mlir::isa<mlir::memref::AllocaOp>(allocOp)) {
-    auto sc =
-        type.getMemorySpace().dyn_cast_or_null<mlir::gpu::AddressSpaceAttr>();
+    auto sc = mlir::dyn_cast_or_null<mlir::gpu::AddressSpaceAttr>(
+        type.getMemorySpace());
     if (!sc || sc.getValue() != mlir::gpu::GPUDialect::getPrivateAddressSpace())
       return false;
   } else {
@@ -1117,16 +1117,7 @@ public:
 
 static std::optional<mlir::spirv::StorageClass>
 convertStorageClass(mlir::Attribute src) {
-  // TODO: Fix storage class upstream
-  //  auto attr = src.dyn_cast_or_null<gpu_runtime::StorageClassAttr>();
-  //  if (!attr)
-  //    return std::nullopt;
-
-  //  auto sc = attr.getValue();
-  //  if (sc == gpu_runtime::StorageClass::local)
-  //    return mlir::spirv::StorageClass::Workgroup;
-
-  if (auto attr = src.dyn_cast_or_null<mlir::gpu::AddressSpaceAttr>()) {
+  if (auto attr = mlir::dyn_cast_or_null<mlir::gpu::AddressSpaceAttr>(src)) {
     if (attr.getValue() == mlir::gpu::GPUDialect::getWorkgroupAddressSpace())
       return mlir::spirv::StorageClass::Workgroup;
 
@@ -1189,7 +1180,7 @@ public:
   matchAndRewrite(mlir::memref::GetGlobalOp op,
                   mlir::memref::GetGlobalOp::Adaptor adaptor,
                   mlir::ConversionPatternRewriter &rewriter) const override {
-    auto memrefType = op.getType().dyn_cast<mlir::MemRefType>();
+    auto memrefType = mlir::dyn_cast<mlir::MemRefType>(op.getType());
     if (!memrefType)
       return mlir::failure();
 
@@ -2080,7 +2071,7 @@ public:
       return mlir::failure();
 
     auto memref = adaptor.getMemref();
-    auto memrefType = memref.getType().dyn_cast<mlir::MemRefType>();
+    auto memrefType = mlir::dyn_cast<mlir::MemRefType>(memref.getType());
     if (!memrefType)
       return mlir::failure();
 
@@ -2105,8 +2096,8 @@ public:
     auto converter = getTypeConverter();
     assert(converter && "Invalid type converter");
 
-    auto resType = converter->convertType(op.getType())
-                       .dyn_cast_or_null<mlir::MemRefType>();
+    auto resType = mlir::dyn_cast_or_null<mlir::MemRefType>(
+        converter->convertType(op.getType()));
     if (!resType)
       return mlir::failure();
 
