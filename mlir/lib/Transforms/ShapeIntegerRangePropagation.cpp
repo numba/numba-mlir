@@ -48,7 +48,7 @@ public:
   ShapeValue(mlir::ArrayAttr attr) : shapeRanges(std::in_place) {
     shapeRanges->reserve(attr.size());
     for (auto elem : attr) {
-      auto range = elem.cast<numba::util::IndexRangeAttr>();
+      auto range = mlir::cast<numba::util::IndexRangeAttr>(elem);
       shapeRanges->emplace_back(getIndexRange(range.getMin(), range.getMax()));
     }
   }
@@ -426,12 +426,12 @@ public:
         return;
 
       if (!llvm::all_of(generic.getIndexingMaps(), [](mlir::Attribute map) {
-            return map.cast<mlir::AffineMapAttr>().getValue().isIdentity();
+            return mlir::cast<mlir::AffineMapAttr>(map).getValue().isIdentity();
           }))
         return;
 
       if (!llvm::all_of(generic.getIteratorTypes(), [](mlir::Attribute map) {
-            return map.cast<mlir::linalg::IteratorTypeAttr>().getValue() ==
+            return mlir::cast<mlir::linalg::IteratorTypeAttr>(map).getValue() ==
                    mlir::utils::IteratorType::parallel;
           }))
 
