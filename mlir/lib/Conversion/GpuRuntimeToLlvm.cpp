@@ -45,9 +45,6 @@ private:
   mlir::LLVM::LLVMFunctionType functionType;
 };
 
-static constexpr llvm::StringLiteral kEventCountAttrName("gpu.event_count");
-static constexpr llvm::StringLiteral kEventIndexAttrName("gpu.event_index");
-
 static mlir::Type getLLVMPointerType(mlir::Type elemType) {
   assert(elemType);
   return mlir::LLVM::LLVMPointerType::get(elemType.getContext());
@@ -87,7 +84,6 @@ protected:
       "gpuxStreamCreate",
       llvmPointerType, // stream
       {
-          llvmIndexType,  // events count
           llvmPointerType // device name
       }};
 
@@ -138,7 +134,6 @@ protected:
           llvmIndexType,           // blockZDim
           llvmPointerPointerType,  // deps (null-term)
           llvmGpuParamPointerType, // params (null-term)
-          llvmIndexType,           // eventIndex
       }};
 
   FunctionCallBuilder waitEventCallBuilder = {"gpuxWait",
@@ -164,7 +159,6 @@ protected:
           llvmIndexType,          // alignment
           llvmInt32Type,          // shared
           llvmPointerPointerType, // deps (null-term)
-          llvmIndexType,          // eventIndex
           llvmAllocResPtrType,    // result
       }};
 
@@ -217,19 +211,6 @@ protected:
     return rewriter.create<mlir::LLVM::BitcastOp>(loc, llvmPointerPointerType,
                                                   depsArrayPtr);
   }
-
-  mlir::Value createEventIndexVar(mlir::OpBuilder &rewriter, mlir::Location loc,
-                                  mlir::Operation *op) const {
-    auto eventIndex = [&]() -> int64_t {
-      auto value = mlir::getConstantIntValue(op->getAttr(kEventIndexAttrName));
-      if (!value)
-        return -1;
-
-      return *value;
-    }();
-    return rewriter.create<mlir::LLVM::ConstantOp>(
-        loc, llvmIndexType, rewriter.getIntegerAttr(llvmIndexType, eventIndex));
-  }
 };
 
 class ConvertGpuStreamCreatePattern
@@ -248,19 +229,10 @@ private:
     if (!mod)
       return mlir::failure();
 
-    auto eventsCount =
-        mlir::getConstantIntValue(mod->getAttr(kEventCountAttrName));
-    if (!eventsCount)
-      return mlir::failure();
-
     auto device =
         mlir::dyn_cast_or_null<mlir::StringAttr>(adaptor.getDeviceAttr());
 
-    auto eventsCountAttr = rewriter.getIntegerAttr(llvmIndexType, *eventsCount);
     auto loc = op.getLoc();
-    mlir::Value eventsCountVar = rewriter.create<mlir::LLVM::ConstantOp>(
-        loc, llvmIndexType, eventsCountAttr);
-
     mlir::Value data;
     if (device) {
       llvm::SmallString<64> name = device.getValue();
@@ -273,8 +245,7 @@ private:
       data = rewriter.create<mlir::LLVM::NullOp>(loc, llvmPointerType);
     }
 
-    auto res =
-        streamCreateCallBuilder.create(loc, rewriter, {eventsCountVar, data});
+    auto res = streamCreateCallBuilder.create(loc, rewriter, data);
     rewriter.replaceOp(op, res.getResults());
     return mlir::success();
   }
@@ -614,8 +585,6 @@ private:
         loc, paramsArray, nullRange, paramsCount);
     rewriter.create<mlir::LLVM::StoreOp>(loc, paramsArray, paramsArrayPtr);
 
-    auto eventIndexVar = createEventIndexVar(rewriter, loc, op);
-
     auto paramsArrayVoidPtr = rewriter.create<mlir::LLVM::BitcastOp>(
         loc, llvmGpuParamPointerType, paramsArrayPtr);
     auto stream = adaptor.getStream();
@@ -631,7 +600,6 @@ private:
         adaptor.getBlockSizeZ(),
         depsArrayPtr,
         paramsArrayVoidPtr,
-        eventIndexVar,
         // clang-format on
     };
     auto event =
@@ -705,8 +673,6 @@ private:
     auto depsArrayPtr =
         createDepsArray(rewriter, loc, op, adaptor.getAsyncDependencies());
 
-    auto eventIndexVar = createEventIndexVar(rewriter, loc, op);
-
     numba::AllocaInsertionPoint allocaHelper(op);
     auto resultPtr = allocaHelper.insert(rewriter, [&]() {
       auto size = rewriter.create<mlir::LLVM::ConstantOp>(
@@ -723,7 +689,6 @@ private:
         alignmentVar,
         typeVar,
         depsArrayPtr,
-        eventIndexVar,
         resultPtr,
         // clang-format on
     };
@@ -874,26 +839,6 @@ private:
   }
 };
 
-struct EnumerateEventsPass
-    : public mlir::PassWrapper<EnumerateEventsPass,
-                               mlir::OperationPass<mlir::ModuleOp>> {
-  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(EnumerateEventsPass)
-
-  void runOnOperation() override {
-    auto mod = getOperation();
-    int64_t eventCount = 0;
-    auto *ctx = &getContext();
-    auto intType = mlir::IntegerType::get(ctx, 64);
-    auto indexAttrName = mlir::StringAttr::get(ctx, kEventIndexAttrName);
-    auto countAttrName = mlir::StringAttr::get(ctx, kEventCountAttrName);
-    mod.walk([&](mlir::gpu::AsyncOpInterface op) {
-      op->setAttr(indexAttrName, mlir::IntegerAttr::get(intType, eventCount));
-      ++eventCount;
-    });
-    mod->setAttr(countAttrName, mlir::IntegerAttr::get(intType, eventCount));
-  }
-};
-
 struct GPUToLLVMPass
     : public mlir::PassWrapper<GPUToLLVMPass,
                                mlir::OperationPass<mlir::ModuleOp>> {
@@ -926,10 +871,6 @@ struct GPUToLLVMPass
 } // namespace
 
 // Expose the passes to the outside world
-std::unique_ptr<mlir::Pass> gpu_runtime::createEnumerateEventsPass() {
-  return std::make_unique<EnumerateEventsPass>();
-}
-
 void gpu_runtime::populateGpuToLLVMPatternsAndLegality(
     mlir::LLVMTypeConverter &converter, mlir::RewritePatternSet &patterns,
     mlir::ConversionTarget &target) {

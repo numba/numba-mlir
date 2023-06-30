@@ -84,8 +84,7 @@ struct EventStorage {
 
 class Stream : public numba::GPUStreamInterface {
 public:
-  Stream(size_t eventsCount, const char *devName)
-      : deviceName(devName ? devName : "") {
+  Stream(const char *devName) : deviceName(devName ? devName : "") {
     LOG_FUNC();
     queue = sycl::queue{sycl::device{getDeviceSelector(deviceName)}};
   }
@@ -137,7 +136,7 @@ public:
   sycl::event *launchKernel(GPUKernel *kernel, size_t gridX, size_t gridY,
                             size_t gridZ, size_t blockX, size_t blockY,
                             size_t blockZ, sycl::event **srcEvents,
-                            numba::GPUParamDesc *params, size_t eventIndex) {
+                            numba::GPUParamDesc *params) {
     assert(kernel);
     auto eventsCount = countEvents(srcEvents);
     auto paramsCount = countUntil(
@@ -180,8 +179,7 @@ public:
 
   std::tuple<void *, void *, sycl::event *>
   allocBuffer(size_t size, size_t alignment, numba::GpuAllocType type,
-              sycl::event **srcEvents, size_t eventIndex,
-              numba::MemInfoAllocFuncT allocFunc) {
+              sycl::event **srcEvents, numba::MemInfoAllocFuncT allocFunc) {
     // Alloc is always sync for now, synchronize
     auto eventsCount = countEvents(srcEvents);
     for (decltype(eventsCount) i = 0; i < eventsCount; ++i) {
@@ -348,9 +346,9 @@ gpuxSetMemInfoAllocFunc(void *func) {
 }
 
 extern "C" NUMBA_MLIR_GPU_RUNTIME_SYCL_EXPORT void *
-gpuxStreamCreate(size_t eventsCount, const char *deviceName) {
+gpuxStreamCreate(const char *deviceName) {
   LOG_FUNC();
-  return catchAll([&]() { return new Stream(eventsCount, deviceName); });
+  return catchAll([&]() { return new Stream(deviceName); });
 }
 
 extern "C" NUMBA_MLIR_GPU_RUNTIME_SYCL_EXPORT void
@@ -389,13 +387,13 @@ gpuxKernelDestroy(void *kernel) {
 extern "C" NUMBA_MLIR_GPU_RUNTIME_SYCL_EXPORT void *
 gpuxLaunchKernel(void *stream, void *kernel, size_t gridX, size_t gridY,
                  size_t gridZ, size_t blockX, size_t blockY, size_t blockZ,
-                 void *events, void *params, size_t eventIndex) {
+                 void *events, void *params) {
   LOG_FUNC();
   return catchAll([&]() {
     return toStream(stream)->launchKernel(
         static_cast<GPUKernel *>(kernel), gridX, gridY, gridZ, blockX, blockY,
         blockZ, static_cast<sycl::event **>(events),
-        static_cast<numba::GPUParamDesc *>(params), eventIndex);
+        static_cast<numba::GPUParamDesc *>(params));
   });
 }
 
@@ -417,12 +415,12 @@ gpuxDestroyEvent(void *stream, void *event) {
 
 extern "C" NUMBA_MLIR_GPU_RUNTIME_SYCL_EXPORT void
 gpuxAlloc(void *stream, size_t size, size_t alignment, int type, void *events,
-          size_t eventIndex, numba::GPUAllocResult *ret) {
+          numba::GPUAllocResult *ret) {
   LOG_FUNC();
   catchAll([&]() {
     auto res = toStream(stream)->allocBuffer(
         size, alignment, static_cast<numba::GpuAllocType>(type),
-        static_cast<sycl::event **>(events), eventIndex, AllocFunc);
+        static_cast<sycl::event **>(events), AllocFunc);
     *ret = {std::get<0>(res), std::get<1>(res), std::get<2>(res)};
   });
 }
