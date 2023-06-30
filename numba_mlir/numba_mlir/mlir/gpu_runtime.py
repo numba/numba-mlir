@@ -48,6 +48,7 @@ if IS_GPU_RUNTIME_AVAILABLE:
             "gpuxStreamDestroy",
             "gpuxSuggestBlockSize",
             "gpuxWait",
+            "gpuxDestroyEvent",
             mlir_func_name("get_global_id"),
             mlir_func_name("get_global_size"),
             mlir_func_name("get_group_id"),

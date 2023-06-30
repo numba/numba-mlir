@@ -144,8 +144,16 @@ protected:
   FunctionCallBuilder waitEventCallBuilder = {"gpuxWait",
                                               llvmVoidType,
                                               {
-                                                  llvmPointerType // dep
+                                                  llvmPointerType, // stream
+                                                  llvmPointerType, // dep
                                               }};
+
+  FunctionCallBuilder destroyEventCallBuilder = {"gpuxDestroyEvent",
+                                                 llvmVoidType,
+                                                 {
+                                                     llvmPointerType, // stream
+                                                     llvmPointerType, // dep
+                                                 }};
 
   FunctionCallBuilder allocCallBuilder = {
       "gpuxAlloc",
@@ -610,9 +618,10 @@ private:
 
     auto paramsArrayVoidPtr = rewriter.create<mlir::LLVM::BitcastOp>(
         loc, llvmGpuParamPointerType, paramsArrayPtr);
+    auto stream = adaptor.getStream();
     mlir::Value params[] = {
         // clang-format off
-        adaptor.getStream(),
+        stream,
         adaptor.getKernel(),
         adaptor.getGridSizeX(),
         adaptor.getGridSizeY(),
@@ -628,7 +637,8 @@ private:
     auto event =
         launchKernelCallBuilder.create(loc, rewriter, params)->getResult(0);
     if (op.getNumResults() == 0) {
-      waitEventCallBuilder.create(loc, rewriter, event);
+      waitEventCallBuilder.create(loc, rewriter, {stream, event});
+      destroyEventCallBuilder.create(loc, rewriter, {stream, event});
       rewriter.eraseOp(op);
     } else {
       rewriter.replaceOp(op, event);
@@ -705,9 +715,10 @@ private:
                                                    llvmAllocResType, size, 0);
     });
 
+    auto stream = adaptor.getStream();
     mlir::Value params[] = {
         // clang-format off
-        adaptor.getStream(),
+        stream,
         sizeBytes,
         alignmentVar,
         typeVar,
@@ -746,7 +757,8 @@ private:
     mlir::Value event = rewriter.create<mlir::LLVM::ExtractValueOp>(
         loc, llvmPointerType, res, 2);
     if (op.getNumResults() == 1) {
-      waitEventCallBuilder.create(loc, rewriter, event);
+      waitEventCallBuilder.create(loc, rewriter, {stream, event});
+      destroyEventCallBuilder.create(loc, rewriter, {stream, event});
       rewriter.replaceOp(op, resMemref);
     } else {
       mlir::Value vals[] = {
