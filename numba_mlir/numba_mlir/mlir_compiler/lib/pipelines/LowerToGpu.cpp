@@ -2294,7 +2294,6 @@ static void populateLowerToGPUPipelineMed(mlir::OpPassManager &pm) {
   pm.addPass(std::make_unique<OutlineInitPass>());
   pm.addNestedPass<mlir::func::FuncOp>(
       std::make_unique<GenerateOutlineContextPass>());
-  pm.addPass(gpu_runtime::createEnumerateEventsPass());
   commonOptPasses(pm);
 }
 static void populateLowerToGPUPipelineLow(mlir::OpPassManager &pm) {

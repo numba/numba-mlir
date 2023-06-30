@@ -84,12 +84,6 @@ static mlir::PassPipelineRegistration<> GpuToGpuRuntime(
     });
 
 static mlir::PassPipelineRegistration<>
-    EnumerateEvents("enumerate-events", "Adds event dependency",
-                    [](mlir::OpPassManager &pm) {
-                      pm.addPass(gpu_runtime::createEnumerateEventsPass());
-                    });
-
-static mlir::PassPipelineRegistration<>
     GpuToLlvm("convert-gpu-to-llvm",
               "Converts Gpu runtime dialect to llvm runtime calls",
               [](mlir::OpPassManager &pm) {

@@ -84,8 +84,6 @@ static LogicalResult runMLIRPasses(mlir::Operation *op,
 
   // GpuRuntime -> LLVM
 
-  passManager.addPass(gpu_runtime::createEnumerateEventsPass());
-
   ConvertFuncToLLVMPassOptions llvmPassOptions;
   llvmPassOptions.dataLayout = llvmOptions.dataLayout.getStringRepresentation();
   passManager.addPass(createConvertFuncToLLVMPass(llvmPassOptions));
