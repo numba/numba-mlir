@@ -1552,6 +1552,118 @@ def test_cfd_f64_truncate_indirect():
 
 
 @require_dpctl
+def test_cfd_use_64bit_index_prange_default():
+    def py_func(a):
+        ah, aw = a.shape
+
+        for h in numba.prange(ah):
+            for w in numba.prange(aw):
+                a[h, w] = w + h * aw
+
+    jit_func_defualt = njit(py_func)
+    jit_func_64 = njit(py_func, gpu_use_64bit_index=True)
+
+    a = np.zeros((2, 3), dtype=int)
+
+    da_default = _from_host(a, buffer="device")
+    da64 = _from_host(a, buffer="device")
+
+    da_default_host = np.zeros_like(a)
+    da64_host = np.zeros_like(a)
+
+    pattern = "spirv.SConvert %[0-9a-zA-Z]+ : i64 to i32"
+
+    with print_pass_ir([], ["GPUToSpirvPass"]):
+        jit_func_defualt(da_default)
+        ir = get_print_buffer()
+        assert re.search(pattern, ir) is None, ir
+
+    with print_pass_ir([], ["GPUToSpirvPass"]):
+        jit_func_64(da64)
+        ir = get_print_buffer()
+        assert re.search(pattern, ir) is None, ir
+
+    _to_host(da_default, da_default_host)
+    _to_host(da64, da64_host)
+    assert_equal(da_default_host, da64_host)
+
+
+@require_dpctl
+def test_cfd_use_64bit_index_prange():
+    def py_func(a):
+        ah, aw = a.shape
+
+        for h in numba.prange(ah):
+            for w in numba.prange(aw):
+                a[h, w] = w + h * aw
+
+    jit_func64 = njit(py_func, gpu_use_64bit_index=True)
+    jit_func32 = njit(py_func, gpu_use_64bit_index=False)
+
+    a = np.zeros((6, 8), dtype=int)
+
+    da64 = _from_host(a, buffer="device")
+    da32 = _from_host(a, buffer="device")
+
+    da64_host = np.zeros_like(a)
+    da32_host = np.zeros_like(a)
+
+    pattern = "spirv.SConvert %[0-9a-zA-Z]+ : i64 to i32"
+
+    with print_pass_ir([], ["GPUToSpirvPass"]):
+        jit_func64(da64)
+        ir = get_print_buffer()
+        assert re.search(pattern, ir) is None, ir
+
+    with print_pass_ir([], ["GPUToSpirvPass"]):
+        jit_func32(da32)
+        ir = get_print_buffer()
+        assert re.search(pattern, ir), ir
+
+    _to_host(da64, da64_host)
+    _to_host(da32, da32_host)
+    assert_equal(da64_host, da32_host)
+
+
+@require_dpctl
+def test_cfd_use_64bit_index_kernel():
+    def py_func(a):
+        aw = a.shape[1]
+
+        h = get_global_id(0)
+        w = get_global_id(1)
+
+        a[h, w] = w + h * aw
+
+    jit_kern64 = kernel_cached(py_func, gpu_use_64bit_index=True)
+    jit_kern32 = kernel_cached(py_func, gpu_use_64bit_index=False)
+
+    a = np.zeros((6, 8), dtype=int)
+
+    da64 = _from_host(a, buffer="device")
+    da32 = _from_host(a, buffer="device")
+
+    da64_host = np.zeros_like(a)
+    da32_host = np.zeros_like(a)
+
+    pattern = "spirv.SConvert %[0-9a-zA-Z]+ : i64 to i32"
+
+    with print_pass_ir([], ["GPUToSpirvPass"]):
+        jit_kern64[da64.shape,](da64)
+        ir = get_print_buffer()
+        assert re.search(pattern, ir) is None, ir
+
+    with print_pass_ir([], ["GPUToSpirvPass"]):
+        jit_kern32[da32.shape,](da32)
+        ir = get_print_buffer()
+        assert re.search(pattern, ir), ir
+
+    _to_host(da64, da64_host)
+    _to_host(da32, da32_host)
+    assert_equal(da64_host, da32_host)
+
+
+@require_dpctl
 def test_cfd_reshape():
     def py_func1(a):
         b = a.reshape(17, 23, 56)

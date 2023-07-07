@@ -21,6 +21,7 @@
 #include <mlir/Dialect/Bufferization/Transforms/BufferViewFlowAnalysis.h>
 #include <mlir/Dialect/ControlFlow/IR/ControlFlowOps.h>
 #include <mlir/Dialect/Func/IR/FuncOps.h>
+#include <mlir/Dialect/GPU/IR/GPUDialect.h>
 #include <mlir/Dialect/GPU/Transforms/ParallelLoopMapper.h>
 #include <mlir/Dialect/GPU/Transforms/Passes.h>
 #include <mlir/Dialect/Linalg/Utils/Utils.h>
@@ -1263,6 +1264,73 @@ public:
   }
 };
 
+template <typename SourceOp, mlir::spirv::BuiltIn builtin>
+class LaunchConfigConversion : public mlir::OpConversionPattern<SourceOp> {
+public:
+  using mlir::OpConversionPattern<SourceOp>::OpConversionPattern;
+
+  LaunchConfigConversion(mlir::TypeConverter &converter,
+                         mlir::MLIRContext *context)
+      : mlir::OpConversionPattern<SourceOp>(converter, context,
+                                            /*benefit*/ 10) {}
+
+  mlir::LogicalResult
+  matchAndRewrite(SourceOp op, typename SourceOp::Adaptor adaptor,
+                  mlir::ConversionPatternRewriter &rewriter) const override {
+    // Overrides original LaunchConfigConversion from spirv dialect.
+    // Original LaunchConfigConversion replaces operations fro gpu dialect to
+    // operations from spirv dialect and replaces index type to either int64 or
+    // in32 depending on flag. This LaunchConfigConversion always assume result
+    // of operation (WorkgroupId, etc) to be in64 but then converts to int32 if
+    // needed
+
+    auto *typeConverter =
+        this->template getTypeConverter<mlir::SPIRVTypeConverter>();
+    mlir::Type indexType = typeConverter->convertType(op.getType());
+
+    if (not indexType)
+      return rewriter.notifyMatchFailure(
+          op, "Failed to find conversion for indexType");
+
+    mlir::Type int64Type = rewriter.getIntegerType(64);
+    mlir::Type int32Type = rewriter.getIntegerType(32);
+
+    if (indexType != int32Type && indexType != int64Type)
+      return rewriter.notifyMatchFailure(op, [&](mlir::Diagnostic &diag) {
+        diag << "indexType should be converted either to int32 or to int64. "
+                "But it is converted to "
+             << indexType;
+      });
+
+    auto loc = op.getLoc();
+
+    mlir::Value vector =
+        mlir::spirv::getBuiltinVariableValue(op, builtin, int64Type, rewriter);
+    mlir::Value dim = rewriter.create<mlir::spirv::CompositeExtractOp>(
+        loc, int64Type, vector,
+        rewriter.getI32ArrayAttr({static_cast<int32_t>(op.getDimension())}));
+
+    if (int64Type != indexType) {
+      auto maxIntAttr = rewriter.getIntegerAttr(
+          int64Type,
+          static_cast<int64_t>(std::numeric_limits<int32_t>::max()) + 1);
+      auto maxInt =
+          rewriter.create<mlir::spirv::ConstantOp>(loc, int64Type, maxIntAttr);
+
+      auto cmp = rewriter.create<mlir::spirv::SLessThanOp>(loc, dim, maxInt);
+      rewriter.create<mlir::spirv::KHRAssumeTrueOp>(loc, cmp);
+
+      mlir::Value cast =
+          rewriter.create<mlir::spirv::SConvertOp>(loc, indexType, dim);
+      rewriter.replaceOp(op, cast);
+    } else {
+      rewriter.replaceOp(op, dim);
+    }
+
+    return mlir::success();
+  }
+};
+
 struct GPUToSpirvPass
     : public mlir::PassWrapper<GPUToSpirvPass,
                                mlir::OperationPass<mlir::ModuleOp>> {
@@ -1280,20 +1348,29 @@ struct GPUToSpirvPass
 
     llvm::SmallVector<mlir::Operation *, 1> kernelModules;
     mlir::OpBuilder builder(context);
-    module.walk([&builder, &kernelModules](mlir::gpu::GPUModuleOp moduleOp) {
-      // For each kernel module (should be only 1 for now, but that is not a
-      // requirement here), clone the module for conversion because the
-      // gpu.launch function still needs the kernel module.
-      builder.setInsertionPoint(moduleOp.getOperation());
-      kernelModules.push_back(builder.clone(*moduleOp.getOperation()));
-    });
+    module.walk(
+        [this, &builder, &kernelModules](mlir::gpu::GPUModuleOp moduleOp) {
+          // For each kernel module (should be only 1 for now, but that is not a
+          // requirement here), clone the module for conversion because the
+          // gpu.launch function still needs the kernel module.
+          builder.setInsertionPoint(moduleOp.getOperation());
+          kernelModules.push_back(builder.clone(*moduleOp.getOperation()));
+        });
 
     for (auto kernelModule : kernelModules) {
       auto targetAttr = mlir::spirv::lookupTargetEnvOrDefault(kernelModule);
       auto target = mlir::SPIRVConversionTarget::get(targetAttr);
 
+      auto use64bitIndexAttr = kernelModule->getAttrOfType<mlir::BoolAttr>(
+          gpu_runtime::getUse64BitIndexAttrName());
+
       mlir::SPIRVConversionOptions options;
       options.use64bitIndex = true;
+
+      auto use64bitIndexFlag =
+          use64bitIndexAttr ? use64bitIndexAttr.getValue() : true;
+      auto indexBits = use64bitIndexFlag ? 64 : 32;
+      auto indexType = builder.getIntegerType(indexBits);
 
       mlir::SPIRVTypeConverter typeConverter(targetAttr, options);
       mlir::RewritePatternSet patterns(context);
@@ -1316,6 +1393,15 @@ struct GPUToSpirvPass
             return mlir::spirv::PointerType::get(elemType, sc);
           });
 
+      // This conversion overrides spirv index conversion. options.use64bitIndex
+      // not only determine index type but also affect Physical32/Physical64
+      // aspect. We want to compile with Physical64 but have all benefits of
+      // 32bit index
+      typeConverter.addConversion(
+          [indexType](mlir::IndexType type) -> std::optional<mlir::Type> {
+            return indexType;
+          });
+
       mlir::ScfToSPIRVContext scfToSpirvCtx;
       mlir::populateSCFToSPIRVPatterns(typeConverter, scfToSpirvCtx, patterns);
       mlir::populateGPUToSPIRVPatterns(typeConverter, patterns);
@@ -1330,12 +1416,79 @@ struct GPUToSpirvPass
           ConvertBitcastOp<numba::util::MemrefBitcastOp>, ConvertLoadOp,
           ConvertStoreOp, ConvertAtomicRMW, AllocaOpPattern, ConvertFunc,
           ConvertAssert, ConvertBarrierOp, ConvertMemFenceOp, ConvertUndef,
-          ConvertGlobalOp, ConvertGetGlobalOp>(typeConverter, context);
+          ConvertGlobalOp, ConvertGetGlobalOp,
+          LaunchConfigConversion<mlir::gpu::BlockIdOp,
+                                 mlir::spirv::BuiltIn::WorkgroupId>,
+          LaunchConfigConversion<mlir::gpu::GridDimOp,
+                                 mlir::spirv::BuiltIn::NumWorkgroups>,
+          LaunchConfigConversion<mlir::gpu::BlockDimOp,
+                                 mlir::spirv::BuiltIn::WorkgroupSize>,
+          LaunchConfigConversion<mlir::gpu::ThreadIdOp,
+                                 mlir::spirv::BuiltIn::LocalInvocationId>,
+          LaunchConfigConversion<mlir::gpu::GlobalIdOp,
+                                 mlir::spirv::BuiltIn::GlobalInvocationId>>(
+          typeConverter, context);
 
       if (failed(
               applyFullConversion(kernelModule, *target, std::move(patterns))))
         return signalPassFailure();
     }
+  }
+};
+
+struct GpuIndexCastPass
+    : public mlir::PassWrapper<GpuIndexCastPass,
+                               mlir::OperationPass<mlir::ModuleOp>> {
+  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(GpuIndexCastPass)
+
+  virtual void
+  getDependentDialects(mlir::DialectRegistry &registry) const override {
+    registry.insert<mlir::gpu::GPUDialect>();
+  }
+
+  void runOnOperation() override {
+    auto *context = &getContext();
+    auto module = getOperation();
+
+    llvm::SmallVector<mlir::Value> kernelOperands;
+    mlir::OpBuilder builder(context);
+    module.walk([this, &context, &module, &builder,
+                 &kernelOperands](mlir::gpu::LaunchFuncOp launchFuncOp) {
+      // Converts kernel arguments of index type to int32 or int64
+
+      auto gpuModule = module.lookupSymbol<mlir::gpu::GPUModuleOp>(
+          launchFuncOp.getKernelModuleName());
+      if (!gpuModule) {
+        launchFuncOp.emitError("Failed to find GPUModuleOp with name ")
+            << launchFuncOp.getKernelModuleName();
+        return signalPassFailure();
+      }
+
+      builder.setInsertionPoint(launchFuncOp.getOperation());
+      auto operands = launchFuncOp.getKernelOperands();
+      auto loc = launchFuncOp.getLoc();
+
+      auto use64bitIndexAttr = gpuModule->getAttrOfType<mlir::BoolAttr>(
+          gpu_runtime::getUse64BitIndexAttrName());
+
+      auto use64bitIndexFlag =
+          use64bitIndexAttr ? use64bitIndexAttr.getValue() : true;
+      auto indexBitSize = use64bitIndexFlag ? 64 : 32;
+      kernelOperands.clear();
+      kernelOperands.reserve(operands.size());
+      for (auto &&operand : operands) {
+        auto op_type = operand.getType();
+
+        auto new_operand = operand;
+        if (mlir::isa<mlir::IndexType>(op_type)) {
+          new_operand = builder.create<mlir::arith::IndexCastOp>(
+              loc, mlir::IntegerType::get(context, indexBitSize), operand);
+        }
+
+        kernelOperands.push_back(new_operand);
+      }
+      launchFuncOp.getKernelOperandsMutable().assign(kernelOperands);
+    });
   }
 };
 
@@ -2777,6 +2930,10 @@ std::unique_ptr<mlir::Pass> gpu_runtime::createSetSPIRVCapabilitiesPass(
 
 std::unique_ptr<mlir::Pass> gpu_runtime::createGPUToSpirvPass() {
   return std::make_unique<GPUToSpirvPass>();
+}
+
+std::unique_ptr<mlir::Pass> gpu_runtime::createGpuIndexCastPass() {
+  return std::make_unique<GpuIndexCastPass>();
 }
 
 std::unique_ptr<mlir::Pass> gpu_runtime::createInsertGPUAllocsPass() {

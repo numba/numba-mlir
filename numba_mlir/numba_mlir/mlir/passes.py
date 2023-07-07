@@ -64,10 +64,11 @@ _mlir_last_compiled_func = None
 _mlir_active_module = None
 
 
-def _create_flags(fp64_truncate):
+def _create_flags(fp64_truncate, use_64bit_index):
     flags = Flags()
     flags.nrt = True
     setattr(flags, "fp64_truncate", fp64_truncate)
+    setattr(flags, "use_64bit_index", use_64bit_index)
     return flags
 
 
@@ -76,6 +77,7 @@ class MlirBackendBase(FunctionPass):
         self._push_func_stack = push_func_stack
         self._get_func_name = func_registry.get_func_name
         self._fp64_truncate = False
+        self._use_64bit_index = True
         FunctionPass.__init__(self)
 
     def run_pass(self, state):
@@ -98,11 +100,19 @@ class MlirBackendBase(FunctionPass):
     def _resolve_func_impl(self, obj):
         if isinstance(obj, types.Function):
             func = obj.typing_key
-            return (self._get_func_name(func), None, _create_flags(self._fp64_truncate))
+            return (
+                self._get_func_name(func),
+                None,
+                _create_flags(self._fp64_truncate, self._use_64bit_index),
+            )
         if isinstance(obj, types.BoundFunction):
-            return (str(obj.typing_key), None, _create_flags(self._fp64_truncate))
+            return (
+                str(obj.typing_key),
+                None,
+                _create_flags(self._fp64_truncate, self._use_64bit_index),
+            )
         if isinstance(obj, numba.core.types.functions.Dispatcher):
-            flags = _create_flags(self._fp64_truncate)
+            flags = _create_flags(self._fp64_truncate, self._use_64bit_index)
             func = obj.dispatcher.py_func
             inline_type = obj.dispatcher.targetoptions.get("inline", None)
             if inline_type is not None:
@@ -121,7 +131,7 @@ class MlirBackendBase(FunctionPass):
             return (
                 "$number." + str(obj.instance_type),
                 None,
-                _create_flags(self._fp64_truncate),
+                _create_flags(self._fp64_truncate, self._use_64bit_index),
             )
         return (None, None, None)
 
@@ -158,6 +168,8 @@ class MlirBackendBase(FunctionPass):
         ctx["opt_level"] = lambda: OPT_LEVEL
         ctx["globals"] = lambda: state.func_id.func.__globals__
         ctx["fp64_truncate"] = lambda: self._fp64_truncate
+        ctx["use_64bit_index"] = lambda: self._use_64bit_index
+
         return ctx
 
 
@@ -219,12 +231,13 @@ class MlirBackend(MlirBackendBase):
 
 
 @functools.lru_cache
-def get_gpu_backend(fp64_trunc):
+def get_gpu_backend(fp64_trunc, use_64bit_index):
     class MlirBackendGPU(MlirBackend):
         def __init__(self):
             MlirBackend.__init__(self)
             self.enable_gpu_pipeline = True
             self._fp64_truncate = fp64_trunc
+            self._use_64bit_index = use_64bit_index
 
     return register_pass(mutates_CFG=True, analysis_only=False)(MlirBackendGPU)
 
@@ -250,13 +263,14 @@ class MlirBackendInner(MlirBackendBase):
 
 
 @functools.lru_cache
-def get_inner_backend(fp64_trunc):
+def get_inner_backend(fp64_trunc, use_64bit_index):
     class MlirBackendInner(MlirBackendBase):
         _name = "mlir_backend_inner"
 
         def __init__(self):
             MlirBackendBase.__init__(self, push_func_stack=False)
             self._fp64_truncate = fp64_trunc
+            self._64bit_index = use_64bit_index
 
         def run_pass_impl(self, state):
             global _mlir_active_module

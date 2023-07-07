@@ -283,47 +283,6 @@ struct KernelMemrefOpsMovementPass
   }
 };
 
-struct AssumeGpuIdRangePass
-    : public mlir::PassWrapper<AssumeGpuIdRangePass,
-                               mlir::OperationPass<void>> {
-  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(AssumeGpuIdRangePass)
-
-  virtual void
-  getDependentDialects(mlir::DialectRegistry &registry) const override {
-    registry.insert<mlir::arith::ArithDialect>();
-    registry.insert<mlir::cf::ControlFlowDialect>();
-    registry.insert<mlir::gpu::GPUDialect>();
-  }
-
-  void runOnOperation() override {
-    auto op = getOperation();
-
-    mlir::OpBuilder builder(&getContext());
-    builder.setInsertionPointToStart(&op->getRegion(0).front());
-    auto maxInt =
-        builder
-            .create<mlir::arith::ConstantIndexOp>(
-                builder.getUnknownLoc(),
-                static_cast<int64_t>(std::numeric_limits<int32_t>::max()) + 1)
-            .getResult();
-
-    op->walk([&](mlir::Operation *nestedOp) {
-      if (!mlir::isa<mlir::gpu::ThreadIdOp, mlir::gpu::BlockIdOp,
-                     mlir::gpu::GlobalIdOp>(nestedOp))
-        return;
-
-      assert(nestedOp->getNumResults() == 1);
-      auto res = nestedOp->getResult(0);
-      assert(res.getType().isa<mlir::IndexType>());
-      builder.setInsertionPointAfter(nestedOp);
-      auto loc = op->getLoc();
-      auto cmp = builder.create<mlir::arith::CmpIOp>(
-          loc, mlir::arith::CmpIPredicate::slt, res, maxInt);
-      builder.create<mlir::cf::AssertOp>(loc, cmp, "Invalid gpu id range");
-    });
-  }
-};
-
 static bool isMathOp(mlir::Operation *op) {
   assert(op);
   return mlir::isa<mlir::arith::ArithDialect, mlir::math::MathDialect>(
@@ -1986,6 +1945,12 @@ public:
     auto attr = parent->getAttr(attrName);
     if (attr)
       gpuMod->setAttr(attrName, attr);
+
+    attrName = mlir::StringAttr::get(&getContext(),
+                                     gpu_runtime::getUse64BitIndexAttrName());
+    attr = parent->getAttr(attrName);
+    if (attr)
+      gpuMod->setAttr(attrName, attr);
   }
 };
 
@@ -2271,13 +2236,13 @@ static void populateLowerToGPUPipelineMed(mlir::OpPassManager &pm) {
   gpuFuncPM.addPass(std::make_unique<FlattenScfPass>());
   gpuFuncPM.addPass(std::make_unique<LowerGpuBuiltins3Pass>());
   commonOptPasses(gpuFuncPM);
-  gpuFuncPM.addPass(std::make_unique<AssumeGpuIdRangePass>());
 
   pm.addNestedPass<mlir::gpu::GPUModuleOp>(gpu_runtime::createAbiAttrsPass());
   pm.addPass(gpu_runtime::createSetSPIRVCapabilitiesPass(&deviceCapsMapper));
   pm.addPass(gpu_runtime::createTruncateF64ForGPUPass());
   commonOptPasses(pm);
   pm.addPass(gpu_runtime::createGPUToSpirvPass());
+  pm.addPass(gpu_runtime::createGpuIndexCastPass());
   commonOptPasses(pm);
 
   auto &modulePM = pm.nest<mlir::spirv::ModuleOp>();

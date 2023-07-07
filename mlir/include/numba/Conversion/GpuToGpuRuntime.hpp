@@ -24,6 +24,7 @@ std::unique_ptr<mlir::Pass> createSetSPIRVCapabilitiesPass(
     std::function<mlir::spirv::TargetEnvAttr(mlir::gpu::GPUModuleOp)> mapper =
         nullptr);
 std::unique_ptr<mlir::Pass> createGPUToSpirvPass();
+std::unique_ptr<mlir::Pass> createGpuIndexCastPass();
 std::unique_ptr<mlir::Pass> createInsertGPUAllocsPass();
 std::unique_ptr<mlir::Pass> createConvertGPUDeallocsPass();
 std::unique_ptr<mlir::Pass> createUnstrideMemrefsPass();
