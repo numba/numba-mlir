@@ -2731,7 +2731,7 @@ struct SortSCFParallel : public mlir::OpRewritePattern<mlir::scf::ParallelOp> {
     llvm::SmallVector<mlir::Value> indVarMapped(numVars);
     for (auto i : llvm::seq(0u, numVars)) {
       auto m = args[i].first;
-      indVarMapped[i] = newOp.getInductionVars()[m];
+      indVarMapped[m] = newOp.getInductionVars()[i];
     }
 
     auto &oldBody = op.getLoopBody().front();
