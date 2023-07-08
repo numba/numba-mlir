@@ -204,3 +204,10 @@ static mlir::PassPipelineRegistration<>
                          [](mlir::OpPassManager &pm) {
                            pm.addPass(numba::createRemoveUnusedArgsPass());
                          });
+
+static mlir::PassPipelineRegistration<>
+    sortLoopsForGPU("numba-sort-loops-for-gpu",
+                    "Rearrange loop for more optimal order for GPU",
+                    [](mlir::OpPassManager &pm) {
+                      pm.addPass(gpu_runtime::createSortParallelLoopsForGPU());
+                    });
