@@ -252,6 +252,11 @@ private:
       func->setAttr(gpu_runtime::getFp64TruncateAttrName(), attr);
     }
 
+    auto use_64bit_index = compilationContext["use_64bit_index"]();
+    auto u64bi_attr =
+        mlir::BoolAttr::get(mod->getContext(), use_64bit_index.cast<bool>());
+    func->setAttr(gpu_runtime::getUse64BitIndexAttrName(), u64bi_attr);
+
     globals = compilationContext["globals"]();
 
     mod.push_back(func);

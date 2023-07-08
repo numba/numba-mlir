@@ -40,8 +40,15 @@ def mlir_jit(
     ], 'gpu_fp64_truncate supported values are True/False/"auto"'
     options.pop("gpu_fp64_truncate", None)
 
+    use_64bit_index = options.get("gpu_use_64bit_index", True)
+    assert use_64bit_index in [
+        True,
+        False,
+    ], "gpu_use_64bit_index supported values are True/False"
+    options.pop("gpu_use_64bit_index", None)
+
     pipeline = (
-        get_gpu_pipeline(fp64_truncate)
+        get_gpu_pipeline(fp64_truncate, use_64bit_index)
         if options.get("enable_gpu_pipeline", True)
         else mlir_compiler_pipeline
     )
