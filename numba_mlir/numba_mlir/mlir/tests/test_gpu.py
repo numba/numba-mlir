@@ -1563,7 +1563,7 @@ def test_cfd_use_64bit_index_prange_default():
     jit_func_defualt = njit(py_func)
     jit_func_64 = njit(py_func, gpu_use_64bit_index=True)
 
-    a = np.zeros((2, 3), dtype=int)
+    a = np.zeros((2, 3), dtype=np.float32)
 
     da_default = _from_host(a, buffer="device")
     da64 = _from_host(a, buffer="device")
@@ -1600,7 +1600,7 @@ def test_cfd_use_64bit_index_prange():
     jit_func64 = njit(py_func, gpu_use_64bit_index=True)
     jit_func32 = njit(py_func, gpu_use_64bit_index=False)
 
-    a = np.zeros((6, 8), dtype=int)
+    a = np.zeros((6, 8), dtype=np.float32)
 
     da64 = _from_host(a, buffer="device")
     da32 = _from_host(a, buffer="device")
@@ -1638,7 +1638,7 @@ def test_cfd_use_64bit_index_kernel():
     jit_kern64 = kernel_cached(py_func, gpu_use_64bit_index=True)
     jit_kern32 = kernel_cached(py_func, gpu_use_64bit_index=False)
 
-    a = np.zeros((6, 8), dtype=int)
+    a = np.zeros((6, 8), dtype=np.float32)
 
     da64 = _from_host(a, buffer="device")
     da32 = _from_host(a, buffer="device")
