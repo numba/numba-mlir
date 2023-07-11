@@ -303,6 +303,17 @@ jobs:
           conda activate test-env
           python "$env:GITHUB_WORKSPACE/scripts/run_package_tests.py" verbose
 
+      - name: Run offload tests
+        if: false # Doesn't work
+        run: |
+          cd numba_mlir
+          conda activate test-env
+          conda install greenlet dpctl -c intel -c conda-forge
+          conda list
+          $env:NUMBA_MLIR_GPU_RUNTIME="sycl"
+          $env:NUMBA_MLIR_DEFAULT_DEVICE="opencl:cpu:0"
+          python "$env:GITHUB_WORKSPACE/scripts/run_package_tests.py" verbose gpu
+
       - name: Build wheels
         run: |
           mkdir numba_mlir_wheels
