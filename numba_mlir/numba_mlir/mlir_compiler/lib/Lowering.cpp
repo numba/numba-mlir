@@ -11,6 +11,7 @@
 
 #include <pybind11/complex.h>
 #include <pybind11/pybind11.h>
+#include <pybind11/numpy.h>
 
 #include <mlir/Dialect/Arith/IR/Arith.h>
 #include <mlir/Dialect/Complex/IR/Complex.h>
@@ -104,6 +105,65 @@ getBlocks(py::handle func) {
 
 static py::list getBody(py::handle block) {
   return block.attr("body").cast<py::list>();
+}
+
+template<typename T>
+static mlir::DenseElementsAttr getArrayData(mlir::ShapedType type, const py::array& arr) {
+  auto sz = static_cast<size_t>(arr.size());
+  auto tmp = arr.attr("flatten")().cast<py::array>();
+  auto data = static_cast<const T*>(tmp.data());
+  return mlir::DenseElementsAttr::get(type, mlir::ArrayRef(data, sz));
+}
+
+static std::optional<mlir::Attribute> makeElementsAttr(mlir::ShapedType type, const py::array& arr) {
+  using fptr_t = mlir::DenseElementsAttr(*)(mlir::ShapedType, const py::array&);
+  auto dtype = type.getElementType();
+  if (auto intType = mlir::dyn_cast<mlir::IntegerType>(dtype)) {
+    const std::pair<unsigned, fptr_t> handlers[] = {
+      // clang-format off
+      {1, &getArrayData<bool>},
+      {8, &getArrayData<int8_t>},
+      {16, &getArrayData<int16_t>},
+      {32, &getArrayData<int32_t>},
+      {64, &getArrayData<int64_t>},
+      // clang-format on
+    };
+    auto w = intType.getWidth();
+    for (auto &&[ww, handler] : handlers) {
+      if(ww == w)
+        return handler(type, arr);
+    }
+  } else if (auto floatType = mlir::dyn_cast<mlir::FloatType>(dtype)) {
+    const std::pair<unsigned, fptr_t> handlers[] = {
+      // clang-format off
+      {32, &getArrayData<float>},
+      {64, &getArrayData<double>},
+      // clang-format on
+    };
+    auto w = floatType.getWidth();
+    for (auto &&[ww, handler] : handlers) {
+      if(ww == w)
+        return handler(type, arr);
+    }
+  } else if (auto complexType = mlir::dyn_cast<mlir::ComplexType>(dtype)) {
+    auto elemType = mlir::dyn_cast<mlir::FloatType>(complexType.getElementType());
+    if (!elemType)
+      return std::nullopt;
+
+    const std::pair<unsigned, fptr_t> handlers[] = {
+      // clang-format off
+      {32, &getArrayData<std::complex<float>>},
+      {64, &getArrayData<std::complex<double>>},
+      // clang-format on
+    };
+    auto w = elemType.getWidth();
+    for (auto &&[ww, handler] : handlers) {
+      if(ww == w)
+        return handler(type, arr);
+    }
+  }
+
+  return std::nullopt;
 }
 
 struct InstHandles {
@@ -559,6 +619,23 @@ private:
       auto c = val.cast<std::complex<double>>();
       auto type = mlir::ComplexType::get(builder.getF64Type());
       return mlir::complex::NumberAttr::get(type, c.real(), c.imag());
+    }
+
+    if (py::isinstance<py::array>(val)) {
+      auto a = val.cast<py::array>();
+      llvm::errs() << "-=-=-=- array -=-=-=- " << py::str(a).cast<std::string>() << "\n";
+      auto dtype = typeConverter.convertType(*builder.getContext(), a.dtype());
+      if (!dtype)
+        return nullptr;
+
+      llvm::errs() << "asdasdaasd 1\n";
+
+      auto ndim = static_cast<unsigned>(a.ndim());
+      auto *s = a.shape();
+      llvm::SmallVector<int64_t> shape(s, s + ndim);
+      auto resType = mlir::RankedTensorType::get(shape, dtype);
+      llvm::errs() << "asdasdaasd 2 " << resType << "\n";
+      return makeElementsAttr(resType, a);
     }
 
     if (py::isinstance<py::none>(val))

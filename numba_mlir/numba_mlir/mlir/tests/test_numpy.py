@@ -497,6 +497,17 @@ def test_array_len():
     assert_equal(py_func(arr), jit_func(arr))
 
 
+def test_array_capture():
+    a = np.arange(2*3*4, dtype = np.int32).reshape(2,3,4);
+    b = a.copy()
+
+    def py_func(a):
+        return a + b
+
+    jit_func = njit(py_func)
+    assert_equal(py_func(a), jit_func(a))
+
+
 @parametrize_function_variants(
     "py_func",
     [
