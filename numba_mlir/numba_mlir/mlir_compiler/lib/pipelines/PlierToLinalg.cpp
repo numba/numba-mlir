@@ -1322,7 +1322,7 @@ struct UnitupleExtractToNtensor
       return mlir::failure();
 
     auto converter = getTypeConverter();
-    assert(converter);
+    assert(converter && "Invalid type converter");
 
     auto dstType = converter->convertType(op.getType());
     if (!dstType)
@@ -1331,6 +1331,156 @@ struct UnitupleExtractToNtensor
     auto index = adaptor.getIndex();
     rewriter.replaceOpWithNewOp<numba::ntensor::GetitemOp>(op, dstType, src,
                                                            index);
+    return mlir::success();
+  }
+};
+
+template <typename T>
+static std::optional<llvm::SmallVector<mlir::Value>>
+getElementsValuesIntImpl(mlir::DenseElementsAttr attr, mlir::Location loc,
+                         mlir::OpBuilder &builder) {
+  auto values = attr.tryGetValues<T>();
+  if (mlir::failed(values))
+    return std::nullopt;
+
+  llvm::SmallVector<mlir::Value> ret(attr.size());
+  auto origElemType = attr.getType().getElementType();
+  auto elemType = numba::makeSignlessType(origElemType);
+  for (auto &&[i, val] : llvm::enumerate(*values)) {
+    mlir::Value res =
+        builder.create<mlir::arith::ConstantIntOp>(loc, val, elemType);
+    if (origElemType != elemType)
+      res = builder.create<numba::util::SignCastOp>(loc, origElemType, res);
+
+    ret[i] = res;
+  }
+
+  return ret;
+}
+
+template <typename T>
+static std::optional<llvm::SmallVector<mlir::Value>>
+getElementsValuesFloatImpl(mlir::DenseElementsAttr attr, mlir::Location loc,
+                           mlir::OpBuilder &builder) {
+  auto values = attr.tryGetValues<T>();
+  if (mlir::failed(values))
+    return std::nullopt;
+
+  llvm::SmallVector<mlir::Value> ret(attr.size());
+  auto elemType =
+      mlir::dyn_cast<mlir::FloatType>(attr.getType().getElementType());
+  if (!elemType)
+    return std::nullopt;
+
+  for (auto &&[i, val] : llvm::enumerate(*values))
+    ret[i] = builder.create<mlir::arith::ConstantFloatOp>(
+        loc, llvm::APFloat(val), elemType);
+
+  return ret;
+}
+
+template <typename T>
+static std::optional<llvm::SmallVector<mlir::Value>>
+getElementsValuesComplexImpl(mlir::DenseElementsAttr attr, mlir::Location loc,
+                             mlir::OpBuilder &builder) {
+  auto count = static_cast<unsigned>(attr.size());
+  llvm::SmallVector<mlir::Value> ret(count);
+
+  auto elemType = mlir::dyn_cast<mlir::ComplexType>(attr.getElementType());
+  if (!elemType)
+    return std::nullopt;
+
+  auto complexElemType =
+      mlir::dyn_cast<mlir::FloatType>(elemType.getElementType());
+  if (!complexElemType || complexElemType.getWidth() != (sizeof(T) * 8))
+    return std::nullopt;
+
+  auto ptr = attr.getRawData().data();
+  using CType = std::complex<T>;
+  auto stride = attr.isSplat() ? 0 : sizeof(CType);
+  for (auto i : llvm::seq(0u, count)) {
+    auto &val = *reinterpret_cast<const CType *>(ptr + stride * i);
+    const mlir::Attribute vals[] = {
+        mlir::FloatAttr::get(complexElemType, val.real()),
+        mlir::FloatAttr::get(complexElemType, val.imag()),
+    };
+    auto arr = builder.getArrayAttr(vals);
+    ret[i] = builder.create<mlir::complex::ConstantOp>(loc, elemType, arr);
+  }
+
+  return ret;
+}
+
+static std::optional<llvm::SmallVector<mlir::Value>>
+getElementsValues(mlir::DenseElementsAttr attr, mlir::Location loc,
+                  mlir::OpBuilder &builder) {
+  using func_t = std::optional<llvm::SmallVector<mlir::Value>> (*)(
+      mlir::DenseElementsAttr, mlir::Location, mlir::OpBuilder &);
+  const func_t funcs[] = {
+      // clang-format off
+    &getElementsValuesIntImpl<int8_t>,
+    &getElementsValuesIntImpl<int16_t>,
+    &getElementsValuesIntImpl<int32_t>,
+    &getElementsValuesIntImpl<int64_t>,
+    &getElementsValuesFloatImpl<float>,
+    &getElementsValuesFloatImpl<double>,
+    &getElementsValuesComplexImpl<float>,
+    &getElementsValuesComplexImpl<double>,
+      // clang-format on
+  };
+
+  for (auto func : funcs)
+    if (auto res = func(attr, loc, builder))
+      return res;
+
+  return std::nullopt;
+}
+
+struct LowerConst : public mlir::OpConversionPattern<plier::ConstOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(plier::ConstOp op, plier::ConstOp::Adaptor adaptor,
+                  mlir::ConversionPatternRewriter &rewriter) const override {
+    auto converter = getTypeConverter();
+    assert(converter && "Invalid type converter");
+    auto resType = mlir::dyn_cast_or_null<numba::ntensor::NTensorType>(
+        converter->convertType(op.getType()));
+    if (!resType)
+      return rewriter.notifyMatchFailure(op, [&](mlir::Diagnostic &diag) {
+        diag << "Invalid result type " << op.getType();
+      });
+
+    auto attr = mlir::dyn_cast_or_null<mlir::DenseElementsAttr>(op.getVal());
+    if (!attr)
+      return rewriter.notifyMatchFailure(op, [&](mlir::Diagnostic &diag) {
+        diag << "Invalid value type " << op.getVal();
+      });
+
+    auto constType = attr.getType();
+    if (!constType.hasStaticShape())
+      if (!attr)
+        return rewriter.notifyMatchFailure(op, [&](mlir::Diagnostic &diag) {
+          diag << "Expected a static shape but got " << constType;
+        });
+
+    auto loc = op.getLoc();
+    auto values = getElementsValues(attr, loc, rewriter);
+    if (!values)
+      return rewriter.notifyMatchFailure(op, [&](mlir::Diagnostic &diag) {
+        diag << "Failed to extract values from " << attr;
+      });
+
+    auto elemType = constType.getElementType();
+    auto constTensorType =
+        numba::ntensor::NTensorType::get(constType.getShape(), elemType);
+
+    mlir::Value res = rewriter.create<numba::ntensor::FromElementsOp>(
+        loc, constTensorType, *values);
+    if (constTensorType != resType)
+      res = rewriter.create<numba::ntensor::CastOp>(loc, resType, res);
+
+    rewriter.replaceOp(op, res);
     return mlir::success();
   }
 };
@@ -1481,6 +1631,11 @@ struct PlierToNtensorPass
           return std::nullopt;
         });
 
+    target.addDynamicallyLegalOp<plier::ConstOp>(
+        [&typeConverter](plier::ConstOp op) {
+          return !isNtensor(typeConverter, op.getType());
+        });
+
     target.addIllegalOp<plier::BuildSliceOp>();
 
     target.addLegalDialect<numba::ntensor::NTensorDialect>();
@@ -1497,7 +1652,8 @@ struct PlierToNtensorPass
         BuildSliceToNtensor,
         BuiltinCallsToNtensor,
         CastsToNtensor,
-        UnitupleExtractToNtensor
+        UnitupleExtractToNtensor,
+        LowerConst
         // clang-format on
         >(typeConverter, &context);
 

@@ -85,6 +85,26 @@ static const constexpr std::pair<llvm::StringLiteral, TypeFunc>
         // clang-format on
 };
 
+static const constexpr std::pair<llvm::StringLiteral, TypeFunc> NumpyTypes[] = {
+    // clang-format off
+        {"int8",  &getIntType<8, true>},
+        {"uint8", &getIntType<8, false>},
+        {"int16",  &getIntType<16, true>},
+        {"uint16", &getIntType<16, false>},
+        {"int32",  &getIntType<32, true>},
+        {"uint32", &getIntType<32, false>},
+        {"int64",  &getIntType<64, true>},
+        {"uint64", &getIntType<64, false>},
+
+        {"float16", &getFloat16Type},
+        {"float32", &getFloat32Type},
+        {"float64", &getFloat64Type},
+
+        {"complex64", &getComplex64Type},
+        {"complex128", &getComplex128Type},
+    // clang-format on
+};
+
 namespace {
 struct Conversion {
   Conversion(PyTypeConverter &conv) : converter(conv) {
@@ -93,6 +113,15 @@ struct Conversion {
       auto &&[name, func] = it;
       auto obj = mod.attr(name.data());
       primitiveTypes[i] = {obj, func};
+    }
+
+    py::object numpyMod = py::module::import("numpy");
+    py::object dt = numpyMod.attr("dtype");
+    for (auto &&[i, it] : llvm::enumerate(NumpyTypes)) {
+      auto &&[name, func] = it;
+      auto obj = numpyMod.attr(name.data());
+      numpyTypes[i] = {obj, func};
+      numpyDTypes[i] = {dt(obj), func};
     }
 
     tupleType = mod.attr("Tuple");
@@ -110,9 +139,13 @@ struct Conversion {
 
   std::optional<mlir::Type> operator()(mlir::MLIRContext &context,
                                        py::handle obj) {
-    for (auto &[cls, func] : primitiveTypes) {
-      if (obj.is(cls))
-        return func(context);
+    for (auto &&typelist :
+         {llvm::ArrayRef(primitiveTypes), llvm::ArrayRef(numpyTypes),
+          llvm::ArrayRef(numpyDTypes)}) {
+      for (auto &[cls, func] : typelist) {
+        if (obj.is(cls))
+          return func(context);
+      }
     }
 
     if (py::isinstance(obj, tupleType)) {
@@ -236,6 +269,8 @@ private:
 
   using TypePair = std::pair<py::object, TypeFunc>;
   std::array<TypePair, std::size(PrimitiveTypes)> primitiveTypes;
+  std::array<TypePair, std::size(NumpyTypes)> numpyTypes;
+  std::array<TypePair, std::size(NumpyTypes)> numpyDTypes;
 
   py::object tupleType;
   py::object uniTupleType;
