@@ -497,6 +497,41 @@ def test_array_len():
     assert_equal(py_func(arr), jit_func(arr))
 
 
+def test_array_capture1():
+    a = np.arange(2 * 3 * 4, dtype=np.int32).reshape(2, 3, 4)
+    b = a.copy()
+
+    def py_func(a):
+        return a + b
+
+    jit_func = njit(py_func)
+    assert_equal(py_func(a), jit_func(a))
+
+
+@pytest.mark.parametrize(
+    "val",
+    [
+        np.int8(1),
+        np.int16(1),
+        np.int32(1),
+        np.int64(1),
+        np.float32(2.3),
+        np.float64(2.3),
+        np.complex64(3.4 - 5.6j),
+        np.complex128(3.4 - 5.6j),
+    ],
+)
+def test_array_capture2(val):
+    a = np.arange(2 * 3 * 4, dtype=val.dtype).reshape(2, 3, 4)
+    b = np.full(a.shape, val, dtype=a.dtype)
+
+    def py_func(a):
+        return a + b
+
+    jit_func = njit(py_func)
+    assert_equal(py_func(a), jit_func(a))
+
+
 @parametrize_function_variants(
     "py_func",
     [
