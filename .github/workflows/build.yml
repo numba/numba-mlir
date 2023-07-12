@@ -15,7 +15,7 @@ env:
   LEVEL_ZERO_VER: v1.6.2
   TBB_URL_PREFIX: https://github.com/oneapi-src/oneTBB/releases/download/
   LLVM_SHA_FILE: llvm-sha.txt
-  MINICONDA_VER: py310_23.5.0
+  MINICONDA_VER: py310_23.5.0-3
 
 jobs:
   build_win:
@@ -50,7 +50,7 @@ jobs:
             ${{ runner.os }}-conda-${{ env.CACHE_NUMBER }}-${{ hashFiles(env.CORE_ENV_FILE) }}
 
       - name: Setup conda
-        uses: conda-incubator/setup-miniconda@v2
+        uses: conda-incubator/setup-miniconda@v2.1.1
         with:
           miniconda-version: ${{ env.MINICONDA_VER }}
           auto-update-conda: true
@@ -226,7 +226,7 @@ jobs:
           access_token: ${{ github.token }}
 
       - name: Setup conda
-        uses: conda-incubator/setup-miniconda@v2
+        uses: conda-incubator/setup-miniconda@v2.1.1
         with:
           miniconda-version: ${{ env.MINICONDA_VER }}
           auto-update-conda: true
@@ -366,7 +366,7 @@ jobs:
           access_token: ${{ github.token }}
 
       - name: Setup conda
-        uses: conda-incubator/setup-miniconda@v2
+        uses: conda-incubator/setup-miniconda@v2.1.1
         with:
           miniconda-version: ${{ env.MINICONDA_VER }}
           auto-update-conda: true
@@ -490,7 +490,7 @@ jobs:
             ${{ runner.os }}-conda-${{ env.CACHE_NUMBER }}-${{ hashFiles(env.CORE_ENV_FILE) }}
 
       - name: Setup conda
-        uses: conda-incubator/setup-miniconda@v2
+        uses: conda-incubator/setup-miniconda@v2.1.1
         with:
           miniconda-version: ${{ env.MINICONDA_VER }}
           auto-update-conda: true
@@ -670,7 +670,7 @@ jobs:
           access_token: ${{ github.token }}
 
       - name: Setup conda
-        uses: conda-incubator/setup-miniconda@v2
+        uses: conda-incubator/setup-miniconda@v2.1.1
         with:
           miniconda-version: ${{ env.MINICONDA_VER }}
           auto-update-conda: true
@@ -813,7 +813,7 @@ jobs:
           access_token: ${{ github.token }}
 
       - name: Setup conda
-        uses: conda-incubator/setup-miniconda@v2
+        uses: conda-incubator/setup-miniconda@v2.1.1
         with:
           miniconda-version: ${{ env.MINICONDA_VER }}
           auto-update-conda: true
@@ -907,7 +907,7 @@ jobs:
     needs: [build_win_python, build_win_conda_package, build_linux_python, build_linux_conda_package]
     runs-on: ubuntu-20.04
     steps:
-      - uses: conda-incubator/setup-miniconda@v2
+      - uses: conda-incubator/setup-miniconda@v2.1.1
         with:
           miniconda-version: ${{ env.MINICONDA_VER }}
           auto-update-conda: true
@@ -948,7 +948,7 @@ jobs:
         with:
           name: numba-mlir ${{ runner.os }} Python ${{ matrix.python }} SHA ${{ github.sha }}
 
-      - uses: conda-incubator/setup-miniconda@v2
+      - uses: conda-incubator/setup-miniconda@v2.1.1
         with:
           miniconda-version: ${{ env.MINICONDA_VER }}
           auto-update-conda: true
