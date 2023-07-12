@@ -15,6 +15,7 @@ env:
   LEVEL_ZERO_VER: v1.6.2
   TBB_URL_PREFIX: https://github.com/oneapi-src/oneTBB/releases/download/
   LLVM_SHA_FILE: llvm-sha.txt
+  MINICONDA_VER: py310_23.5.0-3
 
 jobs:
   build_win:
@@ -51,7 +52,7 @@ jobs:
       - name: Setup conda
         uses: conda-incubator/setup-miniconda@v2
         with:
-          miniconda-version: "latest"
+          miniconda-version: ${{ env.MINICONDA_VER }}
           auto-update-conda: true
           use-only-tar-bz2: true
           run-post: false
@@ -227,6 +228,7 @@ jobs:
       - name: Setup conda
         uses: conda-incubator/setup-miniconda@v2
         with:
+          miniconda-version: ${{ env.MINICONDA_VER }}
           auto-update-conda: true
           use-only-tar-bz2: true
           run-post: false
@@ -366,6 +368,7 @@ jobs:
       - name: Setup conda
         uses: conda-incubator/setup-miniconda@v2
         with:
+          miniconda-version: ${{ env.MINICONDA_VER }}
           auto-update-conda: true
           use-only-tar-bz2: true
           run-post: false
@@ -489,7 +492,7 @@ jobs:
       - name: Setup conda
         uses: conda-incubator/setup-miniconda@v2
         with:
-          miniconda-version: "latest"
+          miniconda-version: ${{ env.MINICONDA_VER }}
           auto-update-conda: true
           use-only-tar-bz2: true
           run-post: false
@@ -669,6 +672,7 @@ jobs:
       - name: Setup conda
         uses: conda-incubator/setup-miniconda@v2
         with:
+          miniconda-version: ${{ env.MINICONDA_VER }}
           auto-update-conda: true
           use-only-tar-bz2: true
           run-post: false
@@ -811,6 +815,7 @@ jobs:
       - name: Setup conda
         uses: conda-incubator/setup-miniconda@v2
         with:
+          miniconda-version: ${{ env.MINICONDA_VER }}
           auto-update-conda: true
           use-only-tar-bz2: true
           run-post: false
@@ -904,6 +909,7 @@ jobs:
     steps:
       - uses: conda-incubator/setup-miniconda@v2
         with:
+          miniconda-version: ${{ env.MINICONDA_VER }}
           auto-update-conda: true
           use-only-tar-bz2: true
           run-post: false
@@ -944,6 +950,7 @@ jobs:
 
       - uses: conda-incubator/setup-miniconda@v2
         with:
+          miniconda-version: ${{ env.MINICONDA_VER }}
           auto-update-conda: true
           use-only-tar-bz2: true
           run-post: false
