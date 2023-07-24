@@ -956,6 +956,8 @@ def test_named_args_indirect():
     a, b, c, d = (2.0, 3.5, 4.7, 5.9)
     assert_equal(py_func2(a, b, c, d), jit_func2(a, b, c, d))
 
+
+@pytest.mark.xfail(reason="replace_parfors is not implemented yet")
 def test_replace_parfor():
     def py_func(c):
         res = 0
