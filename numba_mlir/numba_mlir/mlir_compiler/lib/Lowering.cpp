@@ -18,6 +18,7 @@
 #include <mlir/Dialect/ControlFlow/IR/ControlFlowOps.h>
 #include <mlir/Dialect/Func/Extensions/InlinerExtension.h>
 #include <mlir/Dialect/Func/IR/FuncOps.h>
+#include <mlir/Dialect/SCF/IR/SCF.h>
 #include <mlir/IR/Builders.h>
 #include <mlir/IR/BuiltinOps.h>
 #include <mlir/IR/BuiltinTypes.h>
@@ -226,6 +227,7 @@ struct PlierLowerer final {
     ctx.loadDialect<gpu_runtime::GpuRuntimeDialect>();
     ctx.loadDialect<mlir::cf::ControlFlowDialect>();
     ctx.loadDialect<mlir::func::FuncDialect>();
+    ctx.loadDialect<mlir::scf::SCFDialect>();
     ctx.loadDialect<numba::ntensor::NTensorDialect>();
     ctx.loadDialect<numba::util::NumbaUtilDialect>();
     ctx.loadDialect<plier::PlierDialect>();
@@ -235,6 +237,14 @@ struct PlierLowerer final {
                            mlir::ModuleOp mod, const py::object &funcIr) {
     auto newFunc = createFunc(compilationContext, mod);
     lowerFuncBody(funcIr);
+    return newFunc;
+  }
+
+  mlir::func::FuncOp lowerParfor(const py::object &compilationContext,
+                                 mlir::ModuleOp mod,
+                                 const py::object &parforInst) {
+    auto newFunc = createFunc(compilationContext, mod);
+    lowerParforBody(parforInst);
     return newFunc;
   }
 
@@ -353,6 +363,237 @@ private:
       lowerBlock(blocks[i], irBlock.second);
 
     fixupPhis();
+  }
+
+  void lowerParforBody(py::handle parforInst) {
+    auto block = func.addEntryBlock();
+    mlir::ValueRange blockArgs = block->getArguments();
+
+    auto getNextBlockArg = [&]() -> mlir::Value {
+      assert(!blockArgs.empty());
+      auto res = blockArgs.front();
+      blockArgs = blockArgs.drop_front();
+      return res;
+    };
+
+    for (auto param : parforInst.attr("params")) {
+      auto name = param.cast<std::string>();
+      varsMap[name] = getNextBlockArg();
+    }
+
+    builder.setInsertionPointToStart(block);
+    auto indexType = builder.getIndexType();
+    auto getIndexVal = [&](py::handle obj) -> mlir::Value {
+      auto loc = getCurrentLoc();
+      if (py::isinstance<py::int_>(obj)) {
+        auto val = obj.cast<int64_t>();
+        return builder.create<mlir::arith::ConstantIndexOp>(loc, val);
+      }
+
+      auto var = getNextBlockArg();
+      return builder.create<plier::CastOp>(loc, indexType, var);
+    };
+
+    llvm::SmallVector<mlir::Value, 4> begins;
+    llvm::SmallVector<mlir::Value, 4> ends;
+    llvm::SmallVector<mlir::Value, 4> steps;
+
+    for (auto loop : parforInst.attr("loop_nests")) {
+      begins.emplace_back(getIndexVal(loop.attr("start")));
+      ends.emplace_back(getIndexVal(loop.attr("stop")));
+      steps.emplace_back(getIndexVal(loop.attr("step")));
+    }
+
+    std::string deviceName = "level_zero:gpu:0"; // TODO: get from parfor node
+    bool hasDevice = !deviceName.empty();
+
+    llvm::SmallVector<mlir::Value> reductionInits;
+    llvm::SmallVector<mlir::Type> reductionTypes;
+    std::unordered_map<std::string, unsigned> reductionIndices;
+    for (auto [i, redvar] : llvm::enumerate(parforInst.attr("redvars"))) {
+      auto name = redvar.cast<std::string>();
+      assert(varsMap.count(name));
+      reductionInits.emplace_back(varsMap.find(name)->second);
+      reductionTypes.emplace_back(reductionInits.back().getType());
+      reductionIndices[name] = static_cast<unsigned>(i);
+    }
+
+    numba::util::EnvironmentRegionOp regionOp;
+    if (hasDevice) {
+      auto devNameAttr = builder.getStringAttr(deviceName);
+      auto attr = gpu_runtime::GPURegionDescAttr::get(&ctx, devNameAttr);
+      auto loc = getCurrentLoc();
+      regionOp = builder.create<numba::util::EnvironmentRegionOp>(
+          loc, attr, /*args*/ std::nullopt, reductionTypes);
+      mlir::Block &regionBlock = regionOp.getRegion().front();
+      assert(llvm::hasSingleElement(regionBlock));
+      regionBlock.getTerminator()->erase();
+      builder.setInsertionPointToStart(&regionBlock);
+
+      lowerBlock(&regionBlock, parforInst.attr("init_block"));
+    } else {
+      lowerBlock(block, parforInst.attr("init_block"));
+    }
+
+    auto bodyBuilder = [&](mlir::OpBuilder &b, mlir::Location l,
+                           mlir::ValueRange indices,
+                           mlir::ValueRange iterVars) -> mlir::ValueRange {
+      assert(!indices.empty());
+      mlir::Value index;
+      if (indices.size() == 1) {
+        index = indices.front();
+      } else {
+        auto resType = b.getTupleType(indices.getTypes());
+        index = b.create<numba::util::BuildTupleOp>(l, resType, indices);
+      }
+
+      for (auto [i, redvar] : llvm::enumerate(parforInst.attr("redvars"))) {
+        assert(i < iterVars.size());
+        auto name = redvar.cast<std::string>();
+        varsMap[name] = iterVars[i];
+      }
+
+      auto indexVar = parforInst.attr("index_var");
+      auto indexType = getObjType(typemap(indexVar));
+      index = b.create<plier::CastOp>(l, indexType, index);
+      auto indexVarName = indexVar.attr("name").cast<std::string>();
+      varsMap[indexVarName] = index;
+
+      auto regionOp = b.create<mlir::scf::ExecuteRegionOp>(l, reductionTypes);
+      auto &region = regionOp.getRegion();
+
+      auto irBlocks = getBlocks(parforInst.attr("loop_body"));
+
+      blocks.reserve(irBlocks.size());
+      mlir::OpBuilder::InsertionGuard g(b);
+      for (auto irBlock : irBlocks) {
+        auto block = b.createBlock(&region, region.end());
+        blocks.emplace_back(block);
+        blocksMap[irBlock.first] = block;
+      }
+
+      llvm::SmallVector<mlir::Value> reductionsRet(reductionInits.size());
+      for (auto [i, irBlock] : llvm::enumerate(irBlocks)) {
+        auto bb = blocks[i];
+        builder.setInsertionPointToEnd(bb);
+        for (auto inst : getBody(irBlock.second)) {
+          if (py::isinstance(inst, insts.Assign)) {
+            auto target = inst.attr("target");
+            auto name = target.attr("name").cast<std::string>();
+            auto it = reductionIndices.find(name);
+            if (reductionIndices.end() != it) {
+              assert(it->second < reductionsRet.size());
+              auto val = lowerAssign(inst, target);
+              reductionsRet[it->second] = val;
+            }
+          }
+
+          lowerInst(inst);
+        }
+
+        bool hasTerminator =
+            !bb->empty() && bb->back().hasTrait<mlir::OpTrait::IsTerminator>();
+        if (!hasTerminator)
+          b.create<mlir::scf::YieldOp>(l, reductionsRet);
+      }
+
+      return regionOp.getResults();
+    };
+
+    mlir::ValueRange results = buildNestedParallelLoop(
+        begins, ends, steps, reductionInits, bodyBuilder);
+    auto loc = getCurrentLoc();
+
+    if (hasDevice) {
+      builder.create<numba::util::EnvironmentRegionYieldOp>(loc, results);
+      results = regionOp.getResults();
+      builder.setInsertionPointToEnd(block);
+    }
+
+    mlir::Value result;
+    if (results.empty()) {
+      result = builder.create<numba::util::UndefOp>(loc, builder.getNoneType());
+    } else if (results.size() == 1) {
+      result = results.front();
+    } else {
+      auto resType = builder.getTupleType(results.getTypes());
+      result = builder.create<numba::util::BuildTupleOp>(loc, resType, results);
+    }
+
+    builder.create<mlir::func::ReturnOp>(loc, result);
+    fixupPhis();
+
+    if (!deviceName.empty()) {
+      builder.setInsertionPointToStart(block);
+      auto newEnv = gpu_runtime::GPURegionDescAttr::get(
+          builder.getContext(), builder.getStringAttr(deviceName));
+      llvm::SmallVector<mlir::Type> newArgsTypes;
+      for (auto arg : block->getArguments()) {
+        auto argType = arg.getType();
+        newArgsTypes.emplace_back(argType);
+        auto origType = argType.dyn_cast<numba::ntensor::NTensorType>();
+        if (!origType || origType.getEnvironment())
+          continue;
+
+        auto newType = numba::ntensor::NTensorType::get(
+            builder.getContext(), origType.getShape(),
+            origType.getElementType(), newEnv, origType.getLayout());
+        arg.setType(newType);
+        auto cast = builder.create<numba::ntensor::CastOp>(getCurrentLoc(),
+                                                           origType, arg);
+        arg.replaceAllUsesExcept(cast.getResult(), cast);
+        newArgsTypes.back() = newType;
+      }
+      auto origFuncType = func.getFunctionType();
+      auto newFuncType =
+          origFuncType.clone(newArgsTypes, origFuncType.getResults());
+      func.setFunctionType(newFuncType);
+    }
+  }
+
+  mlir::ValueRange buildNestedParallelLoop(
+      mlir::ValueRange begins, mlir::ValueRange ends, mlir::ValueRange steps,
+      mlir::ValueRange iterArgs,
+      llvm::function_ref<mlir::ValueRange(mlir::OpBuilder &, mlir::Location l,
+                                          mlir::ValueRange, mlir::ValueRange)>
+          bodyBuilder) {
+    assert(!begins.empty());
+    assert(begins.size() == ends.size());
+    assert(begins.size() == steps.size());
+
+    llvm::SmallVector<mlir::Value> indices;
+    indices.reserve(begins.size());
+    auto loc = getCurrentLoc();
+    return buildNestedParallelLoopImpl(builder, loc, begins, ends, steps,
+                                       iterArgs, bodyBuilder, indices);
+  }
+
+  mlir::ValueRange buildNestedParallelLoopImpl(
+      mlir::OpBuilder &loopBuilder, mlir::Location loc, mlir::ValueRange begins,
+      mlir::ValueRange ends, mlir::ValueRange steps, mlir::ValueRange iterArgs,
+      llvm::function_ref<mlir::ValueRange(mlir::OpBuilder &, mlir::Location l,
+                                          mlir::ValueRange, mlir::ValueRange)>
+          bodyBuilder,
+      llvm::SmallVectorImpl<mlir::Value> &indices) {
+    auto forBodyBuilder = [&](mlir::OpBuilder &b, mlir::Location l,
+                              mlir::Value index, mlir::ValueRange vars) {
+      indices.emplace_back(index);
+      mlir::ValueRange res;
+      if (llvm::hasSingleElement(begins)) {
+        res = bodyBuilder(b, l, indices, vars);
+      } else {
+        res = buildNestedParallelLoopImpl(b, l, begins.drop_front(),
+                                          ends.drop_front(), steps.drop_front(),
+                                          vars, bodyBuilder, indices);
+      }
+      b.create<mlir::scf::YieldOp>(l, res);
+    };
+    auto loop = loopBuilder.create<mlir::scf::ForOp>(
+        loc, begins.front(), ends.front(), steps.front(), iterArgs,
+        forBodyBuilder);
+    loop->setAttr(numba::util::attributes::getParallelName(),
+                  builder.getUnitAttr());
+    return loop.getResults();
   }
 
   void lowerBlock(mlir::Block *bb, py::handle irBlock) {
@@ -1056,6 +1297,18 @@ py::capsule lowerFunction(const py::object &compilationContext,
   auto &module = mod->module;
   auto func = PlierLowerer(context, mod->typeConverter)
                   .lower(compilationContext, module, funcIr);
+  return py::capsule(func.getOperation()); // no dtor, func owned by the module.
+}
+
+py::capsule lowerParfor(const pybind11::object &compilationContext,
+                        const pybind11::capsule &pyMod,
+                        const pybind11::object &parforInst) {
+  auto mod = static_cast<Module *>(pyMod);
+  auto &context = mod->context;
+  auto &module = mod->module;
+  auto func = PlierLowerer(context, mod->typeConverter)
+                  .lowerParfor(compilationContext, module, parforInst);
+  func->dump();
   return py::capsule(func.getOperation()); // no dtor, func owned by the module.
 }
 

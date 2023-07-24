@@ -6,7 +6,11 @@
 Define @jit and related decorators.
 """
 
-from .mlir.compiler import mlir_compiler_pipeline, get_gpu_pipeline
+from .mlir.compiler import (
+    mlir_compiler_pipeline,
+    get_gpu_pipeline,
+    mlir_compiler_replace_parfors_pipeline,
+)
 from .mlir.vectorize import vectorize as mlir_vectorize
 from .mlir.settings import USE_MLIR
 
@@ -47,11 +51,15 @@ def mlir_jit(
     ], "gpu_use_64bit_index supported values are True/False"
     options.pop("gpu_use_64bit_index", None)
 
-    pipeline = (
-        get_gpu_pipeline(fp64_truncate, use_64bit_index)
-        if options.get("enable_gpu_pipeline", True)
-        else mlir_compiler_pipeline
-    )
+    if options.get("replace_parfors", False):
+        assert False, "replace_parfors is not implemented yet"
+        pipeline = mlir_compiler_replace_parfors_pipeline
+    elif options.get("enable_gpu_pipeline", True):
+        pipeline = get_gpu_pipeline(fp64_truncate, use_64bit_index)
+    else:
+        pipeline = mlir_compiler_pipeline
+
+    options.pop("replace_parfors", None)
     options.pop("enable_gpu_pipeline", None)
     options.pop(
         "access_types", None

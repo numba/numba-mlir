@@ -955,3 +955,20 @@ def test_named_args_indirect():
 
     a, b, c, d = (2.0, 3.5, 4.7, 5.9)
     assert_equal(py_func2(a, b, c, d), jit_func2(a, b, c, d))
+
+
+@pytest.mark.xfail(reason="replace_parfors is not implemented yet")
+def test_replace_parfor():
+    def py_func(c):
+        res = 0
+        for i in numba.prange(len(c)):
+            ind = 2 if i == 4 else i
+            res = res + c[ind]
+        return res
+
+    import numpy as np
+
+    a = np.arange(10)
+
+    jit_func = njit(py_func, parallel=True, replace_parfors=True)
+    assert_equal(py_func(a), jit_func(a))
