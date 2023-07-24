@@ -26,6 +26,8 @@ from numba.core.typed_passes import (
     NopythonTypeInference,
     PreParforPass,
     ParforPass,
+    ParforFusionPass,
+    ParforPreLoweringPass,
     DumpParforDiagnostics,
     NopythonRewrites,
     PreLowerStripPhis,
@@ -89,6 +91,8 @@ class mlir_PassBuilder(orig_DefaultPassBuilder):
                 [
                     PreParforPass,
                     ParforPass,
+                    ParforFusionPass,
+                    ParforPreLoweringPass,
                     DumpParforDiagnostics,
                     NopythonRewrites,
                     PreLowerStripPhis,
@@ -110,7 +114,7 @@ class mlir_PassBuilder(orig_DefaultPassBuilder):
         import numba_mlir.mlir.settings
 
         if numba_mlir.mlir.settings.USE_MLIR:
-            pm.add_pass_after(MlirReplaceParfors, ParforPass)
+            pm.add_pass_after(MlirReplaceParfors, ParforPreLoweringPass)
 
         pm.finalize()
         return pm
