@@ -252,10 +252,9 @@ func.func @test(%arg1: tensor<?xf32> {numba.shape_range = [#numba_util.index_ran
 
 // -----
 
-// Negative test, as it not yet possble to make linalg.generic work.
 // CHECK-LABEL: func @test
-//   CHECK-NOT:   %[[C:.*]] = arith.constant false
-//   CHECK-NOT:   return %[[C]]
+//       CHECK:   %[[C:.*]] = arith.constant false
+//       CHECK:   return %[[C]]
 
 #map0 = affine_map<(d0) -> (d0)>
 func.func @test(%arg1: tensor<?xf32>, %arg2: tensor<?xf32> {numba.shape_range = [#numba_util.index_range<[2,10]>]}) -> i1 {
