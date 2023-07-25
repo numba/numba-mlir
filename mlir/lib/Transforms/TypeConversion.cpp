@@ -10,7 +10,7 @@
 #include <mlir/Dialect/Func/IR/FuncOps.h>
 #include <mlir/Dialect/Func/Transforms/FuncConversions.h>
 #include <mlir/Dialect/SCF/IR/SCF.h>
-#include <mlir/Dialect/SCF/Transforms/Transforms.h>
+#include <mlir/Dialect/SCF/Transforms/Patterns.h>
 #include <mlir/IR/FunctionInterfaces.h>
 #include <mlir/Interfaces/CallInterfaces.h>
 #include <mlir/Transforms/DialectConversion.h>

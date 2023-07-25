@@ -6,7 +6,6 @@
 
 #include <mlir/Dialect/Arith/IR/Arith.h>
 #include <mlir/Dialect/Func/IR/FuncOps.h>
-#include <mlir/Dialect/Linalg/Utils/Utils.h>
 #include <mlir/Dialect/MemRef/IR/MemRef.h>
 #include <mlir/Dialect/SCF/IR/SCF.h>
 #include <mlir/IR/IRMapping.h>
@@ -36,7 +35,7 @@ getReduceInitVal(mlir::Type type, mlir::Block &reduceBlock) {
   if (!llvm::hasSingleElement(reduceBlock.without_terminator()))
     return std::nullopt;
 
-  return mlir::linalg::getNeutralElement(&(*reduceBlock.begin()));
+  return mlir::arith::getNeutralElement(&(*reduceBlock.begin()));
 }
 
 struct ParallelToTbb : public mlir::OpRewritePattern<mlir::scf::ParallelOp> {

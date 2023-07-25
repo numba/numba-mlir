@@ -887,7 +887,7 @@ def test_input_load_cse():
         ir = get_print_buffer()
         assert (
             ir.count(
-                'spirv.Load "Input" %__builtin_var_GlobalInvocationId___addr : vector<3xi64>'
+                'spirv.Load "Input" %__builtin__GlobalInvocationId___addr : vector<3xi64>'
             )
             == 1
         ), ir
