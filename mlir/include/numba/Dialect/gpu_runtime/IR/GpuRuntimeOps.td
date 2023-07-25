@@ -47,7 +47,10 @@ class GpuRuntime_Op<string mnemonic, list<Trait> traits = []> :
 
 def GPURegionDescAttr
     : GpuRuntime_Attr<"GPURegionDesc", "region_desc"> {
-  let parameters = (ins "::mlir::StringAttr":$device);
+  let parameters = (ins
+    "::mlir::StringAttr":$device,
+    "::mlir::IntegerAttr":$spirv_major_version,
+    "::mlir::IntegerAttr":$spirv_minor_version);
   let assemblyFormat = "`<` struct(params) `>`";
 }
 

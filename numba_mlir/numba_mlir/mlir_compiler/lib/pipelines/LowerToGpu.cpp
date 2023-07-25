@@ -907,9 +907,9 @@ static void rerunStdPipeline(mlir::Operation *op) {
   numba::addPipelineJumpMarker(mod, marker);
 }
 
-static mlir::FailureOr<mlir::StringAttr>
+static mlir::FailureOr<mlir::Attribute>
 getDeviceDescFromArgs(mlir::MLIRContext *context, mlir::TypeRange argTypes) {
-  mlir::StringAttr res;
+  mlir::Attribute res;
   for (auto arg : argTypes) {
     if (auto tupleType = mlir::dyn_cast<mlir::TupleType>(arg)) {
       auto tupleRes = getDeviceDescFromArgs(context, tupleType.getTypes());
@@ -940,11 +940,9 @@ getDeviceDescFromArgs(mlir::MLIRContext *context, mlir::TypeRange argTypes) {
     if (!env)
       continue;
 
-    auto name = env.getDevice();
-    assert(name && "Invalid device name");
     if (!res) {
-      res = name;
-    } else if (res != name) {
+      res = env;
+    } else if (res != env) {
       return mlir::failure();
     }
   }
@@ -952,7 +950,7 @@ getDeviceDescFromArgs(mlir::MLIRContext *context, mlir::TypeRange argTypes) {
   return res;
 }
 
-static mlir::FailureOr<mlir::StringAttr>
+static mlir::FailureOr<mlir::Attribute>
 getDeviceDescFromFunc(mlir::MLIRContext *context, mlir::TypeRange argTypes) {
   auto res = getDeviceDescFromArgs(context, argTypes);
   if (mlir::failed(res))
@@ -963,7 +961,12 @@ getDeviceDescFromFunc(mlir::MLIRContext *context, mlir::TypeRange argTypes) {
     return res;
 
   if (auto dev = getDefaultDevice()) {
-    return mlir::StringAttr::get(context, dev->first);
+    mlir::OpBuilder builder(context);
+    auto devAttr = builder.getStringAttr(dev->first);
+    auto spirvMajor = builder.getIndexAttr(dev->second.spirvMajorVersion);
+    auto spirvMinor = builder.getIndexAttr(dev->second.spirvMinorVersion);
+    return gpu_runtime::GPURegionDescAttr::get(context, devAttr, spirvMajor,
+                                               spirvMinor);
   } else {
     return mlir::failure();
   }
@@ -984,10 +987,10 @@ protected:
     if (!parent)
       return mlir::failure();
 
-    auto device =
+    auto envAttr =
         getDeviceDescFromFunc(op->getContext(), parent.getArgumentTypes());
 
-    if (mlir::failed(device))
+    if (mlir::failed(envAttr))
       return mlir::failure();
 
     llvm::SmallVector<mlir::scf::ForOp> newOps;
@@ -1000,7 +1003,6 @@ protected:
       return mlir::failure();
 
     mlir::OpBuilder::InsertionGuard g(rewriter);
-    auto envAttr = gpu_runtime::GPURegionDescAttr::get(getContext(), *device);
     for (auto op : newOps) {
       auto bodyBuilder = [&](mlir::OpBuilder &builder, mlir::Location loc) {
         auto newOp = builder.clone(*op);
@@ -1010,7 +1012,7 @@ protected:
       auto opResults = op.getResults();
       rewriter.setInsertionPoint(op);
       auto newOp = rewriter.create<numba::util::EnvironmentRegionOp>(
-          op->getLoc(), envAttr, /*args*/ std::nullopt, opResults.getTypes(),
+          op->getLoc(), *envAttr, /*args*/ std::nullopt, opResults.getTypes(),
           bodyBuilder);
       rewriter.replaceOp(op, newOp->getResults());
     }

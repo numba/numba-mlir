@@ -421,7 +421,10 @@ private:
     numba::util::EnvironmentRegionOp regionOp;
     if (hasDevice) {
       auto devNameAttr = builder.getStringAttr(deviceName);
-      auto attr = gpu_runtime::GPURegionDescAttr::get(&ctx, devNameAttr);
+
+      // TODO: get caps
+      auto attr = gpu_runtime::GPURegionDescAttr::get(&ctx, devNameAttr,
+                                                      nullptr, nullptr);
       auto loc = getCurrentLoc();
       regionOp = builder.create<numba::util::EnvironmentRegionOp>(
           loc, attr, /*args*/ std::nullopt, reductionTypes);
@@ -525,8 +528,11 @@ private:
 
     if (!deviceName.empty()) {
       builder.setInsertionPointToStart(block);
+      auto devNameAttr = builder.getStringAttr(deviceName);
+
+      // TODO: get caps
       auto newEnv = gpu_runtime::GPURegionDescAttr::get(
-          builder.getContext(), builder.getStringAttr(deviceName));
+          builder.getContext(), devNameAttr, nullptr, nullptr);
       llvm::SmallVector<mlir::Type> newArgsTypes;
       for (auto arg : block->getArguments()) {
         auto argType = arg.getType();
