@@ -963,7 +963,7 @@ getDeviceDescFromFunc(mlir::MLIRContext *context, mlir::TypeRange argTypes) {
     return res;
 
   if (auto dev = getDefaultDevice()) {
-    return mlir::StringAttr::get(context, *dev);
+    return mlir::StringAttr::get(context, dev->first);
   } else {
     return mlir::failure();
   }

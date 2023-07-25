@@ -14,4 +14,5 @@
 std::optional<numba::OffloadDeviceCapabilities>
 getOffloadDeviceCapabilities(const std::string &name);
 
-std::optional<std::string> getDefaultDevice();
+std::optional<std::pair<std::string, numba::OffloadDeviceCapabilities>>
+getDefaultDevice();

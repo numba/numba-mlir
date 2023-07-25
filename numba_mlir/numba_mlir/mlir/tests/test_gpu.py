@@ -11,7 +11,7 @@ import numba
 import itertools
 import re
 
-from numba_mlir.mlir.dpctl_interop import get_default_device_name
+from numba_mlir.mlir.dpctl_interop import get_default_device
 from numba_mlir.mlir.utils import readenv
 from numba_mlir.kernel import *
 from numba_mlir.mlir.passes import (
@@ -77,7 +77,7 @@ def require_dpctl(func):
     )(func)
 
 
-_def_device = get_default_device_name()
+_def_device = get_default_device().filter_string
 
 _test_values = [
     True,

@@ -4,7 +4,20 @@
 
 from .utils import readenv
 
+from collections import namedtuple
+
 DEFAULT_DEVICE = readenv("NUMBA_MLIR_DEFAULT_DEVICE", str, "")
+
+DeviceCaps = namedtuple(
+    "DeviceCaps",
+    [
+        "filter_string",
+        "spirv_major_version",
+        "spirv_minor_version",
+        "has_fp16",
+        "has_fp64",
+    ],
+)
 
 try:
     import dpctl
@@ -203,11 +216,19 @@ if _is_dpctl_available:
             err_str = f"usm_ndarray arguments have incompatibe devices: {dev_names}"
             raise ValueError(err_str)
 
-    def get_default_device_name():
+    def get_default_device():
         if DEFAULT_DEVICE:
-            return DEFAULT_DEVICE
+            device = dpctl.SyclDevice(DEFAULT_DEVICE)
+        else:
+            device = dpctl.select_default_device()
 
-        return dpctl.select_default_device().filter_string
+        return DeviceCaps(
+            filter_string=device.filter_string,
+            spirv_major_version=1,
+            spirv_minor_version=2,
+            has_fp16=device.has_aspect_fp16,
+            has_fp64=device.has_aspect_fp64,
+        )
 
 else:  # _is_dpctl_available
     USMNdArrayType = None  # dummy
@@ -216,9 +237,17 @@ else:  # _is_dpctl_available
         # dpctl is not loaded, nothing to do
         pass
 
-    def get_default_device_name():
+    def get_default_device():
         # TODO: deprecated
         if DEFAULT_DEVICE:
-            return DEFAULT_DEVICE
+            device_name = DEFAULT_DEVICE
+        else:
+            device_name = "level_zero:gpu:0"
 
-        return "level_zero:gpu:0"
+        return DeviceCaps(
+            filter_string=device_name,
+            spirv_major_version=1,
+            spirv_minor_version=2,
+            has_fp16=True,
+            has_fp64=False,
+        )
