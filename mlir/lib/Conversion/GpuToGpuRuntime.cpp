@@ -1847,7 +1847,7 @@ static std::optional<mlir::TypedAttr> getNeutralValue(mlir::Block &block) {
   if (!llvm::hasSingleElement(body))
     return std::nullopt;
 
-  return mlir::linalg::getNeutralElement(&(*body.begin()));
+  return mlir::arith::getNeutralElement(&(*body.begin()));
 }
 
 static bool isInsideGPURegion(mlir::Operation *op) {

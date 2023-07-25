@@ -36,7 +36,7 @@ getReduceInitVal(mlir::Type type, mlir::Block &reduceBlock) {
   if (!llvm::hasSingleElement(reduceBlock.without_terminator()))
     return std::nullopt;
 
-  return mlir::linalg::getNeutralElement(&(*reduceBlock.begin()));
+  return mlir::arith::getNeutralElement(&(*reduceBlock.begin()));
 }
 
 struct ParallelToTbb : public mlir::OpRewritePattern<mlir::scf::ParallelOp> {

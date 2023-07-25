@@ -8,7 +8,6 @@
 
 #include <mlir/Dialect/Arith/IR/Arith.h>
 #include <mlir/Dialect/GPU/IR/GPUDialect.h>
-#include <mlir/Dialect/Linalg/Utils/Utils.h>
 #include <mlir/Dialect/SCF/IR/SCF.h>
 #include <mlir/IR/Dominance.h>
 #include <mlir/Pass/Pass.h>
@@ -23,7 +22,7 @@ static std::optional<mlir::Attribute> getNeutralValue(mlir::Region &region) {
   if (!llvm::hasSingleElement(body))
     return std::nullopt;
 
-  return mlir::linalg::getNeutralElement(&(*body.begin()));
+  return mlir::arith::getNeutralElement(&(*body.begin()));
 }
 
 static int64_t getMinVal(unsigned bits) {
