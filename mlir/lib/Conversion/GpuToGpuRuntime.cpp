@@ -16,6 +16,7 @@
 #include <mlir/Conversion/FuncToSPIRV/FuncToSPIRV.h>
 #include <mlir/Conversion/GPUToSPIRV/GPUToSPIRV.h>
 #include <mlir/Conversion/MathToSPIRV/MathToSPIRV.h>
+#include <mlir/Conversion/MemRefToSPIRV/MemRefToSPIRV.h>
 #include <mlir/Conversion/SCFToSPIRV/SCFToSPIRV.h>
 #include <mlir/Dialect/Affine/IR/AffineOps.h>
 #include <mlir/Dialect/Bufferization/Transforms/BufferViewFlowAnalysis.h>
@@ -768,56 +769,6 @@ static std::optional<unsigned> getTypeSize(mlir::Type type) {
   return std::nullopt;
 }
 
-class ConvertReinterpretCastOp
-    : public mlir::OpConversionPattern<mlir::memref::ReinterpretCastOp> {
-public:
-  using OpConversionPattern::OpConversionPattern;
-
-  mlir::LogicalResult
-  matchAndRewrite(mlir::memref::ReinterpretCastOp op,
-                  mlir::memref::ReinterpretCastOp::Adaptor adaptor,
-                  mlir::ConversionPatternRewriter &rewriter) const override {
-    auto getStaticVal = [&](int64_t v) -> mlir::OpFoldResult {
-      return rewriter.getI64IntegerAttr(v);
-    };
-
-    auto src = op.getSource();
-    auto offset = op.isDynamicOffset(0)
-                      ? mlir::OpFoldResult(adaptor.getOffsets()[0])
-                      : getStaticVal(adaptor.getStaticOffsets()[0]);
-    if (mlir::isConstantIntValue(offset, 0)) {
-      rewriter.replaceOp(op, src);
-      return mlir::success();
-    }
-
-    auto converter = getTypeConverter();
-    assert(converter && "Invalid type converter");
-
-    auto intType = converter->convertType(rewriter.getIndexType());
-    if (!intType)
-      return mlir::failure();
-
-    auto loc = op.getLoc();
-    auto getValue = [&](mlir::OpFoldResult src) -> mlir::Value {
-      if (auto val = mlir::dyn_cast<mlir::Value>(src))
-        return val;
-
-      auto attr = src.get<mlir::Attribute>();
-      return rewriter.create<mlir::spirv::ConstantOp>(loc, intType, attr);
-    };
-
-    auto finalOffset = getValue(offset);
-
-    auto ptr = rewriter
-                   .create<mlir::spirv::InBoundsPtrAccessChainOp>(
-                       loc, adaptor.getSource(), finalOffset, std::nullopt)
-                   .getResult();
-
-    rewriter.replaceOp(op, ptr);
-    return mlir::success();
-  }
-};
-
 template <typename T>
 class ConvertCastOp : public mlir::OpConversionPattern<T> {
 public:
@@ -854,59 +805,6 @@ public:
     }
 
     rewriter.replaceOpWithNewOp<mlir::spirv::BitcastOp>(op, resType, src);
-    return mlir::success();
-  }
-};
-
-class ConvertLoadOp : public mlir::OpConversionPattern<mlir::memref::LoadOp> {
-public:
-  using OpConversionPattern::OpConversionPattern;
-
-  mlir::LogicalResult
-  matchAndRewrite(mlir::memref::LoadOp op,
-                  mlir::memref::LoadOp::Adaptor adaptor,
-                  mlir::ConversionPatternRewriter &rewriter) const override {
-    auto memrefType = op.getMemref().getType().cast<mlir::MemRefType>();
-    if (memrefType.getRank() != 0)
-      return mlir::failure();
-
-    auto typeSize = getTypeSize(memrefType.getElementType());
-    if (!typeSize)
-      return mlir::failure();
-
-    auto ptr = adaptor.getMemref();
-    auto memoryAccess = mlir::spirv::MemoryAccessAttr::get(
-        op.getContext(), mlir::spirv::MemoryAccess::Aligned);
-    auto alignment = rewriter.getI32IntegerAttr(*typeSize);
-    rewriter.replaceOpWithNewOp<mlir::spirv::LoadOp>(op, ptr, memoryAccess,
-                                                     alignment);
-    return mlir::success();
-  }
-};
-
-class ConvertStoreOp : public mlir::OpConversionPattern<mlir::memref::StoreOp> {
-public:
-  using OpConversionPattern::OpConversionPattern;
-
-  mlir::LogicalResult
-  matchAndRewrite(mlir::memref::StoreOp op,
-                  mlir::memref::StoreOp::Adaptor adaptor,
-                  mlir::ConversionPatternRewriter &rewriter) const override {
-    auto memrefType = op.getMemref().getType().cast<mlir::MemRefType>();
-    if (memrefType.getRank() != 0)
-      return mlir::failure();
-
-    auto typeSize = getTypeSize(memrefType.getElementType());
-    if (!typeSize)
-      return mlir::failure();
-
-    auto ptr = adaptor.getMemref();
-    auto memoryAccess = mlir::spirv::MemoryAccessAttr::get(
-        op.getContext(), mlir::spirv::MemoryAccess::Aligned);
-    auto alignment = rewriter.getI32IntegerAttr(*typeSize);
-    rewriter.replaceOpWithNewOp<mlir::spirv::StoreOp>(
-        op, ptr, adaptor.getValue(), memoryAccess, alignment);
-
     return mlir::success();
   }
 };
@@ -1348,14 +1246,13 @@ struct GPUToSpirvPass
 
     llvm::SmallVector<mlir::Operation *, 1> kernelModules;
     mlir::OpBuilder builder(context);
-    module.walk(
-        [this, &builder, &kernelModules](mlir::gpu::GPUModuleOp moduleOp) {
-          // For each kernel module (should be only 1 for now, but that is not a
-          // requirement here), clone the module for conversion because the
-          // gpu.launch function still needs the kernel module.
-          builder.setInsertionPoint(moduleOp.getOperation());
-          kernelModules.push_back(builder.clone(*moduleOp.getOperation()));
-        });
+    module.walk([&builder, &kernelModules](mlir::gpu::GPUModuleOp moduleOp) {
+      // For each kernel module (should be only 1 for now, but that is not a
+      // requirement here), clone the module for conversion because the
+      // gpu.launch function still needs the kernel module.
+      builder.setInsertionPoint(moduleOp.getOperation());
+      kernelModules.push_back(builder.clone(*moduleOp.getOperation()));
+    });
 
     for (auto kernelModule : kernelModules) {
       auto targetAttr = mlir::spirv::lookupTargetEnvOrDefault(kernelModule);
@@ -1409,14 +1306,14 @@ struct GPUToSpirvPass
       mlir::cf::populateControlFlowToSPIRVPatterns(typeConverter, patterns);
       mlir::arith::populateArithToSPIRVPatterns(typeConverter, patterns);
       mlir::populateMathToSPIRVPatterns(typeConverter, patterns);
+      mlir::populateMemRefToSPIRVPatterns(typeConverter, patterns);
 
       patterns.insert<
-          ConvertReinterpretCastOp, ConvertCastOp<mlir::memref::CastOp>,
+          ConvertCastOp<mlir::memref::CastOp>,
           ConvertBitcastOp<numba::util::BitcastOp>,
-          ConvertBitcastOp<numba::util::MemrefBitcastOp>, ConvertLoadOp,
-          ConvertStoreOp, ConvertAtomicRMW, AllocaOpPattern, ConvertFunc,
-          ConvertAssert, ConvertBarrierOp, ConvertMemFenceOp, ConvertUndef,
-          ConvertGlobalOp, ConvertGetGlobalOp,
+          ConvertBitcastOp<numba::util::MemrefBitcastOp>, ConvertAtomicRMW,
+          AllocaOpPattern, ConvertFunc, ConvertAssert, ConvertBarrierOp,
+          ConvertMemFenceOp, ConvertUndef, ConvertGlobalOp, ConvertGetGlobalOp,
           LaunchConfigConversion<mlir::gpu::BlockIdOp,
                                  mlir::spirv::BuiltIn::WorkgroupId>,
           LaunchConfigConversion<mlir::gpu::GridDimOp,
