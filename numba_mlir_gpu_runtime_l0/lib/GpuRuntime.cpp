@@ -535,35 +535,3 @@ gpuxSuggestBlockSize(void *stream, void *kernel, const uint32_t *gridSize,
         static_cast<ze_kernel_handle_t>(kernel), gridSize, blockSize, numDims);
   });
 }
-
-// TODO: device name
-extern "C" NUMBA_MLIR_GPU_RUNTIME_L0_EXPORT bool
-gpuxGetDeviceCapabilities(numba::OffloadDeviceCapabilities *ret,
-                          const char *deviceName) {
-  LOG_FUNC();
-  assert(ret);
-  assert(deviceName);
-
-  bool success = true;
-  catchAll([&]() {
-    auto driverAndDevice = getDevice(deviceName);
-    if (!driverAndDevice.driver || !driverAndDevice.device) {
-      success = false;
-      return;
-    }
-    ze_device_module_properties_t props = {};
-    props.stype = ZE_STRUCTURE_TYPE_DEVICE_MODULE_PROPERTIES;
-    CHECK_ZE_RESULT(
-        zeDeviceGetModuleProperties(driverAndDevice.device, &props));
-
-    numba::OffloadDeviceCapabilities result = {};
-    result.spirvMajorVersion =
-        static_cast<uint16_t>(ZE_MAJOR_VERSION(props.spirvVersionSupported));
-    result.spirvMinorVersion =
-        static_cast<uint16_t>(ZE_MINOR_VERSION(props.spirvVersionSupported));
-    result.hasFP16 = props.flags & ZE_DEVICE_MODULE_FLAG_FP16;
-    result.hasFP64 = props.flags & ZE_DEVICE_MODULE_FLAG_FP64;
-    *ret = result;
-  });
-  return success;
-}

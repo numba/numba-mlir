@@ -8,11 +8,14 @@
 #include <optional>
 #include <string>
 
-#include "GpuCommon.hpp"
-
-// TODO: device name
-std::optional<numba::OffloadDeviceCapabilities>
-getOffloadDeviceCapabilities(const std::string &name);
+namespace numba {
+struct OffloadDeviceCapabilities {
+  uint16_t spirvMajorVersion;
+  uint16_t spirvMinorVersion;
+  bool hasFP16;
+  bool hasFP64;
+};
 
 std::optional<std::pair<std::string, numba::OffloadDeviceCapabilities>>
 getDefaultDevice();
+} // namespace numba
