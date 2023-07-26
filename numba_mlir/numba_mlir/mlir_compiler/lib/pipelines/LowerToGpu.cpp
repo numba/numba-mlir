@@ -1975,22 +1975,20 @@ public:
       if (!gpuEnv)
         return;
 
-      auto deviceName = gpuEnv.getDevice();
-
       auto kernel = launch.getKernel();
       auto gpuModName = kernel.getRootReference();
       auto gpuMod = mod.lookupSymbol<mlir::gpu::GPUModuleOp>(gpuModName);
       if (!gpuMod)
         return;
 
-      auto gpuModAttr =
-          gpuMod->getAttrOfType<mlir::StringAttr>(kGpuModuleDeviceName);
-      if (gpuModAttr && gpuModAttr != deviceName) {
+      auto gpuModAttr = gpuMod->getAttrOfType<gpu_runtime::GPURegionDescAttr>(
+          kGpuModuleDeviceName);
+      if (gpuModAttr && gpuModAttr != gpuEnv) {
         gpuMod->emitError("Incompatible gpu module devices: ")
-            << gpuModAttr.getValue() << " and " << deviceName;
+            << gpuModAttr << " and " << gpuEnv;
         return signalPassFailure();
       }
-      gpuMod->setAttr(kGpuModuleDeviceName, deviceName);
+      gpuMod->setAttr(kGpuModuleDeviceName, gpuEnv);
     });
   }
 };
@@ -2117,19 +2115,13 @@ static std::optional<mlir::spirv::Version> mapSpirvVersion(uint16_t major,
 }
 
 static mlir::spirv::TargetEnvAttr deviceCapsMapper(mlir::gpu::GPUModuleOp op) {
-  auto deviceAttr = op->getAttrOfType<mlir::StringAttr>(kGpuModuleDeviceName);
+  auto deviceAttr =
+      op->getAttrOfType<gpu_runtime::GPURegionDescAttr>(kGpuModuleDeviceName);
   if (!deviceAttr)
     return {};
 
-  auto deviceCapsRet =
-      getOffloadDeviceCapabilities(deviceAttr.getValue().str());
-  if (!deviceCapsRet)
-    return nullptr;
-
-  auto deviceCaps = *deviceCapsRet;
-
-  auto spirvVersionRet = mapSpirvVersion(deviceCaps.spirvMajorVersion,
-                                         deviceCaps.spirvMinorVersion);
+  auto spirvVersionRet = mapSpirvVersion(deviceAttr.getSpirvMajorVersion(),
+                                         deviceAttr.getSpirvMinorVersion());
   if (!spirvVersionRet)
     return nullptr;
 
@@ -2159,12 +2151,12 @@ static mlir::spirv::TargetEnvAttr deviceCapsMapper(mlir::gpu::GPUModuleOp op) {
   llvm::SmallVector<spirv::Capability, 0> caps(std::begin(fixedCaps),
                                                std::end(fixedCaps));
 
-  if (deviceCaps.hasFP16) {
+  if (deviceAttr.getHasFp16()) {
     caps.emplace_back(spirv::Capability::Float16);
     caps.emplace_back(spirv::Capability::Float16Buffer);
   }
 
-  if (deviceCaps.hasFP64)
+  if (deviceAttr.getHasFp64())
     caps.emplace_back(spirv::Capability::Float64);
 
   llvm::sort(caps);
