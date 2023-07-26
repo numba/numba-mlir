@@ -440,27 +440,3 @@ gpuxSuggestBlockSize(void *stream, void *kernel, const uint32_t *gridSize,
                                        gridSize, blockSize, numDims);
   });
 }
-
-// TODO: device name
-extern "C" NUMBA_MLIR_GPU_RUNTIME_SYCL_EXPORT bool
-gpuxGetDeviceCapabilities(numba::OffloadDeviceCapabilities *ret,
-                          const char *deviceName) {
-  LOG_FUNC();
-  assert(ret);
-  assert(deviceName);
-
-  bool success = true;
-  catchAll([&]() {
-    sycl::device device{getDeviceSelector(deviceName)};
-
-    numba::OffloadDeviceCapabilities result = {};
-
-    // Spirv version is hardcoded for now.
-    result.spirvMajorVersion = 1;
-    result.spirvMinorVersion = 2;
-    result.hasFP16 = device.has(sycl::aspect::fp16);
-    result.hasFP64 = device.has(sycl::aspect::fp64);
-    *ret = result;
-  });
-  return success;
-}

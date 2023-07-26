@@ -907,9 +907,9 @@ static void rerunStdPipeline(mlir::Operation *op) {
   numba::addPipelineJumpMarker(mod, marker);
 }
 
-static mlir::FailureOr<mlir::StringAttr>
+static mlir::FailureOr<mlir::Attribute>
 getDeviceDescFromArgs(mlir::MLIRContext *context, mlir::TypeRange argTypes) {
-  mlir::StringAttr res;
+  mlir::Attribute res;
   for (auto arg : argTypes) {
     if (auto tupleType = mlir::dyn_cast<mlir::TupleType>(arg)) {
       auto tupleRes = getDeviceDescFromArgs(context, tupleType.getTypes());
@@ -940,11 +940,9 @@ getDeviceDescFromArgs(mlir::MLIRContext *context, mlir::TypeRange argTypes) {
     if (!env)
       continue;
 
-    auto name = env.getDevice();
-    assert(name && "Invalid device name");
     if (!res) {
-      res = name;
-    } else if (res != name) {
+      res = env;
+    } else if (res != env) {
       return mlir::failure();
     }
   }
@@ -952,7 +950,7 @@ getDeviceDescFromArgs(mlir::MLIRContext *context, mlir::TypeRange argTypes) {
   return res;
 }
 
-static mlir::FailureOr<mlir::StringAttr>
+static mlir::FailureOr<mlir::Attribute>
 getDeviceDescFromFunc(mlir::MLIRContext *context, mlir::TypeRange argTypes) {
   auto res = getDeviceDescFromArgs(context, argTypes);
   if (mlir::failed(res))
@@ -962,8 +960,11 @@ getDeviceDescFromFunc(mlir::MLIRContext *context, mlir::TypeRange argTypes) {
   if (*res)
     return res;
 
-  if (auto dev = getDefaultDevice()) {
-    return mlir::StringAttr::get(context, *dev);
+  if (auto dev = numba::getDefaultDevice()) {
+    auto &&[device, caps] = *dev;
+    return gpu_runtime::GPURegionDescAttr::get(
+        context, device, caps.spirvMajorVersion, caps.spirvMinorVersion,
+        caps.hasFP16, caps.hasFP64);
   } else {
     return mlir::failure();
   }
@@ -984,10 +985,10 @@ protected:
     if (!parent)
       return mlir::failure();
 
-    auto device =
+    auto envAttr =
         getDeviceDescFromFunc(op->getContext(), parent.getArgumentTypes());
 
-    if (mlir::failed(device))
+    if (mlir::failed(envAttr))
       return mlir::failure();
 
     llvm::SmallVector<mlir::scf::ForOp> newOps;
@@ -1000,7 +1001,6 @@ protected:
       return mlir::failure();
 
     mlir::OpBuilder::InsertionGuard g(rewriter);
-    auto envAttr = gpu_runtime::GPURegionDescAttr::get(getContext(), *device);
     for (auto op : newOps) {
       auto bodyBuilder = [&](mlir::OpBuilder &builder, mlir::Location loc) {
         auto newOp = builder.clone(*op);
@@ -1010,7 +1010,7 @@ protected:
       auto opResults = op.getResults();
       rewriter.setInsertionPoint(op);
       auto newOp = rewriter.create<numba::util::EnvironmentRegionOp>(
-          op->getLoc(), envAttr, /*args*/ std::nullopt, opResults.getTypes(),
+          op->getLoc(), *envAttr, /*args*/ std::nullopt, opResults.getTypes(),
           bodyBuilder);
       rewriter.replaceOp(op, newOp->getResults());
     }
@@ -1975,22 +1975,20 @@ public:
       if (!gpuEnv)
         return;
 
-      auto deviceName = gpuEnv.getDevice();
-
       auto kernel = launch.getKernel();
       auto gpuModName = kernel.getRootReference();
       auto gpuMod = mod.lookupSymbol<mlir::gpu::GPUModuleOp>(gpuModName);
       if (!gpuMod)
         return;
 
-      auto gpuModAttr =
-          gpuMod->getAttrOfType<mlir::StringAttr>(kGpuModuleDeviceName);
-      if (gpuModAttr && gpuModAttr != deviceName) {
+      auto gpuModAttr = gpuMod->getAttrOfType<gpu_runtime::GPURegionDescAttr>(
+          kGpuModuleDeviceName);
+      if (gpuModAttr && gpuModAttr != gpuEnv) {
         gpuMod->emitError("Incompatible gpu module devices: ")
-            << gpuModAttr.getValue() << " and " << deviceName;
+            << gpuModAttr << " and " << gpuEnv;
         return signalPassFailure();
       }
-      gpuMod->setAttr(kGpuModuleDeviceName, deviceName);
+      gpuMod->setAttr(kGpuModuleDeviceName, gpuEnv);
     });
   }
 };
@@ -2117,19 +2115,13 @@ static std::optional<mlir::spirv::Version> mapSpirvVersion(uint16_t major,
 }
 
 static mlir::spirv::TargetEnvAttr deviceCapsMapper(mlir::gpu::GPUModuleOp op) {
-  auto deviceAttr = op->getAttrOfType<mlir::StringAttr>(kGpuModuleDeviceName);
+  auto deviceAttr =
+      op->getAttrOfType<gpu_runtime::GPURegionDescAttr>(kGpuModuleDeviceName);
   if (!deviceAttr)
     return {};
 
-  auto deviceCapsRet =
-      getOffloadDeviceCapabilities(deviceAttr.getValue().str());
-  if (!deviceCapsRet)
-    return nullptr;
-
-  auto deviceCaps = *deviceCapsRet;
-
-  auto spirvVersionRet = mapSpirvVersion(deviceCaps.spirvMajorVersion,
-                                         deviceCaps.spirvMinorVersion);
+  auto spirvVersionRet = mapSpirvVersion(deviceAttr.getSpirvMajorVersion(),
+                                         deviceAttr.getSpirvMinorVersion());
   if (!spirvVersionRet)
     return nullptr;
 
@@ -2159,12 +2151,12 @@ static mlir::spirv::TargetEnvAttr deviceCapsMapper(mlir::gpu::GPUModuleOp op) {
   llvm::SmallVector<spirv::Capability, 0> caps(std::begin(fixedCaps),
                                                std::end(fixedCaps));
 
-  if (deviceCaps.hasFP16) {
+  if (deviceAttr.getHasFp16()) {
     caps.emplace_back(spirv::Capability::Float16);
     caps.emplace_back(spirv::Capability::Float16Buffer);
   }
 
-  if (deviceCaps.hasFP64)
+  if (deviceAttr.getHasFp64())
     caps.emplace_back(spirv::Capability::Float64);
 
   llvm::sort(caps);
