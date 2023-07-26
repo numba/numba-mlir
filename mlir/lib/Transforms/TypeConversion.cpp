@@ -296,6 +296,9 @@ struct CallOpSignatureConversion
       if (mlir::failed(converter->convertTypes(origType, unpackedTypes)))
         return mlir::failure();
 
+      if (unpackedTypes.empty())
+        continue;
+
       if (unpackedTypes.size() == 1 && unpackedTypes.front() == origType) {
         unpackedArgs.emplace_back(arg);
         continue;
