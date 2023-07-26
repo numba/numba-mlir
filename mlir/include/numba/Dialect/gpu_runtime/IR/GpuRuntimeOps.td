@@ -52,6 +52,19 @@ def GPURegionDescAttr
     "::mlir::IntegerAttr":$spirv_major_version,
     "::mlir::IntegerAttr":$spirv_minor_version);
   let assemblyFormat = "`<` struct(params) `>`";
+
+  let builders = [
+    AttrBuilderWithInferredContext<(ins "::mlir::MLIRContext *":$context,
+                                        "::mlir::StringRef":$device,
+                                        "int64_t":$spirv_major_version,
+                                        "int64_t":$spirv_minor_version), [{
+      mlir::OpBuilder builder(context);
+      auto devAttr = builder.getStringAttr(device);
+      auto spirvMajor = builder.getIndexAttr(spirv_major_version);
+      auto spirvMinor = builder.getIndexAttr(spirv_minor_version);
+      return $_get(context, devAttr, spirvMajor, spirvMinor);
+    }]>
+  ];
 }
 
 def CreateGpuStreamOp : GpuRuntime_Op<"create_gpu_stream", [Pure]> {
