@@ -10,7 +10,7 @@
 func.func @check(%arg0: memref<?x?xf64>, %arg1: memref<?x?xf64>, %arg2: index, %arg3: index) {
   %c1 = arith.constant 1 : index
   %c0 = arith.constant 0 : index
-  numba_util.env_region #gpu_runtime.region_desc<device = "test"> {
+  numba_util.env_region #gpu_runtime.region_desc<device = "test", spirv_major_version = 1, spirv_minor_version = 1, has_fp16 = true, has_fp64 = false> {
     scf.parallel (%arg4, %arg5) = (%c0, %c0) to (%arg2, %arg3) step (%c1, %c1) {
       %2 = memref.load %arg0[%arg4, %arg5] : memref<?x?xf64>
       memref.store %2, %arg1[%arg4, %arg5] : memref<?x?xf64>
@@ -34,7 +34,7 @@ func.func @check(%arg0: memref<?x?xf64>, %arg1: memref<?x?xf64>, %arg2: index, %
 func.func @check(%arg0: memref<?x?x?xf64>, %arg1: memref<?x?x?xf64>, %arg3: index, %arg4: index, %arg5: index) {
   %c1 = arith.constant 1 : index
   %c0 = arith.constant 0 : index
-  numba_util.env_region #gpu_runtime.region_desc<device = "test"> {
+  numba_util.env_region #gpu_runtime.region_desc<device = "test", spirv_major_version = 1, spirv_minor_version = 1, has_fp16 = true, has_fp64 = false> {
     scf.parallel (%arg6, %arg7, %arg8) = (%c0, %c0, %c0) to (%arg3, %arg4, %arg5) step (%c1, %c1, %c1) {
       %2 = memref.load %arg0[%arg6, %arg7, %arg8] : memref<?x?x?xf64>
       memref.store %2, %arg1[%arg6, %arg7, %arg8] : memref<?x?x?xf64>
@@ -58,7 +58,7 @@ func.func @check(%arg0: memref<?x?x?xf64>, %arg1: memref<?x?x?xf64>, %arg3: inde
 func.func @check(%arg0: memref<?x?x?xf64>, %arg1: memref<?x?x?xf64>, %arg3: index, %arg4: index, %arg5: index) {
   %c1 = arith.constant 1 : index
   %c0 = arith.constant 0 : index
-  numba_util.env_region #gpu_runtime.region_desc<device = "test"> {
+  numba_util.env_region #gpu_runtime.region_desc<device = "test", spirv_major_version = 1, spirv_minor_version = 1, has_fp16 = true, has_fp64 = false> {
     scf.parallel (%arg6, %arg7, %arg8) = (%c0, %c0, %c0) to (%arg3, %arg4, %arg5) step (%c1, %c1, %c1) {
       %2 = memref.load %arg0[%arg6, %arg8, %arg7] : memref<?x?x?xf64>
       memref.store %2, %arg1[%arg6, %arg8, %arg7] : memref<?x?x?xf64>
