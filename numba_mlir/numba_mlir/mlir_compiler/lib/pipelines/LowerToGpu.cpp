@@ -962,10 +962,9 @@ getDeviceDescFromFunc(mlir::MLIRContext *context, mlir::TypeRange argTypes) {
 
   if (auto dev = getDefaultDevice()) {
     auto &&[device, caps] = *dev;
-    auto spirvMajor = caps.spirvMajorVersion;
-    auto spirvMinor = caps.spirvMinorVersion;
-    return gpu_runtime::GPURegionDescAttr::get(context, device, spirvMajor,
-                                               spirvMinor);
+    return gpu_runtime::GPURegionDescAttr::get(
+        context, device, caps.spirvMajorVersion, caps.spirvMinorVersion,
+        caps.hasFP16, caps.hasFP64);
   } else {
     return mlir::failure();
   }

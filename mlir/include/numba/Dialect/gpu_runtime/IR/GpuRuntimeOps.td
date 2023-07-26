@@ -49,20 +49,22 @@ def GPURegionDescAttr
     : GpuRuntime_Attr<"GPURegionDesc", "region_desc"> {
   let parameters = (ins
     "::mlir::StringAttr":$device,
-    "::mlir::IntegerAttr":$spirv_major_version,
-    "::mlir::IntegerAttr":$spirv_minor_version);
+    "int16_t":$spirv_major_version,
+    "int16_t":$spirv_minor_version,
+    "bool":$has_fp16,
+    "bool":$has_fp64);
   let assemblyFormat = "`<` struct(params) `>`";
 
   let builders = [
     AttrBuilderWithInferredContext<(ins "::mlir::MLIRContext *":$context,
                                         "::mlir::StringRef":$device,
-                                        "int64_t":$spirv_major_version,
-                                        "int64_t":$spirv_minor_version), [{
+                                        "int16_t":$spirv_major_version,
+                                        "int16_t":$spirv_minor_version,
+                                        "bool":$has_fp16,
+                                        "bool":$has_fp64), [{
       mlir::OpBuilder builder(context);
       auto devAttr = builder.getStringAttr(device);
-      auto spirvMajor = builder.getIndexAttr(spirv_major_version);
-      auto spirvMinor = builder.getIndexAttr(spirv_minor_version);
-      return $_get(context, devAttr, spirvMajor, spirvMinor);
+      return $_get(context, devAttr, spirv_major_version, spirv_minor_version, has_fp16, has_fp64);
     }]>
   ];
 }
