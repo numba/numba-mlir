@@ -398,12 +398,17 @@ def test_indirect_call_def_arg():
 
     jit_inner_func = njit(inner_func)
 
-    def func(a, c=99):
+    def func1(a):
         return jit_inner_func(a)
 
-    jit_func = njit(func)
+    def func2(a):
+        return jit_inner_func(a, 8)
 
-    assert_equal(func(5), jit_func(5))
+    jit_func1 = njit(func1)
+    jit_func2 = njit(func2)
+
+    assert_equal(func1(5), jit_func1(5))
+    assert_equal(func2(5), jit_func2(5))
 
 
 def test_indirect_call_inline():
