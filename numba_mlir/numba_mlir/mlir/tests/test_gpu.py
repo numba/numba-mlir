@@ -1212,6 +1212,16 @@ def _to_host(src, dst):
     np.copyto(dst, dpt.asnumpy(src))
 
 
+def _check_filter_string(array, ir):
+    filter_string = array.device.sycl_device.filter_string
+    assert (
+        ir.count(
+            f'numba_util.env_region #gpu_runtime.region_desc<device = "{filter_string}"'
+        )
+        > 0
+    ), ir
+
+
 @pytest.mark.smoke
 @require_dpctl
 @pytest.mark.parametrize("size", [1, 13, 127, 1024])
@@ -1235,16 +1245,10 @@ def test_dpctl_simple1(size):
     gpu_res = np.zeros(a.shape, a.dtype)
     dgpu_res = _from_host(gpu_res, buffer="device")
 
-    filter_string = dgpu_res.device.sycl_device.filter_string
     with print_pass_ir([], ["ConvertParallelLoopToGpu"]):
         gpu_func[a.shape, DEFAULT_LOCAL_SIZE](da, db, dgpu_res)
         ir = get_print_buffer()
-        assert (
-            ir.count(
-                f'numba_util.env_region #gpu_runtime.region_desc<device = "{filter_string}">'
-            )
-            > 0
-        ), ir
+        _check_filter_string(dgpu_res, ir)
         assert ir.count("gpu.launch blocks") == 1, ir
 
     _to_host(dgpu_res, gpu_res)
@@ -1272,16 +1276,10 @@ def test_parfor_simple1():
     gpu_res = np.zeros(a.shape, a.dtype)
     dgpu_res = _from_host(gpu_res, buffer="device")
 
-    filter_string = dgpu_res.device.sycl_device.filter_string
     with print_pass_ir([], ["ConvertParallelLoopToGpu"]):
         gpu_func(da, db, dgpu_res)
         ir = get_print_buffer()
-        assert (
-            ir.count(
-                f'numba_util.env_region #gpu_runtime.region_desc<device = "{filter_string}">'
-            )
-            > 0
-        ), ir
+        _check_filter_string(dgpu_res, ir)
         assert ir.count("gpu.launch blocks") == 1, ir
 
     _to_host(dgpu_res, gpu_res)
@@ -1309,16 +1307,10 @@ def test_parfor_scalar(val):
     gpu_res = np.zeros(a.shape, a.dtype)
     dgpu_res = _from_host(gpu_res, buffer="device")
 
-    filter_string = dgpu_res.device.sycl_device.filter_string
     with print_pass_ir([], ["ConvertParallelLoopToGpu"]):
         gpu_func(da, db, dgpu_res, val)
         ir = get_print_buffer()
-        assert (
-            ir.count(
-                f'numba_util.env_region #gpu_runtime.region_desc<device = "{filter_string}">'
-            )
-            > 0
-        ), ir
+        _check_filter_string(dgpu_res, ir)
         assert ir.count("gpu.launch blocks") == 1, ir
 
     _to_host(dgpu_res, gpu_res)
@@ -1346,16 +1338,10 @@ def test_parfor_scalar_capture(val):
     gpu_res = np.zeros(a.shape, a.dtype)
     dgpu_res = _from_host(gpu_res, buffer="device")
 
-    filter_string = dgpu_res.device.sycl_device.filter_string
     with print_pass_ir([], ["ConvertParallelLoopToGpu"]):
         gpu_func(da, db, dgpu_res)
         ir = get_print_buffer()
-        assert (
-            ir.count(
-                f'numba_util.env_region #gpu_runtime.region_desc<device = "{filter_string}">'
-            )
-            > 0
-        ), ir
+        _check_filter_string(dgpu_res, ir)
         assert ir.count("gpu.launch blocks") == 1, ir
 
     _to_host(dgpu_res, gpu_res)
@@ -1380,16 +1366,10 @@ def test_cfd_simple1():
     gpu_res = np.zeros(a.shape, a.dtype)
     dgpu_res = _from_host(gpu_res, buffer="device")
 
-    filter_string = dgpu_res.device.sycl_device.filter_string
     with print_pass_ir([], ["ConvertParallelLoopToGpu"]):
         jit_func(da, dgpu_res)
         ir = get_print_buffer()
-        assert (
-            ir.count(
-                f'numba_util.env_region #gpu_runtime.region_desc<device = "{filter_string}">'
-            )
-            > 0
-        ), ir
+        _check_filter_string(dgpu_res, ir)
         assert ir.count("gpu.launch blocks") == 1, ir
 
     _to_host(dgpu_res, gpu_res)
@@ -1416,16 +1396,10 @@ def test_cfd_simple2():
     gpu_res = np.zeros(a.shape, a.dtype)
     dgpu_res = _from_host(gpu_res, buffer="device")
 
-    filter_string = dgpu_res.device.sycl_device.filter_string
     with print_pass_ir([], ["ConvertParallelLoopToGpu"]):
         jit_func(da, db, dgpu_res)
         ir = get_print_buffer()
-        assert (
-            ir.count(
-                f'numba_util.env_region #gpu_runtime.region_desc<device = "{filter_string}">'
-            )
-            > 0
-        ), ir
+        _check_filter_string(dgpu_res, ir)
         assert ir.count("gpu.launch blocks") > 0, ir
 
     _to_host(dgpu_res, gpu_res)
@@ -1454,16 +1428,10 @@ def test_cfd_indirect():
     gpu_res = np.zeros(a.shape, a.dtype)
     dgpu_res = _from_host(gpu_res, buffer="device")
 
-    filter_string = dgpu_res.device.sycl_device.filter_string
     with print_pass_ir([], ["ConvertParallelLoopToGpu"]):
         jit_func2(da, dgpu_res)
         ir = get_print_buffer()
-        assert (
-            ir.count(
-                f'numba_util.env_region #gpu_runtime.region_desc<device = "{filter_string}">'
-            )
-            > 0
-        ), ir
+        _check_filter_string(dgpu_res, ir)
         assert ir.count("gpu.launch blocks") > 0, ir
 
     _to_host(dgpu_res, gpu_res)
@@ -1686,16 +1654,10 @@ def test_cfd_reshape():
     gpu_res = np.zeros(a.shape, a.dtype)
     dgpu_res = _from_host(gpu_res, buffer="device")
 
-    filter_string = dgpu_res.device.sycl_device.filter_string
     with print_pass_ir([], ["ConvertParallelLoopToGpu"]):
         jit_func2(dgpu_res)
         ir = get_print_buffer()
-        assert (
-            ir.count(
-                f'numba_util.env_region #gpu_runtime.region_desc<device = "{filter_string}">'
-            )
-            > 0
-        ), ir
+        _check_filter_string(dgpu_res, ir)
         assert ir.count("gpu.launch blocks") > 0, ir
     _to_host(dgpu_res, gpu_res)
     assert_equal(gpu_res, sim_res)
@@ -1716,16 +1678,10 @@ def test_cfd_reduce1(size):
 
     da = _from_host(a, buffer="device")
 
-    filter_string = da.device.sycl_device.filter_string
     with print_pass_ir([], ["ConvertParallelLoopToGpu"]):
         assert_allclose(jit_func(da), py_func(a), rtol=1e-5)
         ir = get_print_buffer()
-        assert (
-            ir.count(
-                f'numba_util.env_region #gpu_runtime.region_desc<device = "{filter_string}">'
-            )
-            > 0
-        ), ir
+        _check_filter_string(da, ir)
         assert ir.count("gpu.launch blocks") == 1, ir
 
 
@@ -1795,16 +1751,10 @@ def test_cfd_dot(a, b, py_func):
     db = _from_host(b, buffer="device")
     dgpu_res = _from_host(gpu_res, buffer="device")
 
-    filter_string = dgpu_res.device.sycl_device.filter_string
     with print_pass_ir([], ["ConvertParallelLoopToGpu"]):
         jit_func(da, db, dgpu_res)
         ir = get_print_buffer()
-        assert (
-            ir.count(
-                f'numba_util.env_region #gpu_runtime.region_desc<device = "{filter_string}">'
-            )
-            > 0
-        ), ir
+        _check_filter_string(dgpu_res, ir)
         assert ir.count("gpu.launch blocks") > 0, ir
 
     _to_host(dgpu_res, gpu_res)
@@ -1831,16 +1781,10 @@ def test_l2_norm():
     gpu_src = _from_host(src, buffer="device")
     dgpu_res = _from_host(gpu_res, buffer="device")
 
-    filter_string = dgpu_res.device.sycl_device.filter_string
     with print_pass_ir([], ["ConvertParallelLoopToGpu"]):
         jit_func(gpu_src, dgpu_res)
         ir = get_print_buffer()
-        assert (
-            ir.count(
-                f'numba_util.env_region #gpu_runtime.region_desc<device = "{filter_string}">'
-            )
-            > 0
-        ), ir
+        _check_filter_string(dgpu_res, ir)
         assert ir.count("gpu.launch blocks") > 0, ir
 
     _to_host(dgpu_res, gpu_res)
@@ -1880,16 +1824,10 @@ def test_pairwise2():
     gpu_b = _from_host(b, buffer="device")
     dgpu_res = _from_host(gpu_res, buffer="device")
 
-    filter_string = dgpu_res.device.sycl_device.filter_string
     with print_pass_ir([], ["ConvertParallelLoopToGpu"]):
         jit_func(gpu_a, gpu_b, dgpu_res)
         ir = get_print_buffer()
-        assert (
-            ir.count(
-                f'numba_util.env_region #gpu_runtime.region_desc<device = "{filter_string}">'
-            )
-            > 0
-        ), ir
+        _check_filter_string(dgpu_res, ir)
         assert ir.count("gpu.launch blocks") > 0, ir
 
     _to_host(dgpu_res, gpu_res)

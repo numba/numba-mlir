@@ -5,7 +5,6 @@
 from .utils import readenv
 
 from collections import namedtuple
-import weakref
 
 DEFAULT_DEVICE = readenv("NUMBA_MLIR_DEFAULT_DEVICE", str, "")
 
@@ -81,9 +80,7 @@ if _is_dpctl_available:
             )
 
             self.filter_string = filter_string
-
-            # Do not prolong life of device
-            self.device = weakref.ref(device)
+            self.device = device
 
         @property
         def key(self):
@@ -98,11 +95,7 @@ if _is_dpctl_available:
             return self.dtype.is_precise()
 
         def get_device_caps(self):
-            device = self.device()
-            if device is None:
-                return None
-
-            return _get_device_caps(device)
+            return _get_device_caps(self.device)
 
     class USMNdArrayModel(StructModel):
         def __init__(self, dmm, fe_type):
