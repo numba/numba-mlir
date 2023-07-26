@@ -81,6 +81,7 @@ if _is_dpctl_available:
 
             self.filter_string = filter_string
             self.device = device
+            self.caps = None
 
         @property
         def key(self):
@@ -95,7 +96,18 @@ if _is_dpctl_available:
             return self.dtype.is_precise()
 
         def get_device_caps(self):
-            return _get_device_caps(self.device)
+            if self.caps:
+                return self.caps
+
+            device = self.device
+            if not device:
+                return None
+
+            caps = _get_device_caps(device)
+            self.device = None
+            self.caps = caps
+
+            return caps
 
     class USMNdArrayModel(StructModel):
         def __init__(self, dmm, fe_type):
