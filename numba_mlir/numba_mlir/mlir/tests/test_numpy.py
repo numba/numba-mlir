@@ -1691,8 +1691,8 @@ def test_concat(arrays, axis):
         "lambda a, b, c: (a, b, c)",
     ],
 )
-def test_xstack(py_func, get_args):
-    shape = (2, 3, 4)
+@pytest.mark.parametrize("shape", [(2, 3, 4), (2, 3, 4, 5), (2, 3, 4, 5, 6)])
+def test_xstack(py_func, get_args, shape):
     sz = math.prod(shape)
     dtype = np.int32
 
