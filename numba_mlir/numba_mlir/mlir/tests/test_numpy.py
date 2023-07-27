@@ -1674,6 +1674,43 @@ def test_concat(arrays, axis):
     assert_equal(py_func(*arr), jit_func(*arr))
 
 
+@parametrize_function_variants(
+    "py_func",
+    [
+        "lambda a: np.vstack(a)",
+        "lambda a: np.hstack(a)",
+        "lambda a: np.dstack(a)",
+    ],
+)
+@parametrize_function_variants(
+    "get_args",
+    [
+        # "lambda a, b, c: (a)", TODO: not supported by numba
+        "lambda a, b, c: ((a,))",
+        "lambda a, b, c: (a, b)",
+        "lambda a, b, c: (a, b, c)",
+    ],
+)
+def test_xstack(py_func, get_args):
+    shape = (2, 3, 4)
+    sz = math.prod(shape)
+    dtype = np.int32
+
+    start = 0
+    a = np.arange(start=start, stop=start + sz, dtype=dtype).reshape(shape)
+
+    start += sz
+    b = np.arange(start=start, stop=start + sz, dtype=dtype).reshape(shape)
+
+    start += sz
+    c = np.arange(start=start, stop=start + sz, dtype=dtype).reshape(shape)
+
+    jit_func = njit(py_func)
+
+    args = get_args(a, b, c)
+    assert_equal(py_func(args), jit_func(args))
+
+
 @pytest.mark.parametrize(
     "arr",
     [
