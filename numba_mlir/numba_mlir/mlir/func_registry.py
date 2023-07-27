@@ -35,8 +35,13 @@ def add_active_funcs(name, func, flags):
     global _active_funcs_stack
     assert len(_active_funcs_stack) > 0
     top = _active_funcs_stack[-1]
-    arg_names = list(inspect.signature(func).parameters)
-    top[name] = (func, flags, arg_names)
+    params = inspect.signature(func).parameters
+    arg_names = list(params.keys())
+    empty = inspect.Parameter.empty
+    param_values = params.values()
+    arg_has_default = list(map(lambda p: p.default is not empty, param_values))
+    arg_defaults = list(map(lambda p: p.default, param_values))
+    top[name] = (func, flags, arg_names, arg_has_default, arg_defaults)
 
 
 def find_active_func(name):

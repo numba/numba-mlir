@@ -7,10 +7,13 @@
 #include "Mangle.hpp"
 #include "PyMapTypes.hpp"
 
+#include "numba/Dialect/numba_util/Dialect.hpp"
+
 #include <pybind11/pybind11.h>
 
 #include <mlir/Dialect/Func/IR/FuncOps.h>
 #include <mlir/IR/BuiltinOps.h>
+#include <mlir/IR/PatternMatch.h>
 
 namespace py = pybind11;
 
@@ -31,7 +34,8 @@ PyFuncResolver::PyFuncResolver() : context(std::make_unique<Context>()) {
 PyFuncResolver::~PyFuncResolver() {}
 
 std::optional<PyFuncResolver::Result> PyFuncResolver::getFunc(
-    mlir::ModuleOp module, llvm::StringRef name, mlir::ValueRange args,
+    mlir::PatternRewriter &rewriter, mlir::Location loc, mlir::ModuleOp module,
+    llvm::StringRef name, mlir::ValueRange args,
     llvm::ArrayRef<llvm::StringRef> kwnames, mlir::ValueRange kwargs) const {
   assert(!name.empty());
   auto funcDesc = context->resolver(py::str(name.data(), name.size()));
@@ -43,11 +47,34 @@ std::optional<PyFuncResolver::Result> PyFuncResolver::getFunc(
   auto pyFunc = funcDescTuple[0];
   auto flags = funcDescTuple[1];
   auto argNames = funcDescTuple[2].cast<py::list>();
+  auto argHasDefault = funcDescTuple[3].cast<py::list>();
+  auto argDefaults = funcDescTuple[4].cast<py::list>();
 
   Result res;
 
-  res.mappedArgs.reserve(args.size() + kwargs.size());
-  for (auto arg : argNames) {
+  auto reserveSize = args.size() + kwargs.size();
+  res.mappedArgs.reserve(reserveSize);
+
+  bool failedToConvert = false;
+  py::list pyTypes;
+  auto convertTypeToNumba = [&](mlir::Type type) {
+    auto pyType = mapTypeToNumba(context->types, type);
+    if (pyType.is_none()) {
+      failedToConvert = true;
+    } else {
+      pyTypes.append(pyType);
+    }
+  };
+
+  auto omitted = context->types.attr("Omitted");
+
+  auto addArg = [&](mlir::Value val) {
+    convertTypeToNumba(val.getType());
+    res.mappedArgs.emplace_back(val);
+  };
+
+  for (auto it : llvm::zip(argNames, argHasDefault, argDefaults)) {
+    auto arg = std::get<0>(it);
     auto kwarg = [&]() -> mlir::Value {
       auto argName = arg.cast<std::string>();
       for (auto &&[name, kw] : llvm::zip(kwnames, kwargs)) {
@@ -58,36 +85,50 @@ std::optional<PyFuncResolver::Result> PyFuncResolver::getFunc(
     }();
 
     if (kwarg) {
-      res.mappedArgs.emplace_back(kwarg);
+      addArg(kwarg);
       continue;
     }
 
-    if (args.empty())
-      return std::nullopt;
+    if (args.empty()) {
+      auto hasDefValue = std::get<1>(it);
+      if (hasDefValue.cast<bool>()) {
+        mlir::Value newVal =
+            rewriter.create<numba::util::UndefOp>(loc, rewriter.getNoneType());
+        res.mappedArgs.emplace_back(newVal);
+        auto def = std::get<2>(it);
+        pyTypes.append(omitted(def));
+        continue;
+      }
 
-    res.mappedArgs.emplace_back(args.front());
+      return std::nullopt;
+    }
+
+    addArg(args.front());
     args = args.drop_front();
   }
 
-  mlir::ValueRange argsRande(res.mappedArgs);
-  auto types = argsRande.getTypes();
-  auto pyTypes = mapTypesToNumba(context->types, types);
-  if (pyTypes.is_none())
+  if (failedToConvert)
     return std::nullopt;
 
+  mlir::ValueRange argsRande(res.mappedArgs);
+  auto types = argsRande.getTypes();
   auto mangledName = mangle(name, types);
   auto externalFunc = module.lookupSymbol<mlir::func::FuncOp>(mangledName);
   if (externalFunc) {
     res.func = externalFunc;
   } else {
+    rewriter.startRootUpdate(module);
     auto resOp = static_cast<mlir::Operation *>(
         context->compiler(pyFunc, pyTypes, flags).cast<py::capsule>());
-    if (!resOp)
+    if (!resOp) {
+      rewriter.cancelRootUpdate(module);
       return std::nullopt;
+    }
 
     res.func = mlir::cast<mlir::func::FuncOp>(resOp);
     res.func.setPrivate();
     res.func.setName(mangledName);
+    rewriter.finalizeRootUpdate(module);
   }
 
   return res;
