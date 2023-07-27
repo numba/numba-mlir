@@ -1693,22 +1693,43 @@ def test_concat(arrays, axis):
 )
 @pytest.mark.parametrize("shape", [(2, 3, 4), (2, 3, 4, 5), (2, 3, 4, 5, 6)])
 def test_xstack(py_func, get_args, shape):
-    sz = math.prod(shape)
+    size = math.prod(shape)
     dtype = np.int32
 
     start = 0
-    a = np.arange(start=start, stop=start + sz, dtype=dtype).reshape(shape)
+    a = np.arange(start=start, stop=start + size, dtype=dtype).reshape(shape)
 
-    start += sz
-    b = np.arange(start=start, stop=start + sz, dtype=dtype).reshape(shape)
+    start += size
+    b = np.arange(start=start, stop=start + size, dtype=dtype).reshape(shape)
 
-    start += sz
-    c = np.arange(start=start, stop=start + sz, dtype=dtype).reshape(shape)
+    start += size
+    c = np.arange(start=start, stop=start + size, dtype=dtype).reshape(shape)
 
     jit_func = njit(py_func)
 
     args = get_args(a, b, c)
     assert_equal(py_func(args), jit_func(args))
+
+
+@parametrize_function_variants(
+    "py_func",
+    [
+        "lambda a: np.triu(a)",
+        "lambda a: np.triu(a, 1)",
+        "lambda a: np.triu(a, k=-2)",
+        "lambda a: np.tril(a)",
+        "lambda a: np.tril(a, 1)",
+        "lambda a: np.tril(a, k=-2)",
+    ],
+)
+@pytest.mark.parametrize("shape", [(3, 4), (3, 4, 5), (3, 4, 5, 6)])
+def test_xtri(py_func, shape):
+    size = math.prod(shape)
+    dtype = np.int32
+    a = np.arange(size, dtype=dtype).reshape(shape)
+
+    jit_func = njit(py_func)
+    assert_equal(py_func(a), jit_func(a))
 
 
 @pytest.mark.parametrize(
