@@ -946,6 +946,21 @@ def concat_impl(builder, arrays, axis=0):
         return res
 
 
+@register_func("numpy.vstack", numpy.vstack)
+def vstack_impl(builder, arrays):
+    return concat_impl(builder, arrays, 0)
+
+
+@register_func("numpy.hstack", numpy.hstack)
+def hstack_impl(builder, arrays):
+    return concat_impl(builder, arrays, 1)
+
+
+@register_func("numpy.dstack", numpy.dstack)
+def dstack_impl(builder, arrays):
+    return concat_impl(builder, arrays, 2)
+
+
 def _cov_get_ddof_func(ddof_is_none):
     if ddof_is_none:
 
