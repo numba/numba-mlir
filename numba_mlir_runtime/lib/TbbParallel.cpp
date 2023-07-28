@@ -64,10 +64,10 @@ struct TBBContext {
   tbb::task_arena arena;
 };
 
-std::unique_ptr<TBBContext> globalContext;
+static std::unique_ptr<TBBContext> globalContext;
 
-TBBContext &getContext() {
-  if (globalContext == nullptr) {
+static TBBContext &getContext() {
+  if (!globalContext) {
     fprintf(stderr, "nmrt: tbb runtime is not initialized\n");
     fflush(stderr);
     abort();
@@ -242,8 +242,10 @@ NUMBA_MLIR_RUNTIME_EXPORT void nmrtParallelInit(int numThreads) {
   if (DEBUG)
     fprintf(stderr, "nmrt_parallel_init %d\n", numThreads);
 
-  if (nullptr == globalContext)
+  if (!globalContext)
     globalContext = std::make_unique<TBBContext>(numThreads);
+
+  assert(globalContext->numThreads == numThreads);
 }
 
 NUMBA_MLIR_RUNTIME_EXPORT void nmrtParallelFinalize() {
