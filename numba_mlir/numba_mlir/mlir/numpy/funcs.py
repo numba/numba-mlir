@@ -17,6 +17,7 @@ from ..linalg_builder import (
     is_int,
     is_literal,
     literal,
+    type_to_numpy,
     DYNAMIC_DIM,
 )
 from ..func_registry import add_func
@@ -556,6 +557,52 @@ def eye_impl(builder, N, M=None, k=0, dtype=None):
         return 1 if (j - i) == a else 0
 
     return builder.linalg_generic(idx, init, iterators, maps, body)
+
+
+def _xtri_impl(builder, array, k, inv):
+    shape = array.shape
+    ndims = len(shape)
+    if ndims < 2:
+        return
+
+    dtype = array.dtype
+    np_dtype = type_to_numpy(builder, dtype)
+
+    init = builder.init_tensor(shape, dtype)
+    idx = builder.from_elements(k, builder.int64)
+
+    iterators = ["parallel"] * ndims
+    indices = ",".join(f"d{i}" for i in range(ndims))
+    idx_map = f"({indices}) -> (0)"
+    array_map = f"({indices}) -> ({indices})"
+    maps = [idx_map, array_map, array_map]
+
+    off = ndims - 2
+    if inv:
+
+        def body(a, b, c):
+            i = _linalg_index(off + 0)
+            j = _linalg_index(off + 1)
+            return b if (j - i) >= a else np_dtype(0)
+
+    else:
+
+        def body(a, b, c):
+            i = _linalg_index(off + 0)
+            j = _linalg_index(off + 1)
+            return b if (j - i) <= a else np_dtype(0)
+
+    return builder.linalg_generic((idx, array), init, iterators, maps, body)
+
+
+@register_func("numpy.triu", numpy.triu)
+def triu_impl(builder, array, k=0):
+    return _xtri_impl(builder, array, k, True)
+
+
+@register_func("numpy.tril", numpy.tril)
+def tril_impl(builder, array, k=0):
+    return _xtri_impl(builder, array, k, False)
 
 
 def _check_mkl_strides(arr):
