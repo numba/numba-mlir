@@ -2159,3 +2159,23 @@ def test_matmul2(py_func, a, b, dtype):
     b = np.array(b, dtype=dtype)
     jit_func = njit(py_func)
     assert_allclose(py_func(a, b), jit_func(a, b), rtol=1e-4, atol=1e-7)
+
+
+def test_batchnorm():
+    def py_func(x, eps=1e-5):
+        # mean = np.mean(x, axis=0, keepdims=True)
+        mean = np.empty(x.shape, dtype=x.dtype)
+        mean[:] = np.sum(x, axis=0) / x.shape[0]
+        # std = np.std(x, axis=0, keepdims=True)
+        std = np.empty(x.shape, dtype=x.dtype)
+        std[:] = np.sqrt(np.sum((x - mean) ** 2, axis=0) / x.shape[0])
+        return (x - mean) / np.sqrt(std + eps)
+
+    jit_func = njit(py_func, parallel=True)
+
+    from numpy.random import default_rng
+
+    rng = default_rng(42)
+    N, W, H, C = 8, 14, 14, 32
+    input = rng.random((N, H, W, C), dtype=np.float32)
+    assert_allclose(py_func(input), jit_func(input), rtol=1e-4, atol=1e-7)
