@@ -379,6 +379,29 @@ void RetainOp::build(mlir::OpBuilder &builder, mlir::OperationState &state,
   RetainOp::build(builder, state, value.getType(), value);
 }
 
+namespace {
+struct DimOfRetain : public mlir::OpRewritePattern<mlir::memref::DimOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(mlir::memref::DimOp op,
+                  mlir::PatternRewriter &rewriter) const override {
+    auto src = op.getSource().getDefiningOp<numba::util::RetainOp>();
+    if (!src)
+      return mlir::failure();
+
+    rewriter.replaceOpWithNewOp<mlir::memref::DimOp>(op, src.getSource(),
+                                                     op.getIndex());
+    return mlir::success();
+  }
+};
+} // namespace
+
+void RetainOp::getCanonicalizationPatterns(::mlir::RewritePatternSet &results,
+                                           ::mlir::MLIRContext *context) {
+  results.insert<DimOfRetain>(context);
+}
+
 static mlir::Value getChangeLayoutParent(mlir::Value val) {
   if (auto parent = val.getDefiningOp<numba::util::ChangeLayoutOp>())
     return parent.getSource();
