@@ -3359,22 +3359,18 @@ struct MakeGenericReduceInnermost
     llvm::SmallVector<mlir::Attribute> remappedIters;
     remappedIters.reserve(numDims);
 
-    llvm::SmallVector<mlir::AffineExpr> remappedDims;
-    remappedDims.reserve(numDims);
+    llvm::SmallVector<mlir::AffineExpr> remappedDims(numDims);
 
-    for (auto i : llvm::seq(0u, numDims)) {
-      if (!reductions[i]) {
-        remappedIters.emplace_back(
-            mlir::linalg::IteratorTypeAttr::get(getContext(), iters[i]));
-        remappedDims.emplace_back(mlir::getAffineDimExpr(i, getContext()));
-      }
-    }
-
-    for (auto i : llvm::seq(0u, numDims)) {
-      if (reductions[i]) {
-        remappedIters.emplace_back(
-            mlir::linalg::IteratorTypeAttr::get(getContext(), iters[i]));
-        remappedDims.emplace_back(mlir::getAffineDimExpr(i, getContext()));
+    auto ctx = getContext();
+    unsigned newIdx = 0;
+    for (bool redLoop : {false, true}) {
+      for (auto i : llvm::seq(0u, numDims)) {
+        if (redLoop == reductions[i]) {
+          remappedIters.emplace_back(
+              mlir::linalg::IteratorTypeAttr::get(ctx, iters[i]));
+          remappedDims[i] = mlir::getAffineDimExpr(newIdx, ctx);
+          newIdx++;
+        }
       }
     }
 
