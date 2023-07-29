@@ -374,6 +374,7 @@ mergeMemrefTypes(mlir::MemRefType type1, mlir::MemRefType type2, bool isDst) {
 
   assert(type1.getRank() == type2.getRank());
   llvm::SmallVector<int64_t> shape;
+  shape.reserve(type1.getRank());
   for (auto &&[dim1, dim2] : llvm::zip(type1.getShape(), type2.getShape()))
     shape.emplace_back(mergeDims(dim1, dim2, isDst));
 
@@ -450,7 +451,7 @@ struct NormalizeMemrefArgs
           if (auto cast = arg.getDefiningOp<mlir::memref::CastOp>())
             arg = cast.getSource();
 
-          auto type = arg.getType().cast<mlir::MemRefType>();
+          auto type = mlir::cast<mlir::MemRefType>(arg.getType());
           if (!newType) {
             newType = type;
             continue;
@@ -461,10 +462,11 @@ struct NormalizeMemrefArgs
             newType = nullptr;
             break;
           }
+          newType = *result;
         }
         if (newType) {
-          if (auto result =
-                  mergeMemrefTypes(newType, arg.cast<mlir::MemRefType>(), true))
+          if (auto result = mergeMemrefTypes(
+                  newType, mlir::cast<mlir::MemRefType>(arg), true))
             newType = *result;
         }
 
