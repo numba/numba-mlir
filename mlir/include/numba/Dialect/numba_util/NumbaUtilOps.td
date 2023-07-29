@@ -145,6 +145,8 @@ def RetainOp : NumbaUtil_Op<"retain", [ViewLikeOpInterface]> {
   let extraClassDeclaration = [{
       ::mlir::Value getViewSource() { return getSource(); }
   }];
+
+  let hasCanonicalizer = 1;
 }
 
 def ChangeLayoutOp : NumbaUtil_Op<"change_layout", [

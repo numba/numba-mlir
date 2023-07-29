@@ -1911,6 +1911,27 @@ def test_tensor_if(a, b):
     assert_equal(py_func(a, b), jit_func(a, b))
 
 
+def test_static_dim_call():
+    def py_func1(a):
+        return a.shape[0]
+
+    jit_func1 = njit(py_func1)
+
+    def py_func2(a, b):
+        return py_func1(a), py_func1(b)
+
+    def py_func3(a, b):
+        return jit_func1(a), jit_func1(b)
+
+    jit_func3 = njit(py_func3)
+
+    a = np.empty(1)
+    b = np.empty(10)
+
+    assert_equal(py_func2(a, b), jit_func3(a, b))
+    # assert_equal(py_func3(a, b), jit_func3(a, b)) TODO: caching issue
+
+
 def _cov(m, y=None, rowvar=True, bias=False, ddof=None):
     return np.cov(m, y, rowvar, bias, ddof)
 
