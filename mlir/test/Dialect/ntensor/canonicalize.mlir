@@ -342,3 +342,13 @@ func.func @test(%t: !ntensor.ntensor<?x2xf32>) -> !ntensor.ntensor<?x2xf32> {
 // CHECK-LABEL: func @test
 //  CHECK-SAME:   (%[[ARG:.*]]: !ntensor.ntensor<?x2xf32>)
 //       CHECK:   return %[[ARG]] : !ntensor.ntensor<?x2xf32>
+
+// -----
+
+// CHECK-LABEL: func @test
+//   CHECK-NOT:   ntensor.copy
+//       CHECK:   return
+func.func @test(%arg1: !ntensor.ntensor<?x?xf32>){
+  ntensor.copy %arg1, %arg1 : !ntensor.ntensor<?x?xf32> to !ntensor.ntensor<?x?xf32>
+  return
+}

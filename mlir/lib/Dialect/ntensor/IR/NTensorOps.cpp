@@ -457,6 +457,27 @@ mlir::OpFoldResult numba::ntensor::DimOp::fold(FoldAdaptor) {
   return nullptr;
 }
 
+namespace {
+struct FoldSelfCopy : public mlir::OpRewritePattern<numba::ntensor::CopyOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(numba::ntensor::CopyOp copyOp,
+                  mlir::PatternRewriter &rewriter) const override {
+    if (copyOp.getSource() != copyOp.getTarget())
+      return mlir::failure();
+
+    rewriter.eraseOp(copyOp);
+    return mlir::success();
+  }
+};
+} // namespace
+
+void numba::ntensor::CopyOp::getCanonicalizationPatterns(
+    ::mlir::RewritePatternSet &results, ::mlir::MLIRContext *context) {
+  results.insert<FoldSelfCopy>(context);
+}
+
 numba::ntensor::NTensorType numba::ntensor::SubviewOp::inferResultType(
     numba::ntensor::NTensorType sourceType,
     mlir::ArrayRef<int64_t> staticOffsets, mlir::ArrayRef<int64_t> staticSizes,
