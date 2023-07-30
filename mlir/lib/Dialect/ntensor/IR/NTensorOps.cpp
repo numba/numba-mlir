@@ -922,13 +922,28 @@ void numba::ntensor::BroadcastOp::build(::mlir::OpBuilder &odsBuilder,
 
 mlir::LogicalResult numba::ntensor::BroadcastOp::fold(
     FoldAdaptor, llvm::SmallVectorImpl<mlir::OpFoldResult> &results) {
-  assert(getInputs().size() == getResults().size());
-  if (getInputs().size() == 1) {
-    if (getInputs().front().getType().cast<mlir::ShapedType>().getShape() !=
-        getResultTypes().front().cast<mlir::ShapedType>().getShape())
+  mlir::ValueRange inputs = getInputs();
+  mlir::TypeRange resultTypes = getResultTypes();
+  assert(inputs.size() == resultTypes.size());
+  if (!inputs.empty()) {
+    auto getShape = [](mlir::Type type) {
+      return mlir::cast<mlir::ShapedType>(type).getShape();
+    };
+
+    mlir::Value first = inputs.front();
+    auto firstShape = getShape(first.getType());
+    if (firstShape != getShape(resultTypes.front()))
       return mlir::failure();
 
-    results.emplace_back(getInputs().front());
+    results.emplace_back(first);
+    for (auto &&[arg, res] :
+         llvm::zip(inputs.drop_front(), resultTypes.drop_front())) {
+      if (arg != first || firstShape != getShape(res)) {
+        results.clear();
+        return mlir::failure();
+      }
+      results.emplace_back(arg);
+    }
     return mlir::success();
   }
 
