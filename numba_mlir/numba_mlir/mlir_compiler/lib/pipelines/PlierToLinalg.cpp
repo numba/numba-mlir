@@ -2892,6 +2892,76 @@ void LinalgOptInnerPass::runOnOperation() {
     return signalPassFailure();
 }
 
+template <typename F>
+static bool mayAliasImpl(mlir::Value src, F &&mayAliasCheck) {
+  llvm::SmallVector<mlir::Value> worklist;
+  worklist.emplace_back(src);
+  do {
+    auto current = worklist.pop_back_val();
+    if (auto extract = current.getDefiningOp<mlir::tensor::ExtractSliceOp>()) {
+      worklist.emplace_back(extract.getSource());
+    }
+    if (auto generic = current.getDefiningOp<mlir::linalg::GenericOp>()) {
+      for (auto arg : generic->getOperands()) {
+        if (mlir::isa<mlir::MemRefType>(arg.getType()) && mayAliasCheck(arg))
+          return true;
+
+        worklist.emplace_back(arg);
+      }
+    }
+    if (auto toTensor =
+            current.getDefiningOp<mlir::bufferization::ToTensorOp>()) {
+      if (mayAliasCheck(toTensor.getMemref()))
+        return true;
+    }
+
+  } while (!worklist.empty());
+  return false;
+}
+
+static bool mayAlias(mlir::AliasAnalysis &analysis, mlir::Value input,
+                     const mlir::OpOperandVector &outputs) {
+  for (auto outOperand : outputs) {
+    auto out = outOperand->get();
+    auto check = [&](mlir::Value val) {
+      return !analysis.alias(val, out).isNo();
+    };
+    if (mlir::isa<mlir::MemRefType>(out.getType()) &&
+        mayAliasImpl(input, check))
+      return true;
+  }
+  return false;
+}
+
+static const constexpr llvm::StringLiteral
+    kMixedGenericNoalias("mixed_generic_noalias");
+
+struct PrepareAdditionalBufferize
+    : public mlir::PassWrapper<PrepareAdditionalBufferize,
+                               mlir::OperationPass<void>> {
+  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(PrepareAdditionalBufferize)
+
+  void runOnOperation() override {
+    auto &aliasAnalysis = getAnalysis<mlir::AliasAnalysis>();
+    mlir::OpBuilder builder(&getContext());
+    auto attrName = builder.getStringAttr(kMixedGenericNoalias);
+    llvm::SmallVector<bool> flagsArray;
+    auto visitor = [&](mlir::linalg::GenericOp op) {
+      if (op.hasBufferSemantics() || op.hasTensorSemantics())
+        return;
+
+      flagsArray.resize(op.getNumDpsInputs());
+      for (auto &&[i, arg] : llvm::enumerate(op.getDpsInputOperands()))
+        flagsArray[i] =
+            !mayAlias(aliasAnalysis, arg->get(), op.getDpsInitOperands());
+
+      auto flags = builder.getDenseBoolArrayAttr(flagsArray);
+      op->setAttr(attrName, flags);
+    };
+    getOperation()->walk(visitor);
+  }
+};
+
 struct BufferizeReshape
     : public mlir::OpConversionPattern<mlir::tensor::ReshapeOp> {
   using OpConversionPattern::OpConversionPattern;
@@ -2962,6 +3032,26 @@ struct BufferizeExtractSlice
   }
 };
 
+static mlir::Value genCopy(mlir::OpBuilder &builder, mlir::Location loc,
+                           mlir::Value src) {
+  auto srcType = mlir::cast<mlir::MemRefType>(src.getType());
+  llvm::SmallVector<mlir::Value> sizes;
+  for (auto &&[i, s] : llvm::enumerate(srcType.getShape())) {
+    if (!mlir::ShapedType::isDynamic(s))
+      continue;
+
+    mlir::Value dim = builder.create<mlir::memref::DimOp>(loc, src, i);
+    sizes.emplace_back(dim);
+  }
+
+  auto resType = mlir::MemRefType::get(
+      srcType.getShape(), srcType.getElementType(),
+      mlir::MemRefLayoutAttrInterface{}, srcType.getMemorySpace());
+  mlir::Value res = builder.create<mlir::memref::AllocOp>(loc, resType, sizes);
+  builder.create<mlir::memref::CopyOp>(loc, src, res);
+  return res;
+}
+
 struct BufferizeMixedGeneric
     : public mlir::OpConversionPattern<mlir::linalg::GenericOp> {
   using OpConversionPattern::OpConversionPattern;
@@ -2973,19 +3063,34 @@ struct BufferizeMixedGeneric
     if (op.hasTensorSemantics() || op.hasBufferSemantics())
       return mlir::failure();
 
+    auto noalias =
+        op->getAttrOfType<mlir::DenseBoolArrayAttr>(kMixedGenericNoalias);
+    if (!noalias || noalias.size() != op.getNumDpsInputs())
+      return mlir::failure();
+
+    auto loc = op.getLoc();
     bool changed = false;
     mlir::ValueRange inputs = adaptor.getInputs();
+    llvm::SmallVector<mlir::Value> newInputs(inputs.size());
     for (auto &&[i, input] : llvm::enumerate(inputs)) {
       auto orig = op.getInputs()[i];
-      if (orig.getType().isa<mlir::RankedTensorType>())
+      if (mlir::isa<mlir::RankedTensorType>(orig.getType())) {
         changed = true;
+        mlir::Value arg = input;
+        if (!noalias[i])
+          arg = genCopy(rewriter, loc, arg);
+
+        newInputs[i] = arg;
+      } else {
+        newInputs[i] = input;
+      }
     }
 
     mlir::ValueRange outputs = adaptor.getOutputs();
     llvm::SmallVector<mlir::Value> newResults;
     for (auto &&[i, output] : llvm::enumerate(outputs)) {
       auto orig = op.getOutputs()[i];
-      if (orig.getType().isa<mlir::RankedTensorType>()) {
+      if (mlir::isa<mlir::RankedTensorType>(orig.getType())) {
         changed = true;
         newResults.emplace_back(output);
       }
@@ -2995,7 +3100,7 @@ struct BufferizeMixedGeneric
       return mlir::failure();
 
     auto newOp = rewriter.create<mlir::linalg::GenericOp>(
-        op.getLoc(), std::nullopt, inputs, outputs, adaptor.getIndexingMaps(),
+        loc, std::nullopt, newInputs, outputs, adaptor.getIndexingMaps(),
         adaptor.getIteratorTypes(), nullptr, nullptr);
 
     auto &newRegion = newOp.getRegion();
@@ -3459,6 +3564,10 @@ static void populatePlierToLinalgOptPipeline(mlir::OpPassManager &pm) {
   pm.addPass(mlir::arith::createConstantBufferizePass());
   pm.addNestedPass<mlir::func::FuncOp>(
       mlir::bufferization::createEmptyTensorToAllocTensorPass());
+  pm.addPass(mlir::createCanonicalizerPass());
+
+  pm.addNestedPass<mlir::func::FuncOp>(
+      std::make_unique<PrepareAdditionalBufferize>());
   pm.addNestedPass<mlir::func::FuncOp>(std::make_unique<AdditionalBufferize>());
   pm.addNestedPass<mlir::func::FuncOp>(mlir::createSCFBufferizePass());
   pm.addNestedPass<mlir::func::FuncOp>(mlir::createLinalgBufferizePass());

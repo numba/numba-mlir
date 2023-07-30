@@ -886,7 +886,6 @@ def test_copy_fusion():
         assert ir.count("scf.parallel") == 1, ir
 
 
-@pytest.mark.xfail(reason="Need to improve Alias analysis")
 def test_fusion_conflict1():
     def py_func(a):
         a[:] = np.flip(a)
@@ -1930,6 +1929,18 @@ def test_static_dim_call():
 
     assert_equal(py_func2(a, b), jit_func3(a, b))
     # assert_equal(py_func3(a, b), jit_func3(a, b)) TODO: caching issue
+
+
+def test_copy_self_alias():
+    def py_func(N):
+        a = np.arange(N)
+        a[:] += 3 * np.flip(a)
+        return a
+
+    jit_func = njit(py_func)
+
+    N = 1000
+    assert_equal(py_func(N), jit_func(N))
 
 
 def _cov(m, y=None, rowvar=True, bias=False, ddof=None):
