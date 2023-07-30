@@ -457,6 +457,27 @@ mlir::OpFoldResult numba::ntensor::DimOp::fold(FoldAdaptor) {
   return nullptr;
 }
 
+namespace {
+struct FoldSelfCopy : public mlir::OpRewritePattern<numba::ntensor::CopyOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(numba::ntensor::CopyOp copyOp,
+                  mlir::PatternRewriter &rewriter) const override {
+    if (copyOp.getSource() != copyOp.getTarget())
+      return mlir::failure();
+
+    rewriter.eraseOp(copyOp);
+    return mlir::success();
+  }
+};
+} // namespace
+
+void numba::ntensor::CopyOp::getCanonicalizationPatterns(
+    ::mlir::RewritePatternSet &results, ::mlir::MLIRContext *context) {
+  results.insert<FoldSelfCopy>(context);
+}
+
 numba::ntensor::NTensorType numba::ntensor::SubviewOp::inferResultType(
     numba::ntensor::NTensorType sourceType,
     mlir::ArrayRef<int64_t> staticOffsets, mlir::ArrayRef<int64_t> staticSizes,
@@ -922,13 +943,28 @@ void numba::ntensor::BroadcastOp::build(::mlir::OpBuilder &odsBuilder,
 
 mlir::LogicalResult numba::ntensor::BroadcastOp::fold(
     FoldAdaptor, llvm::SmallVectorImpl<mlir::OpFoldResult> &results) {
-  assert(getInputs().size() == getResults().size());
-  if (getInputs().size() == 1) {
-    if (getInputs().front().getType().cast<mlir::ShapedType>().getShape() !=
-        getResultTypes().front().cast<mlir::ShapedType>().getShape())
+  mlir::ValueRange inputs = getInputs();
+  mlir::TypeRange resultTypes = getResultTypes();
+  assert(inputs.size() == resultTypes.size());
+  if (!inputs.empty()) {
+    auto getShape = [](mlir::Type type) {
+      return mlir::cast<mlir::ShapedType>(type).getShape();
+    };
+
+    mlir::Value first = inputs.front();
+    auto firstShape = getShape(first.getType());
+    if (firstShape != getShape(resultTypes.front()))
       return mlir::failure();
 
-    results.emplace_back(getInputs().front());
+    results.emplace_back(first);
+    for (auto &&[arg, res] :
+         llvm::zip(inputs.drop_front(), resultTypes.drop_front())) {
+      if (arg != first || firstShape != getShape(res)) {
+        results.clear();
+        return mlir::failure();
+      }
+      results.emplace_back(arg);
+    }
     return mlir::success();
   }
 

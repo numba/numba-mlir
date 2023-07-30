@@ -224,7 +224,17 @@ func.func @test(%arg1: !ntensor.ntensor<?x?xf32>) -> index {
 //  CHECK-NEXT:   return %[[ARG1]] : !ntensor.ntensor<?x?xf32>
 func.func @test(%arg1: !ntensor.ntensor<?x?xf32>) -> (!ntensor.ntensor<?x?xf32>) {
   %0 = ntensor.broadcast (%arg1) : !ntensor.ntensor<?x?xf32> -> !ntensor.ntensor<?x?xf32>
-  return %0#0 : !ntensor.ntensor<?x?xf32>
+  return %0 : !ntensor.ntensor<?x?xf32>
+}
+
+// -----
+
+// CHECK-LABEL: func @test
+//  CHECK-SAME:   (%[[ARG1:.*]]: !ntensor.ntensor<?x?xf32>)
+//  CHECK-NEXT:   return %[[ARG1]], %[[ARG1]] : !ntensor.ntensor<?x?xf32>, !ntensor.ntensor<?x?xf32>
+func.func @test(%arg1: !ntensor.ntensor<?x?xf32>) -> (!ntensor.ntensor<?x?xf32>, !ntensor.ntensor<?x?xf32>) {
+  %0:2 = ntensor.broadcast (%arg1, %arg1) : !ntensor.ntensor<?x?xf32>, !ntensor.ntensor<?x?xf32> -> !ntensor.ntensor<?x?xf32>, !ntensor.ntensor<?x?xf32>
+  return %0#0, %0#1 : !ntensor.ntensor<?x?xf32>, !ntensor.ntensor<?x?xf32>
 }
 
 // -----
@@ -332,3 +342,13 @@ func.func @test(%t: !ntensor.ntensor<?x2xf32>) -> !ntensor.ntensor<?x2xf32> {
 // CHECK-LABEL: func @test
 //  CHECK-SAME:   (%[[ARG:.*]]: !ntensor.ntensor<?x2xf32>)
 //       CHECK:   return %[[ARG]] : !ntensor.ntensor<?x2xf32>
+
+// -----
+
+// CHECK-LABEL: func @test
+//   CHECK-NOT:   ntensor.copy
+//       CHECK:   return
+func.func @test(%arg1: !ntensor.ntensor<?x?xf32>){
+  ntensor.copy %arg1, %arg1 : !ntensor.ntensor<?x?xf32> to !ntensor.ntensor<?x?xf32>
+  return
+}

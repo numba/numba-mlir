@@ -194,6 +194,8 @@ def CopyOp : NTensor_OpBase<"copy",
   let assemblyFormat = [{
     $source `,` $target attr-dict `:` qualified(type($source)) `to` qualified(type($target))
   }];
+
+  let hasCanonicalizer = 1;
 }
 
 // Base class for ops with static/dynamic offset, sizes and strides
