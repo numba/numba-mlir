@@ -233,7 +233,6 @@ jobs:
           run-post: false
           miniforge-variant: Mambaforge
           miniforge-version: latest
-          channel-priority: "disabled"
           channels: intel,conda-forge
 
       - name: Checkout repo
@@ -680,7 +679,6 @@ jobs:
           run-post: false
           miniforge-variant: Mambaforge
           miniforge-version: latest
-          channel-priority: "disabled"
           channels: intel,conda-forge
 
       - name: Checkout repo
