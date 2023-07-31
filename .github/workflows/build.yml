@@ -56,7 +56,9 @@ jobs:
           auto-update-conda: true
           use-only-tar-bz2: true
           run-post: false
-          mamba-version: "*"
+          miniforge-variant: Mambaforge
+          miniforge-version: latest
+          channel-priority: "disabled"
           activate-environment: test-env
           environment-file: ${{ env.CORE_ENV_FILE }}
           python-version: "3.10"
@@ -232,7 +234,9 @@ jobs:
           auto-update-conda: true
           use-only-tar-bz2: true
           run-post: false
-          mamba-version: "*"
+          miniforge-variant: Mambaforge
+          miniforge-version: latest
+          channel-priority: "disabled"
           channels: intel,conda-forge
 
       - name: Checkout repo
@@ -372,7 +376,9 @@ jobs:
           auto-update-conda: true
           use-only-tar-bz2: true
           run-post: false
-          mamba-version: "*"
+          miniforge-variant: Mambaforge
+          miniforge-version: latest
+          channel-priority: "disabled"
           channels: intel,conda-forge
 
       - name: Checkout repo
@@ -496,7 +502,9 @@ jobs:
           auto-update-conda: true
           use-only-tar-bz2: true
           run-post: false
-          mamba-version: "*"
+          miniforge-variant: Mambaforge
+          miniforge-version: latest
+          channel-priority: "disabled"
           activate-environment: test-env
           environment-file: ${{ env.CORE_ENV_FILE }}
           python-version: "3.10"
@@ -676,7 +684,9 @@ jobs:
           auto-update-conda: true
           use-only-tar-bz2: true
           run-post: false
-          mamba-version: "*"
+          miniforge-variant: Mambaforge
+          miniforge-version: latest
+          channel-priority: "disabled"
           channels: intel,conda-forge
 
       - name: Checkout repo
@@ -819,7 +829,9 @@ jobs:
           auto-update-conda: true
           use-only-tar-bz2: true
           run-post: false
-          mamba-version: "*"
+          miniforge-variant: Mambaforge
+          miniforge-version: latest
+          channel-priority: "disabled"
           channels: intel,conda-forge
 
       - name: Checkout repo
@@ -915,7 +927,9 @@ jobs:
           run-post: false
           auto-activate-base: true
           activate-environment: ""
-          mamba-version: "*"
+          miniforge-variant: Mambaforge
+          miniforge-version: latest
+          channel-priority: "disabled"
           channels: intel,conda-forge
 
       - name: Add conda to system path
@@ -956,7 +970,9 @@ jobs:
           run-post: false
           auto-activate-base: true
           activate-environment: ""
-          mamba-version: "*"
+          miniforge-variant: Mambaforge
+          miniforge-version: latest
+          channel-priority: "disabled"
           channels: intel,conda-forge
 
       - name: Install anaconda-client
