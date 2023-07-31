@@ -162,35 +162,41 @@ struct AndConflictSimplify
   }
 };
 
-struct CmpiOfSelect : public mlir::OpRewritePattern<mlir::arith::CmpIOp> {
+// TODO: upstream
+struct XorOfCmpF : public mlir::OpRewritePattern<mlir::arith::XOrIOp> {
   using OpRewritePattern::OpRewritePattern;
 
   mlir::LogicalResult
-  matchAndRewrite(mlir::arith::CmpIOp op,
+  matchAndRewrite(mlir::arith::XOrIOp op,
                   mlir::PatternRewriter &rewriter) const override {
-    using Pred = mlir::arith::CmpIPredicate;
-    auto predicate = op.getPredicate();
-    if (predicate != Pred::eq && predicate != Pred::ne)
+    auto cmp = op.getLhs().getDefiningOp<mlir::arith::CmpFOp>();
+    if (!cmp || !llvm::hasSingleElement(cmp->getUses()) ||
+        !mlir::isConstantIntValue(op.getRhs(), -1))
       return mlir::failure();
 
-    for (bool reverse1 : {false, true}) {
-      auto select = (reverse1 ? op.getRhs() : op.getLhs())
-                        .getDefiningOp<mlir::arith::SelectOp>();
-      if (!select)
+    // TODO: properly handle NaNs
+    using Pred = mlir::arith::CmpFPredicate;
+    const std::pair<Pred, Pred> mapping[] = {
+        // clang-format off
+      {Pred::OEQ, Pred::ONE},
+      {Pred::ONE, Pred::OEQ},
+      {Pred::OGE, Pred::OLT},
+      {Pred::OGT, Pred::OLE},
+      {Pred::OLE, Pred::OGT},
+      {Pred::OLT, Pred::OGE},
+        // clang-format on
+    };
+
+    auto pred = cmp.getPredicate();
+    for (auto &&[oldPred, newPred] : mapping) {
+      if (pred != oldPred)
         continue;
 
-      auto other = (reverse1 ? op.getLhs() : op.getRhs());
-      for (bool reverse2 : {false, true}) {
-        auto selectArg(reverse2 ? select.getFalseValue()
-                                : select.getTrueValue());
-        if (other != selectArg)
-          continue;
-
-        bool res = static_cast<int64_t>(reverse2 != (predicate == Pred::ne));
-        rewriter.replaceOpWithNewOp<mlir::arith::ConstantIntOp>(op, res, 1);
-        return mlir::success();
-      }
+      rewriter.replaceOpWithNewOp<mlir::arith::CmpFOp>(
+          op, newPred, cmp.getLhs(), cmp.getRhs());
+      return mlir::success();
     }
+
     return mlir::failure();
   }
 };
@@ -242,7 +248,8 @@ struct ExtractStridedMetadataConstStrides
   mlir::LogicalResult
   matchAndRewrite(mlir::memref::ExtractStridedMetadataOp op,
                   mlir::PatternRewriter &rewriter) const override {
-    auto srcType = op.getSource().getType().cast<mlir::MemRefType>();
+    auto src = op.getSource();
+    mlir::MemRefType srcType = src.getType();
 
     int64_t offset;
     llvm::SmallVector<int64_t> strides;
@@ -258,15 +265,33 @@ struct ExtractStridedMetadataConstStrides
       changed = true;
       mlir::Value constVal =
           rewriter.create<mlir::arith::ConstantIndexOp>(loc, val);
-      for (auto &use : llvm::make_early_inc_range(res.getUses())) {
-        mlir::Operation *owner = use.getOwner();
-        rewriter.updateRootInPlace(owner, [&] { use.set(constVal); });
-      }
+      rewriter.replaceAllUsesWith(res, constVal);
     };
 
+    auto origStrides = op.getStrides();
     replaceUses(op.getOffset(), offset);
-    for (auto &&[strideRes, strideVal] : llvm::zip(op.getStrides(), strides))
+    for (auto &&[strideRes, strideVal] : llvm::zip(origStrides, strides))
       replaceUses(strideRes, strideVal);
+
+    bool isIdentity = srcType.getLayout().isIdentity();
+    if (isIdentity &&
+        llvm::any_of(origStrides, [](auto s) { return !s.use_empty(); })) {
+      auto rank = srcType.getRank();
+      mlir::Value stride =
+          rewriter.create<mlir::arith::ConstantIndexOp>(loc, 1);
+      rewriter.replaceAllUsesWith(origStrides[rank - 1], stride);
+      for (auto i : llvm::seq<int64_t>(0, rank - 1)) {
+        mlir::Value size =
+            rewriter.create<mlir::memref::DimOp>(loc, src, rank - i - 1);
+        if (i == 0) {
+          stride = size;
+        } else {
+          stride = rewriter.create<mlir::arith::MulIOp>(loc, stride, size);
+        }
+        rewriter.replaceAllUsesWith(origStrides[rank - i - 2], stride);
+      }
+      changed = true;
+    }
 
     return mlir::success(changed);
   }
@@ -286,6 +311,43 @@ struct ExtractStridedMetadataCast
 
     rewriter.replaceOpWithNewOp<mlir::memref::ExtractStridedMetadataOp>(
         op, cast.getSource());
+    return mlir::success();
+  }
+};
+
+// TODO: upstream
+struct IndexCastOfIndexCast
+    : public mlir::OpRewritePattern<mlir::arith::IndexCastOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(mlir::arith::IndexCastOp op,
+                  mlir::PatternRewriter &rewriter) const override {
+    auto mid = op.getIn();
+    if (!mlir::isa<mlir::IndexType>(mid.getType()))
+      return mlir::failure();
+
+    auto prevCast = mid.getDefiningOp<mlir::arith::IndexCastOp>();
+    if (!prevCast)
+      return mlir::failure();
+
+    auto src = prevCast.getIn();
+
+    auto srcType = mlir::dyn_cast<mlir::IntegerType>(src.getType());
+    if (!srcType)
+      return mlir::failure();
+
+    auto dstType = mlir::dyn_cast<mlir::IntegerType>(op.getResult().getType());
+    if (!dstType)
+      return mlir::failure();
+
+    if (srcType.getWidth() < dstType.getWidth()) {
+      rewriter.replaceOpWithNewOp<mlir::arith::ExtSIOp>(op, dstType, src);
+    } else if (srcType.getWidth() > dstType.getWidth()) {
+      rewriter.replaceOpWithNewOp<mlir::arith::TruncIOp>(op, dstType, src);
+    } else {
+      rewriter.replaceOp(op, src);
+    }
     return mlir::success();
   }
 };
@@ -367,10 +429,11 @@ void numba::populateCommonOptsPatterns(mlir::RewritePatternSet &patterns) {
       SubviewStorePropagate,
       PowSimplify,
       AndConflictSimplify,
-      CmpiOfSelect,
+      XorOfCmpF,
       ExtractStridedMetadataUnused,
       ExtractStridedMetadataConstStrides,
       ExtractStridedMetadataCast,
+      IndexCastOfIndexCast,
       GPUGenGlobalId
       // clang-format on
       >(patterns.getContext());

@@ -858,23 +858,20 @@ protected:
     auto kwn = op.getKwNames();
     llvm::SmallVector<llvm::StringRef> kwNames;
     kwNames.reserve(kwn.size());
-    for (auto name : kwn.getAsValueRange<mlir::StringAttr>()) {
+    for (auto name : kwn.getAsValueRange<mlir::StringAttr>())
       kwNames.emplace_back(name);
-    }
 
     auto mod = op->getParentOfType<mlir::ModuleOp>();
     assert(mod);
 
-    rewriter.startRootUpdate(mod);
-    auto res =
-        resolver.getFunc(mod, name, op.getArgs(), kwNames, op.getKwargs());
-    rewriter.finalizeRootUpdate(mod);
+    auto loc = op.getLoc();
+    auto res = resolver.getFunc(rewriter, loc, mod, name, op.getArgs(), kwNames,
+                                op.getKwargs());
     if (!res)
       return mlir::failure();
 
     auto externalFunc = res->func;
     mlir::ValueRange mappedArgs(res->mappedArgs);
-    auto loc = op.getLoc();
 
     llvm::SmallVector<mlir::Value> castedArgs(mappedArgs.size());
     auto funcTypes = externalFunc.getFunctionType().getInputs();
@@ -1009,8 +1006,8 @@ void PlierToStdPass::runOnOperation() {
       return false;
 
     auto res = typeConverter.convertType(t);
-    return res.isa_and_nonnull<mlir::IntegerType, mlir::FloatType,
-                               mlir::IndexType, mlir::ComplexType>();
+    return mlir::isa_and_nonnull<mlir::IntegerType, mlir::FloatType,
+                                 mlir::IndexType, mlir::ComplexType>(res);
   };
 
   auto isTuple = [&](mlir::Type t) -> bool {
@@ -1018,7 +1015,7 @@ void PlierToStdPass::runOnOperation() {
       return false;
 
     auto res = typeConverter.convertType(t);
-    return res && res.isa<mlir::TupleType>();
+    return res && mlir::isa<mlir::TupleType>(res);
   };
 
   target.addDynamicallyLegalOp<plier::BinOp>([&](plier::BinOp op) {

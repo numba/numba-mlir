@@ -65,7 +65,7 @@ def IndexRangeAttr
   let assemblyFormat = "`<` `[` $min `,` $max `]` `>`";
 }
 
-def EnforceShapeOp : NumbaUtil_Op<"enforce_shape"> {
+def EnforceShapeOp : NumbaUtil_Op<"enforce_shape", [Pure]> {
 
   let arguments = (ins AnyShaped:$value, Variadic<Index>:$sizes);
   let results = (outs AnyShaped:$result);
@@ -145,6 +145,8 @@ def RetainOp : NumbaUtil_Op<"retain", [ViewLikeOpInterface]> {
   let extraClassDeclaration = [{
       ::mlir::Value getViewSource() { return getSource(); }
   }];
+
+  let hasCanonicalizer = 1;
 }
 
 def ChangeLayoutOp : NumbaUtil_Op<"change_layout", [
@@ -164,7 +166,10 @@ def ChangeLayoutOp : NumbaUtil_Op<"change_layout", [
   }];
 }
 
-def SignCastOp : NumbaUtil_Op<"sign_cast", [Pure]> {
+def SignCastOp : NumbaUtil_Op<"sign_cast", [
+  DeclareOpInterfaceMethods<CastOpInterface>,
+  ViewLikeOpInterface,
+  Pure]> {
   let arguments = (ins AnyType:$source);
 
   let results = (outs AnyType:$dest);
@@ -172,6 +177,10 @@ def SignCastOp : NumbaUtil_Op<"sign_cast", [Pure]> {
   let hasCanonicalizer = 1;
 
   let assemblyFormat = "$source attr-dict `:` type($source) `to` type($dest)";
+
+  let extraClassDeclaration = [{
+      ::mlir::Value getViewSource() { return getSource(); }
+  }];
 }
 
 def TakeContextOp : NumbaUtil_Op<"take_context"> {
@@ -223,7 +232,7 @@ def TupleExtractOp : NumbaUtil_Op<"tuple_extract", [Pure]> {
 
   let extraClassDeclaration = [{
     /// Helper function to get the index as a simple integer if it is constant.
-    ::llvm::Optional<int64_t> getConstantIndex();
+    ::std::optional<int64_t> getConstantIndex();
   }];
 
   let hasFolder = 1;

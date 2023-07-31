@@ -19,6 +19,7 @@
 #include <mlir/Dialect/Linalg/Passes.h>
 #include <mlir/Dialect/Linalg/Transforms/Transforms.h>
 #include <mlir/Dialect/Math/IR/Math.h>
+#include <mlir/Dialect/Math/Transforms/Passes.h>
 #include <mlir/Dialect/MemRef/IR/MemRef.h>
 #include <mlir/Dialect/SCF/IR/SCF.h>
 #include <mlir/Dialect/SCF/Transforms/Passes.h>
@@ -1321,7 +1322,7 @@ struct UnitupleExtractToNtensor
       return mlir::failure();
 
     auto converter = getTypeConverter();
-    assert(converter);
+    assert(converter && "Invalid type converter");
 
     auto dstType = converter->convertType(op.getType());
     if (!dstType)
@@ -1330,6 +1331,156 @@ struct UnitupleExtractToNtensor
     auto index = adaptor.getIndex();
     rewriter.replaceOpWithNewOp<numba::ntensor::GetitemOp>(op, dstType, src,
                                                            index);
+    return mlir::success();
+  }
+};
+
+template <typename T>
+static std::optional<llvm::SmallVector<mlir::Value>>
+getElementsValuesIntImpl(mlir::DenseElementsAttr attr, mlir::Location loc,
+                         mlir::OpBuilder &builder) {
+  auto values = attr.tryGetValues<T>();
+  if (mlir::failed(values))
+    return std::nullopt;
+
+  llvm::SmallVector<mlir::Value> ret(attr.size());
+  auto origElemType = attr.getType().getElementType();
+  auto elemType = numba::makeSignlessType(origElemType);
+  for (auto &&[i, val] : llvm::enumerate(*values)) {
+    mlir::Value res =
+        builder.create<mlir::arith::ConstantIntOp>(loc, val, elemType);
+    if (origElemType != elemType)
+      res = builder.create<numba::util::SignCastOp>(loc, origElemType, res);
+
+    ret[i] = res;
+  }
+
+  return ret;
+}
+
+template <typename T>
+static std::optional<llvm::SmallVector<mlir::Value>>
+getElementsValuesFloatImpl(mlir::DenseElementsAttr attr, mlir::Location loc,
+                           mlir::OpBuilder &builder) {
+  auto values = attr.tryGetValues<T>();
+  if (mlir::failed(values))
+    return std::nullopt;
+
+  llvm::SmallVector<mlir::Value> ret(attr.size());
+  auto elemType =
+      mlir::dyn_cast<mlir::FloatType>(attr.getType().getElementType());
+  if (!elemType)
+    return std::nullopt;
+
+  for (auto &&[i, val] : llvm::enumerate(*values))
+    ret[i] = builder.create<mlir::arith::ConstantFloatOp>(
+        loc, llvm::APFloat(val), elemType);
+
+  return ret;
+}
+
+template <typename T>
+static std::optional<llvm::SmallVector<mlir::Value>>
+getElementsValuesComplexImpl(mlir::DenseElementsAttr attr, mlir::Location loc,
+                             mlir::OpBuilder &builder) {
+  auto count = static_cast<unsigned>(attr.size());
+  llvm::SmallVector<mlir::Value> ret(count);
+
+  auto elemType = mlir::dyn_cast<mlir::ComplexType>(attr.getElementType());
+  if (!elemType)
+    return std::nullopt;
+
+  auto complexElemType =
+      mlir::dyn_cast<mlir::FloatType>(elemType.getElementType());
+  if (!complexElemType || complexElemType.getWidth() != (sizeof(T) * 8))
+    return std::nullopt;
+
+  auto ptr = attr.getRawData().data();
+  using CType = std::complex<T>;
+  auto stride = attr.isSplat() ? 0 : sizeof(CType);
+  for (auto i : llvm::seq(0u, count)) {
+    auto &val = *reinterpret_cast<const CType *>(ptr + stride * i);
+    const mlir::Attribute vals[] = {
+        mlir::FloatAttr::get(complexElemType, val.real()),
+        mlir::FloatAttr::get(complexElemType, val.imag()),
+    };
+    auto arr = builder.getArrayAttr(vals);
+    ret[i] = builder.create<mlir::complex::ConstantOp>(loc, elemType, arr);
+  }
+
+  return ret;
+}
+
+static std::optional<llvm::SmallVector<mlir::Value>>
+getElementsValues(mlir::DenseElementsAttr attr, mlir::Location loc,
+                  mlir::OpBuilder &builder) {
+  using func_t = std::optional<llvm::SmallVector<mlir::Value>> (*)(
+      mlir::DenseElementsAttr, mlir::Location, mlir::OpBuilder &);
+  const func_t funcs[] = {
+      // clang-format off
+    &getElementsValuesIntImpl<int8_t>,
+    &getElementsValuesIntImpl<int16_t>,
+    &getElementsValuesIntImpl<int32_t>,
+    &getElementsValuesIntImpl<int64_t>,
+    &getElementsValuesFloatImpl<float>,
+    &getElementsValuesFloatImpl<double>,
+    &getElementsValuesComplexImpl<float>,
+    &getElementsValuesComplexImpl<double>,
+      // clang-format on
+  };
+
+  for (auto func : funcs)
+    if (auto res = func(attr, loc, builder))
+      return res;
+
+  return std::nullopt;
+}
+
+struct LowerConst : public mlir::OpConversionPattern<plier::ConstOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(plier::ConstOp op, plier::ConstOp::Adaptor adaptor,
+                  mlir::ConversionPatternRewriter &rewriter) const override {
+    auto converter = getTypeConverter();
+    assert(converter && "Invalid type converter");
+    auto resType = mlir::dyn_cast_or_null<numba::ntensor::NTensorType>(
+        converter->convertType(op.getType()));
+    if (!resType)
+      return rewriter.notifyMatchFailure(op, [&](mlir::Diagnostic &diag) {
+        diag << "Invalid result type " << op.getType();
+      });
+
+    auto attr = mlir::dyn_cast_or_null<mlir::DenseElementsAttr>(op.getVal());
+    if (!attr)
+      return rewriter.notifyMatchFailure(op, [&](mlir::Diagnostic &diag) {
+        diag << "Invalid value type " << op.getVal();
+      });
+
+    auto constType = attr.getType();
+    if (!constType.hasStaticShape())
+      if (!attr)
+        return rewriter.notifyMatchFailure(op, [&](mlir::Diagnostic &diag) {
+          diag << "Expected a static shape but got " << constType;
+        });
+
+    auto loc = op.getLoc();
+    auto values = getElementsValues(attr, loc, rewriter);
+    if (!values)
+      return rewriter.notifyMatchFailure(op, [&](mlir::Diagnostic &diag) {
+        diag << "Failed to extract values from " << attr;
+      });
+
+    auto elemType = constType.getElementType();
+    auto constTensorType =
+        numba::ntensor::NTensorType::get(constType.getShape(), elemType);
+
+    mlir::Value res = rewriter.create<numba::ntensor::FromElementsOp>(
+        loc, constTensorType, *values);
+    if (constTensorType != resType)
+      res = rewriter.create<numba::ntensor::CastOp>(loc, resType, res);
+
+    rewriter.replaceOp(op, res);
     return mlir::success();
   }
 };
@@ -1480,6 +1631,11 @@ struct PlierToNtensorPass
           return std::nullopt;
         });
 
+    target.addDynamicallyLegalOp<plier::ConstOp>(
+        [&typeConverter](plier::ConstOp op) {
+          return !isNtensor(typeConverter, op.getType());
+        });
+
     target.addIllegalOp<plier::BuildSliceOp>();
 
     target.addLegalDialect<numba::ntensor::NTensorDialect>();
@@ -1496,7 +1652,8 @@ struct PlierToNtensorPass
         BuildSliceToNtensor,
         BuiltinCallsToNtensor,
         CastsToNtensor,
-        UnitupleExtractToNtensor
+        UnitupleExtractToNtensor,
+        LowerConst
         // clang-format on
         >(typeConverter, &context);
 
@@ -1921,7 +2078,7 @@ struct WrapParforRegionsPass
       std::optional<mlir::Attribute> env;
       auto innerVisitor = [&](mlir::Operation *innerOp) -> mlir::WalkResult {
         auto opEnv = getOpEnv(innerOp);
-        if (!opEnv)
+        if (!opEnv || !*opEnv)
           return mlir::WalkResult::advance();
 
         if (!env) {
@@ -2018,6 +2175,34 @@ struct MarkInputShapesRanges
         func.setArgAttr(static_cast<unsigned>(i), attrName, *newRange);
       }
     });
+  }
+};
+
+struct PropagateFastmathFlags
+    : public mlir::PassWrapper<PropagateFastmathFlags,
+                               mlir::OperationPass<mlir::func::FuncOp>> {
+  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(PropagateFastmathFlags)
+
+  virtual void
+  getDependentDialects(mlir::DialectRegistry &registry) const override {
+    registry.insert<numba::util::NumbaUtilDialect>();
+  }
+
+  void runOnOperation() override {
+    auto func = getOperation();
+    if (!func->hasAttr(numba::util::attributes::getFastmathName()))
+      return markAllAnalysesPreserved();
+
+    auto newFmf = mlir::arith::FastMathFlagsAttr::get(
+        &getContext(), mlir::arith::FastMathFlags::fast);
+    auto visitor = [&](mlir::arith::ArithFastMathInterface fmi) {
+      if (fmi.getFastMathFlagsAttr() == newFmf)
+        return;
+
+      auto attrName = fmi.getFastMathAttrName();
+      fmi->setAttr(attrName, newFmf);
+    };
+    func->walk(visitor);
   }
 };
 
@@ -2477,18 +2662,14 @@ struct OptimizeGlobalsConstsLoad
     mlir::SymbolTable symbolTable(mod);
 
     llvm::SmallVector<uint64_t> indices(op.getIndices().size());
-    for (auto it : llvm::enumerate(op.getIndices())) {
-      auto constIndex =
-          it.value().getDefiningOp<mlir::arith::ConstantIndexOp>();
-      if (!constIndex)
+    for (auto &&[i, ind] : llvm::enumerate(op.getIndices())) {
+      auto val = mlir::getConstantIntValue(ind);
+      if (!val || *val < 0)
         return mlir::failure();
 
-      auto val = constIndex.value();
-      if (val < 0)
-        return mlir::failure();
-
-      indices[it.index()] = static_cast<uint64_t>(val);
+      indices[i] = static_cast<uint64_t>(*val);
     }
+
     auto getGlobal = op.getMemref().getDefiningOp<mlir::memref::GetGlobalOp>();
     if (!getGlobal)
       return mlir::failure();
@@ -2711,6 +2892,76 @@ void LinalgOptInnerPass::runOnOperation() {
     return signalPassFailure();
 }
 
+template <typename F>
+static bool mayAliasImpl(mlir::Value src, F &&mayAliasCheck) {
+  llvm::SmallVector<mlir::Value> worklist;
+  worklist.emplace_back(src);
+  do {
+    auto current = worklist.pop_back_val();
+    if (auto extract = current.getDefiningOp<mlir::tensor::ExtractSliceOp>()) {
+      worklist.emplace_back(extract.getSource());
+    }
+    if (auto generic = current.getDefiningOp<mlir::linalg::GenericOp>()) {
+      for (auto arg : generic->getOperands()) {
+        if (mlir::isa<mlir::MemRefType>(arg.getType()) && mayAliasCheck(arg))
+          return true;
+
+        worklist.emplace_back(arg);
+      }
+    }
+    if (auto toTensor =
+            current.getDefiningOp<mlir::bufferization::ToTensorOp>()) {
+      if (mayAliasCheck(toTensor.getMemref()))
+        return true;
+    }
+
+  } while (!worklist.empty());
+  return false;
+}
+
+static bool mayAlias(mlir::AliasAnalysis &analysis, mlir::Value input,
+                     const mlir::OpOperandVector &outputs) {
+  for (auto outOperand : outputs) {
+    auto out = outOperand->get();
+    auto check = [&](mlir::Value val) {
+      return !analysis.alias(val, out).isNo();
+    };
+    if (mlir::isa<mlir::MemRefType>(out.getType()) &&
+        mayAliasImpl(input, check))
+      return true;
+  }
+  return false;
+}
+
+static const constexpr llvm::StringLiteral
+    kMixedGenericNoalias("mixed_generic_noalias");
+
+struct PrepareAdditionalBufferize
+    : public mlir::PassWrapper<PrepareAdditionalBufferize,
+                               mlir::OperationPass<void>> {
+  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(PrepareAdditionalBufferize)
+
+  void runOnOperation() override {
+    auto &aliasAnalysis = getAnalysis<mlir::AliasAnalysis>();
+    mlir::OpBuilder builder(&getContext());
+    auto attrName = builder.getStringAttr(kMixedGenericNoalias);
+    llvm::SmallVector<bool> flagsArray;
+    auto visitor = [&](mlir::linalg::GenericOp op) {
+      if (op.hasBufferSemantics() || op.hasTensorSemantics())
+        return;
+
+      flagsArray.resize(op.getNumDpsInputs());
+      for (auto &&[i, arg] : llvm::enumerate(op.getDpsInputOperands()))
+        flagsArray[i] =
+            !mayAlias(aliasAnalysis, arg->get(), op.getDpsInitOperands());
+
+      auto flags = builder.getDenseBoolArrayAttr(flagsArray);
+      op->setAttr(attrName, flags);
+    };
+    getOperation()->walk(visitor);
+  }
+};
+
 struct BufferizeReshape
     : public mlir::OpConversionPattern<mlir::tensor::ReshapeOp> {
   using OpConversionPattern::OpConversionPattern;
@@ -2781,6 +3032,26 @@ struct BufferizeExtractSlice
   }
 };
 
+static mlir::Value genCopy(mlir::OpBuilder &builder, mlir::Location loc,
+                           mlir::Value src) {
+  auto srcType = mlir::cast<mlir::MemRefType>(src.getType());
+  llvm::SmallVector<mlir::Value> sizes;
+  for (auto &&[i, s] : llvm::enumerate(srcType.getShape())) {
+    if (!mlir::ShapedType::isDynamic(s))
+      continue;
+
+    mlir::Value dim = builder.create<mlir::memref::DimOp>(loc, src, i);
+    sizes.emplace_back(dim);
+  }
+
+  auto resType = mlir::MemRefType::get(
+      srcType.getShape(), srcType.getElementType(),
+      mlir::MemRefLayoutAttrInterface{}, srcType.getMemorySpace());
+  mlir::Value res = builder.create<mlir::memref::AllocOp>(loc, resType, sizes);
+  builder.create<mlir::memref::CopyOp>(loc, src, res);
+  return res;
+}
+
 struct BufferizeMixedGeneric
     : public mlir::OpConversionPattern<mlir::linalg::GenericOp> {
   using OpConversionPattern::OpConversionPattern;
@@ -2792,19 +3063,34 @@ struct BufferizeMixedGeneric
     if (op.hasTensorSemantics() || op.hasBufferSemantics())
       return mlir::failure();
 
+    auto noalias =
+        op->getAttrOfType<mlir::DenseBoolArrayAttr>(kMixedGenericNoalias);
+    if (!noalias || noalias.size() != op.getNumDpsInputs())
+      return mlir::failure();
+
+    auto loc = op.getLoc();
     bool changed = false;
     mlir::ValueRange inputs = adaptor.getInputs();
+    llvm::SmallVector<mlir::Value> newInputs(inputs.size());
     for (auto &&[i, input] : llvm::enumerate(inputs)) {
       auto orig = op.getInputs()[i];
-      if (orig.getType().isa<mlir::RankedTensorType>())
+      if (mlir::isa<mlir::RankedTensorType>(orig.getType())) {
         changed = true;
+        mlir::Value arg = input;
+        if (!noalias[i])
+          arg = genCopy(rewriter, loc, arg);
+
+        newInputs[i] = arg;
+      } else {
+        newInputs[i] = input;
+      }
     }
 
     mlir::ValueRange outputs = adaptor.getOutputs();
     llvm::SmallVector<mlir::Value> newResults;
     for (auto &&[i, output] : llvm::enumerate(outputs)) {
       auto orig = op.getOutputs()[i];
-      if (orig.getType().isa<mlir::RankedTensorType>()) {
+      if (mlir::isa<mlir::RankedTensorType>(orig.getType())) {
         changed = true;
         newResults.emplace_back(output);
       }
@@ -2814,7 +3100,7 @@ struct BufferizeMixedGeneric
       return mlir::failure();
 
     auto newOp = rewriter.create<mlir::linalg::GenericOp>(
-        op.getLoc(), std::nullopt, inputs, outputs, adaptor.getIndexingMaps(),
+        loc, std::nullopt, newInputs, outputs, adaptor.getIndexingMaps(),
         adaptor.getIteratorTypes(), nullptr, nullptr);
 
     auto &newRegion = newOp.getRegion();
@@ -2822,6 +3108,25 @@ struct BufferizeMixedGeneric
     auto &srcRegion = op.getRegion();
     rewriter.inlineRegionBefore(srcRegion, newRegion, newRegion.end());
     rewriter.replaceOp(op, newResults);
+    return mlir::success();
+  }
+};
+
+struct BufferizeSignCast
+    : public mlir::OpConversionPattern<numba::util::SignCastOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(numba::util::SignCastOp op,
+                  numba::util::SignCastOp::Adaptor adaptor,
+                  mlir::ConversionPatternRewriter &rewriter) const override {
+    assert(getTypeConverter() && "Invalid type converter");
+    auto resType = getTypeConverter()->convertType(op.getType());
+    if (!resType)
+      return mlir::failure();
+
+    rewriter.replaceOpWithNewOp<numba::util::SignCastOp>(op, resType,
+                                                         adaptor.getSource());
     return mlir::success();
   }
 };
@@ -2909,15 +3214,17 @@ struct AdditionalBufferize
     target
         .addIllegalOp<mlir::tensor::ReshapeOp, mlir::tensor::ExtractSliceOp>();
     target.addLegalOp<mlir::memref::ReshapeOp>();
+    target.addDynamicallyLegalOp<numba::util::SignCastOp>(
+        [&](mlir::Operation *op) { return typeConverter.isLegal(op); });
 
     target.addDynamicallyLegalOp<mlir::linalg::GenericOp>(
         [](mlir::linalg::GenericOp op) {
           return op.hasTensorSemantics() || op.hasBufferSemantics();
         });
 
-    patterns
-        .insert<BufferizeReshape, BufferizeExtractSlice, BufferizeMixedGeneric>(
-            typeConverter, context);
+    patterns.insert<BufferizeReshape, BufferizeExtractSlice,
+                    BufferizeMixedGeneric, BufferizeSignCast>(typeConverter,
+                                                              context);
 
     if (failed(applyPartialConversion(getOperation(), target,
                                       std::move(patterns))))
@@ -3055,10 +3362,10 @@ void PostLinalgOptInnerPass::runOnOperation() {
     signalPassFailure();
 }
 
-struct MoveArithIntoRegionPass
-    : public mlir::PassWrapper<MoveArithIntoRegionPass,
+struct MoveTrivialIntoRegionPass
+    : public mlir::PassWrapper<MoveTrivialIntoRegionPass,
                                mlir::OperationPass<void>> {
-  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(MoveArithIntoRegionPass)
+  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(MoveTrivialIntoRegionPass)
 
   virtual void
   getDependentDialects(mlir::DialectRegistry &registry) const override {
@@ -3070,14 +3377,26 @@ struct MoveArithIntoRegionPass
   void runOnOperation() override {
     auto root = getOperation();
 
+    auto checkOp = [](mlir::Operation *op) -> bool {
+      if (op->hasTrait<mlir::OpTrait::IsTerminator>() || !mlir::isPure(op) ||
+          !op->getRegions().empty())
+        return false;
+
+      if (mlir::isa<mlir::ViewLikeOpInterface>(op))
+        return true;
+
+      auto dialect = op->getDialect();
+      if (mlir::isa<mlir::arith::ArithDialect, mlir::math::MathDialect,
+                    numba::util::NumbaUtilDialect>(dialect))
+        return true;
+
+      return false;
+    };
+
     llvm::SmallVector<mlir::Operation *> opsToCheck;
     root->walk([&](mlir::Operation *op) {
-      auto dialect = op->getDialect();
-      if (!mlir::isa<mlir::arith::ArithDialect, mlir::math::MathDialect>(
-              dialect))
-        return;
-
-      opsToCheck.emplace_back(op);
+      if (checkOp(op))
+        opsToCheck.emplace_back(op);
     });
 
     for (auto *op : llvm::reverse(opsToCheck)) {
@@ -3145,22 +3464,18 @@ struct MakeGenericReduceInnermost
     llvm::SmallVector<mlir::Attribute> remappedIters;
     remappedIters.reserve(numDims);
 
-    llvm::SmallVector<mlir::AffineExpr> remappedDims;
-    remappedDims.reserve(numDims);
+    llvm::SmallVector<mlir::AffineExpr> remappedDims(numDims);
 
-    for (auto i : llvm::seq(0u, numDims)) {
-      if (!reductions[i]) {
-        remappedIters.emplace_back(
-            mlir::linalg::IteratorTypeAttr::get(getContext(), iters[i]));
-        remappedDims.emplace_back(mlir::getAffineDimExpr(i, getContext()));
-      }
-    }
-
-    for (auto i : llvm::seq(0u, numDims)) {
-      if (reductions[i]) {
-        remappedIters.emplace_back(
-            mlir::linalg::IteratorTypeAttr::get(getContext(), iters[i]));
-        remappedDims.emplace_back(mlir::getAffineDimExpr(i, getContext()));
+    auto ctx = getContext();
+    unsigned newIdx = 0;
+    for (bool redLoop : {false, true}) {
+      for (auto i : llvm::seq(0u, numDims)) {
+        if (redLoop == reductions[i]) {
+          remappedIters.emplace_back(
+              mlir::linalg::IteratorTypeAttr::get(ctx, iters[i]));
+          remappedDims[i] = mlir::getAffineDimExpr(newIdx, ctx);
+          newIdx++;
+        }
       }
     }
 
@@ -3191,6 +3506,8 @@ struct MakeGenericReduceInnermostPass
 static void populateCommonOptPass(mlir::OpPassManager &pm) {
   pm.addPass(numba::createCompositePass(
       "PlierToLinalgCommonOptPass", [](mlir::OpPassManager &p) {
+        p.addNestedPass<mlir::func::FuncOp>(
+            std::make_unique<MoveTrivialIntoRegionPass>());
         p.addNestedPass<mlir::func::FuncOp>(mlir::createCSEPass());
         p.addNestedPass<mlir::func::FuncOp>(mlir::createCanonicalizerPass());
       }));
@@ -3247,6 +3564,10 @@ static void populatePlierToLinalgOptPipeline(mlir::OpPassManager &pm) {
   pm.addPass(mlir::arith::createConstantBufferizePass());
   pm.addNestedPass<mlir::func::FuncOp>(
       mlir::bufferization::createEmptyTensorToAllocTensorPass());
+  pm.addPass(mlir::createCanonicalizerPass());
+
+  pm.addNestedPass<mlir::func::FuncOp>(
+      std::make_unique<PrepareAdditionalBufferize>());
   pm.addNestedPass<mlir::func::FuncOp>(std::make_unique<AdditionalBufferize>());
   pm.addNestedPass<mlir::func::FuncOp>(mlir::createSCFBufferizePass());
   pm.addNestedPass<mlir::func::FuncOp>(mlir::createLinalgBufferizePass());
@@ -3298,11 +3619,13 @@ static void populatePlierToLinalgOptPipeline(mlir::OpPassManager &pm) {
 
   pm.addPass(numba::createShapeIntegerRangePropagationPass());
   pm.addPass(std::make_unique<MarkArgsRestrictPass>());
+  pm.addNestedPass<mlir::func::FuncOp>(
+      std::make_unique<PropagateFastmathFlags>());
   pm.addPass(numba::createCompositePass(
       "PostLinalgOptPass", [](mlir::OpPassManager &p) {
         p.addPass(numba::createNormalizeMemrefArgsPass());
         p.addNestedPass<mlir::func::FuncOp>(
-            std::make_unique<MoveArithIntoRegionPass>());
+            std::make_unique<MoveTrivialIntoRegionPass>());
         p.addNestedPass<mlir::func::FuncOp>(mlir::createCSEPass());
         p.addNestedPass<mlir::func::FuncOp>(
             numba::createCanonicalizeReductionsPass());
@@ -3315,9 +3638,11 @@ static void populatePlierToLinalgOptPipeline(mlir::OpPassManager &pm) {
         p.addPass(numba::createRemoveUnusedArgsPass());
       }));
 
+  pm.addNestedPass<mlir::func::FuncOp>(
+      std::make_unique<PropagateFastmathFlags>());
   // Uplifting FMAs con interfere with other optimizations, like loop reduction
   // uplifting. Move it after main optimization pass.
-  pm.addNestedPass<mlir::func::FuncOp>(numba::createUpliftFMAPass());
+  pm.addNestedPass<mlir::func::FuncOp>(mlir::math::createMathUpliftToFMA());
   pm.addNestedPass<mlir::func::FuncOp>(mlir::createCanonicalizerPass());
   pm.addNestedPass<mlir::func::FuncOp>(
       std::make_unique<FixDeallocPlacementPass>());

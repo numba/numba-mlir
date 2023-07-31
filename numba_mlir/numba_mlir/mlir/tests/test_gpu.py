@@ -9,8 +9,9 @@ import numpy as np
 import math
 import numba
 import itertools
+import re
 
-from numba_mlir.mlir.dpctl_interop import get_default_device_name
+from numba_mlir.mlir.dpctl_interop import get_default_device
 from numba_mlir.mlir.utils import readenv
 from numba_mlir.kernel import *
 from numba_mlir.mlir.passes import (
@@ -76,7 +77,7 @@ def require_dpctl(func):
     )(func)
 
 
-_def_device = get_default_device_name()
+_def_device = get_default_device().filter_string
 
 _test_values = [
     True,
@@ -211,6 +212,34 @@ def test_scalar(val, dtype):
 
 
 @require_gpu
+@pytest.mark.parametrize("val", _test_values)
+@pytest.mark.parametrize("dtype", [np.int32, np.int64, np.float32, np.float64])
+def test_scalar_cature(val, dtype):
+    get_id = get_global_id
+
+    def func(a, c):
+        i = get_id(0)
+        c[i] = a[i] + val
+
+    sim_func = kernel_sim(func)
+    gpu_func = kernel_cached(func)
+
+    a = np.arange(-6, 6, dtype=dtype)
+
+    sim_res = np.zeros(a.shape, a.dtype)
+    sim_func[a.shape, DEFAULT_LOCAL_SIZE](a, sim_res)
+
+    gpu_res = np.zeros(a.shape, a.dtype)
+
+    with print_pass_ir([], ["ConvertParallelLoopToGpu"]):
+        gpu_func[a.shape, DEFAULT_LOCAL_SIZE](a, gpu_res)
+        ir = get_print_buffer()
+        assert ir.count("gpu.launch blocks") == 1, ir
+
+    assert_equal(gpu_res, sim_res)
+
+
+@require_gpu
 def test_empty_kernel():
     def func(a):
         pass
@@ -225,6 +254,43 @@ def test_empty_kernel():
         gpu_func[a.shape, DEFAULT_LOCAL_SIZE](a)
         ir = get_print_buffer()
         assert ir.count("gpu.launch blocks") == 0, ir
+
+
+@require_gpu
+def test_f64_truncate():
+    def func(a, b, c):
+        i = get_global_id(0)
+        j = get_global_id(1)
+        k = get_global_id(2)
+        c[i, j, k] = a[i, j, k] + b[i, j, k]
+
+    sim_func = kernel_sim(func)
+    gpu_func1 = kernel(gpu_fp64_truncate=True)(func)
+    gpu_func2 = kernel(gpu_fp64_truncate=True)(func)
+
+    a = np.array([[[1, 2, 3], [4, 5, 6]]], np.float64)
+    b = np.array([[[7, 8, 9], [10, 11, 12]]], np.float64)
+
+    sim_res = np.zeros(a.shape, a.dtype)
+    sim_func[a.shape, DEFAULT_LOCAL_SIZE](a, b, sim_res)
+
+    gpu_res1 = np.zeros(a.shape, a.dtype)
+    gpu_res2 = np.zeros(a.shape, a.dtype)
+
+    pattern = "arith.addf %[0-9a-zA-Z]+, %[0-9a-zA-Z]+ : f32"
+
+    with print_pass_ir(["TruncateF64ForGPUPass"], []):
+        gpu_func1[a.shape, DEFAULT_LOCAL_SIZE](a, b, gpu_res1)
+        ir = get_print_buffer()
+        assert re.search(pattern, ir) is None, ir
+
+    with print_pass_ir([], ["TruncateF64ForGPUPass"]):
+        gpu_func2[a.shape, DEFAULT_LOCAL_SIZE](a, b, gpu_res2)
+        ir = get_print_buffer()
+        assert re.search(pattern, ir), ir
+
+    assert_equal(gpu_res1, sim_res)
+    assert_equal(gpu_res2, sim_res)
 
 
 @require_gpu
@@ -741,6 +807,34 @@ def test_atomics_multidim(funci):
 
 
 @require_gpu
+def test_atomics_different_dims():
+    atomic_op = atomic.add
+    dtype = "int32"
+
+    def func(a, b, c):
+        i = get_global_id(0)
+        j = get_global_id(1)
+        atomic_op(a, (i, j), c[i, j])
+        atomic_op(b, (i), c[i, j])
+
+    sim_func = kernel_sim(func)
+    gpu_func = kernel_cached(func)
+
+    c = np.array([[1, 2, 3], [4, 5, 6]], dtype)
+    a_sim = np.zeros(c.shape, dtype)
+    a_gpu = np.zeros(c.shape, dtype)
+
+    b_sim = np.zeros(c.shape[0], dtype)
+    b_gpu = np.zeros(c.shape[0], dtype)
+
+    sim_func[c.shape, DEFAULT_LOCAL_SIZE](a_sim, b_sim, c)
+    gpu_func[c.shape, DEFAULT_LOCAL_SIZE](a_gpu, b_gpu, c)
+
+    assert_equal(a_gpu, a_sim)
+    assert_equal(b_gpu, b_sim)
+
+
+@require_gpu
 def test_fastmath():
     def func(a, b, c, res):
         i = get_global_id(0)
@@ -793,7 +887,7 @@ def test_input_load_cse():
         ir = get_print_buffer()
         assert (
             ir.count(
-                'spirv.Load "Input" %__builtin_var_GlobalInvocationId___addr : vector<3xi64>'
+                'spirv.Load "Input" %__builtin__GlobalInvocationId___addr : vector<3xi64>'
             )
             == 1
         ), ir
@@ -990,6 +1084,41 @@ def test_private_memory2(blocksize):
 
 
 @require_gpu
+@pytest.mark.parametrize("blocksize", [1, 10, 17, 64, 67, 101])
+@pytest.mark.parametrize("priv_size", [1, 11, 27])
+def test_private_memory3(blocksize, priv_size):
+    private_array = private.array
+
+    def func(A):
+        i = get_global_id(0)
+        prvt_mem = private_array(shape=priv_size, dtype=np.float32)
+        for j in range(priv_size):
+            prvt_mem[j] = j + i
+
+        res = 0
+        for j in range(priv_size):
+            res += prvt_mem[(j + i) % priv_size]
+
+        A[i] = res
+
+    sim_func = kernel_sim(func)
+    gpu_func = kernel_cached(func)
+
+    arr = np.zeros(blocksize).astype(np.float32)
+
+    sim_res = arr.copy()
+    sim_func[blocksize, blocksize](sim_res)
+
+    with print_pass_ir([], ["ConvertParallelLoopToGpu"]):
+        gpu_res = arr.copy()
+        gpu_func[blocksize, blocksize](gpu_res)
+        ir = get_print_buffer()
+        assert ir.count("gpu.launch blocks") == 1, ir
+
+    assert_allclose(sim_res, gpu_res)
+
+
+@require_gpu
 @pytest.mark.parametrize(
     "group_op", [group.reduce_add, group.reduce_mul, group.reduce_min, group.reduce_max]
 )
@@ -1024,6 +1153,43 @@ def test_group_func(group_op, global_size, local_size, dtype):
     assert_allclose(gpu_res, sim_res, rtol=1e-5)
 
 
+@require_gpu
+def test_pairwise1():
+    def func(X1, X2, D):
+        i = get_global_id(0)
+        j = get_global_id(1)
+
+        X1_cols = X1.shape[1]
+
+        d = 0.0
+        for k in range(X1_cols):
+            tmp = X1[i, k] - X2[j, k]
+            d += tmp * tmp
+        D[i, j] = np.sqrt(d)
+
+    sim_func = kernel_sim(func)
+    gpu_func = kernel_cached(func)
+
+    dims = 3
+    npoints = 128
+    dtype = np.float32
+
+    a = np.arange(npoints * dims, dtype=dtype).reshape(npoints, dims)
+    b = a + 5
+
+    sim_res = np.zeros((npoints, npoints), dtype=dtype)
+    sim_func[(a.shape[0], b.shape[0]), DEFAULT_LOCAL_SIZE](a, b, sim_res)
+
+    gpu_res = np.zeros((npoints, npoints), dtype=dtype)
+
+    with print_pass_ir([], ["ConvertParallelLoopToGpu"]):
+        gpu_func[(a.shape[0], b.shape[0]), DEFAULT_LOCAL_SIZE](a, b, gpu_res)
+        ir = get_print_buffer()
+        assert ir.count("gpu.launch blocks") == 1, ir
+
+    assert_allclose(gpu_res, sim_res, rtol=1e-5)
+
+
 def _from_host(arr, buffer):
     if arr.flags["C_CONTIGUOUS"]:
         order = "C"
@@ -1044,6 +1210,16 @@ def _from_host(arr, buffer):
 
 def _to_host(src, dst):
     np.copyto(dst, dpt.asnumpy(src))
+
+
+def _check_filter_string(array, ir):
+    filter_string = array.device.sycl_device.filter_string
+    assert (
+        ir.count(
+            f'numba_util.env_region #gpu_runtime.region_desc<device = "{filter_string}"'
+        )
+        > 0
+    ), ir
 
 
 @pytest.mark.smoke
@@ -1069,16 +1245,10 @@ def test_dpctl_simple1(size):
     gpu_res = np.zeros(a.shape, a.dtype)
     dgpu_res = _from_host(gpu_res, buffer="device")
 
-    filter_string = dgpu_res.device.sycl_device.filter_string
     with print_pass_ir([], ["ConvertParallelLoopToGpu"]):
         gpu_func[a.shape, DEFAULT_LOCAL_SIZE](da, db, dgpu_res)
         ir = get_print_buffer()
-        assert (
-            ir.count(
-                f'numba_util.env_region #gpu_runtime.region_desc<device = "{filter_string}">'
-            )
-            > 0
-        ), ir
+        _check_filter_string(dgpu_res, ir)
         assert ir.count("gpu.launch blocks") == 1, ir
 
     _to_host(dgpu_res, gpu_res)
@@ -1106,16 +1276,72 @@ def test_parfor_simple1():
     gpu_res = np.zeros(a.shape, a.dtype)
     dgpu_res = _from_host(gpu_res, buffer="device")
 
-    filter_string = dgpu_res.device.sycl_device.filter_string
     with print_pass_ir([], ["ConvertParallelLoopToGpu"]):
         gpu_func(da, db, dgpu_res)
         ir = get_print_buffer()
-        assert (
-            ir.count(
-                f'numba_util.env_region #gpu_runtime.region_desc<device = "{filter_string}">'
-            )
-            > 0
-        ), ir
+        _check_filter_string(dgpu_res, ir)
+        assert ir.count("gpu.launch blocks") == 1, ir
+
+    _to_host(dgpu_res, gpu_res)
+    assert_equal(gpu_res, sim_res)
+
+
+@require_dpctl
+@pytest.mark.parametrize("val", _test_values)
+def test_parfor_scalar(val):
+    def py_func(a, b, c, d):
+        for i in numba.prange(len(a)):
+            c[i] = a[i] + b[i] + d
+
+    gpu_func = njit(py_func)
+
+    a = np.arange(1024, dtype=np.float32)
+    b = np.arange(1024, dtype=np.float32) * 3
+
+    sim_res = np.zeros(a.shape, a.dtype)
+    py_func(a, b, sim_res, val)
+
+    da = _from_host(a, buffer="device")
+    db = _from_host(b, buffer="shared")
+
+    gpu_res = np.zeros(a.shape, a.dtype)
+    dgpu_res = _from_host(gpu_res, buffer="device")
+
+    with print_pass_ir([], ["ConvertParallelLoopToGpu"]):
+        gpu_func(da, db, dgpu_res, val)
+        ir = get_print_buffer()
+        _check_filter_string(dgpu_res, ir)
+        assert ir.count("gpu.launch blocks") == 1, ir
+
+    _to_host(dgpu_res, gpu_res)
+    assert_equal(gpu_res, sim_res)
+
+
+@require_dpctl
+@pytest.mark.parametrize("val", _test_values)
+def test_parfor_scalar_capture(val):
+    def py_func(a, b, c):
+        for i in numba.prange(len(a)):
+            c[i] = a[i] + b[i] + val
+
+    gpu_func = njit(py_func)
+
+    a = np.arange(1024, dtype=np.float32)
+    b = np.arange(1024, dtype=np.float32) * 3
+
+    sim_res = np.zeros(a.shape, a.dtype)
+    py_func(a, b, sim_res)
+
+    da = _from_host(a, buffer="device")
+    db = _from_host(b, buffer="shared")
+
+    gpu_res = np.zeros(a.shape, a.dtype)
+    dgpu_res = _from_host(gpu_res, buffer="device")
+
+    with print_pass_ir([], ["ConvertParallelLoopToGpu"]):
+        gpu_func(da, db, dgpu_res)
+        ir = get_print_buffer()
+        _check_filter_string(dgpu_res, ir)
         assert ir.count("gpu.launch blocks") == 1, ir
 
     _to_host(dgpu_res, gpu_res)
@@ -1140,16 +1366,10 @@ def test_cfd_simple1():
     gpu_res = np.zeros(a.shape, a.dtype)
     dgpu_res = _from_host(gpu_res, buffer="device")
 
-    filter_string = dgpu_res.device.sycl_device.filter_string
     with print_pass_ir([], ["ConvertParallelLoopToGpu"]):
         jit_func(da, dgpu_res)
         ir = get_print_buffer()
-        assert (
-            ir.count(
-                f'numba_util.env_region #gpu_runtime.region_desc<device = "{filter_string}">'
-            )
-            > 0
-        ), ir
+        _check_filter_string(dgpu_res, ir)
         assert ir.count("gpu.launch blocks") == 1, ir
 
     _to_host(dgpu_res, gpu_res)
@@ -1176,16 +1396,10 @@ def test_cfd_simple2():
     gpu_res = np.zeros(a.shape, a.dtype)
     dgpu_res = _from_host(gpu_res, buffer="device")
 
-    filter_string = dgpu_res.device.sycl_device.filter_string
     with print_pass_ir([], ["ConvertParallelLoopToGpu"]):
         jit_func(da, db, dgpu_res)
         ir = get_print_buffer()
-        assert (
-            ir.count(
-                f'numba_util.env_region #gpu_runtime.region_desc<device = "{filter_string}">'
-            )
-            > 0
-        ), ir
+        _check_filter_string(dgpu_res, ir)
         assert ir.count("gpu.launch blocks") > 0, ir
 
     _to_host(dgpu_res, gpu_res)
@@ -1214,20 +1428,207 @@ def test_cfd_indirect():
     gpu_res = np.zeros(a.shape, a.dtype)
     dgpu_res = _from_host(gpu_res, buffer="device")
 
-    filter_string = dgpu_res.device.sycl_device.filter_string
     with print_pass_ir([], ["ConvertParallelLoopToGpu"]):
         jit_func2(da, dgpu_res)
         ir = get_print_buffer()
-        assert (
-            ir.count(
-                f'numba_util.env_region #gpu_runtime.region_desc<device = "{filter_string}">'
-            )
-            > 0
-        ), ir
+        _check_filter_string(dgpu_res, ir)
         assert ir.count("gpu.launch blocks") > 0, ir
 
     _to_host(dgpu_res, gpu_res)
     assert_equal(gpu_res, sim_res)
+
+
+@require_dpctl
+def test_cfd_f64_truncate():
+    def py_func(a, b, c):
+        c[:] = a + b
+
+    jit_func1 = njit(py_func, gpu_fp64_truncate=True)
+    jit_func2 = njit(py_func, gpu_fp64_truncate=True)
+
+    a = np.arange(1024, dtype=np.float32)
+    b = 2.5
+
+    sim_res = np.zeros(a.shape, a.dtype)
+    py_func(a, b, sim_res)
+
+    da = _from_host(a, buffer="device")
+
+    gpu_res = np.zeros(a.shape, a.dtype)
+    dgpu_res = _from_host(gpu_res, buffer="device")
+
+    pattern = "arith.addf %[0-9a-zA-Z]+, %[0-9a-zA-Z]+ : f32"
+
+    with print_pass_ir(["TruncateF64ForGPUPass"], []):
+        jit_func1(da, b, dgpu_res)
+        ir = get_print_buffer()
+        assert re.search(pattern, ir) is None, ir
+
+    _to_host(dgpu_res, gpu_res)
+    assert_equal(gpu_res, sim_res)
+
+    with print_pass_ir([], ["TruncateF64ForGPUPass"]):
+        jit_func2(da, b, dgpu_res)
+        ir = get_print_buffer()
+        assert re.search(pattern, ir), ir
+
+    _to_host(dgpu_res, gpu_res)
+    assert_equal(gpu_res, sim_res)
+
+
+@require_dpctl
+def test_cfd_f64_truncate_indirect():
+    def py_func_inner(a, b, c):
+        c[:] = a + b
+
+    jit_func_inner = njit_orig(py_func_inner, gpu_fp64_truncate=True)
+
+    def py_func(a, b, c):
+        jit_func_inner(a, b, c)
+
+    jit_func1 = njit_orig(py_func, gpu_fp64_truncate=True)
+    jit_func2 = njit_orig(py_func, gpu_fp64_truncate=True)
+
+    a = np.arange(1024, dtype=np.float32)
+    b = 2.5
+
+    sim_res = np.zeros(a.shape, a.dtype)
+    py_func(a, b, sim_res)
+
+    da = _from_host(a, buffer="device")
+
+    gpu_res = np.zeros(a.shape, a.dtype)
+    dgpu_res = _from_host(gpu_res, buffer="device")
+
+    pattern = "arith.addf %[0-9a-zA-Z]+, %[0-9a-zA-Z]+ : f32"
+
+    with print_pass_ir(["TruncateF64ForGPUPass"], []):
+        jit_func1(da, b, dgpu_res)
+        ir = get_print_buffer()
+        assert re.search(pattern, ir) is None, ir
+
+    _to_host(dgpu_res, gpu_res)
+    assert_equal(gpu_res, sim_res)
+
+    with print_pass_ir([], ["TruncateF64ForGPUPass"]):
+        jit_func2(da, b, dgpu_res)
+        ir = get_print_buffer()
+        assert re.search(pattern, ir), ir
+
+    _to_host(dgpu_res, gpu_res)
+    assert_equal(gpu_res, sim_res)
+
+
+@require_dpctl
+def test_cfd_use_64bit_index_prange_default():
+    def py_func(a):
+        ah, aw = a.shape
+
+        for h in numba.prange(ah):
+            for w in numba.prange(aw):
+                a[h, w] = w + h * aw
+
+    jit_func_defualt = njit(py_func)
+    jit_func_64 = njit(py_func, gpu_use_64bit_index=True)
+
+    a = np.zeros((2, 3), dtype=np.float32)
+
+    da_default = _from_host(a, buffer="device")
+    da64 = _from_host(a, buffer="device")
+
+    da_default_host = np.zeros_like(a)
+    da64_host = np.zeros_like(a)
+
+    pattern = "spirv.SConvert %[0-9a-zA-Z]+ : i64 to i32"
+
+    with print_pass_ir([], ["GPUToSpirvPass"]):
+        jit_func_defualt(da_default)
+        ir = get_print_buffer()
+        assert re.search(pattern, ir) is None, ir
+
+    with print_pass_ir([], ["GPUToSpirvPass"]):
+        jit_func_64(da64)
+        ir = get_print_buffer()
+        assert re.search(pattern, ir) is None, ir
+
+    _to_host(da_default, da_default_host)
+    _to_host(da64, da64_host)
+    assert_equal(da_default_host, da64_host)
+
+
+@require_dpctl
+def test_cfd_use_64bit_index_prange():
+    def py_func(a):
+        ah, aw = a.shape
+
+        for h in numba.prange(ah):
+            for w in numba.prange(aw):
+                a[h, w] = w + h * aw
+
+    jit_func64 = njit(py_func, gpu_use_64bit_index=True)
+    jit_func32 = njit(py_func, gpu_use_64bit_index=False)
+
+    a = np.zeros((6, 8), dtype=np.float32)
+
+    da64 = _from_host(a, buffer="device")
+    da32 = _from_host(a, buffer="device")
+
+    da64_host = np.zeros_like(a)
+    da32_host = np.zeros_like(a)
+
+    pattern = "spirv.SConvert %[0-9a-zA-Z]+ : i64 to i32"
+
+    with print_pass_ir([], ["GPUToSpirvPass"]):
+        jit_func64(da64)
+        ir = get_print_buffer()
+        assert re.search(pattern, ir) is None, ir
+
+    with print_pass_ir([], ["GPUToSpirvPass"]):
+        jit_func32(da32)
+        ir = get_print_buffer()
+        assert re.search(pattern, ir), ir
+
+    _to_host(da64, da64_host)
+    _to_host(da32, da32_host)
+    assert_equal(da64_host, da32_host)
+
+
+@require_dpctl
+def test_cfd_use_64bit_index_kernel():
+    def py_func(a):
+        aw = a.shape[1]
+
+        h = get_global_id(0)
+        w = get_global_id(1)
+
+        a[h, w] = w + h * aw
+
+    jit_kern64 = kernel_cached(py_func, gpu_use_64bit_index=True)
+    jit_kern32 = kernel_cached(py_func, gpu_use_64bit_index=False)
+
+    a = np.zeros((6, 8), dtype=np.float32)
+
+    da64 = _from_host(a, buffer="device")
+    da32 = _from_host(a, buffer="device")
+
+    da64_host = np.zeros_like(a)
+    da32_host = np.zeros_like(a)
+
+    pattern = "spirv.SConvert %[0-9a-zA-Z]+ : i64 to i32"
+
+    with print_pass_ir([], ["GPUToSpirvPass"]):
+        jit_kern64[da64.shape,](da64)
+        ir = get_print_buffer()
+        assert re.search(pattern, ir) is None, ir
+
+    with print_pass_ir([], ["GPUToSpirvPass"]):
+        jit_kern32[da32.shape,](da32)
+        ir = get_print_buffer()
+        assert re.search(pattern, ir), ir
+
+    _to_host(da64, da64_host)
+    _to_host(da32, da32_host)
+    assert_equal(da64_host, da32_host)
 
 
 @require_dpctl
@@ -1253,16 +1654,10 @@ def test_cfd_reshape():
     gpu_res = np.zeros(a.shape, a.dtype)
     dgpu_res = _from_host(gpu_res, buffer="device")
 
-    filter_string = dgpu_res.device.sycl_device.filter_string
     with print_pass_ir([], ["ConvertParallelLoopToGpu"]):
         jit_func2(dgpu_res)
         ir = get_print_buffer()
-        assert (
-            ir.count(
-                f'numba_util.env_region #gpu_runtime.region_desc<device = "{filter_string}">'
-            )
-            > 0
-        ), ir
+        _check_filter_string(dgpu_res, ir)
         assert ir.count("gpu.launch blocks") > 0, ir
     _to_host(dgpu_res, gpu_res)
     assert_equal(gpu_res, sim_res)
@@ -1283,16 +1678,10 @@ def test_cfd_reduce1(size):
 
     da = _from_host(a, buffer="device")
 
-    filter_string = da.device.sycl_device.filter_string
     with print_pass_ir([], ["ConvertParallelLoopToGpu"]):
         assert_allclose(jit_func(da), py_func(a), rtol=1e-5)
         ir = get_print_buffer()
-        assert (
-            ir.count(
-                f'numba_util.env_region #gpu_runtime.region_desc<device = "{filter_string}">'
-            )
-            > 0
-        ), ir
+        _check_filter_string(da, ir)
         assert ir.count("gpu.launch blocks") == 1, ir
 
 
@@ -1362,16 +1751,10 @@ def test_cfd_dot(a, b, py_func):
     db = _from_host(b, buffer="device")
     dgpu_res = _from_host(gpu_res, buffer="device")
 
-    filter_string = dgpu_res.device.sycl_device.filter_string
     with print_pass_ir([], ["ConvertParallelLoopToGpu"]):
         jit_func(da, db, dgpu_res)
         ir = get_print_buffer()
-        assert (
-            ir.count(
-                f'numba_util.env_region #gpu_runtime.region_desc<device = "{filter_string}">'
-            )
-            > 0
-        ), ir
+        _check_filter_string(dgpu_res, ir)
         assert ir.count("gpu.launch blocks") > 0, ir
 
     _to_host(dgpu_res, gpu_res)
@@ -1398,16 +1781,53 @@ def test_l2_norm():
     gpu_src = _from_host(src, buffer="device")
     dgpu_res = _from_host(gpu_res, buffer="device")
 
-    filter_string = dgpu_res.device.sycl_device.filter_string
     with print_pass_ir([], ["ConvertParallelLoopToGpu"]):
         jit_func(gpu_src, dgpu_res)
         ir = get_print_buffer()
-        assert (
-            ir.count(
-                f'numba_util.env_region #gpu_runtime.region_desc<device = "{filter_string}">'
-            )
-            > 0
-        ), ir
+        _check_filter_string(dgpu_res, ir)
+        assert ir.count("gpu.launch blocks") > 0, ir
+
+    _to_host(dgpu_res, gpu_res)
+    assert_allclose(res, gpu_res, rtol=1e-5)
+
+
+@require_dpctl
+def test_pairwise2():
+    def py_func(X1, X2, D):
+        X1_rows = X1.shape[0]
+        X2_rows = X2.shape[0]
+        X1_cols = X1.shape[1]
+
+        for i in numba.prange(X1_rows):
+            for j in numba.prange(X2_rows):
+                d = 0.0
+                for k in range(X1_cols):
+                    tmp = X1[i, k] - X2[j, k]
+                    d += tmp * tmp
+                D[i, j] = np.sqrt(d)
+
+    jit_func = njit(py_func)
+
+    dims = 3
+    npoints = 128
+    dtype = np.float32
+
+    a = np.arange(npoints * dims, dtype=dtype).reshape(npoints, dims)
+    b = a + 5
+
+    res = np.zeros((npoints, npoints), dtype=dtype)
+    gpu_res = np.zeros_like(res)
+
+    py_func(a, b, res)
+
+    gpu_a = _from_host(a, buffer="device")
+    gpu_b = _from_host(b, buffer="device")
+    dgpu_res = _from_host(gpu_res, buffer="device")
+
+    with print_pass_ir([], ["ConvertParallelLoopToGpu"]):
+        jit_func(gpu_a, gpu_b, dgpu_res)
+        ir = get_print_buffer()
+        _check_filter_string(dgpu_res, ir)
         assert ir.count("gpu.launch blocks") > 0, ir
 
     _to_host(dgpu_res, gpu_res)

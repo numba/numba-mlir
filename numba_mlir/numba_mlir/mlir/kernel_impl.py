@@ -140,8 +140,12 @@ class Kernel(KernelBase):
     def __init__(self, func, kwargs):
         super().__init__(func)
         fp64_truncate = kwargs.get("gpu_fp64_truncate", False)
+        use_64bit_index = kwargs.get("gpu_use_64bit_index", True)
         self._jit_func = mlir_njit(
-            inline="always", enable_gpu_pipeline=True, gpu_fp64_truncate=fp64_truncate
+            inline="always",
+            enable_gpu_pipeline=True,
+            gpu_fp64_truncate=fp64_truncate,
+            gpu_use_64bit_index=use_64bit_index,
         )(func)
         self._kern_body = (
             _decorate_kern_body(_kernel_body1, kwargs),
@@ -247,16 +251,28 @@ class atomic(Stub):
 def _define_atomic_funcs():
     funcs = ["add", "sub"]
 
-    def get_func(func_name):
-        def api_func_impl(builder, arr, idx, val):
-            if not (isinstance(idx, int) and idx == 0):
-                arr = builder.subview(arr, idx)
+    def get_func(func_name, sub):
+        if sub:
 
-            dtype = arr.dtype
-            val = builder.cast(val, dtype)
-            return builder.external_call(
-                f"{func_name}_{dtype_str(builder, dtype)}", (arr, val), val
-            )
+            def api_func_impl(builder, arr, idx, val):
+                if not (isinstance(idx, int) and literal(idx) == 0):
+                    arr = builder.subview(arr, idx)
+
+                dtype = arr.dtype
+                val = builder.cast(-val, dtype)
+                fname = f"atomic_add_{dtype_str(builder, dtype)}_{len(arr.shape)}"
+                return builder.external_call(fname, (arr, val), val)
+
+        else:
+
+            def api_func_impl(builder, arr, idx, val):
+                if not (isinstance(idx, int) and literal(idx) == 0):
+                    arr = builder.subview(arr, idx)
+
+                dtype = arr.dtype
+                val = builder.cast(val, dtype)
+                fname = f"{func_name}_{dtype_str(builder, dtype)}_{len(arr.shape)}"
+                return builder.external_call(fname, (arr, val), val)
 
         return api_func_impl
 
@@ -282,7 +298,7 @@ def _define_atomic_funcs():
         setattr(this_module, func_name, func)
 
         infer_global(func)(_AtomicId)
-        registry.register_func(func_name, func)(get_func(func_name))
+        registry.register_func(func_name, func)(get_func(func_name, name == "sub"))
         setattr(atomic, name, func)
 
 

@@ -87,7 +87,7 @@ def NTensor_Tensor : NTensor_Type<"NTensor", "ntensor", [ShapedTypeInterface],
       "::llvm::ArrayRef<int64_t>":$shape,
       "::mlir::Type":$elementType,
       CArg<"::mlir::Attribute", "{}">:$environment,
-      CArg<"::llvm::Optional<::llvm::StringRef>", "std::nullopt">:$layout
+      CArg<"::std::optional<::llvm::StringRef>", "std::nullopt">:$layout
     ), [{
       auto ctx = elementType.getContext();
       auto l = layout ? ::mlir::StringAttr::get(ctx, *layout) : ::mlir::StringAttr{};
@@ -194,6 +194,8 @@ def CopyOp : NTensor_OpBase<"copy",
   let assemblyFormat = [{
     $source `,` $target attr-dict `:` qualified(type($source)) `to` qualified(type($target))
   }];
+
+  let hasCanonicalizer = 1;
 }
 
 // Base class for ops with static/dynamic offset, sizes and strides
@@ -317,7 +319,7 @@ def SubviewOp : NTensor_OpWithOffsetSizesAndStrides<"subview", [
 
     /// Compute the rank-reduction mask that can be applied to map the source
     /// tensor type to the result tensor type by dropping unit dims.
-    llvm::Optional<llvm::SmallDenseSet<unsigned>>
+    ::std::optional<llvm::SmallDenseSet<unsigned>>
     computeRankReductionMask() {
       return ::mlir::computeRankReductionMask(getSourceType().getShape(),
                                               getType().getShape());
@@ -510,7 +512,7 @@ def DimOp : NTensor_OpBase<"dim", [
 
   let extraClassDeclaration = [{
     /// Helper function to get the index as a simple integer if it is constant.
-    ::llvm::Optional<int64_t> getConstantIndex();
+    ::std::optional<int64_t> getConstantIndex();
 
     /// Interface method of ShapedDimOpInterface: Return the source tensor.
     ::mlir::Value getShapedValue() { return getSource(); }
@@ -595,6 +597,15 @@ def CreateArrayOp : NTensor_OpBase<"create", [AttrSizedOperandSegments, Pure]> {
   let results = (outs Res<NTensor_Tensor, "", [MemAlloc<DefaultResource>]>:$result);
 
   let assemblyFormat = "`(`$dynamicSizes`)` (`=` `(` $initValue^ `:` type($initValue) `)`)? attr-dict `:` qualified(type($result))";
+
+    let extraClassDeclaration = [{
+    // Return both static and dynamic sizes as a list of `OpFoldResult`.
+    ::llvm::SmallVector<::mlir::OpFoldResult> getMixedSizes();
+
+    // Return the Value of the dynamic size of the tensor at dimension `idx`.
+    // Asserts that the shape is dynamic at that `idx`.
+    ::mlir::Value getDynamicSize(unsigned idx);
+  }];
 }
 
 def FromTensorOp : NTensor_OpBase<"from_tensor",
@@ -770,6 +781,10 @@ def BroadcastOp : NTensor_OpBase<"broadcast", [
 
   let assemblyFormat =
     "attr-dict `(` $inputs `)` `:`  qualified(type($inputs)) `->` qualified(type($results))";
+
+  let builders = [
+    OpBuilder<(ins "::mlir::ValueRange":$inputs)>
+  ];
 
   let hasFolder = 1;
   let hasCanonicalizer = 1;

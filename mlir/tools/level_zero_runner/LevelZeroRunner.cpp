@@ -8,6 +8,7 @@
 #include <mlir/Conversion/MemRefToLLVM/MemRefToLLVM.h>
 #include <mlir/Conversion/ReconcileUnrealizedCasts/ReconcileUnrealizedCasts.h>
 #include <mlir/Dialect/Arith/IR/Arith.h>
+#include <mlir/Dialect/ControlFlow/IR/ControlFlow.h>
 #include <mlir/Dialect/GPU/IR/GPUDialect.h>
 #include <mlir/Dialect/GPU/Transforms/Passes.h>
 #include <mlir/Dialect/LLVMIR/LLVMDialect.h>
@@ -83,8 +84,6 @@ static LogicalResult runMLIRPasses(mlir::Operation *op,
 
   // GpuRuntime -> LLVM
 
-  passManager.addPass(gpu_runtime::createEnumerateEventsPass());
-
   ConvertFuncToLLVMPassOptions llvmPassOptions;
   llvmPassOptions.dataLayout = llvmOptions.dataLayout.getStringRepresentation();
   passManager.addPass(createConvertFuncToLLVMPass(llvmPassOptions));
@@ -95,6 +94,9 @@ static LogicalResult runMLIRPasses(mlir::Operation *op,
   passManager.addPass(mlir::createLowerAffinePass());
   passManager.addPass(createFinalizeMemRefToLLVMConversionPass());
   passManager.addPass(createReconcileUnrealizedCastsPass());
+
+  // TODO: hack as GpuKernelOutlining doesn't register cf as dependency.
+  passManager.getContext()->loadDialect<mlir::cf::ControlFlowDialect>();
 
   return passManager.run(module);
 }
@@ -111,10 +113,11 @@ int main(int argc, char **argv) {
   jitRunnerConfig.mlirTransformer = runMLIRPasses;
 
   mlir::DialectRegistry registry;
-  registry.insert<mlir::arith::ArithDialect, mlir::LLVM::LLVMDialect,
-                  mlir::gpu::GPUDialect, mlir::spirv::SPIRVDialect,
-                  mlir::func::FuncDialect, mlir::memref::MemRefDialect,
-                  mlir::linalg::LinalgDialect, mlir::tensor::TensorDialect>();
+  registry.insert<mlir::cf::ControlFlowDialect, mlir::arith::ArithDialect,
+                  mlir::LLVM::LLVMDialect, mlir::gpu::GPUDialect,
+                  mlir::spirv::SPIRVDialect, mlir::func::FuncDialect,
+                  mlir::memref::MemRefDialect, mlir::linalg::LinalgDialect,
+                  mlir::tensor::TensorDialect>();
   mlir::registerLLVMDialectTranslation(registry);
   mlir::registerBuiltinDialectTranslation(registry);
 

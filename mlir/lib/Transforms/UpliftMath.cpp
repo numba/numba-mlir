@@ -4,8 +4,6 @@
 
 #include "numba/Transforms/UpliftMath.hpp"
 
-#include "numba/Dialect/numba_util/Dialect.hpp"
-
 #include <mlir/Dialect/Arith/IR/Arith.h>
 #include <mlir/Dialect/Complex/IR/Complex.h>
 #include <mlir/Dialect/Func/IR/FuncOps.h>
@@ -240,33 +238,6 @@ struct UpliftMinMax : public mlir::OpRewritePattern<mlir::arith::SelectOp> {
   }
 };
 
-struct UpliftFma : public mlir::OpRewritePattern<mlir::arith::AddFOp> {
-  using OpRewritePattern::OpRewritePattern;
-
-  mlir::LogicalResult
-  matchAndRewrite(mlir::arith::AddFOp op,
-                  mlir::PatternRewriter &rewriter) const override {
-    auto func = op->getParentOfType<mlir::func::FuncOp>();
-    if (!func || !func->hasAttr(numba::util::attributes::getFastmathName()))
-      return mlir::failure();
-
-    mlir::Value c;
-    mlir::arith::MulFOp ab;
-    if ((ab = op.getLhs().getDefiningOp<mlir::arith::MulFOp>())) {
-      c = op.getRhs();
-    } else if ((ab = op.getRhs().getDefiningOp<mlir::arith::MulFOp>())) {
-      c = op.getLhs();
-    } else {
-      return mlir::failure();
-    }
-
-    auto a = ab.getLhs();
-    auto b = ab.getRhs();
-    rewriter.replaceOpWithNewOp<mlir::math::FmaOp>(op, a, b, c);
-    return mlir::success();
-  }
-};
-
 struct UpliftMathPass
     : public mlir::PassWrapper<UpliftMathPass, mlir::OperationPass<>> {
   MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(UpliftMathPass)
@@ -287,25 +258,6 @@ struct UpliftMathPass
       return signalPassFailure();
   }
 };
-
-struct UpliftFMAPass
-    : public mlir::PassWrapper<UpliftFMAPass, mlir::OperationPass<>> {
-  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(UpliftFMAPass)
-
-  virtual void
-  getDependentDialects(mlir::DialectRegistry &registry) const override {
-    registry.insert<mlir::arith::ArithDialect>();
-    registry.insert<mlir::math::MathDialect>();
-  }
-
-  void runOnOperation() override {
-    mlir::RewritePatternSet patterns(&getContext());
-    numba::populateUpliftFMAPatterns(patterns);
-    if (mlir::failed(mlir::applyPatternsAndFoldGreedily(getOperation(),
-                                                        std::move(patterns))))
-      return signalPassFailure();
-  }
-};
 } // namespace
 
 void numba::populateUpliftMathPatterns(mlir::RewritePatternSet &patterns) {
@@ -313,14 +265,6 @@ void numba::populateUpliftMathPatterns(mlir::RewritePatternSet &patterns) {
                   UpliftMinMax, UpliftComplexCalls>(patterns.getContext());
 }
 
-void numba::populateUpliftFMAPatterns(mlir::RewritePatternSet &patterns) {
-  patterns.insert<UpliftFma>(patterns.getContext());
-}
-
 std::unique_ptr<mlir::Pass> numba::createUpliftMathPass() {
   return std::make_unique<UpliftMathPass>();
-}
-
-std::unique_ptr<mlir::Pass> numba::createUpliftFMAPass() {
-  return std::make_unique<UpliftFMAPass>();
 }

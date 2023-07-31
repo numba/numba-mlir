@@ -26,6 +26,11 @@ static mlir::RankedTensorType toTensorType(mlir::ShapedType type) {
 }
 
 namespace {
+template <typename Op>
+static numba::ntensor::NTensorType getNTensorType(Op op) {
+  return mlir::dyn_cast<numba::ntensor::NTensorType>(op.getType());
+}
+
 struct ConvertCreateOp
     : public mlir::OpRewritePattern<numba::ntensor::CreateArrayOp> {
   using OpRewritePattern::OpRewritePattern;
@@ -36,7 +41,7 @@ struct ConvertCreateOp
     if (!op->hasAttr(kReadonly))
       return mlir::failure();
 
-    auto dstType = op.getType().dyn_cast<numba::ntensor::NTensorType>();
+    auto dstType = getNTensorType(op);
     if (!dstType)
       return mlir::failure();
 
@@ -73,12 +78,12 @@ struct ConvertCopyOp : public mlir::OpRewritePattern<numba::ntensor::CopyOp> {
   matchAndRewrite(numba::ntensor::CopyOp op,
                   mlir::PatternRewriter &rewriter) const override {
     auto src = op.getSource();
-    auto srcType = src.getType().dyn_cast<numba::ntensor::NTensorType>();
+    auto srcType = getNTensorType(src);
     if (!srcType)
       return mlir::failure();
 
     auto dst = op.getTarget();
-    auto dstType = dst.getType().dyn_cast<numba::ntensor::NTensorType>();
+    auto dstType = getNTensorType(dst);
     if (!dstType)
       return mlir::failure();
 
@@ -239,11 +244,11 @@ struct ConvertCastOp : public mlir::OpRewritePattern<numba::ntensor::CastOp> {
   matchAndRewrite(numba::ntensor::CastOp op,
                   mlir::PatternRewriter &rewriter) const override {
     auto src = op.getSource();
-    auto srcType = src.getType().dyn_cast<numba::ntensor::NTensorType>();
+    auto srcType = getNTensorType(src);
     if (!srcType)
       return mlir::failure();
 
-    auto dstType = op.getType().dyn_cast<numba::ntensor::NTensorType>();
+    auto dstType = getNTensorType(op);
     if (!dstType)
       return mlir::failure();
 
@@ -279,7 +284,7 @@ struct ConvertFromElementsOp
   mlir::LogicalResult
   matchAndRewrite(numba::ntensor::FromElementsOp op,
                   mlir::PatternRewriter &rewriter) const override {
-    auto dstType = op.getType().dyn_cast<numba::ntensor::NTensorType>();
+    auto dstType = getNTensorType(op);
     if (!dstType)
       return mlir::failure();
 
@@ -315,11 +320,11 @@ struct ConvertSubviewOp
       return mlir::failure();
 
     auto src = op.getSource();
-    auto srcType = src.getType().dyn_cast<numba::ntensor::NTensorType>();
+    auto srcType = getNTensorType(src);
     if (!srcType)
       return mlir::failure();
 
-    auto dstType = op.getType().dyn_cast<numba::ntensor::NTensorType>();
+    auto dstType = getNTensorType(op);
     if (!dstType)
       return mlir::failure();
 
@@ -360,7 +365,7 @@ struct ConvertLoadOp : public mlir::OpRewritePattern<numba::ntensor::LoadOp> {
   matchAndRewrite(numba::ntensor::LoadOp op,
                   mlir::PatternRewriter &rewriter) const override {
     auto src = op.getArray();
-    auto srcType = src.getType().dyn_cast<numba::ntensor::NTensorType>();
+    auto srcType = getNTensorType(src);
     if (!srcType || op.getType() != srcType.getElementType())
       return mlir::failure();
 
@@ -388,7 +393,7 @@ struct ConvertDimOp : public mlir::OpRewritePattern<numba::ntensor::DimOp> {
   matchAndRewrite(numba::ntensor::DimOp op,
                   mlir::PatternRewriter &rewriter) const override {
     auto src = op.getSource();
-    auto srcType = src.getType().dyn_cast<numba::ntensor::NTensorType>();
+    auto srcType = getNTensorType(src);
     if (!srcType)
       return mlir::failure();
 
@@ -536,18 +541,15 @@ struct ConvertBroadcastOp
     assert(inputs.size() == results.size());
 
     for (auto &&[src, dst] : llvm::zip(inputs, results))
-      if (src.getType().cast<mlir::ShapedType>().getElementType() !=
-          dst.getType().cast<mlir::ShapedType>().getElementType())
+      if (mlir::cast<mlir::ShapedType>(src.getType()).getElementType() !=
+          mlir::cast<mlir::ShapedType>(dst.getType()).getElementType())
         return mlir::failure();
 
-    auto env = inputs.front()
-                   .getType()
-                   .cast<numba::ntensor::NTensorType>()
+    auto env = mlir::cast<numba::ntensor::NTensorType>(inputs.front().getType())
                    .getEnvironment();
     for (auto args : {inputs.drop_front(), results})
       for (auto arg : args)
-        if (arg.getType()
-                .cast<numba::ntensor::NTensorType>()
+        if (mlir::cast<numba::ntensor::NTensorType>(arg.getType())
                 .getEnvironment() != env)
           return mlir::failure();
 
@@ -603,7 +605,8 @@ struct ConvertBroadcastOp
             auto srcRank = static_cast<unsigned>(srcType.getRank());
             auto result = expandDims(rewriter, loc, input, srcRank, retShape);
 
-            auto resultType = results[i].getType().cast<mlir::ShapedType>();
+            auto resultType =
+                mlir::cast<mlir::ShapedType>(results[i].getType());
             if (srcRank != dstRank) {
               auto elementType = srcType.getElementType();
               auto resultTensorType = toTensorType(resultType);
@@ -626,10 +629,20 @@ struct ConvertBroadcastOp
                 builder.create<mlir::linalg::YieldOp>(loc, res);
               };
               result = rewriter
-                           .create<mlir::linalg::GenericOp>(
-                               loc, resultTensorType, result, init, maps,
-                               iterators, body)
+                           .create<mlir::linalg::GenericOp>(loc, init.getType(),
+                                                            result, init, maps,
+                                                            iterators, body)
                            .getResult(0);
+              if (result.getType() != resultTensorType)
+                result = rewriter.create<mlir::tensor::CastOp>(
+                    loc, resultTensorType, result);
+            }
+            auto tempResultType =
+                mlir::cast<mlir::ShapedType>(result.getType());
+            if (tempResultType.getShape() != resultType.getShape()) {
+              auto tempTensorType = tempResultType.clone(resultType.getShape());
+              result = rewriter.create<mlir::tensor::CastOp>(
+                  loc, tempTensorType, result);
             }
 
             result = rewriter.create<numba::ntensor::FromTensorOp>(

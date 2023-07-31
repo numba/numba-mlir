@@ -48,7 +48,7 @@ public:
   ShapeValue(mlir::ArrayAttr attr) : shapeRanges(std::in_place) {
     shapeRanges->reserve(attr.size());
     for (auto elem : attr) {
-      auto range = elem.cast<numba::util::IndexRangeAttr>();
+      auto range = mlir::cast<numba::util::IndexRangeAttr>(elem);
       shapeRanges->emplace_back(getIndexRange(range.getMin(), range.getMax()));
     }
   }
@@ -143,8 +143,8 @@ public:
 
     if (auto fromElements = mlir::dyn_cast<mlir::tensor::FromElementsOp>(op)) {
       assert(results.size() == 1);
-      auto tensorType =
-          fromElements.getResult().getType().cast<mlir::RankedTensorType>();
+      auto tensorType = mlir::cast<mlir::RankedTensorType>(
+          fromElements.getResult().getType());
       if (tensorType.getRank() != 1 ||
           mlir::ShapedType::isDynamic(tensorType.getShape().front()))
         return;
@@ -234,7 +234,7 @@ public:
         return;
 
       auto result = op->getResult(0);
-      auto shaped = result.getType().dyn_cast<mlir::ShapedType>();
+      auto shaped = mlir::dyn_cast<mlir::ShapedType>(result.getType());
       if (!shaped)
         return;
 
@@ -293,12 +293,12 @@ public:
 
     if (auto enforceShape = mlir::dyn_cast<numba::util::EnforceShapeOp>(op)) {
       auto srcShaped =
-          enforceShape.getValue().getType().dyn_cast<mlir::ShapedType>();
+          mlir::dyn_cast<mlir::ShapedType>(enforceShape.getValue().getType());
       if (!srcShaped)
         return;
 
       auto dstShaped =
-          enforceShape.getResult().getType().dyn_cast<mlir::ShapedType>();
+          mlir::dyn_cast<mlir::ShapedType>(enforceShape.getResult().getType());
       if (!dstShaped)
         return;
 
@@ -324,8 +324,11 @@ public:
       newVal = ShapeValue::intersect(newVal, {srcShaped});
       newVal = ShapeValue::intersect(newVal, {dstShaped});
 
-      auto inputLattice = operands.front();
-      newVal = ShapeValue::intersect(newVal, inputLattice->getValue());
+      auto inputLatticeVal = operands.front()->getValue();
+      if (inputLatticeVal.isUninitialized())
+        return;
+
+      newVal = ShapeValue::intersect(newVal, inputLatticeVal);
 
       LLVM_DEBUG(llvm::dbgs()
                  << "ShapeValueAnalysis: New enforce shape result: " << newVal
@@ -364,11 +367,51 @@ public:
 
       ShapeValue newVal(ranges);
 
-      auto shaped = empty.getResult().getType().cast<mlir::ShapedType>();
+      auto shaped = mlir::cast<mlir::ShapedType>(empty.getResult().getType());
       newVal = ShapeValue::intersect(newVal, {shaped});
 
       LLVM_DEBUG(llvm::dbgs()
                  << "ShapeValueAnalysis: New tensor empty shape result: "
+                 << newVal << "\n");
+
+      auto resultLattice = results.front();
+      auto changed = resultLattice->join(newVal);
+      propagateIfChanged(resultLattice, changed);
+      return;
+    }
+
+    if (auto empty = mlir::dyn_cast<numba::ntensor::CreateArrayOp>(op)) {
+      assert(results.size() == 1);
+      auto mixedSizes = empty.getMixedSizes();
+
+      llvm::SmallVector<mlir::ConstantIntRanges> ranges;
+      ranges.reserve(mixedSizes.size());
+      for (auto size : mixedSizes) {
+        if (auto val = mlir::getConstantIntValue(size)) {
+          ranges.emplace_back(getFixedDimRange(*val));
+        } else {
+          assert(size.is<mlir::Value>());
+          auto state = getOrCreateFor<mlir::dataflow::IntegerValueRangeLattice>(
+              op, size.get<mlir::Value>());
+
+          if (!state)
+            return;
+
+          auto value = state->getValue();
+          if (value.isUninitialized())
+            return;
+
+          ranges.emplace_back(value.getValue());
+        }
+      }
+
+      ShapeValue newVal(ranges);
+
+      auto shaped = mlir::cast<mlir::ShapedType>(empty.getResult().getType());
+      newVal = ShapeValue::intersect(newVal, {shaped});
+
+      LLVM_DEBUG(llvm::dbgs()
+                 << "ShapeValueAnalysis: New CreateArrayOp shape result: "
                  << newVal << "\n");
 
       auto resultLattice = results.front();
@@ -383,12 +426,12 @@ public:
         return;
 
       if (!llvm::all_of(generic.getIndexingMaps(), [](mlir::Attribute map) {
-            return map.cast<mlir::AffineMapAttr>().getValue().isIdentity();
+            return mlir::cast<mlir::AffineMapAttr>(map).getValue().isIdentity();
           }))
         return;
 
       if (!llvm::all_of(generic.getIteratorTypes(), [](mlir::Attribute map) {
-            return map.cast<mlir::linalg::IteratorTypeAttr>().getValue() ==
+            return mlir::cast<mlir::linalg::IteratorTypeAttr>(map).getValue() ==
                    mlir::utils::IteratorType::parallel;
           }))
 
@@ -397,14 +440,19 @@ public:
       ShapeValue newVal;
       for (auto arg : op->getOperands())
         newVal = ShapeValue::intersect(
-            newVal, {arg.getType().cast<mlir::ShapedType>()});
+            newVal, {mlir::cast<mlir::ShapedType>(arg.getType())});
 
       for (auto result : op->getResults())
         newVal = ShapeValue::intersect(
-            newVal, {result.getType().cast<mlir::ShapedType>()});
+            newVal, {mlir::cast<mlir::ShapedType>(result.getType())});
 
-      for (auto input : operands)
-        newVal = ShapeValue::intersect(newVal, input->getValue());
+      for (auto input : operands) {
+        auto inpuLatticeVal = input->getValue();
+        if (inpuLatticeVal.isUninitialized())
+          return;
+
+        newVal = ShapeValue::intersect(newVal, inpuLatticeVal);
+      }
 
       LLVM_DEBUG(llvm::dbgs() << "ShapeValueAnalysis: Shaped linalg generic: "
                               << newVal << "\n");
@@ -420,11 +468,16 @@ public:
       assert(operands.size() == 1);
       assert(results.size() == 1);
 
-      auto srcShaped = op->getOperand(0).getType().cast<mlir::ShapedType>();
-      auto dstShaped = op->getResult(0).getType().cast<mlir::ShapedType>();
+      auto inputLatticeVal = operands.front()->getValue();
+      if (inputLatticeVal.isUninitialized())
+        return;
+
+      auto srcShaped =
+          mlir::cast<mlir::ShapedType>(op->getOperand(0).getType());
+      auto dstShaped = mlir::cast<mlir::ShapedType>(op->getResult(0).getType());
       auto res =
           ShapeValue::intersect(ShapeValue{srcShaped}, ShapeValue{dstShaped});
-      res = ShapeValue::intersect(operands.front()->getValue(), res);
+      res = ShapeValue::intersect(inputLatticeVal, res);
 
       LLVM_DEBUG(llvm::dbgs()
                  << "ShapeValueAnalysis: Shaped cast: " << res << "\n");
@@ -441,9 +494,12 @@ public:
 
       assert(operands.size() == 3);
       assert(results.size() == 1);
-      auto lhs = operands[1];
-      auto rhs = operands[2];
-      auto newVal = ShapeValue::join(lhs->getValue(), rhs->getValue());
+      auto lhs = operands[1]->getValue();
+      auto rhs = operands[2]->getValue();
+      if (lhs.isUninitialized() || rhs.isUninitialized())
+        return;
+
+      auto newVal = ShapeValue::join(lhs, rhs);
 
       LLVM_DEBUG(llvm::dbgs()
                  << "ShapeValueAnalysis: select: " << newVal << "\n");
@@ -455,7 +511,7 @@ public:
     }
 
     for (auto &&[res, resultLattice] : llvm::zip(op->getResults(), results)) {
-      auto shaped = res.getType().dyn_cast<mlir::ShapedType>();
+      auto shaped = mlir::dyn_cast<mlir::ShapedType>(res.getType());
       if (!shaped)
         continue;
 
@@ -485,7 +541,7 @@ public:
       auto &body = func.getFunctionBody();
       assert(!body.empty());
       for (auto &&[i, arg] : llvm::enumerate(body.front().getArguments())) {
-        auto shaped = arg.getType().dyn_cast<mlir::ShapedType>();
+        auto shaped = mlir::dyn_cast<mlir::ShapedType>(arg.getType());
         if (!shaped)
           continue;
 
@@ -555,6 +611,7 @@ public:
           return std::nullopt;
 
         auto shape = shapeVal.getShape();
+
         auto indexVal = *index;
         if (indexVal < 0 || indexVal >= static_cast<int64_t>(shape.size()))
           return std::nullopt;

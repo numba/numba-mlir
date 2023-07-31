@@ -80,6 +80,61 @@ pytest -n8 --capture=tee-sys -rXF
 
 TBD
 
+## Using GPU offload
+
+* Install Intel GPU drivers: https://dgpu-docs.intel.com/installation-guides/index.html
+* Install dpctl `conda install dpctl -c dppy/label/dev -c intel`
+
+Kernel offload example:
+```Python
+from numba_mlir.kernel import kernel, get_global_id, DEFAULT_LOCAL_SIZE
+import numpy as np
+import dpctl.tensor as dpt
+
+@kernel
+def foo(a, b, c):
+    i = get_global_id(0)
+    j = get_global_id(1)
+    c[i, j] = a[i, j] + b[i, j]
+
+a = np.array([[1,2,3],[4,5,6]])
+b = np.array([[7,8,9],[-1,-2,-3]])
+
+print(a + b)
+
+device = "gpu"
+a = dpt.asarray(a, device=device)
+b = dpt.asarray(b, device=device)
+c = dpt.empty(a.shape, dtype=a.dtype, device=device)
+
+foo[a.shape, DEFAULT_LOCAL_SIZE] (a, b, c)
+
+result = dpt.asnumpy(c)
+print(result)
+```
+
+Numpy offload example:
+```Python
+from numba_mlir import njit
+import numpy as np
+import dpctl.tensor as dpt
+
+@njit(parallel=True)
+def foo(a, b):
+    return a + b
+
+a = np.array([[1,2,3],[4,5,6]])
+b = np.array([[1,2,3]])
+
+print(a + b)
+
+a = dpt.asarray(a, device="gpu")
+b = dpt.asarray(b, device="gpu")
+
+result = foo(a, b)
+print(result)
+```
+
 
 ## Contributing
 

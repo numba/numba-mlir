@@ -81,15 +81,22 @@ bool numba::ntensor::NTensorBase::isValidElementType(Type type) {
   return type.isIntOrIndexOrFloat() || type.isa<mlir::ComplexType>();
 }
 
-static mlir::Value handleSliceIndexVars(mlir::OpBuilder &builder,
-                                        mlir::Location loc, mlir::Value source,
-                                        mlir::Value size) {
+static mlir::Value handleElemIndexVars(mlir::OpBuilder &builder,
+                                       mlir::Location loc, mlir::Value source,
+                                       mlir::Value size) {
   auto zero = builder.create<mlir::arith::ConstantIndexOp>(loc, 0);
   auto isNeg = builder.create<mlir::arith::CmpIOp>(
       loc, mlir::arith::CmpIPredicate::slt, source, zero);
   auto negIndex = builder.create<mlir::arith::AddIOp>(loc, size, source);
   auto posIndex =
       builder.create<mlir::arith::SelectOp>(loc, isNeg, negIndex, source);
+  return posIndex;
+}
+
+static mlir::Value handleSliceIndexVars(mlir::OpBuilder &builder,
+                                        mlir::Location loc, mlir::Value source,
+                                        mlir::Value size) {
+  auto posIndex = handleElemIndexVars(builder, loc, source, size);
   auto isOutOfRange = builder.create<mlir::arith::CmpIOp>(
       loc, mlir::arith::CmpIPredicate::sge, posIndex, size);
   return builder.create<mlir::arith::SelectOp>(loc, isOutOfRange, size,
@@ -120,11 +127,11 @@ struct ResolveSlicePropagate
     if (!buildSlice)
       return mlir::failure();
 
-    auto loc = op->getLoc();
+    auto loc = op.getLoc();
     auto size = op.getSize();
     std::array<mlir::Value, 4> results;
     if (auto begin = buildSlice.getBegin()) {
-      results[0] = handleSliceIndexVars(rewriter, loc, begin, size);
+      results[0] = handleElemIndexVars(rewriter, loc, begin, size);
     } else {
       results[0] = rewriter.create<mlir::arith::ConstantIndexOp>(loc, 0);
     }
@@ -258,8 +265,8 @@ struct ResolveIndexPropagate
   mlir::LogicalResult
   matchAndRewrite(numba::ntensor::ResolveIndexOp op,
                   mlir::PatternRewriter &rewriter) const override {
-    auto res = handleSliceIndexVars(rewriter, op->getLoc(), op.getIndex(),
-                                    op.getSize());
+    auto res =
+        handleElemIndexVars(rewriter, op.getLoc(), op.getIndex(), op.getSize());
     rewriter.replaceOp(op, res);
     return mlir::success();
   }
@@ -448,6 +455,27 @@ mlir::OpFoldResult numba::ntensor::DimOp::fold(FoldAdaptor) {
   }
 
   return nullptr;
+}
+
+namespace {
+struct FoldSelfCopy : public mlir::OpRewritePattern<numba::ntensor::CopyOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(numba::ntensor::CopyOp copyOp,
+                  mlir::PatternRewriter &rewriter) const override {
+    if (copyOp.getSource() != copyOp.getTarget())
+      return mlir::failure();
+
+    rewriter.eraseOp(copyOp);
+    return mlir::success();
+  }
+};
+} // namespace
+
+void numba::ntensor::CopyOp::getCanonicalizationPatterns(
+    ::mlir::RewritePatternSet &results, ::mlir::MLIRContext *context) {
+  results.insert<FoldSelfCopy>(context);
 }
 
 numba::ntensor::NTensorType numba::ntensor::SubviewOp::inferResultType(
@@ -860,15 +888,83 @@ void numba::ntensor::ElementwiseOp::build(
   }
 }
 
+void numba::ntensor::BroadcastOp::build(::mlir::OpBuilder &odsBuilder,
+                                        ::mlir::OperationState &odsState,
+                                        ::mlir::ValueRange inputs) {
+  if (inputs.empty())
+    return build(odsBuilder, odsState, /*types*/ {}, /*inputs*/ {});
+
+  if (inputs.size() == 1)
+    return build(odsBuilder, odsState, inputs.front().getType(), inputs);
+
+  auto isDynamicOrUnit = [](int64_t v) {
+    return mlir::ShapedType::isDynamic(v) || v == 1;
+  };
+
+  auto areDimsBroadcastable = [&](int64_t a, int64_t b) {
+    return isDynamicOrUnit(a) || isDynamicOrUnit(b) || a == b;
+  };
+
+  auto broadcastDim = [&](int64_t a, int64_t b) {
+    if (!areDimsBroadcastable(a, b))
+      return mlir::ShapedType::kDynamic; // Will be caught later
+
+    if (mlir::ShapedType::isDynamic(a) || mlir::ShapedType::isDynamic(b))
+      return mlir::ShapedType::kDynamic;
+
+    return a == 1 ? b : a;
+  };
+
+  llvm::SmallVector<int64_t> newShape;
+  for (auto &&arg : inputs) {
+    auto type = mlir::cast<mlir::ShapedType>(arg.getType());
+    auto shape = type.getShape();
+    if (shape.size() > newShape.size()) {
+      size_t diff = shape.size() - newShape.size();
+      newShape.insert(newShape.begin(), diff, mlir::ShapedType::kDynamic);
+    }
+
+    for (auto &&[i, dim] : llvm::enumerate(shape)) {
+      auto diff =
+          shape.size() < newShape.size() ? newShape.size() - shape.size() : 0;
+      auto oldDim = newShape[diff + i];
+      auto newDim = broadcastDim(dim, oldDim);
+      newShape[diff + i] = newDim;
+    }
+  }
+
+  mlir::SmallVector<mlir::Type> resultTypes(inputs.size());
+  for (auto &&[i, arg] : llvm::enumerate(inputs)) {
+    auto type = mlir::cast<mlir::ShapedType>(arg.getType());
+    resultTypes[i] = type.clone(newShape);
+  }
+  build(odsBuilder, odsState, resultTypes, inputs);
+}
+
 mlir::LogicalResult numba::ntensor::BroadcastOp::fold(
     FoldAdaptor, llvm::SmallVectorImpl<mlir::OpFoldResult> &results) {
-  assert(getInputs().size() == getResults().size());
-  if (getInputs().size() == 1) {
-    if (getInputs().front().getType().cast<mlir::ShapedType>().getShape() !=
-        getResultTypes().front().cast<mlir::ShapedType>().getShape())
+  mlir::ValueRange inputs = getInputs();
+  mlir::TypeRange resultTypes = getResultTypes();
+  assert(inputs.size() == resultTypes.size());
+  if (!inputs.empty()) {
+    auto getShape = [](mlir::Type type) {
+      return mlir::cast<mlir::ShapedType>(type).getShape();
+    };
+
+    mlir::Value first = inputs.front();
+    auto firstShape = getShape(first.getType());
+    if (firstShape != getShape(resultTypes.front()))
       return mlir::failure();
 
-    results.emplace_back(getInputs().front());
+    results.emplace_back(first);
+    for (auto &&[arg, res] :
+         llvm::zip(inputs.drop_front(), resultTypes.drop_front())) {
+      if (arg != first || firstShape != getShape(res)) {
+        results.clear();
+        return mlir::failure();
+      }
+      results.emplace_back(arg);
+    }
     return mlir::success();
   }
 
@@ -921,6 +1017,30 @@ struct BroadcastSameStaticShape
 void numba::ntensor::BroadcastOp::getCanonicalizationPatterns(
     ::mlir::RewritePatternSet &results, ::mlir::MLIRContext *context) {
   results.insert<BroadcastSameStaticShape>(context);
+}
+
+mlir::Value numba::ntensor::CreateArrayOp::getDynamicSize(unsigned idx) {
+  assert(getType().isDynamicDim(idx) && "expected dynamic dim");
+  unsigned ctr = 0;
+  for (int64_t i = 0; i < static_cast<int64_t>(idx); ++i)
+    if (getType().isDynamicDim(i))
+      ++ctr;
+  return getDynamicSizes()[ctr];
+}
+
+llvm::SmallVector<mlir::OpFoldResult>
+numba::ntensor::CreateArrayOp::getMixedSizes() {
+  llvm::SmallVector<mlir::OpFoldResult> result;
+  unsigned ctr = 0;
+  mlir::OpBuilder b(getContext());
+  for (int64_t i = 0; i < getType().getRank(); ++i) {
+    if (getType().isDynamicDim(i)) {
+      result.push_back(getDynamicSizes()[ctr++]);
+    } else {
+      result.push_back(b.getIndexAttr(getType().getShape()[i]));
+    }
+  }
+  return result;
 }
 
 static mlir::LogicalResult parseShape(mlir::AsmParser &parser,

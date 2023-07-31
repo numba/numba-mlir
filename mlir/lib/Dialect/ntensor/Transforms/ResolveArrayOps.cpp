@@ -246,6 +246,8 @@ struct SetitemOpLowering
         if (auto srcType =
                 value.getType().dyn_cast<numba::ntensor::NTensorType>()) {
           auto dstElementType = targetType.getElementType();
+          auto dstType = srcType.clone(dstElementType);
+          mlir::Value res = value;
           if (srcType.getElementType() != dstElementType) {
             auto bodyBuilder = [&](mlir::OpBuilder &b, mlir::Location l,
                                    mlir::ValueRange vals) {
@@ -255,12 +257,12 @@ struct SetitemOpLowering
               b.create<numba::ntensor::ElementwiseYieldOp>(l, res);
             };
 
-            return rewriter
-                .create<numba::ntensor::ElementwiseOp>(loc, targetType, value,
-                                                       bodyBuilder)
-                .getResult(0);
+            res = rewriter
+                      .create<numba::ntensor::ElementwiseOp>(loc, dstType,
+                                                             value, bodyBuilder)
+                      .getResult(0);
           }
-          return value;
+          return res;
         }
 
         auto dstType = dst.getType().cast<numba::ntensor::NTensorType>();
@@ -278,6 +280,10 @@ struct SetitemOpLowering
         return rewriter.create<numba::ntensor::CreateArrayOp>(
             loc, dstType, dynamicDims, dstVal);
       }();
+      mlir::Value broadcastArgs[] = {newArray, dst};
+      auto broadcast =
+          rewriter.create<numba::ntensor::BroadcastOp>(loc, broadcastArgs);
+      newArray = broadcast.getResult(0);
       rewriter.replaceOpWithNewOp<numba::ntensor::CopyOp>(op, newArray, dst);
     } else {
       // Is single element

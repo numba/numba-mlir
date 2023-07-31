@@ -14,11 +14,7 @@ class Pass;
 
 namespace numba {
 void populateUpliftMathPatterns(mlir::RewritePatternSet &patterns);
-void populateUpliftFMAPatterns(mlir::RewritePatternSet &patterns);
 
 /// This pass tries to uplift libm-style func call to math dialect ops.
 std::unique_ptr<mlir::Pass> createUpliftMathPass();
-
-/// This pass tries to uplift sequence of arith ops to math.fma op.
-std::unique_ptr<mlir::Pass> createUpliftFMAPass();
 } // namespace numba

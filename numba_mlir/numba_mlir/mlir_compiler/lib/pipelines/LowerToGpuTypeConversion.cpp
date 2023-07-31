@@ -49,9 +49,17 @@ struct Conversion {
       }
     }
 
-    auto devAttr = mlir::StringAttr::get(
-        &context, obj.attr("filter_string").cast<std::string>());
-    auto env = gpu_runtime::GPURegionDescAttr::get(&context, devAttr);
+    auto caps = obj.attr("get_device_caps")();
+    if (caps.is_none())
+      return std::nullopt;
+
+    auto device = obj.attr("filter_string").cast<std::string>();
+    auto spirvMajor = caps.attr("spirv_major_version").cast<int16_t>();
+    auto spirvMinor = caps.attr("spirv_major_version").cast<int16_t>();
+    auto hasFP16 = caps.attr("has_fp16").cast<bool>();
+    auto hasFP64 = caps.attr("has_fp64").cast<bool>();
+    auto env = gpu_runtime::GPURegionDescAttr::get(
+        &context, device, spirvMajor, spirvMinor, hasFP16, hasFP64);
 
     return numba::ntensor::NTensorType::get(shape, elemType, env,
                                             llvm::StringRef(layout));

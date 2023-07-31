@@ -24,6 +24,7 @@ std::unique_ptr<mlir::Pass> createSetSPIRVCapabilitiesPass(
     std::function<mlir::spirv::TargetEnvAttr(mlir::gpu::GPUModuleOp)> mapper =
         nullptr);
 std::unique_ptr<mlir::Pass> createGPUToSpirvPass();
+std::unique_ptr<mlir::Pass> createGpuIndexCastPass();
 std::unique_ptr<mlir::Pass> createInsertGPUAllocsPass();
 std::unique_ptr<mlir::Pass> createConvertGPUDeallocsPass();
 std::unique_ptr<mlir::Pass> createUnstrideMemrefsPass();
@@ -50,5 +51,9 @@ std::unique_ptr<mlir::Pass> createInsertGPUGlobalReducePass();
 /// Lowers `global_reduce` op to trhe series of workgroup reduces, barriers and
 /// global memory accesses. Intended to be run before gpu kernel outlining.
 std::unique_ptr<mlir::Pass> createLowerGPUGlobalReducePass();
+
+/// This pass tries to rearrange nested stc.parallel loops for more gpu-friendly
+/// memory access.
+std::unique_ptr<mlir::Pass> createSortParallelLoopsForGPU();
 
 } // namespace gpu_runtime

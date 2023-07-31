@@ -406,7 +406,7 @@ auto hasMemEffect(mlir::Operation &op) {
     ret.write = true;
   } else if (mlir::isa<mlir::CallOpInterface>(op)) {
     for (auto arg : op.getOperands()) {
-      if (arg.getType().isa<mlir::MemRefType>()) {
+      if (mlir::isa<mlir::MemRefType>(arg.getType())) {
         ret.read = true;
         ret.write = true;
         break;

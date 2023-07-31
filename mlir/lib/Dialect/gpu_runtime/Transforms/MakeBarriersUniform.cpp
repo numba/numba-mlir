@@ -8,7 +8,6 @@
 
 #include <mlir/Dialect/Arith/IR/Arith.h>
 #include <mlir/Dialect/GPU/IR/GPUDialect.h>
-#include <mlir/Dialect/Linalg/Utils/Utils.h>
 #include <mlir/Dialect/SCF/IR/SCF.h>
 #include <mlir/IR/Dominance.h>
 #include <mlir/Pass/Pass.h>
@@ -23,7 +22,7 @@ static std::optional<mlir::Attribute> getNeutralValue(mlir::Region &region) {
   if (!llvm::hasSingleElement(body))
     return std::nullopt;
 
-  return mlir::linalg::getNeutralElement(&(*body.begin()));
+  return mlir::arith::getNeutralElement(&(*body.begin()));
 }
 
 static int64_t getMinVal(unsigned bits) {
@@ -217,16 +216,16 @@ static mlir::LogicalResult convertBlockingOp(mlir::Operation *op,
       rewriter.create<mlir::scf::IfOp>(ifLoc, cond, emptyBodyBuilder);
   rewriter.mergeBlocks(afterBlock, afterIf.thenBlock());
 
-  for (auto &op : *afterIf.thenBlock()) {
-    for (mlir::OpOperand &arg : op.getOpOperands()) {
+  afterIf.thenBlock()->walk([&](mlir::Operation *innerOp) {
+    for (mlir::OpOperand &arg : innerOp->getOpOperands()) {
       auto val = arg.get();
       auto it = yieldArgsMap.find(val);
       if (it != yieldArgsMap.end()) {
         auto newVal = getBeforeIfResult(it->second);
-        rewriter.updateRootInPlace(&op, [&]() { arg.set(newVal); });
+        rewriter.updateRootInPlace(innerOp, [&]() { arg.set(newVal); });
       }
     }
-  }
+  });
 
   rewriter.eraseOp(ifOp);
   return mlir::success();

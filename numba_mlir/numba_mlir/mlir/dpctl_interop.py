@@ -4,7 +4,20 @@
 
 from .utils import readenv
 
+from collections import namedtuple
+
 DEFAULT_DEVICE = readenv("NUMBA_MLIR_DEFAULT_DEVICE", str, "")
+
+DeviceCaps = namedtuple(
+    "DeviceCaps",
+    [
+        "filter_string",
+        "spirv_major_version",
+        "spirv_minor_version",
+        "has_fp16",
+        "has_fp64",
+    ],
+)
 
 try:
     import dpctl
@@ -30,11 +43,14 @@ if _is_dpctl_available:
 
     from . import array_type
 
-    def _get_filter_string(array):
-        if isinstance(array, usm_ndarray):
-            return array.device.sycl_device.filter_string
-
-        return None
+    def _get_device_caps(device):
+        return DeviceCaps(
+            filter_string=device.filter_string,
+            spirv_major_version=1,
+            spirv_minor_version=2,
+            has_fp16=device.has_aspect_fp16,
+            has_fp64=device.has_aspect_fp64,
+        )
 
     class USMNdArrayBaseType(array_type.FixedArray):
         """
@@ -51,6 +67,7 @@ if _is_dpctl_available:
             name=None,
             aligned=True,
             filter_string=None,
+            device=None,
         ):
             super(USMNdArrayBaseType, self).__init__(
                 dtype,
@@ -63,9 +80,12 @@ if _is_dpctl_available:
             )
 
             self.filter_string = filter_string
+            self.device = device
+            self.caps = None
 
         @property
         def key(self):
+            # Do not add a device, as it alreadfy covered by filter_string
             return super().key + (self.filter_string,)
 
         @property
@@ -74,6 +94,20 @@ if _is_dpctl_available:
 
         def is_precise(self):
             return self.dtype.is_precise()
+
+        def get_device_caps(self):
+            if self.caps:
+                return self.caps
+
+            device = self.device
+            if not device:
+                return None
+
+            caps = _get_device_caps(device)
+            self.device = None
+            self.caps = caps
+
+            return caps
 
     class USMNdArrayModel(StructModel):
         def __init__(self, dmm, fe_type):
@@ -108,6 +142,7 @@ if _is_dpctl_available:
             name=None,
             aligned=True,
             filter_string=None,
+            device=None,
         ):
             self.usm_type = usm_type
             # This name defines how this type will be shown in Numba's type dumps.
@@ -120,6 +155,7 @@ if _is_dpctl_available:
                 readonly=readonly,
                 name=name,
                 filter_string=filter_string,
+                device=device,
             )
 
         def copy(self, dtype=None, ndim=None, layout=None, readonly=None):
@@ -140,6 +176,7 @@ if _is_dpctl_available:
                 readonly=readonly,
                 aligned=self.aligned,
                 filter_string=self.filter_string,
+                device=self.device,
             )
 
     register_model(USMNdArrayType)(USMNdArrayModel)
@@ -155,8 +192,9 @@ if _is_dpctl_available:
             raise ValueError("Unsupported array dtype: %s" % (val.dtype,))
         layout = numpy_support.map_layout(val)
         readonly = False
-        filter_string = _get_filter_string(val)
-        assert filter_string is not None
+
+        device = val.device.sycl_device
+        filter_string = device.filter_string
         fixed_dims = array_type.get_fixed_dims(val.shape)
         return USMNdArrayType(
             dtype,
@@ -166,6 +204,7 @@ if _is_dpctl_available:
             fixed_dims,
             readonly=readonly,
             filter_string=filter_string,
+            device=device,
         )
 
     def adapt_sycl_array_from_python(pyapi, ary, ptr):
@@ -196,6 +235,12 @@ if _is_dpctl_available:
             )
         return NativeValue(c.builder.load(aryptr), is_error=failed)
 
+    def _get_filter_string(array):
+        if isinstance(array, usm_ndarray):
+            return array.device.sycl_device.filter_string
+
+        return None
+
     def check_usm_ndarray_args(args):
         devs = set(s for s in map(_get_filter_string, args) if s is not None)
         if len(devs) > 1:
@@ -203,11 +248,13 @@ if _is_dpctl_available:
             err_str = f"usm_ndarray arguments have incompatibe devices: {dev_names}"
             raise ValueError(err_str)
 
-    def get_default_device_name():
+    def get_default_device():
         if DEFAULT_DEVICE:
-            return DEFAULT_DEVICE
+            device = dpctl.SyclDevice(DEFAULT_DEVICE)
+        else:
+            device = dpctl.select_default_device()
 
-        return dpctl.select_default_device().filter_string
+        return _get_device_caps(device)
 
 else:  # _is_dpctl_available
     USMNdArrayType = None  # dummy
@@ -216,9 +263,17 @@ else:  # _is_dpctl_available
         # dpctl is not loaded, nothing to do
         pass
 
-    def get_default_device_name():
+    def get_default_device():
         # TODO: deprecated
         if DEFAULT_DEVICE:
-            return DEFAULT_DEVICE
+            device_name = DEFAULT_DEVICE
+        else:
+            device_name = "level_zero:gpu:0"
 
-        return "level_zero:gpu:0"
+        return DeviceCaps(
+            filter_string=device_name,
+            spirv_major_version=1,
+            spirv_minor_version=2,
+            has_fp16=True,
+            has_fp64=False,
+        )

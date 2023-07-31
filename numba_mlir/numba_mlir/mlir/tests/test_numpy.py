@@ -312,6 +312,23 @@ def test_broadcast(a, b):
     assert_equal(py_func(a, b), jit_func(a, b))
 
 
+@pytest.mark.parametrize(
+    "a_shape, b_shape",
+    [((2, 3, 4), (2, 1, 4)), ((1, 2, 3), (1, 1)), ((2, 3, 4), (3, 4))],
+)
+def test_broadcast_setitem(a_shape, b_shape):
+    def py_func(a, b):
+        a[:] = b
+        return a
+
+    jit_func = njit(py_func)
+
+    a = np.zeros(a_shape)
+    b = np.arange(math.prod(b_shape)).reshape(b_shape)
+
+    assert_equal(py_func(a.copy(), b), jit_func(a.copy(), b))
+
+
 @pytest.mark.parametrize("a", [np.arange(3 * 4 * 5).reshape(3, 4, 5)])
 @parametrize_function_variants(
     "py_func",
@@ -478,6 +495,41 @@ def test_array_len():
     jit_func = njit(py_func)
     arr = np.asarray([5, 6, 7])
     assert_equal(py_func(arr), jit_func(arr))
+
+
+def test_array_capture1():
+    a = np.arange(2 * 3 * 4, dtype=np.int32).reshape(2, 3, 4)
+    b = a.copy()
+
+    def py_func(a):
+        return a + b
+
+    jit_func = njit(py_func)
+    assert_equal(py_func(a), jit_func(a))
+
+
+@pytest.mark.parametrize(
+    "val",
+    [
+        np.int8(1),
+        np.int16(1),
+        np.int32(1),
+        np.int64(1),
+        np.float32(2.3),
+        np.float64(2.3),
+        np.complex64(3.4 - 5.6j),
+        np.complex128(3.4 - 5.6j),
+    ],
+)
+def test_array_capture2(val):
+    a = np.arange(2 * 3 * 4, dtype=val.dtype).reshape(2, 3, 4)
+    b = np.full(a.shape, val, dtype=a.dtype)
+
+    def py_func(a):
+        return a + b
+
+    jit_func = njit(py_func)
+    assert_equal(py_func(a), jit_func(a))
 
 
 @parametrize_function_variants(
@@ -834,7 +886,6 @@ def test_copy_fusion():
         assert ir.count("scf.parallel") == 1, ir
 
 
-@pytest.mark.xfail(reason="Need to improve Alias analysis")
 def test_fusion_conflict1():
     def py_func(a):
         a[:] = np.flip(a)
@@ -1096,7 +1147,6 @@ def test_array_bounds3():
         assert ir.count("cmpi") == 0, ir
 
 
-@pytest.mark.xfail(reason="Need to improve CmpLoopBoundsSimplify")
 def test_array_bounds4():
     def py_func(a):
         res = 0
@@ -1623,6 +1673,64 @@ def test_concat(arrays, axis):
     assert_equal(py_func(*arr), jit_func(*arr))
 
 
+@parametrize_function_variants(
+    "py_func",
+    [
+        "lambda a: np.vstack(a)",
+        "lambda a: np.hstack(a)",
+        "lambda a: np.dstack(a)",
+    ],
+)
+@parametrize_function_variants(
+    "get_args",
+    [
+        # "lambda a, b, c: (a)", TODO: not supported by numba
+        "lambda a, b, c: ((a,))",
+        "lambda a, b, c: (a, b)",
+        "lambda a, b, c: (a, b, c)",
+    ],
+)
+@pytest.mark.parametrize("shape", [(2, 3, 4), (2, 3, 4, 5), (2, 3, 4, 5, 6)])
+def test_xstack(py_func, get_args, shape):
+    size = math.prod(shape)
+    dtype = np.int32
+
+    start = 0
+    a = np.arange(start=start, stop=start + size, dtype=dtype).reshape(shape)
+
+    start += size
+    b = np.arange(start=start, stop=start + size, dtype=dtype).reshape(shape)
+
+    start += size
+    c = np.arange(start=start, stop=start + size, dtype=dtype).reshape(shape)
+
+    jit_func = njit(py_func)
+
+    args = get_args(a, b, c)
+    assert_equal(py_func(args), jit_func(args))
+
+
+@parametrize_function_variants(
+    "py_func",
+    [
+        "lambda a: np.triu(a)",
+        "lambda a: np.triu(a, 1)",
+        "lambda a: np.triu(a, k=-2)",
+        "lambda a: np.tril(a)",
+        "lambda a: np.tril(a, 1)",
+        "lambda a: np.tril(a, k=-2)",
+    ],
+)
+@pytest.mark.parametrize("shape", [(3, 4), (3, 4, 5), (3, 4, 5, 6)])
+def test_xtri(py_func, shape):
+    size = math.prod(shape)
+    dtype = np.int32
+    a = np.arange(size, dtype=dtype).reshape(shape)
+
+    jit_func = njit(py_func)
+    assert_equal(py_func(a), jit_func(a))
+
+
 @pytest.mark.parametrize(
     "arr",
     [
@@ -1800,6 +1908,39 @@ def test_tensor_if(a, b):
     jit_func = njit(py_func)
 
     assert_equal(py_func(a, b), jit_func(a, b))
+
+
+def test_static_dim_call():
+    def py_func1(a):
+        return a.shape[0]
+
+    jit_func1 = njit(py_func1)
+
+    def py_func2(a, b):
+        return py_func1(a), py_func1(b)
+
+    def py_func3(a, b):
+        return jit_func1(a), jit_func1(b)
+
+    jit_func3 = njit(py_func3)
+
+    a = np.empty(1)
+    b = np.empty(10)
+
+    assert_equal(py_func2(a, b), jit_func3(a, b))
+    # assert_equal(py_func3(a, b), jit_func3(a, b)) TODO: caching issue
+
+
+def test_copy_self_alias():
+    def py_func(N):
+        a = np.arange(N)
+        a[:] += 3 * np.flip(a)
+        return a
+
+    jit_func = njit(py_func)
+
+    N = 1000
+    assert_equal(py_func(N), jit_func(N))
 
 
 def _cov(m, y=None, rowvar=True, bias=False, ddof=None):
@@ -1996,6 +2137,8 @@ def test_eye2(N, M, k):
 
 
 _matmul_inputs_vars = [
+    ([], []),
+    (np.empty((0,)), np.empty((0,))),
     (np.empty((0, 0)), np.empty((0, 0))),
     ([2], [3]),
     ([2, 3], [4, 5]),
@@ -2050,3 +2193,23 @@ def test_matmul2(py_func, a, b, dtype):
     b = np.array(b, dtype=dtype)
     jit_func = njit(py_func)
     assert_allclose(py_func(a, b), jit_func(a, b), rtol=1e-4, atol=1e-7)
+
+
+def test_batchnorm():
+    def py_func(x, eps=1e-5):
+        # mean = np.mean(x, axis=0, keepdims=True)
+        mean = np.empty(x.shape, dtype=x.dtype)
+        mean[:] = np.sum(x, axis=0) / x.shape[0]
+        # std = np.std(x, axis=0, keepdims=True)
+        std = np.empty(x.shape, dtype=x.dtype)
+        std[:] = np.sqrt(np.sum((x - mean) ** 2, axis=0) / x.shape[0])
+        return (x - mean) / np.sqrt(std + eps)
+
+    jit_func = njit(py_func, parallel=True)
+
+    from numpy.random import default_rng
+
+    rng = default_rng(42)
+    N, W, H, C = 8, 14, 14, 32
+    input = rng.random((N, H, W, C), dtype=np.float32)
+    assert_allclose(py_func(input), jit_func(input), rtol=1e-4, atol=1e-7)

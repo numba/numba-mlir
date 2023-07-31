@@ -261,14 +261,14 @@ def test_math_uplifting_fma(py_func):
     y = 3.0
     z = 4.0
 
-    with print_pass_ir([], ["UpliftFMAPass"]):
+    with print_pass_ir([], ["MathUpliftToFMA"]):
         jit_func = njit(py_func, fastmath=False)
 
         assert_equal(py_func(x, y, z), jit_func(x, y, z))
         ir = get_print_buffer()
         assert ir.count(f"math.fma") == 0, ir
 
-    with print_pass_ir([], ["UpliftFMAPass"]):
+    with print_pass_ir([], ["MathUpliftToFMA"]):
         jit_func = njit(py_func, fastmath=True)
 
         assert_equal(py_func(x, y, z), jit_func(x, y, z))
@@ -392,6 +392,25 @@ def test_indirect_call2():
     assert_equal(func(inner_func, 5), jit_func(jit_inner_func, 5))
 
 
+def test_indirect_call_def_arg():
+    def inner_func(a, b=7):
+        return a + b
+
+    jit_inner_func = njit(inner_func)
+
+    def func1(a):
+        return jit_inner_func(a)
+
+    def func2(a):
+        return jit_inner_func(a, 8)
+
+    jit_func1 = njit(func1)
+    jit_func2 = njit(func2)
+
+    assert_equal(func1(5), jit_func1(5))
+    assert_equal(func2(5), jit_func2(5))
+
+
 def test_indirect_call_inline():
     def inner_func(a):
         return a + 1
@@ -406,6 +425,20 @@ def test_indirect_call_inline():
         assert_equal(func(inner_func, 5), jit_func(jit_inner_func, 5))
         ir = get_print_buffer()
         assert ir.count("call @") == 0, ir
+
+
+@pytest.mark.parametrize("arg", [(), (1,), (1, 2), (1, 2.5)])
+def test_indirect_call_tuple(arg):
+    def inner_func(a):
+        return a
+
+    def func(func, a):
+        return func(a)
+
+    jit_inner_func = njit(inner_func)
+    jit_func = njit(func)
+
+    assert_equal(func(inner_func, arg), jit_func(jit_inner_func, arg))
 
 
 def test_none_args():
@@ -941,3 +974,20 @@ def test_named_args_indirect():
 
     a, b, c, d = (2.0, 3.5, 4.7, 5.9)
     assert_equal(py_func2(a, b, c, d), jit_func2(a, b, c, d))
+
+
+@pytest.mark.xfail(reason="replace_parfors is not implemented yet")
+def test_replace_parfor():
+    def py_func(c):
+        res = 0
+        for i in numba.prange(len(c)):
+            ind = 2 if i == 4 else i
+            res = res + c[ind]
+        return res
+
+    import numpy as np
+
+    a = np.arange(10)
+
+    jit_func = njit(py_func, parallel=True, replace_parfors=True)
+    assert_equal(py_func(a), jit_func(a))

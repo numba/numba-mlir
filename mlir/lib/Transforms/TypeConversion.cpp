@@ -10,7 +10,7 @@
 #include <mlir/Dialect/Func/IR/FuncOps.h>
 #include <mlir/Dialect/Func/Transforms/FuncConversions.h>
 #include <mlir/Dialect/SCF/IR/SCF.h>
-#include <mlir/Dialect/SCF/Transforms/Transforms.h>
+#include <mlir/Dialect/SCF/Transforms/Patterns.h>
 #include <mlir/IR/FunctionInterfaces.h>
 #include <mlir/Interfaces/CallInterfaces.h>
 #include <mlir/Transforms/DialectConversion.h>
@@ -295,6 +295,9 @@ struct CallOpSignatureConversion
       unpackedTypes.clear();
       if (mlir::failed(converter->convertTypes(origType, unpackedTypes)))
         return mlir::failure();
+
+      if (unpackedTypes.empty())
+        continue;
 
       if (unpackedTypes.size() == 1 && unpackedTypes.front() == origType) {
         unpackedArgs.emplace_back(arg);

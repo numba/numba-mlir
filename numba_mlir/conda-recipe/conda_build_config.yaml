@@ -1,4 +1,4 @@
 cxx_compiler:
   - vs2019  # [win]
 numpy:
-    - 1.22
+    - 1.23

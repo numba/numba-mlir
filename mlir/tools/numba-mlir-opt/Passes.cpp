@@ -84,12 +84,6 @@ static mlir::PassPipelineRegistration<> GpuToGpuRuntime(
     });
 
 static mlir::PassPipelineRegistration<>
-    EnumerateEvents("enumerate-events", "Adds event dependency",
-                    [](mlir::OpPassManager &pm) {
-                      pm.addPass(gpu_runtime::createEnumerateEventsPass());
-                    });
-
-static mlir::PassPipelineRegistration<>
     GpuToLlvm("convert-gpu-to-llvm",
               "Converts Gpu runtime dialect to llvm runtime calls",
               [](mlir::OpPassManager &pm) {
@@ -210,3 +204,10 @@ static mlir::PassPipelineRegistration<>
                          [](mlir::OpPassManager &pm) {
                            pm.addPass(numba::createRemoveUnusedArgsPass());
                          });
+
+static mlir::PassPipelineRegistration<>
+    sortLoopsForGPU("numba-sort-loops-for-gpu",
+                    "Rearrange loop for more optimal order for GPU",
+                    [](mlir::OpPassManager &pm) {
+                      pm.addPass(gpu_runtime::createSortParallelLoopsForGPU());
+                    });

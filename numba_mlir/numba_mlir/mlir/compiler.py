@@ -10,7 +10,13 @@ from .lowering import mlir_NativeLowering
 
 import functools
 
-from numba_mlir.mlir.passes import MlirDumpPlier, MlirBackend, get_gpu_backend
+
+from numba_mlir.mlir.passes import (
+    MlirDumpPlier,
+    MlirBackend,
+    get_gpu_backend,
+    MlirReplaceParfors,
+)
 from numba.core.compiler_machinery import PassManager
 from numba.core.compiler import CompilerBase as orig_CompilerBase
 from numba.core.compiler import DefaultPassBuilder as orig_DefaultPassBuilder
@@ -20,6 +26,8 @@ from numba.core.typed_passes import (
     NopythonTypeInference,
     PreParforPass,
     ParforPass,
+    ParforFusionPass,
+    ParforPreLoweringPass,
     DumpParforDiagnostics,
     NopythonRewrites,
     PreLowerStripPhis,
@@ -54,14 +62,19 @@ def _remove_passes(passes, to_remove):
 
 class mlir_PassBuilder(orig_DefaultPassBuilder):
     @staticmethod
-    def define_nopython_pipeline(state, enable_gpu_pipeline, fp64_truncate):
+    def define_nopython_pipeline(
+        state, enable_gpu_pipeline, fp64_truncate, use_64bit_index
+    ):
         pm = orig_DefaultPassBuilder.define_nopython_pipeline(state, "nopython")
 
         import numba_mlir.mlir.settings
 
         if numba_mlir.mlir.settings.USE_MLIR:
             if enable_gpu_pipeline:
-                pm.add_pass_after(get_gpu_backend(fp64_truncate), NopythonTypeInference)
+                pm.add_pass_after(
+                    get_gpu_backend(fp64_truncate, use_64bit_index),
+                    NopythonTypeInference,
+                )
             else:
                 pm.add_pass_after(MlirBackend, NopythonTypeInference)
             pm.passes, replaced = _replace_pass(
@@ -78,6 +91,8 @@ class mlir_PassBuilder(orig_DefaultPassBuilder):
                 [
                     PreParforPass,
                     ParforPass,
+                    ParforFusionPass,
+                    ParforPreLoweringPass,
                     DumpParforDiagnostics,
                     NopythonRewrites,
                     PreLowerStripPhis,
@@ -89,6 +104,17 @@ class mlir_PassBuilder(orig_DefaultPassBuilder):
 
         if numba_mlir.mlir.settings.DUMP_PLIER:
             pm.add_pass_after(MlirDumpPlier, NopythonTypeInference)
+
+        pm.finalize()
+        return pm
+
+    def define_replace_parfors_pipeline(state, name="nopython"):
+        pm = orig_DefaultPassBuilder.define_nopython_pipeline(state, name)
+
+        import numba_mlir.mlir.settings
+
+        if numba_mlir.mlir.settings.USE_MLIR:
+            pm.add_pass_after(MlirReplaceParfors, ParforPreLoweringPass)
 
         pm.finalize()
         return pm
@@ -106,7 +132,7 @@ class mlir_compiler_pipeline(orig_CompilerBase):
 
 
 @functools.lru_cache
-def get_gpu_pipeline(fp64_truncate):
+def get_gpu_pipeline(fp64_truncate, use_64bit_index):
     class mlir_compiler_gpu_pipeline(orig_CompilerBase):
         def define_pipelines(self):
             # this maintains the objmode fallback behaviour
@@ -117,6 +143,7 @@ def get_gpu_pipeline(fp64_truncate):
                         self.state,
                         enable_gpu_pipeline=True,
                         fp64_truncate=fp64_truncate,
+                        use_64bit_index=use_64bit_index,
                     )
                 )
             if self.state.status.can_fallback or self.state.flags.force_pyobject:
@@ -124,3 +151,14 @@ def get_gpu_pipeline(fp64_truncate):
             return pms
 
     return mlir_compiler_gpu_pipeline
+
+
+class mlir_compiler_replace_parfors_pipeline(orig_CompilerBase):
+    def define_pipelines(self):
+        # this maintains the objmode fallback behaviour
+        pms = []
+        if not self.state.flags.force_pyobject:
+            pms.append(mlir_PassBuilder.define_replace_parfors_pipeline(self.state))
+        if self.state.status.can_fallback or self.state.flags.force_pyobject:
+            pms.append(mlir_PassBuilder.define_objectmode_pipeline(self.state))
+        return pms

@@ -42,8 +42,9 @@ public:
     _handle = dlopen(libName, RTLD_NOLOAD | RTLD_NOW | RTLD_LOCAL);
     if (!_handle) {
       char *error = dlerror();
-      reportError("Could not load library " + std::string(libName) +
-                  ". Error encountered: " + std::string(error));
+      reportError(
+          "Could not load library " + std::string(libName) +
+          ". Error encountered: " + std::string(error ? error : "<null>"));
     }
 #elif defined(_WIN32) || defined(_WIN64)
     _handle = LoadLibraryExA(libName, nullptr, LOAD_LIBRARY_SEARCH_SYSTEM32);
@@ -93,7 +94,7 @@ private:
 
 static constexpr const char *zeLibName =
 #ifdef __linux__
-    "libze_loader.so";
+    "libze_loader.so.1";
 #elif defined(_WIN32) || defined(_WIN64)
     "ze_loader.dll";
 #endif
@@ -219,7 +220,7 @@ using ZeKernel =
 
 static constexpr const char *clLibName =
 #ifdef __linux__
-    "libOpenCL.so";
+    "libOpenCL.so.1";
 #elif defined(_WIN32) || defined(_WIN64)
     "OpenCL.dll";
 #endif

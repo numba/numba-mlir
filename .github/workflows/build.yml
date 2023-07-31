@@ -51,11 +51,12 @@ jobs:
       - name: Setup conda
         uses: conda-incubator/setup-miniconda@v2
         with:
-          miniconda-version: "latest"
           auto-update-conda: true
           use-only-tar-bz2: true
           run-post: false
-          mamba-version: "*"
+          miniforge-variant: Mambaforge
+          miniforge-version: latest
+          channel-priority: "disabled"
           activate-environment: test-env
           environment-file: ${{ env.CORE_ENV_FILE }}
           python-version: "3.10"
@@ -237,7 +238,8 @@ jobs:
           auto-update-conda: true
           use-only-tar-bz2: true
           run-post: false
-          mamba-version: "*"
+          miniforge-variant: Mambaforge
+          miniforge-version: latest
           activate-environment: test-env
           environment-file: ${{ env.PYTHON_ENV_FILE }}
           python-version: ${{ matrix.python }}
@@ -305,6 +307,17 @@ jobs:
           cd numba_mlir
           python "$env:GITHUB_WORKSPACE/scripts/run_package_tests.py" verbose
 
+      - name: Run offload tests
+        if: false # Doesn't work
+        run: |
+          cd numba_mlir
+          conda activate test-env
+          conda install greenlet dpctl -c intel -c conda-forge
+          conda list
+          $env:NUMBA_MLIR_GPU_RUNTIME="sycl"
+          $env:NUMBA_MLIR_DEFAULT_DEVICE="opencl:cpu:0"
+          python "$env:GITHUB_WORKSPACE/scripts/run_package_tests.py" verbose gpu
+
       - name: Build wheels
         run: |
           mkdir numba_mlir_wheels
@@ -361,7 +374,8 @@ jobs:
           auto-update-conda: true
           use-only-tar-bz2: true
           run-post: false
-          mamba-version: "*"
+          miniforge-variant: Mambaforge
+          miniforge-version: latest
           channels: conda-forge, intel
 
       - name: Checkout repo
@@ -432,7 +446,8 @@ jobs:
 
       - name: Test conda package
         run: |
-          conda create -y -n conda-test-env python=${{ matrix.python }} numba=0.57 numpy=1.22 scikit-learn pytest-xdist scipy pytest "tbb=$env:TBB_VER" "mkl-dpcpp>=2023.1.0" -c conda-forge -c intel -c numba
+          cd numba_mlir_conda/win-64
+          conda create -y -n conda-test-env python=${{ matrix.python }} numba=0.57 numpy=1.23 scikit-learn pytest-xdist scipy pytest "tbb>=$env:TBB_VER" "mkl-dpcpp>=2023.1" -c conda-forge -c intel -c numba
           conda info
           conda activate conda-test-env
           conda list
@@ -481,12 +496,12 @@ jobs:
       - name: Setup conda
         uses: conda-incubator/setup-miniconda@v2
         with:
-          miniconda-version: "latest"
           auto-update-conda: true
           use-only-tar-bz2: true
           run-post: false
-          mamba-version: "*"
-          channels: conda-forge, intel
+          miniforge-variant: Mambaforge
+          miniforge-version: latest
+          channel-priority: "disabled"
           activate-environment: test-env
           environment-file: ${{ env.CORE_ENV_FILE }}
           python-version: "3.10"
@@ -586,7 +601,6 @@ jobs:
           git checkout $LLVM_SHA || exit 1
           mkdir _build || exit 1
           cd _build || exit 1
-          source activate test-env
           export CC=$CONDA_PREFIX/bin/x86_64-conda-linux-gnu-cc
           export CXX=$CONDA_PREFIX/bin/x86_64-conda-linux-gnu-c++
           cmake ../llvm                                                    \
@@ -673,10 +687,11 @@ jobs:
           auto-update-conda: true
           use-only-tar-bz2: true
           run-post: false
-          mamba-version: "*"
           activate-environment: test-env
           environment-file: ${{ env.PYTHON_ENV_FILE }}
           python-version: ${{ matrix.python }}
+          miniforge-variant: Mambaforge
+          miniforge-version: latest
 
       - name: Setup Cache Vars
         run: |
@@ -809,7 +824,8 @@ jobs:
           auto-update-conda: true
           use-only-tar-bz2: true
           run-post: false
-          mamba-version: "*"
+          miniforge-variant: Mambaforge
+          miniforge-version: latest
           channels: conda-forge, intel
 
       - name: Checkout repo
@@ -873,7 +889,8 @@ jobs:
         shell: bash -l {0}
 
         run: |
-          conda create -y -n conda-test-env python=${{ matrix.python }} numba=0.57 numpy=1.22 scikit-learn pytest-xdist scipy pytest tbb=${TBB_VER} "mkl-dpcpp>=2023.1.0" -c conda-forge -c intel -c numba
+          cd numba_mlir_conda/linux-64
+          conda create -y -n conda-test-env python=${{ matrix.python }} numba=0.57 numpy=1.23 scikit-learn pytest-xdist scipy pytest "tbb>=${TBB_VER}" "mkl-dpcpp>=2023.1" -c conda-forge -c intel -c numba
           conda info
           conda activate conda-test-env
           conda list
@@ -904,7 +921,9 @@ jobs:
           run-post: false
           auto-activate-base: true
           activate-environment: ""
-          mamba-version: "*"
+          miniforge-variant: Mambaforge
+          miniforge-version: latest
+          channel-priority: "disabled"
           channels: conda-forge, intel
 
       - name: Add conda to system path
@@ -937,14 +956,16 @@ jobs:
         with:
           name: numba-mlir ${{ runner.os }} Python ${{ matrix.python }} SHA ${{ github.sha }}
 
-      - uses: conda-incubator/setup-miniconda@v2
+      - uses: conda-incubator/setup-miniconda@v
         with:
           auto-update-conda: true
           use-only-tar-bz2: true
           run-post: false
           auto-activate-base: true
           activate-environment: ""
-          mamba-version: "*"
+          miniforge-variant: Mambaforge
+          miniforge-version: latest
+          channel-priority: "disabled"
           channels: conda-forge, intel
 
       - name: Install anaconda-client

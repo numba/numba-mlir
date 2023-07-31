@@ -17,6 +17,7 @@ from ..linalg_builder import (
     is_int,
     is_literal,
     literal,
+    type_to_numpy,
     DYNAMIC_DIM,
 )
 from ..func_registry import add_func
@@ -558,6 +559,52 @@ def eye_impl(builder, N, M=None, k=0, dtype=None):
     return builder.linalg_generic(idx, init, iterators, maps, body)
 
 
+def _xtri_impl(builder, array, k, inv):
+    shape = array.shape
+    ndims = len(shape)
+    if ndims < 2:
+        return
+
+    dtype = array.dtype
+    np_dtype = type_to_numpy(builder, dtype)
+
+    init = builder.init_tensor(shape, dtype)
+    idx = builder.from_elements(k, builder.int64)
+
+    iterators = ["parallel"] * ndims
+    indices = ",".join(f"d{i}" for i in range(ndims))
+    idx_map = f"({indices}) -> (0)"
+    array_map = f"({indices}) -> ({indices})"
+    maps = [idx_map, array_map, array_map]
+
+    off = ndims - 2
+    if inv:
+
+        def body(a, b, c):
+            i = _linalg_index(off + 0)
+            j = _linalg_index(off + 1)
+            return b if (j - i) >= a else np_dtype(0)
+
+    else:
+
+        def body(a, b, c):
+            i = _linalg_index(off + 0)
+            j = _linalg_index(off + 1)
+            return b if (j - i) <= a else np_dtype(0)
+
+    return builder.linalg_generic((idx, array), init, iterators, maps, body)
+
+
+@register_func("numpy.triu", numpy.triu)
+def triu_impl(builder, array, k=0):
+    return _xtri_impl(builder, array, k, True)
+
+
+@register_func("numpy.tril", numpy.tril)
+def tril_impl(builder, array, k=0):
+    return _xtri_impl(builder, array, k, False)
+
+
 def _check_mkl_strides(arr):
     strides = arr.strides
     res = (strides[0] <= 0).or_op(strides[1] <= 0)
@@ -581,7 +628,7 @@ def _mkl_gemm(builder, a, b, alpha, beta, shape1, shape2):
     c = builder.init_tensor(res_shape, dtype)
 
     return builder.external_call(
-        func_name, (a, b), c, attrs={"device_func": device_func_name}
+        func_name, (a, b), c, attrs={"gpu_runtime.device_func": device_func_name}
     )
 
 
@@ -612,22 +659,26 @@ def _matmul2d(builder, a, b, shape1, shape2):
         return _linalg_matmul2d(builder, a, b, shape1, shape2)
 
 
+def _dot1d(builder, a, b):
+    iterators = ["reduction"]
+    expr1 = "(d0) -> (d0)"
+    expr2 = "(d0) -> (0)"
+    maps = [expr1, expr1, expr2]
+    init = builder.from_elements(0, a.dtype)
+
+    def body(a, b, c):
+        return a * b + c
+
+    res = builder.linalg_generic((a, b), init, iterators, maps, body)
+    return builder.extract(res, 0)
+
+
 @register_func("numpy.dot", numpy.dot, out="out")
 def dot_impl(builder, a, b):
     shape1 = a.shape
     shape2 = b.shape
     if len(shape1) == 1 and len(shape2) == 1:
-        iterators = ["reduction"]
-        expr1 = "(d0) -> (d0)"
-        expr2 = "(d0) -> (0)"
-        maps = [expr1, expr1, expr2]
-        init = builder.from_elements(0, a.dtype)
-
-        def body(a, b, c):
-            return a * b + c
-
-        res = builder.linalg_generic((a, b), init, iterators, maps, body)
-        return builder.extract(res, 0)
+        return _dot1d(builder, a, b)
     if len(shape1) == 2 and len(shape2) == 2:
         return _matmul2d(builder, a, b, shape1, shape2)
 
@@ -641,6 +692,9 @@ def matmul_impl(builder, a, b):
     if dim1 > 2 or dim2 > 2:
         return
 
+    if dim1 == 1 and dim2 == 1:
+        return _dot1d(builder, a, b)
+
     if dim1 == 1:
         x = shape2[0]
         y = shape1[0]
@@ -649,7 +703,7 @@ def matmul_impl(builder, a, b):
         tmp_a = builder.reshape(a, (1, y))
         tmp = builder.insert(tmp_a, tmp, (x - 1, 0), (1, 1))
         a = tmp
-    if dim2 == 1:
+    elif dim2 == 1:
         x = shape2[0]
         y = shape1[0]
         dst_shape = (x, y)
@@ -660,9 +714,7 @@ def matmul_impl(builder, a, b):
 
     res = _matmul2d(builder, a, b, a.shape, b.shape)
 
-    if dim1 == 1 and dim2 == 1:
-        res = builder.extract(res, (shape2[0] - 1, 0))
-    elif dim1 == 1:
+    if dim1 == 1:
         res = builder.subview(res, (shape2[0] - 1, 0), (1, shape2[1]), result_rank=1)
     elif dim2 == 1:
         res = builder.subview(res, (0, 0), (shape1[0], 1), result_rank=1)
@@ -944,6 +996,21 @@ def concat_impl(builder, arrays, axis=0):
             res = builder.insert(array, res, offsets, strides)
             offsets[axis] += sizes[axis]
         return res
+
+
+@register_func("numpy.vstack", numpy.vstack)
+def vstack_impl(builder, arrays):
+    return concat_impl(builder, arrays, 0)
+
+
+@register_func("numpy.hstack", numpy.hstack)
+def hstack_impl(builder, arrays):
+    return concat_impl(builder, arrays, 1)
+
+
+@register_func("numpy.dstack", numpy.dstack)
+def dstack_impl(builder, arrays):
+    return concat_impl(builder, arrays, 2)
 
 
 def _cov_get_ddof_func(ddof_is_none):
