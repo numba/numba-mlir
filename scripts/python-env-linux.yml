@@ -2,15 +2,14 @@ name: dev
 channels:
   - intel
   - conda-forge
-  - numba
 dependencies:
   - cmake >=3.23
   - lit
-  - mkl-devel-dpcpp >=2023.0.0
+  - mkl-devel-dpcpp >=2023.1
   - ninja
-  - numba::numba =0.57
-  - numba::llvmlite
-  - numpy =1.22
+  - numba =0.57
+  - llvmlite
+  - numpy =1.23
   - pybind11
   - pytest
   - pytest-xdist
