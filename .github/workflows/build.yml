@@ -15,7 +15,6 @@ env:
   LEVEL_ZERO_VER: v1.6.2
   TBB_URL_PREFIX: https://github.com/oneapi-src/oneTBB/releases/download/
   LLVM_SHA_FILE: llvm-sha.txt
-  MINICONDA_VER: py310_23.3.1-0
 
 jobs:
   build_win:
@@ -50,13 +49,14 @@ jobs:
             ${{ runner.os }}-conda-${{ env.CACHE_NUMBER }}-${{ hashFiles(env.CORE_ENV_FILE) }}
 
       - name: Setup conda
-        uses: conda-incubator/setup-miniconda@v2.1.1
+        uses: conda-incubator/setup-miniconda@v2
         with:
-          miniconda-version: ${{ env.MINICONDA_VER }}
           auto-update-conda: true
           use-only-tar-bz2: true
           run-post: false
-          mamba-version: "*"
+          miniforge-variant: Mambaforge
+          miniforge-version: latest
+          channel-priority: "disabled"
           activate-environment: test-env
           environment-file: ${{ env.CORE_ENV_FILE }}
           python-version: "3.10"
@@ -226,13 +226,13 @@ jobs:
           access_token: ${{ github.token }}
 
       - name: Setup conda
-        uses: conda-incubator/setup-miniconda@v2.1.1
+        uses: conda-incubator/setup-miniconda@v2
         with:
-          miniconda-version: ${{ env.MINICONDA_VER }}
           auto-update-conda: true
           use-only-tar-bz2: true
           run-post: false
-          mamba-version: "*"
+          miniforge-variant: Mambaforge
+          miniforge-version: latest
           channels: intel,conda-forge
 
       - name: Checkout repo
@@ -278,7 +278,7 @@ jobs:
       - name: Build Python frontend
         run: |
           cd numba_mlir
-          conda create -y -n test-env python=${{ matrix.python }} "pip>=22" numba=0.57 numpy=1.22 "setuptools<65.6" scikit-learn pytest-xdist ninja scipy pybind11 pytest "tbb=$env:TBB_VER" cmake "mkl-devel-dpcpp>=2023.0.0" zlib dpcpp_win-64 -c conda-forge -c intel -c numba
+          conda create -y -n test-env python=${{ matrix.python }} "pip>=22" numba=0.57 numpy=1.23 "setuptools<65.6" scikit-learn pytest-xdist ninja scipy pybind11 pytest "tbb>=$env:TBB_VER" cmake "mkl-devel-dpcpp>=2023.1" zlib dpcpp_win-64 -c conda-forge -c intel -c numba
           conda info
           conda activate test-env
           echo "Conda prefix: $env:CONDA_PREFIX"
@@ -366,13 +366,13 @@ jobs:
           access_token: ${{ github.token }}
 
       - name: Setup conda
-        uses: conda-incubator/setup-miniconda@v2.1.1
+        uses: conda-incubator/setup-miniconda@v2
         with:
-          miniconda-version: ${{ env.MINICONDA_VER }}
           auto-update-conda: true
           use-only-tar-bz2: true
           run-post: false
-          mamba-version: "*"
+          miniforge-variant: Mambaforge
+          miniforge-version: latest
           channels: intel,conda-forge
 
       - name: Checkout repo
@@ -444,7 +444,7 @@ jobs:
       - name: Test conda package
         run: |
           cd numba_mlir_conda/win-64
-          conda create -y -n conda-test-env python=${{ matrix.python }} numba=0.57 numpy=1.22 scikit-learn pytest-xdist scipy pytest "tbb=$env:TBB_VER" "mkl-dpcpp>=2023.1.0" -c conda-forge -c intel -c numba
+          conda create -y -n conda-test-env python=${{ matrix.python }} numba=0.57 numpy=1.23 scikit-learn pytest-xdist scipy pytest "tbb>=$env:TBB_VER" "mkl-dpcpp>=2023.1" -c conda-forge -c intel -c numba
           conda info
           conda activate conda-test-env
           conda list
@@ -490,13 +490,14 @@ jobs:
             ${{ runner.os }}-conda-${{ env.CACHE_NUMBER }}-${{ hashFiles(env.CORE_ENV_FILE) }}
 
       - name: Setup conda
-        uses: conda-incubator/setup-miniconda@v2.1.1
+        uses: conda-incubator/setup-miniconda@v2
         with:
-          miniconda-version: ${{ env.MINICONDA_VER }}
           auto-update-conda: true
           use-only-tar-bz2: true
           run-post: false
-          mamba-version: "*"
+          miniforge-variant: Mambaforge
+          miniforge-version: latest
+          channel-priority: "disabled"
           activate-environment: test-env
           environment-file: ${{ env.CORE_ENV_FILE }}
           python-version: "3.10"
@@ -670,13 +671,13 @@ jobs:
           access_token: ${{ github.token }}
 
       - name: Setup conda
-        uses: conda-incubator/setup-miniconda@v2.1.1
+        uses: conda-incubator/setup-miniconda@v2
         with:
-          miniconda-version: ${{ env.MINICONDA_VER }}
           auto-update-conda: true
           use-only-tar-bz2: true
           run-post: false
-          mamba-version: "*"
+          miniforge-variant: Mambaforge
+          miniforge-version: latest
           channels: intel,conda-forge
 
       - name: Checkout repo
@@ -722,7 +723,7 @@ jobs:
 
         run: |
           cd numba_mlir
-          conda create -y -n test-env python=${{ matrix.python }} "pip>=22" numba=0.57 numpy=1.22 "setuptools<65.6" scikit-learn pytest-xdist ninja scipy pybind11 pytest tbb=${TBB_VER} cmake "mkl-devel-dpcpp>=2023.0.0" dpcpp_linux-64 -c conda-forge -c intel -c numba
+          conda create -y -n test-env python=${{ matrix.python }} "pip>=22" numba=0.57 numpy=1.23 "setuptools<65.6" scikit-learn pytest-xdist ninja scipy pybind11 pytest "tbb>=${TBB_VER}" cmake "mkl-devel-dpcpp>=2023.1" dpcpp_linux-64 -c conda-forge -c intel -c numba
           conda info
           source $CONDA/bin/activate test-env
           conda install gxx_linux-64 -c conda-forge --override-channels
@@ -813,13 +814,13 @@ jobs:
           access_token: ${{ github.token }}
 
       - name: Setup conda
-        uses: conda-incubator/setup-miniconda@v2.1.1
+        uses: conda-incubator/setup-miniconda@v2
         with:
-          miniconda-version: ${{ env.MINICONDA_VER }}
           auto-update-conda: true
           use-only-tar-bz2: true
           run-post: false
-          mamba-version: "*"
+          miniforge-variant: Mambaforge
+          miniforge-version: latest
           channels: intel,conda-forge
 
       - name: Checkout repo
@@ -884,7 +885,7 @@ jobs:
 
         run: |
           cd numba_mlir_conda/linux-64
-          conda create -y -n conda-test-env python=${{ matrix.python }} numba=0.57 numpy=1.22 scikit-learn pytest-xdist scipy pytest tbb=${TBB_VER} "mkl-dpcpp>=2023.1.0" -c conda-forge -c intel -c numba
+          conda create -y -n conda-test-env python=${{ matrix.python }} numba=0.57 numpy=1.23 scikit-learn pytest-xdist scipy pytest "tbb>=${TBB_VER}" "mkl-dpcpp>=2023.1" -c conda-forge -c intel -c numba
           conda info
           source $CONDA/bin/activate conda-test-env
           conda list
@@ -907,15 +908,16 @@ jobs:
     needs: [build_win_python, build_win_conda_package, build_linux_python, build_linux_conda_package]
     runs-on: ubuntu-20.04
     steps:
-      - uses: conda-incubator/setup-miniconda@v2.1.1
+      - uses: conda-incubator/setup-miniconda@v2
         with:
-          miniconda-version: ${{ env.MINICONDA_VER }}
           auto-update-conda: true
           use-only-tar-bz2: true
           run-post: false
           auto-activate-base: true
           activate-environment: ""
-          mamba-version: "*"
+          miniforge-variant: Mambaforge
+          miniforge-version: latest
+          channel-priority: "disabled"
           channels: intel,conda-forge
 
       - name: Add conda to system path
@@ -948,15 +950,16 @@ jobs:
         with:
           name: numba-mlir ${{ runner.os }} Python ${{ matrix.python }} SHA ${{ github.sha }}
 
-      - uses: conda-incubator/setup-miniconda@v2.1.1
+      - uses: conda-incubator/setup-miniconda@v
         with:
-          miniconda-version: ${{ env.MINICONDA_VER }}
           auto-update-conda: true
           use-only-tar-bz2: true
           run-post: false
           auto-activate-base: true
           activate-environment: ""
-          mamba-version: "*"
+          miniforge-variant: Mambaforge
+          miniforge-version: latest
+          channel-priority: "disabled"
           channels: intel,conda-forge
 
       - name: Install anaconda-client
