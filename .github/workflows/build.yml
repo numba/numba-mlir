@@ -312,7 +312,7 @@ jobs:
         run: |
           cd numba_mlir
           conda activate test-env
-          conda install greenlet dpctl -c conda-forge  -c intel
+          conda install greenlet dpctl -c dppy/label/dev -c intel -c conda-forge
           conda list
           $env:NUMBA_MLIR_GPU_RUNTIME="sycl"
           $env:NUMBA_MLIR_DEFAULT_DEVICE="opencl:cpu:0"
@@ -759,7 +759,7 @@ jobs:
 
         run: |
           cd numba_mlir
-          conda install greenlet dpctl -c conda-forge -c intel
+          conda install greenlet dpctl -c dppy/label/dev -c intel -c conda-forge
           conda list
           export NUMBA_MLIR_GPU_RUNTIME=sycl
           export NUMBA_MLIR_DEFAULT_DEVICE=opencl:cpu:0
