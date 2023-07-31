@@ -439,7 +439,7 @@ jobs:
           $env:CXX="cl.exe"
           $env:CC="cl.exe"
           $env:VSCMD_DEBUG = 3
-          conda mambabuild --output-folder=. ../numba_mlir/conda-recipe --python=${{ matrix.python }} -c intel -c conda-forge -c numba --override-channels
+          conda mambabuild --output-folder=. ../numba_mlir/conda-recipe --python=${{ matrix.python }} -c intel -c conda-forge --override-channels
           cd win-64
           ls .
           popd
@@ -447,7 +447,7 @@ jobs:
       - name: Test conda package
         run: |
           cd numba_mlir_conda/win-64
-          conda create -y -n conda-test-env python=${{ matrix.python }} numba=0.57 numpy=1.23 scikit-learn pytest-xdist scipy pytest "tbb>=$env:TBB_VER" "mkl-dpcpp>=2023.1" -c conda-forge -c intel -c numba
+          conda create -y -n conda-test-env python=${{ matrix.python }} numba=0.57 numpy=1.23 scikit-learn pytest-xdist scipy pytest "tbb>=$env:TBB_VER" "mkl-dpcpp>=2023.1" -c conda-forge -c intel
           conda info
           conda activate conda-test-env
           conda list
@@ -879,7 +879,7 @@ jobs:
           export LEVEL_ZERO_DIR=/home/runner/work/level-zero/level-zero/level_zero_install
           export LEVEL_ZERO_VERSION_CHECK_OFF=1
           export NUMBA_MLIR_USE_SYCL=ON
-          conda mambabuild --output-folder=. ../numba_mlir/conda-recipe --python=${{ matrix.python }} -c intel -c conda-forge -c numba --override-channels || exit 1
+          conda mambabuild --output-folder=. ../numba_mlir/conda-recipe --python=${{ matrix.python }} -c intel -c conda-forge --override-channels || exit 1
           cd linux-64
           ls -l --block-size=M
           popd
@@ -890,7 +890,7 @@ jobs:
 
         run: |
           cd numba_mlir_conda/linux-64
-          conda create -y -n conda-test-env python=${{ matrix.python }} numba=0.57 numpy=1.23 scikit-learn pytest-xdist scipy pytest "tbb>=${TBB_VER}" "mkl-dpcpp>=2023.1" -c conda-forge -c intel -c numba
+          conda create -y -n conda-test-env python=${{ matrix.python }} numba=0.57 numpy=1.23 scikit-learn pytest-xdist scipy pytest "tbb>=${TBB_VER}" "mkl-dpcpp>=2023.1" -c conda-forge -c intel
           conda info
           conda activate conda-test-env
           conda list
