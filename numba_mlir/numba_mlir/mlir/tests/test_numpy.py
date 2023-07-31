@@ -2137,6 +2137,8 @@ def test_eye2(N, M, k):
 
 
 _matmul_inputs_vars = [
+    ([], []),
+    (np.empty((0,)), np.empty((0,))),
     (np.empty((0, 0)), np.empty((0, 0))),
     ([2], [3]),
     ([2, 3], [4, 5]),

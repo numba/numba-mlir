@@ -659,22 +659,26 @@ def _matmul2d(builder, a, b, shape1, shape2):
         return _linalg_matmul2d(builder, a, b, shape1, shape2)
 
 
+def _dot1d(builder, a, b):
+    iterators = ["reduction"]
+    expr1 = "(d0) -> (d0)"
+    expr2 = "(d0) -> (0)"
+    maps = [expr1, expr1, expr2]
+    init = builder.from_elements(0, a.dtype)
+
+    def body(a, b, c):
+        return a * b + c
+
+    res = builder.linalg_generic((a, b), init, iterators, maps, body)
+    return builder.extract(res, 0)
+
+
 @register_func("numpy.dot", numpy.dot, out="out")
 def dot_impl(builder, a, b):
     shape1 = a.shape
     shape2 = b.shape
     if len(shape1) == 1 and len(shape2) == 1:
-        iterators = ["reduction"]
-        expr1 = "(d0) -> (d0)"
-        expr2 = "(d0) -> (0)"
-        maps = [expr1, expr1, expr2]
-        init = builder.from_elements(0, a.dtype)
-
-        def body(a, b, c):
-            return a * b + c
-
-        res = builder.linalg_generic((a, b), init, iterators, maps, body)
-        return builder.extract(res, 0)
+        return _dot1d(builder, a, b)
     if len(shape1) == 2 and len(shape2) == 2:
         return _matmul2d(builder, a, b, shape1, shape2)
 
@@ -688,6 +692,9 @@ def matmul_impl(builder, a, b):
     if dim1 > 2 or dim2 > 2:
         return
 
+    if dim1 == 1 and dim2 == 1:
+        return _dot1d(builder, a, b)
+
     if dim1 == 1:
         x = shape2[0]
         y = shape1[0]
@@ -696,7 +703,7 @@ def matmul_impl(builder, a, b):
         tmp_a = builder.reshape(a, (1, y))
         tmp = builder.insert(tmp_a, tmp, (x - 1, 0), (1, 1))
         a = tmp
-    if dim2 == 1:
+    elif dim2 == 1:
         x = shape2[0]
         y = shape1[0]
         dst_shape = (x, y)
@@ -707,9 +714,7 @@ def matmul_impl(builder, a, b):
 
     res = _matmul2d(builder, a, b, a.shape, b.shape)
 
-    if dim1 == 1 and dim2 == 1:
-        res = builder.extract(res, (shape2[0] - 1, 0))
-    elif dim1 == 1:
+    if dim1 == 1:
         res = builder.subview(res, (shape2[0] - 1, 0), (1, shape2[1]), result_rank=1)
     elif dim2 == 1:
         res = builder.subview(res, (0, 0), (shape1[0], 1), result_rank=1)
