@@ -18,3 +18,5 @@ dependencies:
   - tbb >=2021.6.0
   - zlib
   - dpcpp_win-64
+  - greenlet
+  - dpctl
