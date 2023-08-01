@@ -2863,12 +2863,29 @@ struct LinalgOptInnerPass
   void runOnOperation() override;
 };
 
+static const constexpr llvm::StringLiteral
+    kMixedGenericNoalias("mixed_generic_noalias");
+
 static bool defaultControlFusionFn(mlir::OpOperand *fusedOperand) {
+  assert(fusedOperand);
   if (auto generic =
           mlir::dyn_cast<mlir::linalg::GenericOp>(fusedOperand->getOwner())) {
-    // TODO: Need better analysis for mixed generics
-    if (!generic.hasTensorSemantics() && !generic.hasBufferSemantics())
-      return false;
+    // Mixed generics fusion
+    if (!generic.hasTensorSemantics() && !generic.hasBufferSemantics()) {
+      auto numInputs = generic.getNumDpsInputs();
+      auto noalias = generic->getAttrOfType<mlir::DenseBoolArrayAttr>(
+          kMixedGenericNoalias);
+      if (!noalias || noalias.size() != numInputs)
+        return false;
+
+      auto idx = fusedOperand->getOperandNumber();
+
+      // Do not fuse outputs.
+      if (idx >= numInputs)
+        return false;
+
+      return noalias[idx];
+    }
   }
   return true;
 }
@@ -2904,6 +2921,9 @@ static bool mayAliasImpl(mlir::Value src, F &&mayAliasCheck) {
   worklist.emplace_back(src);
   do {
     auto current = worklist.pop_back_val();
+    if (mayAliasCheck(current))
+      return true;
+
     if (auto extract = current.getDefiningOp<mlir::tensor::ExtractSliceOp>()) {
       worklist.emplace_back(extract.getSource());
     }
@@ -2917,8 +2937,11 @@ static bool mayAliasImpl(mlir::Value src, F &&mayAliasCheck) {
     }
     if (auto toTensor =
             current.getDefiningOp<mlir::bufferization::ToTensorOp>()) {
-      if (mayAliasCheck(toTensor.getMemref()))
-        return true;
+      worklist.emplace_back(toTensor.getMemref());
+    }
+    if (auto enforceShape =
+            current.getDefiningOp<numba::util::EnforceShapeOp>()) {
+      worklist.emplace_back(enforceShape.getValue());
     }
 
   } while (!worklist.empty());
@@ -2939,13 +2962,10 @@ static bool mayAlias(mlir::AliasAnalysis &analysis, mlir::Value input,
   return false;
 }
 
-static const constexpr llvm::StringLiteral
-    kMixedGenericNoalias("mixed_generic_noalias");
-
-struct PrepareAdditionalBufferize
-    : public mlir::PassWrapper<PrepareAdditionalBufferize,
+struct MixedGenericsAliasAnalysis
+    : public mlir::PassWrapper<MixedGenericsAliasAnalysis,
                                mlir::OperationPass<void>> {
-  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(PrepareAdditionalBufferize)
+  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(MixedGenericsAliasAnalysis)
 
   void runOnOperation() override {
     auto &aliasAnalysis = getAnalysis<mlir::AliasAnalysis>();
@@ -3555,6 +3575,8 @@ static void populatePlierToLinalgOptPipeline(mlir::OpPassManager &pm) {
         p.addPass(numba::createShapeIntegerRangePropagationPass());
         p.addNestedPass<mlir::func::FuncOp>(mlir::createCSEPass());
         p.addNestedPass<mlir::func::FuncOp>(
+            std::make_unique<MixedGenericsAliasAnalysis>());
+        p.addNestedPass<mlir::func::FuncOp>(
             std::make_unique<LinalgOptInnerPass>());
         p.addPass(numba::createRemoveUnusedArgsPass());
       }));
@@ -3573,7 +3595,7 @@ static void populatePlierToLinalgOptPipeline(mlir::OpPassManager &pm) {
   pm.addPass(mlir::createCanonicalizerPass());
 
   pm.addNestedPass<mlir::func::FuncOp>(
-      std::make_unique<PrepareAdditionalBufferize>());
+      std::make_unique<MixedGenericsAliasAnalysis>());
   pm.addNestedPass<mlir::func::FuncOp>(std::make_unique<AdditionalBufferize>());
   pm.addNestedPass<mlir::func::FuncOp>(mlir::createSCFBufferizePass());
   pm.addNestedPass<mlir::func::FuncOp>(mlir::createLinalgBufferizePass());
