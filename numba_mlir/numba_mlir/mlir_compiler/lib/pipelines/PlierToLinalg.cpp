@@ -2924,9 +2924,9 @@ static bool mayAliasImpl(mlir::Value src, F &&mayAliasCheck) {
     if (mayAliasCheck(current))
       return true;
 
-    if (auto extract = current.getDefiningOp<mlir::tensor::ExtractSliceOp>()) {
+    if (auto extract = current.getDefiningOp<mlir::tensor::ExtractSliceOp>())
       worklist.emplace_back(extract.getSource());
-    }
+
     if (auto generic = current.getDefiningOp<mlir::linalg::GenericOp>()) {
       for (auto arg : generic->getOperands()) {
         if (mlir::isa<mlir::MemRefType>(arg.getType()) && mayAliasCheck(arg))
@@ -2935,14 +2935,14 @@ static bool mayAliasImpl(mlir::Value src, F &&mayAliasCheck) {
         worklist.emplace_back(arg);
       }
     }
+
     if (auto toTensor =
-            current.getDefiningOp<mlir::bufferization::ToTensorOp>()) {
+            current.getDefiningOp<mlir::bufferization::ToTensorOp>())
       worklist.emplace_back(toTensor.getMemref());
-    }
+
     if (auto enforceShape =
-            current.getDefiningOp<numba::util::EnforceShapeOp>()) {
+            current.getDefiningOp<numba::util::EnforceShapeOp>())
       worklist.emplace_back(enforceShape.getValue());
-    }
 
   } while (!worklist.empty());
   return false;
