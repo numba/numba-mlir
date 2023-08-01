@@ -160,9 +160,9 @@ extern "C" {
 #ifdef NUMBA_MLIR_USE_SYCL_MKL
 #define GEMM_VARIANT(T, Suff)                                                  \
   NUMBA_MLIR_MATH_SYCL_RUNTIME_EXPORT void mkl_gemm_##Suff##_device(           \
-      void *stream, const Memref<2, T> *a, const Memref<2, T> *b,              \
-      Memref<2, T> *c) {                                                       \
-    deviceGemm<T>(stream, a, b, c, 1, 0);                                      \
+      void *stream, const Memref<2, T> *a, const Memref<2, T> *b, T alpha,     \
+      T beta, Memref<2, T> *c) {                                               \
+    deviceGemm<T>(stream, a, b, c, alpha, beta);                               \
   }
 
 GEMM_VARIANT(float, float32)
