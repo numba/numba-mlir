@@ -337,8 +337,8 @@ jobs:
       - name: Test wheels
         run: |
           conda info
-          conda create -n wheels-test-env python=${{ matrix.python }} -c conda-forge
           conda deactivate
+          conda create -n wheels-test-env python=${{ matrix.python }} -c conda-forge
           conda activate wheels-test-env
           conda env update --name wheels-test-env --file="$env:PYTHON_ENV_FILE" --prune
           conda list
@@ -786,8 +786,8 @@ jobs:
 
         run: |
           conda info
-          conda create -n wheels-test-env python=${{ matrix.python }} -c conda-forge
           conda deactivate
+          conda create -n wheels-test-env python=${{ matrix.python }} -c conda-forge
           conda activate wheels-test-env
           conda env update --name wheels-test-env --file=${PYTHON_ENV_FILE} --prune
           conda list
