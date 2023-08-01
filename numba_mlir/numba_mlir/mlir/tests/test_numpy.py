@@ -1829,7 +1829,7 @@ def test_alias2():
     assert_equal(py_func(4), jit_func(4))
 
 
-def test_inplace_alias():
+def test_inplace_alias1():
     def py_func(a):
         a += 1
         a[:] = 3
@@ -1842,6 +1842,22 @@ def test_inplace_alias():
     jit_arg = a.copy()
     py_func(py_arg)
     jit_func(jit_arg)
+    assert_equal(py_arg, jit_arg)
+
+
+def test_inplace_alias2():
+    def py_func(a, b):
+        a[:] += b
+
+    jit_func = njit(py_func)
+
+    a = np.ones(1)
+    b = a + 2
+
+    py_arg = a.copy()
+    jit_arg = a.copy()
+    py_func(py_arg, b)
+    jit_func(jit_arg, b)
     assert_equal(py_arg, jit_arg)
 
 
