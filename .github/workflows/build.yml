@@ -18,9 +18,9 @@ env:
 
 jobs:
   build_win:
+    name: Builds Windows Numba-MLIR core
     env:
       CORE_ENV_FILE: scripts/core-env-win.yml
-    name: Builds Windows Numba-MLIR core
     runs-on: windows-2019
     timeout-minutes: 450
 
@@ -207,6 +207,8 @@ jobs:
 
   build_win_python:
     name: Builds Windows Numba-MLIR
+    env:
+      PYTHON_ENV_FILE: scripts/python-env-win.yml
     runs-on: windows-2019
     timeout-minutes: 450
     needs: build_win
@@ -225,6 +227,11 @@ jobs:
         with:
           access_token: ${{ github.token }}
 
+      - name: Checkout repo
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+
       - name: Setup conda
         uses: conda-incubator/setup-miniconda@v2
         with:
@@ -233,12 +240,9 @@ jobs:
           run-post: false
           miniforge-variant: Mambaforge
           miniforge-version: latest
-          channels: intel,conda-forge
-
-      - name: Checkout repo
-        uses: actions/checkout@v2
-        with:
-          fetch-depth: 0
+          activate-environment: test-env
+          environment-file: ${{ env.PYTHON_ENV_FILE }}
+          python-version: ${{ matrix.python }}
 
       - name: Setup Cache Vars
         run: |
@@ -278,9 +282,8 @@ jobs:
       - name: Build Python frontend
         run: |
           cd numba_mlir
-          conda create -y -n test-env python=${{ matrix.python }} "pip>=22" numba=0.57 numpy=1.23 "setuptools<65.6" scikit-learn pytest-xdist ninja scipy pybind11 pytest "tbb>=$env:TBB_VER" cmake "mkl-devel-dpcpp>=2023.1" zlib dpcpp_win-64 -c conda-forge -c intel -c numba
           conda info
-          conda activate test-env
+          conda remove -y libopenblas -c conda-forge -c intel
           echo "Conda prefix: $env:CONDA_PREFIX"
           echo "Patch broken Windows MKLConfig.cmake"
           cp "$env:GITHUB_WORKSPACE/numba_mlir/conda-recipe/MKLConfig.cmake" "$env:CONDA_PREFIX/Library/lib/cmake/mkl" -Force
@@ -302,15 +305,12 @@ jobs:
       - name: Test Python frontend
         run: |
           cd numba_mlir
-          conda activate test-env
           python "$env:GITHUB_WORKSPACE/scripts/run_package_tests.py" verbose
 
       - name: Run offload tests
         if: false # Doesn't work
         run: |
           cd numba_mlir
-          conda activate test-env
-          conda install greenlet dpctl -c intel -c conda-forge
           conda list
           $env:NUMBA_MLIR_GPU_RUNTIME="sycl"
           $env:NUMBA_MLIR_DEFAULT_DEVICE="opencl:cpu:0"
@@ -320,7 +320,6 @@ jobs:
         run: |
           mkdir numba_mlir_wheels
           pushd numba_mlir_wheels
-          conda activate test-env
           $env:TBB_PATH=(Resolve-Path "$env:WORKSPACE/tbb/oneapi-tbb-$env:TBB_VER")
           $env:LEVEL_ZERO_DIR=(Resolve-Path "$env:WORKSPACE/level-zero/level-zero/level_zero_install")
           $env:LEVEL_ZERO_VERSION_CHECK_OFF="1"
@@ -337,11 +336,13 @@ jobs:
 
       - name: Test wheels
         run: |
-          cd numba_mlir_wheels
-          conda create -y -n wheels-test-env python=${{ matrix.python }} numba=0.57 numpy=1.22 "setuptools<65.6" scikit-learn pytest-xdist ninja scipy pybind11 pytest "tbb=$env:TBB_VER" cmake "mkl-devel-dpcpp>=2023.0.0" dpcpp_win-64 -c conda-forge -c intel -c numba
           conda info
-          conda activate wheels-test-env
+          mamba create -n wheels-test-env python=${{ matrix.python }} -c conda-forge
+          mamba deactivate
+          mamba activate wheels-test-env
+          mamba env update --name wheels-test-env --file="$env:PYTHON_ENV_FILE" --prune
           conda list
+          cd numba_mlir_wheels
           ls .
           ls *.whl | Foreach-Object { pip install $_.FullName }
           python "$env:GITHUB_WORKSPACE/scripts/run_package_tests.py" verbose smoke
@@ -373,7 +374,7 @@ jobs:
           run-post: false
           miniforge-variant: Mambaforge
           miniforge-version: latest
-          channels: intel,conda-forge
+          channels: conda-forge, intel
 
       - name: Checkout repo
         uses: actions/checkout@v2
@@ -436,7 +437,7 @@ jobs:
           $env:CXX="cl.exe"
           $env:CC="cl.exe"
           $env:VSCMD_DEBUG = 3
-          conda mambabuild --output-folder=. ../numba_mlir/conda-recipe --python=${{ matrix.python }} -c intel -c conda-forge -c numba --override-channels
+          conda mambabuild --output-folder=. ../numba_mlir/conda-recipe --python=${{ matrix.python }} -c intel -c conda-forge --override-channels
           cd win-64
           ls .
           popd
@@ -444,10 +445,11 @@ jobs:
       - name: Test conda package
         run: |
           cd numba_mlir_conda/win-64
-          conda create -y -n conda-test-env python=${{ matrix.python }} numba=0.57 numpy=1.23 scikit-learn pytest-xdist scipy pytest "tbb>=$env:TBB_VER" "mkl-dpcpp>=2023.1" -c conda-forge -c intel -c numba
+          conda create -y -n conda-test-env python=${{ matrix.python }} numba=0.57 numpy=1.23 scikit-learn pytest-xdist scipy pytest "tbb>=$env:TBB_VER" "mkl-dpcpp>=2023.1" -c conda-forge -c intel
           conda info
           conda activate conda-test-env
           conda list
+          cd numba_mlir_conda/win-64
           ls .
           ls *.tar.bz2 | Foreach-Object { conda install $_.FullName }
           python "$env:GITHUB_WORKSPACE/scripts/run_package_tests.py" verbose smoke
@@ -463,9 +465,9 @@ jobs:
 
 
   build_linux:
+    name: Builds Linux Numba-MLIR core
     env:
       CORE_ENV_FILE: scripts/core-env-linux.yml
-    name: Builds Linux Numba-MLIR core
     runs-on: ubuntu-20.04
     timeout-minutes: 450
 
@@ -654,6 +656,8 @@ jobs:
 
   build_linux_python:
     name: Builds Linux Numba-MLIR
+    env:
+      PYTHON_ENV_FILE: scripts/python-env-linux.yml
     runs-on: ubuntu-20.04
     timeout-minutes: 450
     needs: build_linux
@@ -670,20 +674,22 @@ jobs:
         with:
           access_token: ${{ github.token }}
 
+      - name: Checkout repo
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+
       - name: Setup conda
         uses: conda-incubator/setup-miniconda@v2
         with:
           auto-update-conda: true
           use-only-tar-bz2: true
           run-post: false
+          activate-environment: test-env
+          environment-file: ${{ env.PYTHON_ENV_FILE }}
+          python-version: ${{ matrix.python }}
           miniforge-variant: Mambaforge
           miniforge-version: latest
-          channels: intel,conda-forge
-
-      - name: Checkout repo
-        uses: actions/checkout@v2
-        with:
-          fetch-depth: 0
 
       - name: Setup Cache Vars
         run: |
@@ -723,10 +729,7 @@ jobs:
 
         run: |
           cd numba_mlir
-          conda create -y -n test-env python=${{ matrix.python }} "pip>=22" numba=0.57 numpy=1.23 "setuptools<65.6" scikit-learn pytest-xdist ninja scipy pybind11 pytest "tbb>=${TBB_VER}" cmake "mkl-devel-dpcpp>=2023.1" dpcpp_linux-64 -c conda-forge -c intel -c numba
           conda info
-          source $CONDA/bin/activate test-env
-          conda install gxx_linux-64 -c conda-forge --override-channels
           conda list
           python -c "import numba; print('numba', numba.__version__)"
           python -c "import numpy; print(numpy.get_include())"
@@ -746,7 +749,6 @@ jobs:
 
         run: |
           cd numba_mlir
-          source $CONDA/bin/activate test-env
           python $GITHUB_WORKSPACE/scripts/run_package_tests.py verbose
 
 
@@ -755,8 +757,6 @@ jobs:
 
         run: |
           cd numba_mlir
-          source $CONDA/bin/activate test-env
-          conda install greenlet dpctl -c intel -c conda-forge
           conda list
           export NUMBA_MLIR_GPU_RUNTIME=sycl
           export NUMBA_MLIR_DEFAULT_DEVICE=opencl:cpu:0
@@ -769,7 +769,6 @@ jobs:
         run: |
           mkdir numba_mlir_wheels
           pushd numba_mlir_wheels
-          source $CONDA/bin/activate test-env
           export TBB_PATH=/home/runner/work/tbb/oneapi-tbb-${TBB_VER}
           export LLVM_PATH=/home/runner/work/llvm-mlir/_mlir_install
           export LEVEL_ZERO_DIR=/home/runner/work/level-zero/level-zero/level_zero_install
@@ -786,11 +785,13 @@ jobs:
         shell: bash -l {0}
 
         run: |
-          cd numba_mlir_wheels
-          conda create -y -n wheels-test-env python=${{ matrix.python }} numba=0.57 numpy=1.22 "setuptools<65.6" scikit-learn pytest-xdist ninja scipy pybind11 pytest tbb=${TBB_VER} cmake "mkl-devel-dpcpp>=2023.0.0" dpcpp_linux-64 -c conda-forge -c intel -c numba
           conda info
-          source $CONDA/bin/activate wheels-test-env
+          mamba create -n wheels-test-env python=${{ matrix.python }} -c conda-forge
+          mamba deactivate
+          mamba activate wheels-test-env
+          mamba env update --name wheels-test-env --file=${PYTHON_ENV_FILE} --prune
           conda list
+          cd numba_mlir_wheels
           pip install *.whl
           python $GITHUB_WORKSPACE/scripts/run_package_tests.py verbose smoke
 
@@ -821,7 +822,7 @@ jobs:
           run-post: false
           miniforge-variant: Mambaforge
           miniforge-version: latest
-          channels: intel,conda-forge
+          channels: conda-forge, intel
 
       - name: Checkout repo
         uses: actions/checkout@v2
@@ -874,7 +875,7 @@ jobs:
           export LEVEL_ZERO_DIR=/home/runner/work/level-zero/level-zero/level_zero_install
           export LEVEL_ZERO_VERSION_CHECK_OFF=1
           export NUMBA_MLIR_USE_SYCL=ON
-          conda mambabuild --output-folder=. ../numba_mlir/conda-recipe --python=${{ matrix.python }} -c intel -c conda-forge -c numba --override-channels || exit 1
+          conda mambabuild --output-folder=. ../numba_mlir/conda-recipe --python=${{ matrix.python }} -c intel -c conda-forge --override-channels || exit 1
           cd linux-64
           ls -l --block-size=M
           popd
@@ -885,9 +886,9 @@ jobs:
 
         run: |
           cd numba_mlir_conda/linux-64
-          conda create -y -n conda-test-env python=${{ matrix.python }} numba=0.57 numpy=1.23 scikit-learn pytest-xdist scipy pytest "tbb>=${TBB_VER}" "mkl-dpcpp>=2023.1" -c conda-forge -c intel -c numba
+          conda create -y -n conda-test-env python=${{ matrix.python }} numba=0.57 numpy=1.23 scikit-learn pytest-xdist scipy pytest "tbb>=${TBB_VER}" "mkl-dpcpp>=2023.1" -c conda-forge -c intel
           conda info
-          source $CONDA/bin/activate conda-test-env
+          conda activate conda-test-env
           conda list
           conda install numba-mlir-*.tar.bz2
           python $GITHUB_WORKSPACE/scripts/run_package_tests.py verbose smoke
@@ -918,7 +919,7 @@ jobs:
           miniforge-variant: Mambaforge
           miniforge-version: latest
           channel-priority: "disabled"
-          channels: intel,conda-forge
+          channels: conda-forge, intel
 
       - name: Add conda to system path
         run: echo $CONDA/bin >> $GITHUB_PATH
@@ -960,7 +961,7 @@ jobs:
           miniforge-variant: Mambaforge
           miniforge-version: latest
           channel-priority: "disabled"
-          channels: intel,conda-forge
+          channels: conda-forge, intel
 
       - name: Install anaconda-client
         run: conda install anaconda-client
