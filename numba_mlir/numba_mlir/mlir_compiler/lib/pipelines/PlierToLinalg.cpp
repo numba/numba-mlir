@@ -2863,7 +2863,13 @@ struct LinalgOptInnerPass
   void runOnOperation() override;
 };
 
-static bool defaultControlFusionFn(mlir::OpOperand * /*fusedOperand*/) {
+static bool defaultControlFusionFn(mlir::OpOperand *fusedOperand) {
+  if (auto generic =
+          mlir::dyn_cast<mlir::linalg::GenericOp>(fusedOperand->getOwner())) {
+    // TODO: Need better analysis for mixed generics
+    if (!generic.hasTensorSemantics() && !generic.hasBufferSemantics())
+      return false;
+  }
   return true;
 }
 
