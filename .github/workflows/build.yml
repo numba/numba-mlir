@@ -337,10 +337,10 @@ jobs:
       - name: Test wheels
         run: |
           conda info
-          conda deactivate
-          conda create -n wheels-test-env python=${{ matrix.python }} -c conda-forge
-          conda activate wheels-test-env
-          conda env update --name wheels-test-env --file="$env:PYTHON_ENV_FILE" --prune
+          mamba create -n wheels-test-env python=${{ matrix.python }} -c conda-forge
+          mamba deactivate
+          mamba activate wheels-test-env
+          mamba env update --name wheels-test-env --file="$env:PYTHON_ENV_FILE" --prune
           conda list
           cd numba_mlir_wheels
           ls .
@@ -786,10 +786,10 @@ jobs:
 
         run: |
           conda info
-          conda deactivate
-          conda create -n wheels-test-env python=${{ matrix.python }} -c conda-forge
-          conda activate wheels-test-env
-          conda env update --name wheels-test-env --file=${PYTHON_ENV_FILE} --prune
+          mamba create -n wheels-test-env python=${{ matrix.python }} -c conda-forge
+          mamba deactivate
+          mamba activate wheels-test-env
+          mamba env update --name wheels-test-env --file=${PYTHON_ENV_FILE} --prune
           conda list
           cd numba_mlir_wheels
           pip install *.whl
