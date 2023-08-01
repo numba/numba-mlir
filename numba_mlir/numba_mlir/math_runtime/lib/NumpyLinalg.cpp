@@ -140,8 +140,9 @@ static inline void ALL_UNUSED(int dummy, ...) { (void)dummy; }
 
 #define GEMM_VARIANT(T, Prefix, Suff)                                          \
   NUMBA_MLIR_MATH_RUNTIME_EXPORT void mkl_gemm_##Suff(                         \
-      const Memref<2, T> *a, const Memref<2, T> *b, Memref<2, T> *c) {         \
-    MKL_CALL(cpuGemm<T>, MKL_GEMM(Prefix), a, b, c, 1, 0);                     \
+      const Memref<2, T> *a, const Memref<2, T> *b, T alpha, T beta,           \
+      Memref<2, T> *c) {                                                       \
+    MKL_CALL(cpuGemm<T>, MKL_GEMM(Prefix), a, b, c, alpha, beta);              \
   }
 
 GEMM_VARIANT(float, s, float32)

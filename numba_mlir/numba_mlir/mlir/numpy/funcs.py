@@ -627,8 +627,14 @@ def _mkl_gemm(builder, a, b, alpha, beta, shape1, shape2):
     res_shape = (shape1[0], shape2[1])
     c = builder.init_tensor(res_shape, dtype)
 
+    alpha = builder.cast(alpha, dtype)
+    beta = builder.cast(beta, dtype)
+
     return builder.external_call(
-        func_name, (a, b), c, attrs={"gpu_runtime.device_func": device_func_name}
+        func_name,
+        (a, b, alpha, beta),
+        c,
+        attrs={"gpu_runtime.device_func": device_func_name},
     )
 
 
