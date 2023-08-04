@@ -1,4 +1,9 @@
 cxx_compiler:
   - vs2019  # [win]
 numpy:
-    - 1.23
+  - 1.23
+pin_run_as_build:
+  - mkl: x.x
+  - mkl-dpcpp: x.x
+  - dpcpp-cpp-rt: x.x
+  - dpcpp_cpp_rt: x.x
