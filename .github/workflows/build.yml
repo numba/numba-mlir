@@ -303,7 +303,7 @@ jobs:
         run: |
           cd numba_mlir
           conda activate test-env
-          python "$env:GITHUB_WORKSPACE/scripts/run_package_tests.py" verbose
+          python "$env:GITHUB_WORKSPACE/numba_mlir/conda-recipe/run_package_tests.py" verbose
 
       - name: Run offload tests
         if: false # Doesn't work
@@ -314,7 +314,7 @@ jobs:
           conda list
           $env:NUMBA_MLIR_GPU_RUNTIME="sycl"
           $env:NUMBA_MLIR_DEFAULT_DEVICE="opencl:cpu:0"
-          python "$env:GITHUB_WORKSPACE/scripts/run_package_tests.py" verbose gpu
+          python "$env:GITHUB_WORKSPACE/numba_mlir/conda-recipe/run_package_tests.py" verbose gpu
 
       - name: Build wheels
         run: |
@@ -344,7 +344,7 @@ jobs:
           conda list
           ls .
           ls *.whl | Foreach-Object { pip install $_.FullName }
-          python "$env:GITHUB_WORKSPACE/scripts/run_package_tests.py" verbose smoke
+          python "$env:GITHUB_WORKSPACE/numba_mlir/conda-recipe/run_package_tests.py" verbose smoke
 
 
   build_win_conda_package:
@@ -440,18 +440,6 @@ jobs:
           cd win-64
           ls .
           popd
-
-      - name: Test conda package
-        run: |
-          cd numba_mlir_conda/win-64
-          conda create -y -n conda-test-env python=${{ matrix.python }} numba=0.57 numpy=1.23 scikit-learn pytest-xdist scipy pytest "tbb>=$env:TBB_VER" "mkl-dpcpp>=2023.1" -c conda-forge -c intel -c numba
-          conda info
-          conda activate conda-test-env
-          conda list
-          ls .
-          ls *.tar.bz2 | Foreach-Object { conda install $_.FullName }
-          python "$env:GITHUB_WORKSPACE/scripts/run_package_tests.py" verbose smoke
-
 
       - name: Upload artifact
         if: matrix.is_main
@@ -747,7 +735,7 @@ jobs:
         run: |
           cd numba_mlir
           source $CONDA/bin/activate test-env
-          python $GITHUB_WORKSPACE/scripts/run_package_tests.py verbose
+          python $GITHUB_WORKSPACE/numba_mlir/conda-recipe/run_package_tests.py verbose
 
 
       - name: Run offload tests
@@ -760,7 +748,7 @@ jobs:
           conda list
           export NUMBA_MLIR_GPU_RUNTIME=sycl
           export NUMBA_MLIR_DEFAULT_DEVICE=opencl:cpu:0
-          python $GITHUB_WORKSPACE/scripts/run_package_tests.py verbose gpu
+          python $GITHUB_WORKSPACE/numba_mlir/conda-recipe/run_package_tests.py verbose gpu
 
 
       - name: Build wheels
@@ -792,7 +780,7 @@ jobs:
           source $CONDA/bin/activate wheels-test-env
           conda list
           pip install *.whl
-          python $GITHUB_WORKSPACE/scripts/run_package_tests.py verbose smoke
+          python $GITHUB_WORKSPACE/numba_mlir/conda-recipe/run_package_tests.py verbose smoke
 
 
   build_linux_conda_package:
@@ -879,18 +867,6 @@ jobs:
           ls -l --block-size=M
           popd
           rm -rf numba_mlir_cmake_build
-
-      - name: Test conda package
-        shell: bash -l {0}
-
-        run: |
-          cd numba_mlir_conda/linux-64
-          conda create -y -n conda-test-env python=${{ matrix.python }} numba=0.57 numpy=1.23 scikit-learn pytest-xdist scipy pytest "tbb>=${TBB_VER}" "mkl-dpcpp>=2023.1" -c conda-forge -c intel -c numba
-          conda info
-          source $CONDA/bin/activate conda-test-env
-          conda list
-          conda install numba-mlir-*.tar.bz2
-          python $GITHUB_WORKSPACE/scripts/run_package_tests.py verbose smoke
 
       - name: Upload artifact
         if: matrix.is_main

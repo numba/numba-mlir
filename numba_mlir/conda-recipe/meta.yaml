@@ -41,3 +41,10 @@ requirements:
 test:
     requires:
         - pytest
+        - pytest-xdist
+        - scikit-learn
+        - scipy
+    files:
+        - run_package_tests.py
+    commands:
+        - python run_package_tests.py verbose smoke
