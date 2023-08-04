@@ -16,7 +16,6 @@ root_dir = os.path.dirname(os.path.abspath(__file__))
 LLVM_PATH = os.environ["LLVM_PATH"]
 LLVM_DIR = os.path.join(LLVM_PATH, "lib", "cmake", "llvm")
 MLIR_DIR = os.path.join(LLVM_PATH, "lib", "cmake", "mlir")
-TBB_DIR = os.path.join(os.environ["TBB_PATH"], "lib", "cmake", "tbb")
 NUMBA_MLIR_USE_MKL = os.environ.get("NUMBA_MLIR_USE_MKL", "ON")
 NUMBA_MLIR_USE_SYCL = os.environ.get("NUMBA_MLIR_USE_SYCL", "ON")
 CMAKE_INSTALL_PREFIX = os.path.join(root_dir, "..")
@@ -100,7 +99,6 @@ def build_sycl_math_runtime(install_prefix):
     cmake_cmd += [
         "-DCMAKE_BUILD_TYPE=Release",
         "-DMATH_SYCL_RUNTIME_INSTALL_PATH=" + MATH_SYCL_RUNTIME_INSTALL_PATH,
-        "-DTBB_DIR=" + TBB_DIR,
     ]
 
     if NUMBA_MLIR_USE_MKL is not None:
@@ -158,7 +156,6 @@ def build_runtime(install_dir):
         "-DCMAKE_BUILD_TYPE=Release",
         "-DLLVM_DIR=" + LLVM_DIR,
         "-DMLIR_DIR=" + MLIR_DIR,
-        "-DTBB_DIR=" + TBB_DIR,
         "-DCMAKE_INSTALL_PREFIX=" + CMAKE_INSTALL_PREFIX,
         "-DPython3_NumPy_INCLUDE_DIRS=" + NUMPY_INCLUDE_DIR,
         "-DPython3_FIND_STRATEGY=LOCATION",

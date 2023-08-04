@@ -10,7 +10,6 @@ source:
 build:
     number: {{ GIT_DESCRIBE_NUMBER }}
     script_env:
-        - TBB_PATH
         - LLVM_PATH
         - LEVEL_ZERO_DIR
         - LEVEL_ZERO_VERSION_CHECK_OFF

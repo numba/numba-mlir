@@ -731,14 +731,6 @@ jobs:
           cat $GITHUB_WORKSPACE/$LLVM_SHA_FILE >> $GITHUB_ENV
           echo 'EOF' >> $GITHUB_ENV
 
-      - name: Cache TBB
-        id: cache-tbb
-        uses: actions/cache@v3
-        with:
-          path: |
-            /home/runner/work/tbb/*
-          key: ${{ runner.os }}-build-tbb-${{ env.TBB_VER }}
-
       - name: Cache Level-Zero
         id: cache-level-zero
         uses: actions/cache@v3
@@ -766,7 +758,6 @@ jobs:
           pushd numba_mlir_conda
           conda create -y -n conda-build-env python=${{ matrix.python }} conda-build conda-verify boa -c conda-forge
           conda activate conda-build-env
-          export TBB_PATH=/home/runner/work/tbb/oneapi-tbb-${TBB_VER}
           export LLVM_PATH=/home/runner/work/llvm-mlir/_mlir_install
           export LEVEL_ZERO_DIR=/home/runner/work/level-zero/level-zero/level_zero_install
           export LEVEL_ZERO_VERSION_CHECK_OFF=1
