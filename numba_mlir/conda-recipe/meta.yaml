@@ -29,6 +29,7 @@ requirements:
         - mkl-dpcpp {{ dpcpp_version }}
         - dpcpp-cpp-rt {{ dpcpp_version }}
         - dpcpp_cpp_rt {{ dpcpp_version }}
+        - tbb-devel =2021.10.0
         - ninja
         - numba =0.57
         - pybind11

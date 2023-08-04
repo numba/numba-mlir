@@ -11,7 +11,7 @@ on:
   pull_request:
 
 env:
-  TBB_VER: 2021.9.0
+  TBB_VER: 2021.10.0
   LEVEL_ZERO_VER: v1.6.2
   LLVM_SHA_FILE: llvm-sha.txt
 
