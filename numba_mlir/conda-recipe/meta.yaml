@@ -23,6 +23,10 @@ requirements:
         - cmake >=3.23
         - mkl-devel >=2023.1
         - mkl-devel-dpcpp >=2023.1
+        - mkl >=2023.1
+        - mkl-dpcpp >=2023.1
+        - dpcpp-cpp-rt >=2023.1
+        - dpcpp_cpp_rt >=2023.1
         - ninja
         - numba =0.57
         - pybind11
@@ -31,8 +35,8 @@ requirements:
         - wheel
         - zlib
     run:
-        - mkl >=2023.1
-        - mkl-dpcpp >=2023.1
+        - mkl
+        - mkl-dpcpp
         - numba =0.57
         - packaging
         - python
