@@ -17,6 +17,7 @@ LLVM_PATH = os.environ["LLVM_PATH"]
 LLVM_DIR = os.path.join(LLVM_PATH, "lib", "cmake", "llvm")
 MLIR_DIR = os.path.join(LLVM_PATH, "lib", "cmake", "mlir")
 NUMBA_MLIR_USE_MKL = os.environ.get("NUMBA_MLIR_USE_MKL", "ON")
+NUMBA_MLIR_USE_L0 = os.environ.get("NUMBA_MLIR_USE_L0", "ON")
 NUMBA_MLIR_USE_SYCL = os.environ.get("NUMBA_MLIR_USE_SYCL", "ON")
 CMAKE_INSTALL_PREFIX = os.path.join(root_dir, "..")
 
@@ -186,15 +187,9 @@ def build_runtime(install_dir):
     # except ImportError:
     #     print("DPNP not found")
 
-    # GPU/L0
-    LEVEL_ZERO_DIR = os.getenv("LEVEL_ZERO_DIR", None)
-    if LEVEL_ZERO_DIR is None:
-        print("LEVEL_ZERO_DIR is not set")
-    else:
-        print("LEVEL_ZERO_DIR is", LEVEL_ZERO_DIR)
-        cmake_cmd += [
-            "-DNUMBA_MLIR_ENABLE_IGPU_DIALECT=ON",
-        ]
+    if NUMBA_MLIR_USE_L0 is not None or NUMBA_MLIR_USE_SYCL is not None:
+        print("Enable GPU pipeline")
+        cmake_cmd += ["-DNUMBA_MLIR_ENABLE_IGPU_DIALECT=ON"]
 
     _ensure_dir(cmake_build_dir)
 
