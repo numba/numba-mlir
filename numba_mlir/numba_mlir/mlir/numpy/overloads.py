@@ -73,7 +73,12 @@ class ReductionId(AbstractTemplate):
 
         arr = args[0]
         axis = kws.get("axis", None)
-        keepdims = kws.get("keepdims", False)
+
+        if "keepdims" in kws:
+            keepdims = kws["keepdims"].literal_value
+        else:
+            keepdims = False
+
         if "dtype" in kws:
             dtype = npydecl.parse_dtype(kws["dtype"])
         else:

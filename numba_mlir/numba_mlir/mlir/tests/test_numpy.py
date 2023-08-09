@@ -532,22 +532,26 @@ def test_array_capture2(val):
     assert_equal(py_func(a), jit_func(a))
 
 
-@parametrize_function_variants(
-    "py_func",
-    [
-        "lambda a: np.sum(a, dtype=np.int16)",
-        "lambda a: np.sum(a, dtype=np.int16, axis=0)",
-        "lambda a: np.sum(a, axis=0)",
-        "lambda a: np.sum(a, axis=1)",
-        "lambda a: np.sum(a, axis=-1)",
-        "lambda a: np.sum(a, axis=-2)",
-        "lambda a: np.sum(a, axis=0, keepdims=True)",
-        # 'lambda a: np.amax(a, axis=0)', # TODO: Not supported by numba
-        # 'lambda a: np.amax(a, axis=1)',
-        # 'lambda a: np.amin(a, axis=0)',
-        # 'lambda a: np.amin(a, axis=1)',
-    ],
-)
+def _gen_reduce_axis_func():
+    template = [
+        "lambda a: np.%s(a, dtype=np.int16)",
+        "lambda a: np.%s(a, dtype=np.int16, axis=0)",
+        "lambda a: np.%s(a, axis=0)",
+        "lambda a: np.%s(a, axis=1)",
+        "lambda a: np.%s(a, axis=-1)",
+        "lambda a: np.%s(a, axis=-2)",
+        "lambda a: np.%s(a, axis=0, keepdims=False)",
+        "lambda a: np.%s(a, axis=0, keepdims=True)",
+    ]
+
+    res = []
+    for func in ["sum"]:
+        for t in template:
+            res.append(t % func)
+    return res
+
+
+@parametrize_function_variants("py_func", _gen_reduce_axis_func())
 @pytest.mark.parametrize(
     "arr",
     [
