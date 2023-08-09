@@ -130,8 +130,12 @@ def _fix_axis(axis, num_dims):
     return axis
 
 
-def _array_reduce(builder, arg, axis, body, get_init_value):
+def _array_reduce(builder, arg, axis, keepdims, body, get_init_value):
     axis = literal(axis)
+    keepdims = literal(keepdims)
+    if not isinstance(keepdims, (bool, int)) and keepdims is not None:
+        return
+
     if axis is None:
         shape = arg.shape
         num_dims = len(shape)
@@ -152,11 +156,22 @@ def _array_reduce(builder, arg, axis, body, get_init_value):
             ("reduction" if i == axis else "parallel") for i in range(num_dims)
         ]
         dims1 = ",".join(["d%s" % i for i in range(num_dims)])
-        dims2 = ",".join(["d%s" % i for i in range(num_dims) if i != axis])
+        if keepdims:
+            dims2 = ",".join(
+                [(("d%s" % i) if i != axis else "0") for i in range(num_dims)]
+            )
+        else:
+            dims2 = ",".join(["d%s" % i for i in range(num_dims) if i != axis])
+
         expr1 = f"({dims1}) -> ({dims1})"
         expr2 = f"({dims1}) -> ({dims2})"
         maps = [expr1, expr2]
-        res_shape = tuple(shape[i] for i in range(len(shape)) if i != axis)
+
+        if keepdims:
+            res_shape = tuple((shape[i] if i != axis else 1) for i in range(len(shape)))
+        else:
+            res_shape = tuple(shape[i] for i in range(len(shape)) if i != axis)
+
         res_type = promote_int(arg.dtype, builder)
         init = builder.init_tensor(
             res_shape, res_type, get_init_value(builder, res_type)
@@ -166,13 +181,17 @@ def _array_reduce(builder, arg, axis, body, get_init_value):
 
 @register_func("array.sum")
 @register_func("numpy.sum", numpy.sum)
-def sum_impl(builder, arg, axis=None):
-    return _array_reduce(builder, arg, axis, lambda a, b: a + b, lambda b, t: 0)
+def sum_impl(builder, arg, axis=None, keepdims=False):
+    return _array_reduce(
+        builder, arg, axis, keepdims, lambda a, b: a + b, lambda b, t: 0
+    )
 
 
 @register_func("numpy.prod", numpy.prod)
-def prod_impl(builder, arg, axis=None):
-    return _array_reduce(builder, arg, axis, lambda a, b: a * b, lambda b, t: 1)
+def prod_impl(builder, arg, axis=None, keepdims=False):
+    return _array_reduce(
+        builder, arg, axis, keepdims, lambda a, b: a * b, lambda b, t: 1
+    )
 
 
 @register_func("numpy.flip", numpy.flip)
@@ -222,9 +241,9 @@ def _get_max_init_value(builder, dtype):
 
 @register_func("array.max")
 @register_func("numpy.amax", numpy.amax)
-def max_impl(builder, arg, axis=None):
+def max_impl(builder, arg, axis=None, keepdims=False):
     return _array_reduce(
-        builder, arg, axis, lambda a, b: max(a, b), _get_max_init_value
+        builder, arg, axis, keepdims, lambda a, b: max(a, b), _get_max_init_value
     )
 
 
@@ -236,16 +255,16 @@ def _get_min_init_value(builder, dtype):
 
 @register_func("array.min")
 @register_func("numpy.amin", numpy.amin)
-def min_impl(builder, arg, axis=None):
+def min_impl(builder, arg, axis=None, keepdims=False):
     return _array_reduce(
-        builder, arg, axis, lambda a, b: min(a, b), _get_min_init_value
+        builder, arg, axis, keepdims, lambda a, b: min(a, b), _get_min_init_value
     )
 
 
 @register_func("array.mean")
 @register_func("numpy.mean", numpy.mean)
-def mean_impl(builder, arg, axis=None):
-    return sum_impl(builder, arg, axis) / size_impl(builder, arg)
+def mean_impl(builder, arg, axis=None, keepdims=False):
+    return sum_impl(builder, arg, axis, keepdims) / size_impl(builder, arg)
 
 
 def _gen_unary_ops():

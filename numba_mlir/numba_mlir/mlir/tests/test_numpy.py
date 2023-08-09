@@ -539,6 +539,7 @@ def test_array_capture2(val):
         "lambda a: np.sum(a, axis=1)",
         "lambda a: np.sum(a, axis=-1)",
         "lambda a: np.sum(a, axis=-2)",
+        "lambda a: np.sum(a, axis=0, keepdims=True)",
         # 'lambda a: np.amax(a, axis=0)', # TODO: Not supported by numba
         # 'lambda a: np.amax(a, axis=1)',
         # 'lambda a: np.amin(a, axis=0)',
