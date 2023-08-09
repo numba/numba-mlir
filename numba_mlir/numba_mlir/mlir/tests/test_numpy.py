@@ -535,6 +535,8 @@ def test_array_capture2(val):
 @parametrize_function_variants(
     "py_func",
     [
+        "lambda a: np.sum(a, dtype=np.int16)",
+        "lambda a: np.sum(a, dtype=np.int16, axis=0)",
         "lambda a: np.sum(a, axis=0)",
         "lambda a: np.sum(a, axis=1)",
         "lambda a: np.sum(a, axis=-1)",
