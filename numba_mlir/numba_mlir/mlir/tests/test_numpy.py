@@ -545,8 +545,10 @@ def _gen_reduce_axis_func():
     ]
 
     res = []
-    for func in ["sum"]:
+    for func in ["sum", "amax", "amin"]:
         for t in template:
+            if (func == "amax" or func == "amin") and "dtype=" in t:
+                continue
             res.append(t % func)
     return res
 

@@ -101,3 +101,5 @@ class ReductionId(AbstractTemplate):
 
 
 _replace_global(npydecl.registry, np.sum, ReductionId)
+_replace_global(npydecl.registry, np.amax, ReductionId)
+_replace_global(npydecl.registry, np.amin, ReductionId)
