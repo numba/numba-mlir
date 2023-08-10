@@ -9,6 +9,7 @@ from numba.core.extending import overload
 from numba.core.typing.templates import signature, AbstractTemplate
 from numba.core.typing import npydecl
 from numba.core.types.npytypes import Array
+from numba.core import types
 
 
 def _get_init_like_impl(init_func, dtype, shape):
@@ -64,45 +65,50 @@ def _replace_global(registry, func, cls):
     registry.register_global(func)(cls)
 
 
-class ReductionId(AbstractTemplate):
-    prefer_literal = True
+def get_reduction_id(prefer_float):
+    class ReductionId(AbstractTemplate):
+        prefer_literal = True
 
-    def generic(self, args, kws):
-        if len(args) != 1 or not isinstance(args[0], Array):
-            return
+        def generic(self, args, kws):
+            if len(args) != 1 or not isinstance(args[0], Array):
+                return
 
-        arr = args[0]
-        axis = kws.get("axis", None)
+            arr = args[0]
+            axis = kws.get("axis", None)
 
-        if "keepdims" in kws:
-            keepdims = kws["keepdims"].literal_value
-        else:
-            keepdims = False
-
-        if "dtype" in kws:
-            dtype = npydecl.parse_dtype(kws["dtype"])
-        else:
-            dtype = arr.dtype
-
-        res_args = args + tuple(kws.values())
-        if axis is None:
-            if keepdims:
-                ndim = arr.ndim
+            if "keepdims" in kws:
+                keepdims = kws["keepdims"].literal_value
             else:
-                return signature(dtype, *res_args)
-        else:
-            if keepdims:
-                ndim = arr.ndim
+                keepdims = False
+
+            if "dtype" in kws:
+                dtype = npydecl.parse_dtype(kws["dtype"])
             else:
-                ndim = arr.ndim - 1
+                dtype = arr.dtype
+                if prefer_float and dtype in types.integer_domain:
+                    dtype = types.float64
 
-        arr_type = Array(dtype=dtype, ndim=ndim, layout="C")
-        return signature(arr_type, *res_args)
+            res_args = args + tuple(kws.values())
+            if axis is None:
+                if keepdims:
+                    ndim = arr.ndim
+                else:
+                    return signature(dtype, *res_args)
+            else:
+                if keepdims:
+                    ndim = arr.ndim
+                else:
+                    ndim = arr.ndim - 1
+
+            arr_type = Array(dtype=dtype, ndim=ndim, layout="C")
+            return signature(arr_type, *res_args)
+
+    return ReductionId
 
 
-_replace_global(npydecl.registry, np.sum, ReductionId)
-_replace_global(npydecl.registry, np.max, ReductionId)
-_replace_global(npydecl.registry, np.min, ReductionId)
-_replace_global(npydecl.registry, np.amax, ReductionId)
-_replace_global(npydecl.registry, np.amin, ReductionId)
-_replace_global(npydecl.registry, np.prod, ReductionId)
+ReductionId = get_reduction_id(False)
+ReductionFloatId = get_reduction_id(True)
+for func in [np.sum, np.max, np.min, np.amax, np.amin, np.prod]:
+    _replace_global(npydecl.registry, func, ReductionId)
+
+_replace_global(npydecl.registry, np.mean, ReductionFloatId)

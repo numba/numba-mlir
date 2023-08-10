@@ -545,7 +545,7 @@ def _gen_reduce_axis_func():
     ]
 
     res = []
-    for func in ["sum", "amax", "amin", "max", "min", "prod"]:
+    for func in ["sum", "amax", "amin", "max", "min", "prod", "mean"]:
         for t in template:
             if ("max" in func or "min" in func) and "dtype=" in t:
                 continue
