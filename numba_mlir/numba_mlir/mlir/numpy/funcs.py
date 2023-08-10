@@ -269,7 +269,29 @@ def min_impl(builder, arg, axis=None, keepdims=False):
 @register_func("array.mean")
 @register_func("numpy.mean", numpy.mean)
 def mean_impl(builder, arg, dtype=None, axis=None, keepdims=False):
-    return sum_impl(builder, arg, dtype, axis, keepdims) / size_impl(builder, arg)
+    if dtype is None:
+        dtype = arg.dtype
+        if is_int(dtype, builder):
+            dtype = builder.float64
+
+    axis = literal(axis)
+    s = sum_impl(builder, arg, dtype, axis, keepdims)
+
+    if axis is None:
+        size = size_impl(builder, arg)
+        res = builder.cast(s / size, dtype)
+    else:
+        shape = arg.shape
+        axis = _fix_axis(axis, len(shape))
+        size = builder.cast(shape[axis], dtype)
+        size = builder.init_tensor(s.shape, dtype, size)
+
+        def body(a, b, c):
+            return a / b
+
+        res = eltwise(builder, (s, size), body, dtype)
+
+    return res
 
 
 def _gen_unary_ops():
