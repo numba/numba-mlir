@@ -92,12 +92,12 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
     MLIRIR
     MLIRLLVMDialect
     MLIRLLVMToLLVMIRTranslation
-    MLIRLinalgToLLVM
     MLIRLinalgTransforms
     MLIRMathToLLVM
     MLIRMathToLibm
     MLIRMathTransforms
     MLIRReconcileUnrealizedCasts
+    MLIRSCFToControlFlow
     MLIRSCFToGPU
     MLIRSPIRVSerialization
     MLIRSPIRVTransforms

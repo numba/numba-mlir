@@ -1845,7 +1845,7 @@ mlir::OpFoldResult TupleExtractOp::fold(FoldAdaptor adaptor) {
 /// correspond to a constant value for each operand, or null if that operand is
 /// not a constant.
 void EnvironmentRegionOp::getSuccessorRegions(
-    std::optional<unsigned> index, mlir::ArrayRef<mlir::Attribute> operands,
+    std::optional<unsigned> index,
     mlir::SmallVectorImpl<mlir::RegionSuccessor> &regions) {
   // Branch into body if we came from parent region.
   if (!index) {
