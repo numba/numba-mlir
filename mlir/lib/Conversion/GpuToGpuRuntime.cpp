@@ -522,204 +522,6 @@ struct ConvertGPUDeallocsPass
   }
 };
 
-static void setInsertionPointToStart(mlir::OpBuilder &builder,
-                                     mlir::Value val) {
-  if (auto parentOp = val.getDefiningOp()) {
-    builder.setInsertionPointAfter(parentOp);
-  } else {
-    builder.setInsertionPointToStart(val.getParentBlock());
-  }
-}
-
-// TODO: copypasted from upstream.
-static std::tuple<mlir::Value, mlir::OpFoldResult,
-                  llvm::SmallVector<mlir::OpFoldResult>>
-getFlatOffsetAndStrides(
-    mlir::OpBuilder &rewriter, mlir::Location loc, mlir::Value source,
-    llvm::ArrayRef<mlir::OpFoldResult> subOffsets,
-    llvm::ArrayRef<mlir::OpFoldResult> subStrides = std::nullopt) {
-  auto sourceType = source.getType().cast<mlir::MemRefType>();
-  unsigned sourceRank = sourceType.getRank();
-
-  auto newExtractStridedMetadata = [&]() {
-    mlir::OpBuilder::InsertionGuard g(rewriter);
-    setInsertionPointToStart(rewriter, source);
-    return rewriter.create<mlir::memref::ExtractStridedMetadataOp>(loc, source);
-  }();
-
-  auto &&[sourceStrides, sourceOffset] = getStridesAndOffset(sourceType);
-
-  // Compute the new strides and offset from the base strides and offset:
-  // newStride#i = baseStride#i * subStride#i
-  // offset = baseOffset + sum(subOffsets#i * newStrides#i)
-  llvm::SmallVector<mlir::OpFoldResult> strides;
-  auto origStrides = newExtractStridedMetadata.getStrides();
-
-  // Hold the affine symbols and values for the computation of the offset.
-  llvm::SmallVector<mlir::OpFoldResult> values(2 * sourceRank + 1);
-  llvm::SmallVector<mlir::AffineExpr> symbols(2 * sourceRank + 1);
-
-  mlir::bindSymbolsList(rewriter.getContext(), mlir::MutableArrayRef{symbols});
-  mlir::AffineExpr expr = symbols.front();
-  values[0] = mlir::ShapedType::isDynamic(sourceOffset)
-                  ? getAsOpFoldResult(newExtractStridedMetadata.getOffset())
-                  : rewriter.getIndexAttr(sourceOffset);
-
-  mlir::AffineExpr s0 = rewriter.getAffineSymbolExpr(0);
-  mlir::AffineExpr s1 = rewriter.getAffineSymbolExpr(1);
-  for (unsigned i = 0; i < sourceRank; ++i) {
-    // Compute the stride.
-    mlir::OpFoldResult origStride =
-        mlir::ShapedType::isDynamic(sourceStrides[i])
-            ? origStrides[i]
-            : mlir::OpFoldResult(rewriter.getIndexAttr(sourceStrides[i]));
-
-    if (!subStrides.empty()) {
-      strides.push_back(mlir::affine::makeComposedFoldedAffineApply(
-          rewriter, loc, s0 * s1, {subStrides[i], origStride}));
-    }
-
-    // Build up the computation of the offset.
-    unsigned baseIdxForDim = 1 + 2 * i;
-    unsigned subOffsetForDim = baseIdxForDim;
-    unsigned origStrideForDim = baseIdxForDim + 1;
-    expr = expr + symbols[subOffsetForDim] * symbols[origStrideForDim];
-    values[subOffsetForDim] = subOffsets[i];
-    values[origStrideForDim] = origStride;
-  }
-
-  // Compute the offset.
-  mlir::OpFoldResult finalOffset =
-      mlir::affine::makeComposedFoldedAffineApply(rewriter, loc, expr, values);
-
-  return {newExtractStridedMetadata.getBaseBuffer(), finalOffset, strides};
-}
-
-static mlir::Value getFlatMemref(mlir::OpBuilder &rewriter, mlir::Location loc,
-                                 mlir::Value source, mlir::ValueRange offsets) {
-  auto offsetsTemp = mlir::getAsOpFoldResult(offsets);
-  auto &&[base, offset, ignore] =
-      getFlatOffsetAndStrides(rewriter, loc, source, offsetsTemp);
-  auto retType = base.getType().cast<mlir::MemRefType>();
-  return rewriter.create<mlir::memref::ReinterpretCastOp>(
-      loc, retType, base, offset, std::nullopt, std::nullopt);
-}
-
-static bool needFlatten(mlir::Value val) {
-  auto type = val.getType().cast<mlir::MemRefType>();
-  return type.getRank() != 0;
-}
-
-struct FlattenLoad : public mlir::OpRewritePattern<mlir::memref::LoadOp> {
-  using OpRewritePattern::OpRewritePattern;
-
-  mlir::LogicalResult
-  matchAndRewrite(mlir::memref::LoadOp op,
-                  mlir::PatternRewriter &rewriter) const override {
-    if (!op->getParentOfType<mlir::gpu::LaunchOp>())
-      return mlir::failure();
-
-    auto memref = op.getMemref();
-    if (!needFlatten(memref))
-      return mlir::failure();
-
-    auto loc = op.getLoc();
-    auto flatMemref = getFlatMemref(rewriter, loc, memref, op.getIndices());
-    rewriter.replaceOpWithNewOp<mlir::memref::LoadOp>(op, flatMemref);
-    return mlir::success();
-  }
-};
-
-struct FlattenStore : public mlir::OpRewritePattern<mlir::memref::StoreOp> {
-  using OpRewritePattern::OpRewritePattern;
-
-  mlir::LogicalResult
-  matchAndRewrite(mlir::memref::StoreOp op,
-                  mlir::PatternRewriter &rewriter) const override {
-    if (!op->getParentOfType<mlir::gpu::LaunchOp>())
-      return mlir::failure();
-
-    auto memref = op.getMemref();
-    if (!needFlatten(memref))
-      return mlir::failure();
-
-    auto loc = op.getLoc();
-    auto flatMemref = getFlatMemref(rewriter, loc, memref, op.getIndices());
-    auto value = op.getValue();
-    rewriter.replaceOpWithNewOp<mlir::memref::StoreOp>(op, value, flatMemref);
-    return mlir::success();
-  }
-};
-
-struct FlattenSubview : public mlir::OpRewritePattern<mlir::memref::SubViewOp> {
-  using OpRewritePattern::OpRewritePattern;
-
-  mlir::LogicalResult
-  matchAndRewrite(mlir::memref::SubViewOp op,
-                  mlir::PatternRewriter &rewriter) const override {
-    if (!op->getParentOfType<mlir::gpu::LaunchOp>())
-      return mlir::failure();
-
-    auto memref = op.getSource();
-    if (!needFlatten(memref))
-      return mlir::failure();
-
-    auto loc = op.getLoc();
-    auto subOffsets = op.getMixedOffsets();
-    auto subSizes = op.getMixedSizes();
-    auto subStrides = op.getMixedStrides();
-    auto &&[base, finalOffset, strides] =
-        getFlatOffsetAndStrides(rewriter, loc, memref, subOffsets, subStrides);
-
-    auto srcType = memref.getType().cast<mlir::MemRefType>();
-    auto resultType = op.getType().cast<mlir::MemRefType>();
-    unsigned subRank = static_cast<unsigned>(resultType.getRank());
-
-    auto droppedDims = op.getDroppedDims();
-
-    llvm::SmallVector<mlir::OpFoldResult> finalSizes;
-    finalSizes.reserve(subRank);
-
-    llvm::SmallVector<mlir::OpFoldResult> finalStrides;
-    finalStrides.reserve(subRank);
-
-    for (auto i : llvm::seq(0u, static_cast<unsigned>(srcType.getRank()))) {
-      if (droppedDims.test(i))
-        continue;
-
-      finalSizes.push_back(subSizes[i]);
-      finalStrides.push_back(strides[i]);
-    }
-
-    rewriter.replaceOpWithNewOp<mlir::memref::ReinterpretCastOp>(
-        op, resultType, base, finalOffset, finalSizes, finalStrides);
-    return mlir::success();
-  }
-};
-
-struct UnstrideMemrefsPass
-    : public mlir::PassWrapper<UnstrideMemrefsPass, mlir::OperationPass<void>> {
-  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(UnstrideMemrefsPass)
-
-  virtual void
-  getDependentDialects(mlir::DialectRegistry &registry) const override {
-    registry.insert<mlir::gpu::GPUDialect>();
-    registry.insert<mlir::memref::MemRefDialect>();
-    registry.insert<numba::util::NumbaUtilDialect>();
-  }
-
-  void runOnOperation() override {
-    auto *ctx = &getContext();
-    mlir::RewritePatternSet patterns(ctx);
-
-    patterns.insert<FlattenLoad, FlattenStore, FlattenSubview>(ctx);
-
-    if (mlir::failed(mlir::applyPatternsAndFoldGreedily(getOperation(),
-                                                        std::move(patterns))))
-      return signalPassFailure();
-  }
-};
-
 static std::optional<mlir::Value> getGpuStream(mlir::OpBuilder &builder,
                                                mlir::Operation *op) {
   assert(op);
@@ -751,36 +553,6 @@ static std::optional<mlir::Value> getGpuStream(mlir::OpBuilder &builder,
   builder.create<gpu_runtime::DestroyGpuStreamOp>(loc, stream);
   return stream;
 }
-
-static std::optional<unsigned> getTypeSize(mlir::Type type) {
-  if (type.isIntOrFloat())
-    return type.getIntOrFloatBitWidth() / 8;
-
-  if (auto vec = mlir::dyn_cast<mlir::VectorType>(type)) {
-    if (!vec.hasStaticShape())
-      return std::nullopt;
-
-    auto elemSize = getTypeSize(vec.getElementType());
-    if (!elemSize)
-      return std::nullopt;
-
-    return static_cast<unsigned>(vec.getNumElements()) * *elemSize;
-  }
-  return std::nullopt;
-}
-
-template <typename T>
-class ConvertCastOp : public mlir::OpConversionPattern<T> {
-public:
-  using mlir::OpConversionPattern<T>::OpConversionPattern;
-
-  mlir::LogicalResult
-  matchAndRewrite(T op, typename T::Adaptor adaptor,
-                  mlir::ConversionPatternRewriter &rewriter) const override {
-    rewriter.replaceOp(op, adaptor.getSource());
-    return mlir::success();
-  }
-};
 
 template <typename Op>
 class ConvertBitcastOp : public mlir::OpConversionPattern<Op> {
@@ -1309,7 +1081,6 @@ struct GPUToSpirvPass
       mlir::populateMemRefToSPIRVPatterns(typeConverter, patterns);
 
       patterns.insert<
-          ConvertCastOp<mlir::memref::CastOp>,
           ConvertBitcastOp<numba::util::BitcastOp>,
           ConvertBitcastOp<numba::util::MemrefBitcastOp>, ConvertAtomicRMW,
           AllocaOpPattern, ConvertFunc, ConvertAssert, ConvertBarrierOp,
@@ -2839,10 +2610,6 @@ std::unique_ptr<mlir::Pass> gpu_runtime::createInsertGPUAllocsPass() {
 
 std::unique_ptr<mlir::Pass> gpu_runtime::createConvertGPUDeallocsPass() {
   return std::make_unique<ConvertGPUDeallocsPass>();
-}
-
-std::unique_ptr<mlir::Pass> gpu_runtime::createUnstrideMemrefsPass() {
-  return std::make_unique<UnstrideMemrefsPass>();
 }
 
 std::unique_ptr<mlir::Pass> gpu_runtime::createSerializeSPIRVPass() {

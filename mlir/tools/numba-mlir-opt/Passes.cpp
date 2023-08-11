@@ -10,6 +10,7 @@
 
 #include <mlir/Dialect/Func/IR/FuncOps.h>
 #include <mlir/Dialect/GPU/IR/GPUDialect.h>
+#include <mlir/Dialect/GPU/Transforms/Passes.h>
 #include <mlir/Dialect/SCF/IR/SCF.h>
 
 #include "numba/Conversion/CfgToScf.hpp"
@@ -50,7 +51,7 @@ static mlir::PassPipelineRegistration<>
     UnstrideMemrefPass("unstride-memref", "Used to flatten 2D to 1D",
                        [](mlir::OpPassManager &pm) {
                          pm.addNestedPass<mlir::func::FuncOp>(
-                             gpu_runtime::createUnstrideMemrefsPass());
+                             mlir::createGpuDecomposeMemrefsPass());
                        });
 
 static mlir::PassPipelineRegistration<>

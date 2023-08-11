@@ -62,7 +62,7 @@ static LogicalResult runMLIRPasses(mlir::Operation *op,
       gpu_runtime::createInsertGPUAllocsPass());
   passManager.addPass(mlir::createCanonicalizerPass());
   passManager.addNestedPass<mlir::func::FuncOp>(
-      gpu_runtime::createUnstrideMemrefsPass());
+      mlir::createGpuDecomposeMemrefsPass());
   passManager.addNestedPass<mlir::func::FuncOp>(mlir::createLowerAffinePass());
 
   passManager.addPass(createGpuKernelOutliningPass());
