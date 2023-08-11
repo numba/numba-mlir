@@ -34,6 +34,7 @@
 #include <mlir/Dialect/SPIRV/IR/SPIRVOps.h>
 #include <mlir/Dialect/SPIRV/IR/TargetAndABI.h>
 #include <mlir/Dialect/SPIRV/Transforms/SPIRVConversion.h>
+#include <mlir/Dialect/UB/IR/UBOps.h>
 #include <mlir/Pass/Pass.h>
 #include <mlir/Target/SPIRV/Serialization.h>
 #include <mlir/Transforms/DialectConversion.h>
@@ -935,6 +936,27 @@ public:
   }
 };
 
+class ConvertPoison : public mlir::OpConversionPattern<mlir::ub::PoisonOp> {
+public:
+  using OpConversionPattern::OpConversionPattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(mlir::ub::PoisonOp op, mlir::ub::PoisonOp::Adaptor adaptor,
+                  mlir::ConversionPatternRewriter &rewriter) const override {
+    auto srcType = op.getType();
+    if (!mlir::isa<mlir::MemRefType>(srcType))
+      return mlir::failure();
+
+    auto converter = getTypeConverter();
+    auto type = converter->convertType(srcType);
+    if (!type)
+      return mlir::failure();
+
+    rewriter.replaceOpWithNewOp<mlir::spirv::UndefOp>(op, type);
+    return mlir::success();
+  }
+};
+
 template <typename SourceOp, mlir::spirv::BuiltIn builtin>
 class LaunchConfigConversion : public mlir::OpConversionPattern<SourceOp> {
 public:
@@ -1086,7 +1108,8 @@ struct GPUToSpirvPass
           ConvertBitcastOp<numba::util::BitcastOp>,
           ConvertBitcastOp<numba::util::MemrefBitcastOp>, ConvertAtomicRMW,
           AllocaOpPattern, ConvertFunc, ConvertAssert, ConvertBarrierOp,
-          ConvertMemFenceOp, ConvertUndef, ConvertGlobalOp, ConvertGetGlobalOp,
+          ConvertMemFenceOp, ConvertUndef, ConvertPoison, ConvertGlobalOp,
+          ConvertGetGlobalOp,
           LaunchConfigConversion<mlir::gpu::BlockIdOp,
                                  mlir::spirv::BuiltIn::WorkgroupId>,
           LaunchConfigConversion<mlir::gpu::GridDimOp,
