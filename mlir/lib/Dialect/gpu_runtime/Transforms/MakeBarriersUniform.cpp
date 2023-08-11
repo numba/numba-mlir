@@ -4,12 +4,12 @@
 
 #include "numba/Dialect/gpu_runtime/Transforms/MakeBarriersUniform.hpp"
 
-#include "numba/Dialect/numba_util/Dialect.hpp"
-
 #include <mlir/Dialect/Arith/IR/Arith.h>
 #include <mlir/Dialect/GPU/IR/GPUDialect.h>
 #include <mlir/Dialect/SCF/IR/SCF.h>
+#include <mlir/Dialect/UB/IR/UBOps.h>
 #include <mlir/IR/Dominance.h>
+#include <mlir/IR/IRMapping.h>
 #include <mlir/Pass/Pass.h>
 #include <mlir/Transforms/GreedyPatternRewriteDriver.h>
 
@@ -148,7 +148,8 @@ static mlir::LogicalResult convertBlockingOp(mlir::Operation *op,
     llvm::SmallVector<mlir::Value> results;
     results.reserve(yieldArgs.size());
     for (auto arg : yieldArgs) {
-      auto val = builder.create<numba::util::UndefOp>(loc, arg.getType());
+      auto val =
+          builder.create<mlir::ub::PoisonOp>(loc, arg.getType(), nullptr);
       results.emplace_back(val);
     }
 
@@ -283,7 +284,7 @@ struct MakeBarriersUniformPass
     registry.insert<mlir::arith::ArithDialect>();
     registry.insert<mlir::gpu::GPUDialect>();
     registry.insert<mlir::scf::SCFDialect>();
-    registry.insert<numba::util::NumbaUtilDialect>();
+    registry.insert<mlir::ub::UBDialect>();
   }
 
   void runOnOperation() override {

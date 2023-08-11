@@ -18,6 +18,7 @@
 #include <mlir/Conversion/MathToSPIRV/MathToSPIRV.h>
 #include <mlir/Conversion/MemRefToSPIRV/MemRefToSPIRV.h>
 #include <mlir/Conversion/SCFToSPIRV/SCFToSPIRV.h>
+#include <mlir/Conversion/UBToSPIRV/UBToSPIRV.h>
 #include <mlir/Dialect/Affine/IR/AffineOps.h>
 #include <mlir/Dialect/Bufferization/Transforms/BufferViewFlowAnalysis.h>
 #include <mlir/Dialect/ControlFlow/IR/ControlFlowOps.h>
@@ -1079,6 +1080,7 @@ struct GPUToSpirvPass
       mlir::arith::populateArithToSPIRVPatterns(typeConverter, patterns);
       mlir::populateMathToSPIRVPatterns(typeConverter, patterns);
       mlir::populateMemRefToSPIRVPatterns(typeConverter, patterns);
+      mlir::ub::populateUBToSPIRVConversionPatterns(typeConverter, patterns);
 
       patterns.insert<
           ConvertBitcastOp<numba::util::BitcastOp>,
