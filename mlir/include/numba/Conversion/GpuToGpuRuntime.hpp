@@ -27,7 +27,6 @@ std::unique_ptr<mlir::Pass> createGPUToSpirvPass();
 std::unique_ptr<mlir::Pass> createGpuIndexCastPass();
 std::unique_ptr<mlir::Pass> createInsertGPUAllocsPass();
 std::unique_ptr<mlir::Pass> createConvertGPUDeallocsPass();
-std::unique_ptr<mlir::Pass> createUnstrideMemrefsPass();
 std::unique_ptr<mlir::Pass> createSerializeSPIRVPass();
 std::unique_ptr<mlir::Pass> createGPUExPass();
 
