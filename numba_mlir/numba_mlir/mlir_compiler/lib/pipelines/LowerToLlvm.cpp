@@ -13,7 +13,6 @@
 #include <mlir/Conversion/LLVMCommon/ConversionTarget.h>
 #include <mlir/Conversion/LLVMCommon/LoweringOptions.h>
 #include <mlir/Conversion/LLVMCommon/TypeConverter.h>
-#include <mlir/Conversion/LinalgToLLVM/LinalgToLLVM.h>
 #include <mlir/Conversion/MathToLLVM/MathToLLVM.h>
 #include <mlir/Conversion/MathToLibm/MathToLibm.h>
 #include <mlir/Conversion/MemRefToLLVM/AllocLikeConversion.h>
@@ -911,6 +910,11 @@ struct AllocOpLowering : public mlir::AllocLikeOpLLVMLowering {
   }
 
 private:
+  mlir::Value createIndexConstant(mlir::OpBuilder &builder, mlir::Location loc,
+                                  int64_t val) const {
+    return createIndexAttrConstant(builder, loc, getIndexType(), val);
+  }
+
   mlir::Value createAllocCall(mlir::Location loc, mlir::StringRef name,
                               mlir::Type ptrType,
                               mlir::ArrayRef<mlir::Value> params,
@@ -1564,7 +1568,6 @@ struct LLVMLoweringPass
     populateFuncToLLVMFuncOpConversionPattern(typeConverter, patterns);
     populateFuncToLLVMConversionPatterns(typeConverter, patterns);
     populateFinalizeMemRefToLLVMConversionPatterns(typeConverter, patterns);
-    populateLinalgToLLVMConversionPatterns(typeConverter, patterns);
     cf::populateControlFlowToLLVMConversionPatterns(typeConverter, patterns);
     arith::populateArithToLLVMConversionPatterns(typeConverter, patterns);
     populateComplexToLLVMConversionPatterns(typeConverter, patterns);

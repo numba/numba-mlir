@@ -126,9 +126,9 @@ struct EnvValueLattice : public mlir::dataflow::Lattice<EnvValue> {
 };
 
 class EnvValueAnalysis
-    : public mlir::dataflow::SparseDataFlowAnalysis<EnvValueLattice> {
+    : public mlir::dataflow::SparseForwardDataFlowAnalysis<EnvValueLattice> {
 public:
-  using SparseDataFlowAnalysis::SparseDataFlowAnalysis;
+  using SparseForwardDataFlowAnalysis::SparseForwardDataFlowAnalysis;
 
   void visitOperation(mlir::Operation *op,
                       llvm::ArrayRef<const EnvValueLattice *> operands,

@@ -131,9 +131,9 @@ struct TensorValueLattice : public mlir::dataflow::Lattice<ShapeValue> {
 };
 
 class TensorValueAnalysis
-    : public mlir::dataflow::SparseDataFlowAnalysis<TensorValueLattice> {
+    : public mlir::dataflow::SparseForwardDataFlowAnalysis<TensorValueLattice> {
 public:
-  using SparseDataFlowAnalysis::SparseDataFlowAnalysis;
+  using SparseForwardDataFlowAnalysis::SparseForwardDataFlowAnalysis;
 
   void visitOperation(mlir::Operation *op,
                       llvm::ArrayRef<const TensorValueLattice *> /*operands*/,
@@ -199,9 +199,9 @@ static bool isShapedCast(mlir::Operation *op) {
 }
 
 class ShapeValueAnalysis
-    : public mlir::dataflow::SparseDataFlowAnalysis<ShapeValueLattice> {
+    : public mlir::dataflow::SparseForwardDataFlowAnalysis<ShapeValueLattice> {
 public:
-  using SparseDataFlowAnalysis::SparseDataFlowAnalysis;
+  using SparseForwardDataFlowAnalysis::SparseForwardDataFlowAnalysis;
 
   void visitOperation(mlir::Operation *op,
                       llvm::ArrayRef<const ShapeValueLattice *> operands,
@@ -529,7 +529,7 @@ public:
   }
 
   mlir::LogicalResult initialize(mlir::Operation *top) override {
-    if (mlir::failed(SparseDataFlowAnalysis::initialize(top)))
+    if (mlir::failed(SparseForwardDataFlowAnalysis::initialize(top)))
       return mlir::failure();
 
     auto attrName = mlir::StringAttr::get(
