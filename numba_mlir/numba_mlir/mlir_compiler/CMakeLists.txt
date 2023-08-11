@@ -103,6 +103,7 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
     MLIRSPIRVTransforms
     MLIRTensorTransforms
     MLIRTransforms
+    MLIRUBToLLVM
     )
 
 target_include_directories(${PROJECT_NAME} SYSTEM PRIVATE

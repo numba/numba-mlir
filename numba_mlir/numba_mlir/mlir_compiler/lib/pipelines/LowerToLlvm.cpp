@@ -18,6 +18,7 @@
 #include <mlir/Conversion/MemRefToLLVM/AllocLikeConversion.h>
 #include <mlir/Conversion/MemRefToLLVM/MemRefToLLVM.h>
 #include <mlir/Conversion/SCFToControlFlow/SCFToControlFlow.h>
+#include <mlir/Conversion/UBToLLVM/UBToLLVM.h>
 #include <mlir/Dialect/Arith/IR/Arith.h>
 #include <mlir/Dialect/Arith/Transforms/Passes.h>
 #include <mlir/Dialect/ControlFlow/IR/ControlFlowOps.h>
@@ -27,6 +28,7 @@
 #include <mlir/Dialect/MemRef/IR/MemRef.h>
 #include <mlir/Dialect/MemRef/Transforms/Passes.h>
 #include <mlir/Dialect/SCF/IR/SCF.h>
+#include <mlir/Dialect/UB/IR/UBOps.h>
 #include <mlir/IR/Builders.h>
 #include <mlir/IR/IRMapping.h>
 #include <mlir/IR/PatternMatch.h>
@@ -865,6 +867,28 @@ struct AtomicRMWOpLowering
   }
 };
 
+// TODO: upstream
+struct LowerPoison : public mlir::ConvertOpToLLVMPattern<mlir::ub::PoisonOp> {
+  using ConvertOpToLLVMPattern::ConvertOpToLLVMPattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(mlir::ub::PoisonOp op,
+                  mlir::ub::PoisonOp::Adaptor /*adaptor*/,
+                  mlir::ConversionPatternRewriter &rewriter) const override {
+    auto srcType = op.getType();
+    if (!mlir::isa<mlir::MemRefType>(srcType))
+      return mlir::failure();
+
+    auto converter = getTypeConverter();
+    auto type = converter->convertType(srcType);
+    if (!type)
+      return mlir::failure();
+
+    rewriter.replaceOpWithNewOp<mlir::LLVM::PoisonOp>(op, type);
+    return mlir::success();
+  }
+};
+
 struct AllocOpLowering : public mlir::AllocLikeOpLLVMLowering {
   AllocOpLowering(mlir::LLVMTypeConverter &converter)
       : AllocLikeOpLLVMLowering(mlir::memref::AllocOp::getOperationName(),
@@ -1571,9 +1595,10 @@ struct LLVMLoweringPass
     cf::populateControlFlowToLLVMConversionPatterns(typeConverter, patterns);
     arith::populateArithToLLVMConversionPatterns(typeConverter, patterns);
     populateComplexToLLVMConversionPatterns(typeConverter, patterns);
+    ub::populateUBToLLVMConversionPatterns(typeConverter, patterns);
 
     patterns.insert<AllocOpLowering, DeallocOpLowering, LowerRetainOp,
-                    AtomicRMWOpLowering>(typeConverter);
+                    AtomicRMWOpLowering, LowerPoison>(typeConverter);
 
     LLVMConversionTarget target(context);
     target.addIllegalDialect<mlir::func::FuncDialect>();
