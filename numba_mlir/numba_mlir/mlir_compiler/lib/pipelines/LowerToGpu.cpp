@@ -24,6 +24,7 @@
 #include <mlir/Dialect/SPIRV/IR/SPIRVOps.h>
 #include <mlir/Dialect/SPIRV/IR/TargetAndABI.h>
 #include <mlir/Dialect/SPIRV/Transforms/Passes.h>
+#include <mlir/Dialect/UB/IR/UBOps.h>
 #include <mlir/IR/Dominance.h>
 #include <mlir/IR/IRMapping.h>
 #include <mlir/Pass/PassManager.h>
@@ -1879,8 +1880,8 @@ public:
             auto isSinkingBeneficiary = [](mlir::Operation *op) -> bool {
               return isa<arith::ConstantOp, func::ConstantOp, arith::SelectOp,
                          arith::CmpIOp, arith::IndexCastOp, arith::MulIOp,
-                         arith::SubIOp, arith::AddIOp, numba::util::UndefOp>(
-                  op);
+                         arith::SubIOp, arith::AddIOp, numba::util::UndefOp,
+                         mlir::ub::PoisonOp>(op);
             };
 
             // Pull in instructions that can be sunk
