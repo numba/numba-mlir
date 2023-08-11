@@ -752,36 +752,6 @@ static std::optional<mlir::Value> getGpuStream(mlir::OpBuilder &builder,
   return stream;
 }
 
-static std::optional<unsigned> getTypeSize(mlir::Type type) {
-  if (type.isIntOrFloat())
-    return type.getIntOrFloatBitWidth() / 8;
-
-  if (auto vec = mlir::dyn_cast<mlir::VectorType>(type)) {
-    if (!vec.hasStaticShape())
-      return std::nullopt;
-
-    auto elemSize = getTypeSize(vec.getElementType());
-    if (!elemSize)
-      return std::nullopt;
-
-    return static_cast<unsigned>(vec.getNumElements()) * *elemSize;
-  }
-  return std::nullopt;
-}
-
-template <typename T>
-class ConvertCastOp : public mlir::OpConversionPattern<T> {
-public:
-  using mlir::OpConversionPattern<T>::OpConversionPattern;
-
-  mlir::LogicalResult
-  matchAndRewrite(T op, typename T::Adaptor adaptor,
-                  mlir::ConversionPatternRewriter &rewriter) const override {
-    rewriter.replaceOp(op, adaptor.getSource());
-    return mlir::success();
-  }
-};
-
 template <typename Op>
 class ConvertBitcastOp : public mlir::OpConversionPattern<Op> {
 public:
@@ -1309,7 +1279,6 @@ struct GPUToSpirvPass
       mlir::populateMemRefToSPIRVPatterns(typeConverter, patterns);
 
       patterns.insert<
-          ConvertCastOp<mlir::memref::CastOp>,
           ConvertBitcastOp<numba::util::BitcastOp>,
           ConvertBitcastOp<numba::util::MemrefBitcastOp>, ConvertAtomicRMW,
           AllocaOpPattern, ConvertFunc, ConvertAssert, ConvertBarrierOp,
