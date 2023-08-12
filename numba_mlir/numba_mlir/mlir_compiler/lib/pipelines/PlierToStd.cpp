@@ -13,6 +13,7 @@
 #include <mlir/Dialect/Func/IR/FuncOps.h>
 #include <mlir/Dialect/Math/IR/Math.h>
 #include <mlir/Dialect/SCF/IR/SCF.h>
+#include <mlir/Dialect/UB/IR/UBOps.h>
 #include <mlir/IR/Dialect.h>
 #include <mlir/IR/IRMapping.h>
 #include <mlir/Pass/Pass.h>
@@ -70,10 +71,10 @@ struct ConstOpLowering : public mlir::OpConversionPattern<plier::ConstOp> {
     if (!expectedType)
       return mlir::failure();
 
-    auto value = adaptor.getVal();
-    auto typeAttr = value.dyn_cast_or_null<mlir::TypedAttr>();
+    auto typeAttr =
+        mlir::dyn_cast_or_null<mlir::TypedAttr>(adaptor.getValAttr());
     if (typeAttr && isSupportedType(typeAttr.getType())) {
-      if (auto intAttr = value.dyn_cast<mlir::IntegerAttr>()) {
+      if (auto intAttr = mlir::dyn_cast<mlir::IntegerAttr>(typeAttr)) {
         auto intVal = intAttr.getValue().getSExtValue();
         auto origType = intAttr.getType().cast<mlir::IntegerType>();
         auto type = numba::makeSignlessType(origType);
@@ -85,12 +86,13 @@ struct ConstOpLowering : public mlir::OpConversionPattern<plier::ConstOp> {
         return mlir::success();
       }
 
-      if (auto floatAttr = value.dyn_cast<mlir::FloatAttr>()) {
+      if (auto floatAttr = mlir::dyn_cast<mlir::FloatAttr>(typeAttr)) {
         rewriter.replaceOpWithNewOp<mlir::arith::ConstantOp>(op, floatAttr);
         return mlir::success();
       }
 
-      if (auto complexAttr = value.dyn_cast<mlir::complex::NumberAttr>()) {
+      if (auto complexAttr =
+              mlir::dyn_cast<mlir::complex::NumberAttr>(typeAttr)) {
         const double vals[] = {
             complexAttr.getReal().convertToDouble(),
             complexAttr.getImag().convertToDouble(),
@@ -104,8 +106,9 @@ struct ConstOpLowering : public mlir::OpConversionPattern<plier::ConstOp> {
       return mlir::failure();
     }
 
-    if (expectedType.isa<mlir::NoneType>()) {
-      rewriter.replaceOpWithNewOp<numba::util::UndefOp>(op, expectedType);
+    if (mlir::isa<mlir::NoneType>(expectedType)) {
+      rewriter.replaceOpWithNewOp<mlir::ub::PoisonOp>(op, expectedType,
+                                                      nullptr);
       return mlir::success();
     }
     return mlir::failure();
@@ -141,14 +144,15 @@ struct LiteralLowering : public mlir::OpConversionPattern<Op> {
     if (!convertedType)
       return mlir::failure();
 
-    if (convertedType.template isa<mlir::NoneType>()) {
-      rewriter.replaceOpWithNewOp<numba::util::UndefOp>(op, convertedType);
+    if (mlir::isa<mlir::NoneType>(convertedType)) {
+      rewriter.replaceOpWithNewOp<mlir::ub::PoisonOp>(op, convertedType,
+                                                      nullptr);
       return mlir::success();
     }
 
     if (auto typevar =
-            convertedType.template dyn_cast<numba::util::TypeVarType>()) {
-      rewriter.replaceOpWithNewOp<numba::util::UndefOp>(op, typevar);
+            mlir::dyn_cast<numba::util::TypeVarType>(convertedType)) {
+      rewriter.replaceOpWithNewOp<mlir::ub::PoisonOp>(op, typevar, nullptr);
       return mlir::success();
     }
 
@@ -916,6 +920,7 @@ struct PlierToStdPass
     registry.insert<mlir::func::FuncDialect>();
     registry.insert<mlir::math::MathDialect>();
     registry.insert<mlir::scf::SCFDialect>();
+    registry.insert<mlir::ub::UBDialect>();
     registry.insert<numba::util::NumbaUtilDialect>();
     registry.insert<plier::PlierDialect>();
   }

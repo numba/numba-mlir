@@ -88,7 +88,7 @@ class Plier_Op<string mnemonic, list<Trait> traits = []>
     : Op<Plier_Dialect, mnemonic, traits>;
 
 def ConstOp : Plier_Op<"const", [Pure]> {
-  let arguments = (ins AnyAttr : $val);
+  let arguments = (ins OptionalAttr<AnyAttr> : $val);
 
   let results = (outs AnyType);
 

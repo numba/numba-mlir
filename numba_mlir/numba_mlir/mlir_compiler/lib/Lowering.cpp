@@ -410,7 +410,7 @@ private:
     llvm::SmallVector<mlir::Value> reductionInits;
     llvm::SmallVector<mlir::Type> reductionTypes;
     std::unordered_map<std::string, unsigned> reductionIndices;
-    for (auto [i, redvar] : llvm::enumerate(parforInst.attr("redvars"))) {
+    for (auto &&[i, redvar] : llvm::enumerate(parforInst.attr("redvars"))) {
       auto name = redvar.cast<std::string>();
       assert(varsMap.count(name));
       reductionInits.emplace_back(varsMap.find(name)->second);
@@ -448,7 +448,7 @@ private:
         index = b.create<numba::util::BuildTupleOp>(l, resType, indices);
       }
 
-      for (auto [i, redvar] : llvm::enumerate(parforInst.attr("redvars"))) {
+      for (auto &&[i, redvar] : llvm::enumerate(parforInst.attr("redvars"))) {
         assert(i < iterVars.size());
         auto name = redvar.cast<std::string>();
         varsMap[name] = iterVars[i];
@@ -467,14 +467,14 @@ private:
 
       blocks.reserve(irBlocks.size());
       mlir::OpBuilder::InsertionGuard g(b);
-      for (auto irBlock : irBlocks) {
+      for (auto &&irBlock : irBlocks) {
         auto block = b.createBlock(&region, region.end());
         blocks.emplace_back(block);
         blocksMap[irBlock.first] = block;
       }
 
       llvm::SmallVector<mlir::Value> reductionsRet(reductionInits.size());
-      for (auto [i, irBlock] : llvm::enumerate(irBlocks)) {
+      for (auto &&[i, irBlock] : llvm::enumerate(irBlocks)) {
         auto bb = blocks[i];
         builder.setInsertionPointToEnd(bb);
         for (auto inst : getBody(irBlock.second)) {
@@ -513,7 +513,8 @@ private:
 
     mlir::Value result;
     if (results.empty()) {
-      result = builder.create<numba::util::UndefOp>(loc, builder.getNoneType());
+      result =
+          builder.create<plier::ConstOp>(loc, builder.getNoneType(), nullptr);
     } else if (results.size() == 1) {
       result = results.front();
     } else {
@@ -713,8 +714,8 @@ private:
 
   mlir::Value lowerStaticIndex(mlir::Location loc, py::handle obj) {
     if (obj.is_none()) {
-      auto type = mlir::NoneType::get(builder.getContext());
-      return builder.create<numba::util::UndefOp>(loc, type);
+      return builder.create<plier::ConstOp>(loc, builder.getNoneType(),
+                                            nullptr);
     }
     if (py::isinstance<py::int_>(obj)) {
       auto index = obj.cast<int64_t>();

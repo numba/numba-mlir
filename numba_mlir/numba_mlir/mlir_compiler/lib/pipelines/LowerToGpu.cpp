@@ -1528,7 +1528,7 @@ static void genBarrierOp(mlir::Operation *srcOp,
   // TODO: remove
   assert(srcOp->getNumResults() == 1);
   auto retType = srcOp->getResult(0).getType();
-  rewriter.replaceOpWithNewOp<numba::util::UndefOp>(srcOp, retType);
+  rewriter.replaceOpWithNewOp<mlir::ub::PoisonOp>(srcOp, retType, nullptr);
 }
 
 template <typename Op>
@@ -1540,7 +1540,7 @@ static void genCustomBarrierOp(mlir::Operation *srcOp,
   // TODO: remove
   assert(srcOp->getNumResults() == 1);
   auto retType = srcOp->getResult(0).getType();
-  rewriter.replaceOpWithNewOp<numba::util::UndefOp>(srcOp, retType);
+  rewriter.replaceOpWithNewOp<mlir::ub::PoisonOp>(srcOp, retType, nullptr);
 }
 
 class ConvertBarrierOps : public mlir::OpRewritePattern<mlir::func::CallOp> {

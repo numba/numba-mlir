@@ -876,7 +876,7 @@ struct LowerPoison : public mlir::ConvertOpToLLVMPattern<mlir::ub::PoisonOp> {
                   mlir::ub::PoisonOp::Adaptor /*adaptor*/,
                   mlir::ConversionPatternRewriter &rewriter) const override {
     auto srcType = op.getType();
-    if (!mlir::isa<mlir::MemRefType>(srcType))
+    if (!mlir::isa<mlir::MemRefType, mlir::NoneType>(srcType))
       return mlir::failure();
 
     auto converter = getTypeConverter();
