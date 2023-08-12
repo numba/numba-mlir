@@ -70,10 +70,10 @@ struct ConstOpLowering : public mlir::OpConversionPattern<plier::ConstOp> {
     if (!expectedType)
       return mlir::failure();
 
-    auto value = adaptor.getVal();
-    auto typeAttr = value.dyn_cast_or_null<mlir::TypedAttr>();
+    auto typeAttr =
+        mlir::dyn_cast_or_null<mlir::TypedAttr>(adaptor.getValAttr());
     if (typeAttr && isSupportedType(typeAttr.getType())) {
-      if (auto intAttr = value.dyn_cast<mlir::IntegerAttr>()) {
+      if (auto intAttr = mlir::dyn_cast<mlir::IntegerAttr>(typeAttr)) {
         auto intVal = intAttr.getValue().getSExtValue();
         auto origType = intAttr.getType().cast<mlir::IntegerType>();
         auto type = numba::makeSignlessType(origType);
@@ -85,12 +85,13 @@ struct ConstOpLowering : public mlir::OpConversionPattern<plier::ConstOp> {
         return mlir::success();
       }
 
-      if (auto floatAttr = value.dyn_cast<mlir::FloatAttr>()) {
+      if (auto floatAttr = mlir::dyn_cast<mlir::FloatAttr>(typeAttr)) {
         rewriter.replaceOpWithNewOp<mlir::arith::ConstantOp>(op, floatAttr);
         return mlir::success();
       }
 
-      if (auto complexAttr = value.dyn_cast<mlir::complex::NumberAttr>()) {
+      if (auto complexAttr =
+              mlir::dyn_cast<mlir::complex::NumberAttr>(typeAttr)) {
         const double vals[] = {
             complexAttr.getReal().convertToDouble(),
             complexAttr.getImag().convertToDouble(),

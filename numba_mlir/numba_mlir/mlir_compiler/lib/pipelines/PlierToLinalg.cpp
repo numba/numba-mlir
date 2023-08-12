@@ -1451,10 +1451,11 @@ struct LowerConst : public mlir::OpConversionPattern<plier::ConstOp> {
         diag << "Invalid result type " << op.getType();
       });
 
-    auto attr = mlir::dyn_cast_or_null<mlir::DenseElementsAttr>(op.getVal());
+    auto attr =
+        mlir::dyn_cast_or_null<mlir::DenseElementsAttr>(op.getValAttr());
     if (!attr)
       return rewriter.notifyMatchFailure(op, [&](mlir::Diagnostic &diag) {
-        diag << "Invalid value type " << op.getVal();
+        diag << "Invalid value type " << op.getValAttr();
       });
 
     auto constType = attr.getType();
