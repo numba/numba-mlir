@@ -22,6 +22,7 @@
 #include <mlir/Dialect/MemRef/IR/MemRef.h>
 #include <mlir/Dialect/SCF/IR/SCF.h>
 #include <mlir/Dialect/SPIRV/IR/SPIRVOps.h>
+#include <mlir/Dialect/UB/IR/UBOps.h>
 
 #include <llvm/ADT/TypeSwitch.h>
 
@@ -1280,6 +1281,23 @@ struct SignCastUndefPropagate
   }
 };
 
+struct SignCastPoisonPropagate
+    : public mlir::OpRewritePattern<numba::util::SignCastOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(numba::util::SignCastOp op,
+                  mlir::PatternRewriter &rewriter) const override {
+    auto poisonOp = op.getSource().getDefiningOp<mlir::ub::PoisonOp>();
+    if (!poisonOp)
+      return mlir::failure();
+
+    rewriter.replaceOpWithNewOp<mlir::ub::PoisonOp>(op, op.getType(),
+                                                    poisonOp.getValue());
+    return mlir::success();
+  }
+};
+
 static mlir::Type
 getSignCastGetIntermediateType(mlir::ShapedType srcType,
                                mlir::ShapedType intermediateType,
@@ -1783,7 +1801,7 @@ void SignCastOp::getCanonicalizationPatterns(::mlir::RewritePatternSet &results,
   results.insert<
       SignCastDimPropagate<mlir::tensor::DimOp>,
       SignCastDimPropagate<mlir::memref::DimOp>, SignCastUndefPropagate,
-      SignCastCastPropagate<mlir::tensor::CastOp>,
+      SignCastPoisonPropagate, SignCastCastPropagate<mlir::tensor::CastOp>,
       SignCastCastPropagate<mlir::memref::CastOp>,
       SignCastCastPropagate<numba::util::ChangeLayoutOp>,
       SignCastReinterpretPropagate, SignCastLoadPropagate,
