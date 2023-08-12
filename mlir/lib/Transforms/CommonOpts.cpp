@@ -14,6 +14,7 @@
 #include <mlir/Dialect/Math/IR/Math.h>
 #include <mlir/Dialect/MemRef/IR/MemRef.h>
 #include <mlir/Dialect/SCF/IR/SCF.h>
+#include <mlir/Dialect/UB/IR/UBOps.h>
 #include <mlir/IR/BuiltinOps.h>
 #include <mlir/IR/Matchers.h>
 #include <mlir/IR/PatternMatch.h>
@@ -394,6 +395,53 @@ struct GPUGenGlobalId : public mlir::OpRewritePattern<mlir::arith::AddIOp> {
   }
 };
 
+struct SelectOfPoison : public mlir::OpRewritePattern<mlir::arith::SelectOp> {
+  // SelectOfPoison benefit than upstream select patterns
+  SelectOfPoison(mlir::MLIRContext *context)
+      : mlir::OpRewritePattern<mlir::arith::SelectOp>(context, /*benefit*/ 10) {
+  }
+
+  mlir::LogicalResult
+  matchAndRewrite(mlir::arith::SelectOp op,
+                  mlir::PatternRewriter &rewriter) const override {
+    mlir::Value result;
+    if (op.getTrueValue().getDefiningOp<mlir::ub::PoisonOp>()) {
+      result = op.getFalseValue();
+    } else if (op.getFalseValue().getDefiningOp<mlir::ub::PoisonOp>()) {
+      result = op.getTrueValue();
+    } else {
+      return mlir::failure();
+    }
+
+    rewriter.replaceOp(op, result);
+    return mlir::success();
+  }
+};
+
+struct ReplacePoisonMath : public mlir::OpRewritePattern<mlir::ub::PoisonOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(mlir::ub::PoisonOp op,
+                  mlir::PatternRewriter &rewriter) const override {
+    bool changed = false;
+    for (auto &use : llvm::make_early_inc_range(op->getUses())) {
+      auto owner = use.getOwner();
+      if (!mlir::isa<mlir::arith::ArithDialect, mlir::math::MathDialect>(
+              owner->getDialect()))
+        continue;
+
+      if (owner->getNumOperands() != 1 || owner->getNumResults() != 1)
+        continue;
+
+      auto resType = owner->getResult(0).getType();
+      rewriter.replaceOpWithNewOp<mlir::ub::PoisonOp>(owner, resType, nullptr);
+      changed = true;
+    }
+    return mlir::success(changed);
+  }
+};
+
 struct CommonOptsPass
     : public mlir::PassWrapper<CommonOptsPass, mlir::OperationPass<void>> {
   MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(CommonOptsPass)
@@ -420,8 +468,13 @@ void numba::populateCanonicalizationPatterns(
     op.getCanonicalizationPatterns(patterns, context);
 }
 
+void numba::populatePoisonOptsPatterns(mlir::RewritePatternSet &patterns) {
+  patterns.insert<SelectOfPoison, ReplacePoisonMath>(patterns.getContext());
+}
+
 void numba::populateCommonOptsPatterns(mlir::RewritePatternSet &patterns) {
   populateCanonicalizationPatterns(patterns);
+  populatePoisonOptsPatterns(patterns);
 
   patterns.insert<
       // clang-format off
