@@ -416,36 +416,6 @@ struct CopyOpLowering
     return mlir::success();
   }
 };
-
-struct UndefOpLowering
-    : public mlir::OpConversionPattern<numba::util::UndefOp> {
-  using OpConversionPattern::OpConversionPattern;
-
-  mlir::LogicalResult
-  matchAndRewrite(numba::util::UndefOp op,
-                  numba::util::UndefOp::Adaptor /*adaptor*/,
-                  mlir::ConversionPatternRewriter &rewriter) const override {
-    auto *converter = getTypeConverter();
-    assert(converter && "Type converter is not set");
-
-    auto origType = mlir::dyn_cast<numba::ntensor::NTensorType>(op.getType());
-    if (!origType)
-      return mlir::failure();
-
-    mlir::Type newResType = converter->convertType(origType);
-    if (!newResType)
-      return mlir::failure();
-
-    auto results = numba::util::wrapEnvRegion(
-        rewriter, op.getLoc(), origType.getEnvironment(), newResType,
-        [&](mlir::ConversionPatternRewriter &builder, mlir::Location loc) {
-          return builder.create<numba::util::UndefOp>(loc, newResType)
-              .getResult();
-        });
-    rewriter.replaceOp(op, results);
-    return mlir::success();
-  }
-};
 } // namespace
 
 void numba::populateNtensorToMemrefRewritesAndTarget(
@@ -460,12 +430,11 @@ void numba::populateNtensorToMemrefRewritesAndTarget(
         return std::nullopt;
       });
 
-  patterns
-      .insert<DimOpLowering, CreateOpLowering, SubviewOpLowering,
-              LoadOpLowering, StoreOpLowering, ToTensorOpLowering,
-              FromTensorOpLowering, ToMemrefOpLowering, FromMemrefOpLowering,
-              CastOpLowering, CopyOpLowering, UndefOpLowering>(
-          converter, patterns.getContext());
+  patterns.insert<DimOpLowering, CreateOpLowering, SubviewOpLowering,
+                  LoadOpLowering, StoreOpLowering, ToTensorOpLowering,
+                  FromTensorOpLowering, ToMemrefOpLowering,
+                  FromMemrefOpLowering, CastOpLowering, CopyOpLowering>(
+      converter, patterns.getContext());
 
   target.addIllegalOp<numba::ntensor::DimOp, numba::ntensor::CreateArrayOp,
                       numba::ntensor::SubviewOp, numba::ntensor::LoadOp,
@@ -473,9 +442,6 @@ void numba::populateNtensorToMemrefRewritesAndTarget(
                       numba::ntensor::FromTensorOp, numba::ntensor::ToMemrefOp,
                       numba::ntensor::FromMemrefOp, numba::ntensor::CastOp,
                       numba::ntensor::CopyOp>();
-
-  target.addDynamicallyLegalOp<numba::util::UndefOp>(
-      [&](mlir::Operation *op) { return converter.isLegal(op); });
 }
 
 namespace {

@@ -916,26 +916,6 @@ public:
   }
 };
 
-class ConvertUndef : public mlir::OpConversionPattern<numba::util::UndefOp> {
-public:
-  using OpConversionPattern::OpConversionPattern;
-
-  mlir::LogicalResult
-  matchAndRewrite(numba::util::UndefOp op,
-                  numba::util::UndefOp::Adaptor adaptor,
-                  mlir::ConversionPatternRewriter &rewriter) const override {
-    auto converter = getTypeConverter();
-    assert(converter);
-
-    auto resType = converter->convertType(op.getType());
-    if (!resType)
-      return mlir::failure();
-
-    rewriter.replaceOpWithNewOp<mlir::spirv::UndefOp>(op, resType);
-    return mlir::success();
-  }
-};
-
 class ConvertPoison : public mlir::OpConversionPattern<mlir::ub::PoisonOp> {
 public:
   using OpConversionPattern::OpConversionPattern;
@@ -1108,8 +1088,7 @@ struct GPUToSpirvPass
           ConvertBitcastOp<numba::util::BitcastOp>,
           ConvertBitcastOp<numba::util::MemrefBitcastOp>, ConvertAtomicRMW,
           AllocaOpPattern, ConvertFunc, ConvertAssert, ConvertBarrierOp,
-          ConvertMemFenceOp, ConvertUndef, ConvertPoison, ConvertGlobalOp,
-          ConvertGetGlobalOp,
+          ConvertMemFenceOp, ConvertPoison, ConvertGlobalOp, ConvertGetGlobalOp,
           LaunchConfigConversion<mlir::gpu::BlockIdOp,
                                  mlir::spirv::BuiltIn::WorkgroupId>,
           LaunchConfigConversion<mlir::gpu::GridDimOp,

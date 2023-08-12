@@ -3,12 +3,13 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "numba/Conversion/CfgToScf.hpp"
-#include "numba/Dialect/numba_util/Dialect.hpp"
+#include "numba/Transforms/CommonOpts.hpp"
 
 #include <mlir/Dialect/Arith/IR/Arith.h>
 #include <mlir/Dialect/ControlFlow/IR/ControlFlowOps.h>
 #include <mlir/Dialect/Func/IR/FuncOps.h>
 #include <mlir/Dialect/SCF/IR/SCF.h>
+#include <mlir/Dialect/UB/IR/UBOps.h>
 #include <mlir/IR/Dominance.h>
 #include <mlir/IR/IRMapping.h>
 #include <mlir/Interfaces/CallInterfaces.h>
@@ -304,7 +305,8 @@ tailLoopToWhile(mlir::PatternRewriter &rewriter, mlir::Location loc,
                                          bodyBlock->getArgumentTypes(), locs);
     for (auto types : {exitTypes, definedTypes}) {
       for (auto type : types) {
-        mlir::Value val = rewriter.create<numba::util::UndefOp>(loc, type);
+        mlir::Value val =
+            rewriter.create<mlir::ub::PoisonOp>(loc, type, nullptr);
         whileArgs.emplace_back(val);
       }
     }
@@ -616,7 +618,7 @@ static void initUndefMultiplexConds(mlir::PatternRewriter &rewriter,
                                     llvm::SmallVectorImpl<mlir::Value> &res) {
   assert(numBlocks > 0);
   auto boolType = rewriter.getI1Type();
-  auto undefVal = rewriter.create<numba::util::UndefOp>(loc, boolType);
+  auto undefVal = rewriter.create<mlir::ub::PoisonOp>(loc, boolType, nullptr);
   for (auto j : llvm::seq<size_t>(0, numBlocks - 1)) {
     (void)j;
     res.emplace_back(undefVal);
@@ -634,7 +636,8 @@ static void initMultiplexVars(mlir::PatternRewriter &rewriter,
       res.append(args.begin(), args.end());
     } else {
       for (auto type : args.getTypes()) {
-        mlir::Value init = rewriter.create<numba::util::UndefOp>(loc, type);
+        mlir::Value init =
+            rewriter.create<mlir::ub::PoisonOp>(loc, type, nullptr);
         res.emplace_back(init);
       }
     }
@@ -647,7 +650,8 @@ static void initUndefMultiplexVars(mlir::PatternRewriter &rewriter,
                                    llvm::SmallVectorImpl<mlir::Value> &res) {
   for (auto &&[j, edge] : llvm::enumerate(edges)) {
     for (auto type : edge.second->getArgumentTypes()) {
-      mlir::Value init = rewriter.create<numba::util::UndefOp>(loc, type);
+      mlir::Value init =
+          rewriter.create<mlir::ub::PoisonOp>(loc, type, nullptr);
       res.emplace_back(init);
     }
   }
@@ -1173,7 +1177,7 @@ struct WhileMoveToAfter : public mlir::OpRewritePattern<mlir::scf::WhileOp> {
       otherTerm = mlir::cast<mlir::scf::YieldOp>(otherBlock->getTerminator());
 
       for (auto arg : otherTerm.getResults()) {
-        if (arg.getDefiningOp<numba::util::UndefOp>())
+        if (arg.getDefiningOp<mlir::ub::PoisonOp>())
           continue;
 
         if (!otherBlockRegion->isAncestor(arg.getParentRegion()))
@@ -1233,9 +1237,9 @@ struct WhileMoveToAfter : public mlir::OpRewritePattern<mlir::scf::WhileOp> {
     if (otherTerm) {
       for (auto &&[res, otherRes] :
            llvm::zip(ifOp.getResults(), otherTerm.getResults())) {
-        if (otherRes.getDefiningOp<numba::util::UndefOp>()) {
+        if (otherRes.getDefiningOp<mlir::ub::PoisonOp>()) {
           mlir::Value undef =
-              rewriter.create<numba::util::UndefOp>(loc, res.getType());
+              rewriter.create<mlir::ub::PoisonOp>(loc, res.getType(), nullptr);
           rewriter.replaceAllUsesWith(res, undef);
         } else {
           rewriter.replaceAllUsesWith(res, otherRes);
@@ -1311,7 +1315,7 @@ struct WhileReductionSelect
     if (!falseArg || falseArg.getParentRegion() != region)
       return mlir::failure();
 
-    if (!inits[falseArg.getArgNumber()].getDefiningOp<numba::util::UndefOp>())
+    if (!inits[falseArg.getArgNumber()].getDefiningOp<mlir::ub::PoisonOp>())
       return mlir::failure();
 
     mlir::SmallVector<mlir::Value> newInits(inits.begin(), inits.end());
@@ -1335,7 +1339,7 @@ struct WhileUndefArgs : public mlir::OpRewritePattern<mlir::scf::WhileOp> {
     llvm::SmallVector<mlir::Value> newArgs;
     for (auto &&[yieldArg, init] :
          llvm::zip(yield.getResults(), op.getInits())) {
-      if (yieldArg.getDefiningOp<numba::util::UndefOp>() && yieldArg != init) {
+      if (yieldArg.getDefiningOp<mlir::ub::PoisonOp>() && yieldArg != init) {
         changed = true;
         newArgs.emplace_back(init);
         continue;
@@ -1553,7 +1557,7 @@ struct CFGToSCFPass
   getDependentDialects(mlir::DialectRegistry &registry) const override {
     registry.insert<mlir::cf::ControlFlowDialect>();
     registry.insert<mlir::scf::SCFDialect>();
-    registry.insert<numba::util::NumbaUtilDialect>();
+    registry.insert<mlir::ub::UBDialect>();
   }
 
   void runOnOperation() override {
@@ -1588,7 +1592,7 @@ struct CFGToSCFPass
     mlir::scf::WhileOp::getCanonicalizationPatterns(patterns, context);
     mlir::arith::SelectOp::getCanonicalizationPatterns(patterns, context);
 
-    numba::util::UndefOp::getCanonicalizationPatterns(patterns, context);
+    numba::populatePoisonOptsPatterns(patterns);
 
     auto op = getOperation();
 
