@@ -513,7 +513,8 @@ private:
 
     mlir::Value result;
     if (results.empty()) {
-      result = builder.create<numba::util::UndefOp>(loc, builder.getNoneType());
+      result =
+          builder.create<plier::ConstOp>(loc, builder.getNoneType(), nullptr);
     } else if (results.size() == 1) {
       result = results.front();
     } else {
@@ -713,8 +714,8 @@ private:
 
   mlir::Value lowerStaticIndex(mlir::Location loc, py::handle obj) {
     if (obj.is_none()) {
-      auto type = mlir::NoneType::get(builder.getContext());
-      return builder.create<numba::util::UndefOp>(loc, type);
+      return builder.create<plier::ConstOp>(loc, builder.getNoneType(),
+                                            nullptr);
     }
     if (py::isinstance<py::int_>(obj)) {
       auto index = obj.cast<int64_t>();
