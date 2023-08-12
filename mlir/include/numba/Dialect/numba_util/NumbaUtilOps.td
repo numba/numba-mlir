@@ -118,13 +118,6 @@ def ParallelOp : NumbaUtil_Op<"parallel", [
     }];
 }
 
-def UndefOp : NumbaUtil_Op<"undef", [Pure]> {
-  let results = (outs AnyType:$result);
-
-  let assemblyFormat = "attr-dict `:` type($result)";
-  let hasCanonicalizer = 1;
-}
-
 def YieldOp : NumbaUtil_Op<"yield", [
   Pure, ReturnLike, Terminator, ParentOneOf<["::numba::util::ParallelOp"]>
 ]> {

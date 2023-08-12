@@ -160,23 +160,6 @@ struct LowerBuildTuple
   }
 };
 
-struct LowerUndef : public mlir::ConvertOpToLLVMPattern<numba::util::UndefOp> {
-  using ConvertOpToLLVMPattern::ConvertOpToLLVMPattern;
-
-  mlir::LogicalResult
-  matchAndRewrite(numba::util::UndefOp op,
-                  numba::util::UndefOp::Adaptor /*adaptor*/,
-                  mlir::ConversionPatternRewriter &rewriter) const override {
-    auto converter = getTypeConverter();
-    auto type = converter->convertType(op.getType());
-    if (!type)
-      return mlir::failure();
-
-    rewriter.replaceOpWithNewOp<mlir::LLVM::UndefOp>(op, type);
-    return mlir::success();
-  }
-};
-
 static void addToGlobalDtors(mlir::ConversionPatternRewriter &rewriter,
                              mlir::ModuleOp mod, mlir::SymbolRefAttr attr,
                              int32_t priority) {
@@ -581,7 +564,6 @@ struct NumbaUtilToLLVMPass
 
     patterns.insert<
         // clang-format off
-        LowerUndef,
         LowerBuildTuple,
         LowerMemrefBitcastOp,
         LowerTakeContextOp,

@@ -197,25 +197,6 @@ struct OmittedLowering : public mlir::OpConversionPattern<plier::CastOp> {
   }
 };
 
-struct UndefOpLowering
-    : public mlir::OpConversionPattern<numba::util::UndefOp> {
-  using OpConversionPattern::OpConversionPattern;
-
-  mlir::LogicalResult
-  matchAndRewrite(numba::util::UndefOp op,
-                  numba::util::UndefOp::Adaptor /*adapator*/,
-                  mlir::ConversionPatternRewriter &rewriter) const override {
-    auto oldType = op.getType();
-    auto &converter = *getTypeConverter();
-    auto type = converter.convertType(oldType);
-    if (!type || oldType == type)
-      return mlir::failure();
-
-    rewriter.replaceOpWithNewOp<numba::util::UndefOp>(op, type);
-    return mlir::success();
-  }
-};
-
 static unsigned getBitsCount(mlir::Type type) {
   assert(type);
   if (type.isa<mlir::IntegerType>())
@@ -1061,16 +1042,10 @@ void PlierToStdPass::runOnOperation() {
         if (!type)
           return true;
 
-        if (type.isa<mlir::NoneType, numba::util::TypeVarType>())
+        if (mlir::isa<mlir::NoneType, numba::util::TypeVarType>(type))
           return false;
 
         return !isSupportedType(type);
-      });
-  target.addDynamicallyLegalOp<numba::util::UndefOp>(
-      [&](numba::util::UndefOp op) {
-        auto srcType = op.getType();
-        auto dstType = typeConverter.convertType(srcType);
-        return srcType == dstType;
       });
 
   target.addDynamicallyLegalOp<plier::GetItemOp>(
@@ -1097,7 +1072,6 @@ void PlierToStdPass::runOnOperation() {
       LiteralLowering<plier::CastOp>,
       LiteralLowering<plier::GlobalOp>,
       OmittedLowering,
-      UndefOpLowering,
       BuildTupleConversionPattern,
       GetItemTupleConversionPattern
       // clang-format on

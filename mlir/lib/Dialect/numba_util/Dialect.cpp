@@ -1265,22 +1265,6 @@ struct SignCastDimPropagate : public mlir::OpRewritePattern<Op> {
   }
 };
 
-struct SignCastUndefPropagate
-    : public mlir::OpRewritePattern<numba::util::SignCastOp> {
-  using OpRewritePattern::OpRewritePattern;
-
-  mlir::LogicalResult
-  matchAndRewrite(numba::util::SignCastOp op,
-                  mlir::PatternRewriter &rewriter) const override {
-    auto undefOp = op.getSource().getDefiningOp<numba::util::UndefOp>();
-    if (!undefOp)
-      return mlir::failure();
-
-    rewriter.replaceOpWithNewOp<numba::util::UndefOp>(op, op.getType());
-    return mlir::success();
-  }
-};
-
 struct SignCastPoisonPropagate
     : public mlir::OpRewritePattern<numba::util::SignCastOp> {
   using OpRewritePattern::OpRewritePattern;
@@ -1699,75 +1683,6 @@ struct SignCastForPropagate : public mlir::OpRewritePattern<mlir::scf::ForOp> {
   }
 };
 
-template <typename CastOp>
-struct SignCastIfPropagate : public mlir::OpRewritePattern<mlir::scf::IfOp> {
-  using OpRewritePattern::OpRewritePattern;
-
-  mlir::LogicalResult
-  matchAndRewrite(mlir::scf::IfOp op,
-                  mlir::PatternRewriter &rewriter) const override {
-    if (op->getNumResults() == 0)
-      return mlir::failure();
-
-    auto thenYield = op.thenYield();
-    auto elseYield = op.elseYield();
-
-    unsigned idx = 0;
-    CastOp castOp;
-    numba::util::UndefOp undefOp;
-    for (auto &&[i, args] : llvm::enumerate(
-             llvm::zip(thenYield.getResults(), elseYield.getResults()))) {
-      auto &&[thenArg, elseArg] = args;
-      auto cast = thenArg.template getDefiningOp<CastOp>();
-      auto undef = elseArg.template getDefiningOp<numba::util::UndefOp>();
-      if (cast && undef) {
-        idx = static_cast<unsigned>(i);
-        castOp = cast;
-        undefOp = undef;
-        break;
-      }
-    }
-
-    if (!castOp)
-      return mlir::failure();
-
-    auto dstType = castOp.getType();
-
-    auto src = castOp.getSource();
-    auto srcType = src.getType();
-
-    rewriter.updateRootInPlace(thenYield,
-                               [&]() { thenYield->setOperand(idx, src); });
-
-    mlir::OpBuilder::InsertionGuard g(rewriter);
-
-    rewriter.setInsertionPoint(elseYield);
-    auto newUndef =
-        rewriter.create<numba::util::UndefOp>(undefOp->getLoc(), srcType);
-
-    rewriter.updateRootInPlace(
-        elseYield, [&]() { elseYield->setOperand(idx, newUndef.getResult()); });
-
-    auto res = op.getResult(idx);
-
-    rewriter.setInsertionPointAfter(op);
-    auto newRes = rewriter.create<CastOp>(castOp->getLoc(), dstType, res);
-
-    for (auto &use : llvm::make_early_inc_range(res.getUses())) {
-      auto owner = use.getOwner();
-      if (owner == newRes)
-        continue;
-
-      rewriter.updateRootInPlace(owner, [&]() { use.set(newRes); });
-    }
-
-    rewriter.updateRootInPlace(op,
-                               [&]() { op->getResult(idx).setType(srcType); });
-
-    return mlir::success();
-  }
-};
-
 struct SignCastChainPropagate
     : public mlir::OpRewritePattern<numba::util::SignCastOp> {
   using OpRewritePattern::OpRewritePattern;
@@ -1800,8 +1715,8 @@ void SignCastOp::getCanonicalizationPatterns(::mlir::RewritePatternSet &results,
                                              ::mlir::MLIRContext *context) {
   results.insert<
       SignCastDimPropagate<mlir::tensor::DimOp>,
-      SignCastDimPropagate<mlir::memref::DimOp>, SignCastUndefPropagate,
-      SignCastPoisonPropagate, SignCastCastPropagate<mlir::tensor::CastOp>,
+      SignCastDimPropagate<mlir::memref::DimOp>, SignCastPoisonPropagate,
+      SignCastCastPropagate<mlir::tensor::CastOp>,
       SignCastCastPropagate<mlir::memref::CastOp>,
       SignCastCastPropagate<numba::util::ChangeLayoutOp>,
       SignCastReinterpretPropagate, SignCastLoadPropagate,
@@ -1812,9 +1727,7 @@ void SignCastOp::getCanonicalizationPatterns(::mlir::RewritePatternSet &results,
       SignCastSubviewPropagate<mlir::tensor::ExtractSliceOp,
                                mlir::RankedTensorType>,
       SignCastSubviewPropagate<mlir::memref::SubViewOp, mlir::MemRefType>,
-      SignCastForPropagate, SignCastIfPropagate<numba::util::SignCastOp>,
-      SignCastIfPropagate<mlir::memref::CastOp>, SignCastChainPropagate>(
-      context);
+      SignCastForPropagate, SignCastChainPropagate>(context);
 }
 
 bool SignCastOp::areCastCompatible(mlir::TypeRange /*inputs*/,
@@ -2188,103 +2101,6 @@ mlir::OpFoldResult MemrefBitcastOp::fold(FoldAdaptor) {
 
   return nullptr;
 }
-
-namespace {
-struct MergeUndefs : public mlir::OpRewritePattern<numba::util::UndefOp> {
-  using OpRewritePattern::OpRewritePattern;
-
-  mlir::LogicalResult
-  matchAndRewrite(numba::util::UndefOp op,
-                  mlir::PatternRewriter &rewriter) const override {
-    auto parent = op->getParentOfType<mlir::FunctionOpInterface>();
-    if (!parent)
-      return mlir::failure();
-
-    auto &block = parent.front();
-
-    auto type = op.getType();
-    auto insertionPoint = [&]() -> mlir::Operation * {
-      for (auto &op : block.without_terminator()) {
-        if (op.hasTrait<mlir::OpTrait::ConstantLike>())
-          continue;
-
-        auto undef = mlir::dyn_cast<numba::util::UndefOp>(op);
-        if (undef && undef.getType() != type)
-          continue;
-
-        return &op;
-      }
-      return block.getTerminator();
-    }();
-
-    if (insertionPoint == op)
-      return mlir::failure();
-
-    auto existingUndef = mlir::dyn_cast<numba::util::UndefOp>(insertionPoint);
-    if (!existingUndef) {
-      mlir::OpBuilder::InsertionGuard g(rewriter);
-      rewriter.setInsertionPoint(insertionPoint);
-      existingUndef = rewriter.create<numba::util::UndefOp>(op.getLoc(), type);
-    }
-
-    rewriter.replaceOp(op, existingUndef.getResult());
-    return mlir::success();
-  }
-};
-
-struct SelectOfUndef : public mlir::OpRewritePattern<mlir::arith::SelectOp> {
-  // Higher benefit than upstream select patterns
-  SelectOfUndef(mlir::MLIRContext *context)
-      : mlir::OpRewritePattern<mlir::arith::SelectOp>(context, /*benefit*/ 10) {
-  }
-
-  mlir::LogicalResult
-  matchAndRewrite(mlir::arith::SelectOp op,
-                  mlir::PatternRewriter &rewriter) const override {
-    mlir::Value result;
-    if (op.getTrueValue().getDefiningOp<numba::util::UndefOp>()) {
-      result = op.getFalseValue();
-    } else if (op.getFalseValue().getDefiningOp<numba::util::UndefOp>()) {
-      result = op.getTrueValue();
-    } else {
-      return mlir::failure();
-    }
-
-    rewriter.replaceOp(op, result);
-    return mlir::success();
-  }
-};
-
-struct ReplaceUndefUse : public mlir::OpRewritePattern<numba::util::UndefOp> {
-  using OpRewritePattern::OpRewritePattern;
-
-  mlir::LogicalResult
-  matchAndRewrite(numba::util::UndefOp op,
-                  mlir::PatternRewriter &rewriter) const override {
-    bool changed = false;
-    for (auto &use : llvm::make_early_inc_range(op->getUses())) {
-      auto owner = use.getOwner();
-      if (!mlir::isa<mlir::arith::ArithDialect, mlir::math::MathDialect>(
-              owner->getDialect()))
-        continue;
-
-      if (owner->getNumOperands() != 1 || owner->getNumResults() != 1)
-        continue;
-
-      auto resType = owner->getResult(0).getType();
-      rewriter.replaceOpWithNewOp<numba::util::UndefOp>(owner, resType);
-      changed = true;
-    }
-    return mlir::success(changed);
-  }
-};
-} // namespace
-
-void UndefOp::getCanonicalizationPatterns(mlir::RewritePatternSet &results,
-                                          mlir::MLIRContext *context) {
-  results.insert<MergeUndefs, SelectOfUndef, ReplaceUndefUse>(context);
-}
-
 } // namespace util
 } // namespace numba
 
