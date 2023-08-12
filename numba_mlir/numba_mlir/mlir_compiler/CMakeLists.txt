@@ -85,6 +85,7 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
     LLVMTarget
     MLIRComplexToLLVM
     MLIRComplexToStandard
+    MLIRControlFlowToSCF
     MLIRFuncInlinerExtension # TODO: Remove
     MLIRFuncTransforms
     MLIRGPUToGPURuntimeTransforms
