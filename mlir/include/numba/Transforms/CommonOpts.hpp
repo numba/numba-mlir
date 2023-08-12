@@ -7,14 +7,14 @@
 #include <memory>
 
 namespace mlir {
-class RewritePatternSet;
-class MLIRContext;
 class Pass;
+class RewritePatternSet;
 } // namespace mlir
 
 namespace numba {
 void populateCanonicalizationPatterns(mlir::RewritePatternSet &patterns);
 
+void populatePoisonOptsPatterns(mlir::RewritePatternSet &patterns);
 void populateCommonOptsPatterns(mlir::RewritePatternSet &patterns);
 
 std::unique_ptr<mlir::Pass> createCommonOptsPass();
