@@ -15,6 +15,7 @@
 #include <mlir/Dialect/MemRef/IR/MemRef.h>
 #include <mlir/Dialect/SCF/IR/SCF.h>
 #include <mlir/Dialect/Tensor/IR/Tensor.h>
+#include <mlir/Dialect/UB/IR/UBOps.h>
 #include <mlir/IR/Builders.h>
 #include <mlir/IR/BuiltinAttributes.h>
 #include <mlir/IR/BuiltinOps.h>
@@ -325,12 +326,12 @@ struct PyLinalgResolver::Context {
 
     if (py::isinstance(obj, type)) {
       auto type = numba::util::TypeVarType::get(unwrapType(obj));
-      return builder.create<numba::util::UndefOp>(loc, type);
+      return builder.create<mlir::ub::PoisonOp>(loc, type, nullptr);
     }
 
     if (obj.is_none()) {
-      auto type = mlir::NoneType::get(builder.getContext());
-      return builder.create<numba::util::UndefOp>(loc, type);
+      return builder.create<mlir::ub::PoisonOp>(loc, builder.getNoneType(),
+                                                nullptr);
     }
 
     if (py::isinstance<py::iterable>(obj)) {
@@ -1282,7 +1283,7 @@ static py::object undefImpl(py::capsule context, py::handle dtype) {
   auto &builder = ctx.builder;
   auto loc = ctx.loc;
   auto type = unwrapType(dtype);
-  auto ret = builder.createOrFold<numba::util::UndefOp>(loc, type);
+  auto ret = builder.createOrFold<mlir::ub::PoisonOp>(loc, type, nullptr);
   return ctx.context.createVar(context, ret);
 }
 
@@ -1432,7 +1433,8 @@ static py::object selectImpl(py::capsule context, py::handle cond,
 static mlir::Value wrapMultiresult(mlir::OpBuilder &builder, mlir::Location loc,
                                    mlir::ValueRange args) {
   if (args.empty())
-    return builder.create<numba::util::UndefOp>(loc, builder.getNoneType());
+    return builder.create<mlir::ub::PoisonOp>(loc, builder.getNoneType(),
+                                              nullptr);
 
   if (args.size() == 1)
     return args.front();

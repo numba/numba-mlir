@@ -25,6 +25,7 @@
 #include <mlir/Dialect/SCF/Transforms/Passes.h>
 #include <mlir/Dialect/Tensor/IR/Tensor.h>
 #include <mlir/Dialect/Tensor/Transforms/Passes.h>
+#include <mlir/Dialect/UB/IR/UBOps.h>
 #include <mlir/IR/Dialect.h>
 #include <mlir/IR/Dominance.h>
 #include <mlir/Pass/Pass.h>
@@ -2023,6 +2024,7 @@ struct ResolveNtensorPass
     registry.insert<mlir::linalg::LinalgDialect>();
     registry.insert<mlir::memref::MemRefDialect>();
     registry.insert<mlir::tensor::TensorDialect>();
+    registry.insert<mlir::ub::UBDialect>();
     registry.insert<numba::ntensor::NTensorDialect>();
     registry.insert<numba::util::NumbaUtilDialect>();
   }
