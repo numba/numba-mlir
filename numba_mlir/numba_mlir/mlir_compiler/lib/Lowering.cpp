@@ -410,7 +410,7 @@ private:
     llvm::SmallVector<mlir::Value> reductionInits;
     llvm::SmallVector<mlir::Type> reductionTypes;
     std::unordered_map<std::string, unsigned> reductionIndices;
-    for (auto [i, redvar] : llvm::enumerate(parforInst.attr("redvars"))) {
+    for (auto &&[i, redvar] : llvm::enumerate(parforInst.attr("redvars"))) {
       auto name = redvar.cast<std::string>();
       assert(varsMap.count(name));
       reductionInits.emplace_back(varsMap.find(name)->second);
@@ -448,7 +448,7 @@ private:
         index = b.create<numba::util::BuildTupleOp>(l, resType, indices);
       }
 
-      for (auto [i, redvar] : llvm::enumerate(parforInst.attr("redvars"))) {
+      for (auto &&[i, redvar] : llvm::enumerate(parforInst.attr("redvars"))) {
         assert(i < iterVars.size());
         auto name = redvar.cast<std::string>();
         varsMap[name] = iterVars[i];
@@ -467,14 +467,14 @@ private:
 
       blocks.reserve(irBlocks.size());
       mlir::OpBuilder::InsertionGuard g(b);
-      for (auto irBlock : irBlocks) {
+      for (auto &&irBlock : irBlocks) {
         auto block = b.createBlock(&region, region.end());
         blocks.emplace_back(block);
         blocksMap[irBlock.first] = block;
       }
 
       llvm::SmallVector<mlir::Value> reductionsRet(reductionInits.size());
-      for (auto [i, irBlock] : llvm::enumerate(irBlocks)) {
+      for (auto &&[i, irBlock] : llvm::enumerate(irBlocks)) {
         auto bb = blocks[i];
         builder.setInsertionPointToEnd(bb);
         for (auto inst : getBody(irBlock.second)) {
