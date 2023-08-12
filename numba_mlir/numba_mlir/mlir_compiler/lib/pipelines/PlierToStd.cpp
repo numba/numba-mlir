@@ -13,6 +13,7 @@
 #include <mlir/Dialect/Func/IR/FuncOps.h>
 #include <mlir/Dialect/Math/IR/Math.h>
 #include <mlir/Dialect/SCF/IR/SCF.h>
+#include <mlir/Dialect/UB/IR/UBOps.h>
 #include <mlir/IR/Dialect.h>
 #include <mlir/IR/IRMapping.h>
 #include <mlir/Pass/Pass.h>
@@ -917,6 +918,7 @@ struct PlierToStdPass
     registry.insert<mlir::func::FuncDialect>();
     registry.insert<mlir::math::MathDialect>();
     registry.insert<mlir::scf::SCFDialect>();
+    registry.insert<mlir::ub::UBDialect>();
     registry.insert<numba::util::NumbaUtilDialect>();
     registry.insert<plier::PlierDialect>();
   }

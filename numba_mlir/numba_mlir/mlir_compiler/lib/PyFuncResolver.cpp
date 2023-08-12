@@ -7,11 +7,10 @@
 #include "Mangle.hpp"
 #include "PyMapTypes.hpp"
 
-#include "numba/Dialect/numba_util/Dialect.hpp"
-
 #include <pybind11/pybind11.h>
 
 #include <mlir/Dialect/Func/IR/FuncOps.h>
+#include <mlir/Dialect/UB/IR/UBOps.h>
 #include <mlir/IR/BuiltinOps.h>
 #include <mlir/IR/PatternMatch.h>
 
@@ -92,8 +91,8 @@ std::optional<PyFuncResolver::Result> PyFuncResolver::getFunc(
     if (args.empty()) {
       auto hasDefValue = std::get<1>(it);
       if (hasDefValue.cast<bool>()) {
-        mlir::Value newVal =
-            rewriter.create<numba::util::UndefOp>(loc, rewriter.getNoneType());
+        mlir::Value newVal = rewriter.create<mlir::ub::PoisonOp>(
+            loc, rewriter.getNoneType(), nullptr);
         res.mappedArgs.emplace_back(newVal);
         auto def = std::get<2>(it);
         pyTypes.append(omitted(def));
