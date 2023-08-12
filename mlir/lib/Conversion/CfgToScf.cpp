@@ -1567,11 +1567,11 @@ struct CFGToSCFPass
 
     patterns.insert<
         // clang-format off
-        ScfIfRewriteOneExit,
-        LoopRestructuringBr,
-        LoopRestructuringCondBr,
-        TailLoopToWhile,
-        TailLoopToWhileCond,
+//        ScfIfRewriteOneExit,
+//        LoopRestructuringBr,
+//        LoopRestructuringCondBr,
+//        TailLoopToWhile,
+//        TailLoopToWhileCond,
         WhileReductionSelect,
         WhileUndefArgs,
         WhileMoveToAfter,
@@ -1595,22 +1595,25 @@ struct CFGToSCFPass
     numba::populatePoisonOptsPatterns(patterns);
 
     auto op = getOperation();
+    if (mlir::failed(
+            mlir::applyPatternsAndFoldGreedily(op, std::move(patterns))))
+      return signalPassFailure();
 
-    mlir::OperationFingerPrint fp(op);
-    int maxIters = 10;
-    mlir::FrozenRewritePatternSet frozenPatterns(std::move(patterns));
+    //    mlir::OperationFingerPrint fp(op);
+    //    int maxIters = 10;
+    //    mlir::FrozenRewritePatternSet frozenPatterns(std::move(patterns));
 
-    // Repeat transformations multiple times until they converge.
-    // TODO Not clear why it's needed, investigate later.
-    for (auto i : llvm::seq(0, maxIters)) {
-      (void)i;
-      (void)mlir::applyPatternsAndFoldGreedily(op, frozenPatterns);
-      mlir::OperationFingerPrint newFp(op);
-      if (newFp == fp)
-        break;
+    //    // Repeat transformations multiple times until they converge.
+    //    // TODO Not clear why it's needed, investigate later.
+    //    for (auto i : llvm::seq(0, maxIters)) {
+    //      (void)i;
+    //      (void)mlir::applyPatternsAndFoldGreedily(op, frozenPatterns);
+    //      mlir::OperationFingerPrint newFp(op);
+    //      if (newFp == fp)
+    //        break;
 
-      fp = newFp;
-    }
+    //      fp = newFp;
+    //    }
 
     op->walk([&](mlir::Operation *o) -> mlir::WalkResult {
       if (mlir::isa<mlir::cf::BranchOp, mlir::cf::CondBranchOp>(o)) {
