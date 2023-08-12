@@ -10,6 +10,7 @@
 
 #include <llvm/ADT/StringRef.h>
 #include <mlir/Dialect/Arith/IR/Arith.h>
+#include <mlir/Dialect/UB/IR/UBOps.h>
 #include <mlir/IR/Builders.h>
 
 namespace py = pybind11;
@@ -59,7 +60,7 @@ parseDefault(mlir::OpBuilder &builder, mlir::Location loc, py::handle obj) {
   }
   if (py::isinstance<py::none>(obj)) {
     auto type = builder.getNoneType();
-    return builder.create<numba::util::UndefOp>(loc, type).getResult();
+    return builder.create<mlir::ub::PoisonOp>(loc, type, nullptr).getResult();
   }
   if (py::isinstance<py::tuple>(obj)) {
     auto val = obj.cast<py::tuple>();
