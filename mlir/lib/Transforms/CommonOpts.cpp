@@ -11,6 +11,7 @@
 #include <mlir/Dialect/Arith/IR/Arith.h>
 #include <mlir/Dialect/Func/IR/FuncOps.h>
 #include <mlir/Dialect/GPU/IR/GPUDialect.h>
+#include <mlir/Dialect/Index/IR/IndexDialect.h>
 #include <mlir/Dialect/Math/IR/Math.h>
 #include <mlir/Dialect/MemRef/IR/MemRef.h>
 #include <mlir/Dialect/SCF/IR/SCF.h>
@@ -427,8 +428,8 @@ struct ReplacePoisonMath : public mlir::OpRewritePattern<mlir::ub::PoisonOp> {
     bool changed = false;
     for (auto &use : llvm::make_early_inc_range(op->getUses())) {
       auto owner = use.getOwner();
-      if (!mlir::isa<mlir::arith::ArithDialect, mlir::math::MathDialect>(
-              owner->getDialect()))
+      if (!mlir::isa<mlir::arith::ArithDialect, mlir::math::MathDialect,
+                     mlir::index::IndexDialect>(owner->getDialect()))
         continue;
 
       if (owner->getNumOperands() != 1 || owner->getNumResults() != 1)
