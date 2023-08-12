@@ -106,8 +106,9 @@ struct ConstOpLowering : public mlir::OpConversionPattern<plier::ConstOp> {
       return mlir::failure();
     }
 
-    if (expectedType.isa<mlir::NoneType>()) {
-      rewriter.replaceOpWithNewOp<numba::util::UndefOp>(op, expectedType);
+    if (mlir::isa<mlir::NoneType>(expectedType)) {
+      rewriter.replaceOpWithNewOp<mlir::ub::PoisonOp>(op, expectedType,
+                                                      nullptr);
       return mlir::success();
     }
     return mlir::failure();
@@ -143,14 +144,15 @@ struct LiteralLowering : public mlir::OpConversionPattern<Op> {
     if (!convertedType)
       return mlir::failure();
 
-    if (convertedType.template isa<mlir::NoneType>()) {
-      rewriter.replaceOpWithNewOp<numba::util::UndefOp>(op, convertedType);
+    if (mlir::isa<mlir::NoneType>(convertedType)) {
+      rewriter.replaceOpWithNewOp<mlir::ub::PoisonOp>(op, convertedType,
+                                                      nullptr);
       return mlir::success();
     }
 
     if (auto typevar =
-            convertedType.template dyn_cast<numba::util::TypeVarType>()) {
-      rewriter.replaceOpWithNewOp<numba::util::UndefOp>(op, typevar);
+            mlir::dyn_cast<numba::util::TypeVarType>(convertedType)) {
+      rewriter.replaceOpWithNewOp<mlir::ub::PoisonOp>(op, typevar, nullptr);
       return mlir::success();
     }
 
