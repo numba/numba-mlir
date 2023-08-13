@@ -4,7 +4,6 @@
 
 #include "pipelines/PlierToScf.hpp"
 
-#include <mlir/Conversion/ControlFlowToSCF/ControlFlowToSCF.h>
 #include <mlir/Dialect/Func/IR/FuncOps.h>
 #include <mlir/Pass/PassManager.h>
 #include <mlir/Transforms/Passes.h>
@@ -18,7 +17,6 @@ namespace {
 
 static void populatePlierToScfPipeline(mlir::OpPassManager &pm) {
   pm.addNestedPass<mlir::func::FuncOp>(mlir::createCanonicalizerPass());
-  //  pm.addNestedPass<mlir::func::FuncOp>(mlir::createLiftControlFlowToSCFPass());
   pm.addNestedPass<mlir::func::FuncOp>(numba::createCFGToSCFPass());
   pm.addNestedPass<mlir::func::FuncOp>(mlir::createCanonicalizerPass());
 }
