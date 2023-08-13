@@ -1550,6 +1550,52 @@ struct WhileHoistFromBefore
   }
 };
 
+struct LowerIndexSwitch
+    : public mlir::OpRewritePattern<mlir::scf::IndexSwitchOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(mlir::scf::IndexSwitchOp op,
+                  mlir::PatternRewriter &rewriter) const override {
+    auto cases = op.getCases();
+    if (cases.empty())
+      return mlir::failure();
+
+    mlir::TypeRange resTypes = op.getResultTypes();
+    auto arg = op.getArg();
+    auto loc = op.getLoc();
+
+    mlir::ValueRange results;
+    mlir::scf::IfOp newIf;
+    for (auto &&[caseVal, reg] : llvm::zip(cases, op.getCaseRegions())) {
+      bool first = !newIf;
+      if (!first) {
+        auto elseBlock = rewriter.createBlock(&newIf.getElseRegion());
+        rewriter.setInsertionPointToStart(elseBlock);
+      }
+      mlir::Value cst =
+          rewriter.create<mlir::arith::ConstantIndexOp>(loc, caseVal);
+      mlir::Value cond = rewriter.create<mlir::arith::CmpIOp>(
+          loc, mlir::arith::CmpIPredicate::eq, arg, cst);
+      newIf = rewriter.create<mlir::scf::IfOp>(loc, resTypes, cond);
+      if (first) {
+        results = newIf.getResults();
+      } else {
+        rewriter.create<mlir::scf::YieldOp>(loc, newIf.getResults());
+      }
+
+      newIf.getThenRegion().takeBody(reg);
+    }
+
+    assert(newIf);
+    newIf.getElseRegion().takeBody(op.getDefaultRegion());
+
+    rewriter.setInsertionPoint(op);
+    rewriter.replaceOp(op, results);
+    return mlir::success();
+  }
+};
+
 namespace {
 using namespace mlir;
 class ControlFlowToSCFTransformation : public CFGToSCFInterface {
@@ -1723,17 +1769,16 @@ struct CFGToSCFPass
         CondBrSameTarget,
         OrOfXor,
         HoistSelects,
-        WhileHoistFromBefore
+        WhileHoistFromBefore,
+        LowerIndexSwitch
         // clang-format on
         >(context);
-
-    context->getLoadedDialect<mlir::cf::ControlFlowDialect>()
-        ->getCanonicalizationPatterns(patterns);
 
     mlir::cf::BranchOp::getCanonicalizationPatterns(patterns, context);
     mlir::cf::CondBranchOp::getCanonicalizationPatterns(patterns, context);
     mlir::scf::ExecuteRegionOp::getCanonicalizationPatterns(patterns, context);
     mlir::scf::IfOp::getCanonicalizationPatterns(patterns, context);
+    mlir::scf::IndexSwitchOp::getCanonicalizationPatterns(patterns, context);
     mlir::scf::WhileOp::getCanonicalizationPatterns(patterns, context);
     mlir::arith::SelectOp::getCanonicalizationPatterns(patterns, context);
 
