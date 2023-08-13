@@ -14,6 +14,7 @@
 #include <mlir/IR/IRMapping.h>
 #include <mlir/Interfaces/CallInterfaces.h>
 #include <mlir/Interfaces/SideEffectInterfaces.h>
+#include <mlir/Transforms/CFGToSCF.h>
 #include <mlir/Transforms/GreedyPatternRewriteDriver.h>
 #include <mlir/Transforms/Passes.h>
 #include <mlir/Transforms/RegionUtils.h>
@@ -1549,8 +1550,137 @@ struct WhileHoistFromBefore
   }
 };
 
+namespace {
+using namespace mlir;
+class ControlFlowToSCFTransformation : public CFGToSCFInterface {
+public:
+  FailureOr<Operation *> createStructuredBranchRegionOp(
+      OpBuilder &builder, Operation *controlFlowCondOp, TypeRange resultTypes,
+      MutableArrayRef<Region> regions) override {
+    if (auto condBrOp = dyn_cast<cf::CondBranchOp>(controlFlowCondOp)) {
+      assert(regions.size() == 2);
+      auto ifOp = builder.create<scf::IfOp>(
+          controlFlowCondOp->getLoc(), resultTypes, condBrOp.getCondition());
+      ifOp.getThenRegion().takeBody(regions[0]);
+      ifOp.getElseRegion().takeBody(regions[1]);
+      return ifOp.getOperation();
+    }
+
+    if (auto switchOp = dyn_cast<cf::SwitchOp>(controlFlowCondOp)) {
+      // `getCFGSwitchValue` returns an i32 that we need to convert to index
+      // fist.
+      auto cast = builder.create<arith::IndexCastUIOp>(
+          controlFlowCondOp->getLoc(), builder.getIndexType(),
+          switchOp.getFlag());
+      SmallVector<int64_t> cases;
+      if (auto caseValues = switchOp.getCaseValues())
+        llvm::append_range(
+            cases, llvm::map_range(*caseValues, [](const llvm::APInt &apInt) {
+              return apInt.getZExtValue();
+            }));
+
+      assert(regions.size() == cases.size() + 1);
+
+      auto indexSwitchOp = builder.create<scf::IndexSwitchOp>(
+          controlFlowCondOp->getLoc(), resultTypes, cast, cases, cases.size());
+
+      indexSwitchOp.getDefaultRegion().takeBody(regions[0]);
+      for (auto &&[targetRegion, sourceRegion] :
+           llvm::zip(indexSwitchOp.getCaseRegions(), llvm::drop_begin(regions)))
+        targetRegion.takeBody(sourceRegion);
+
+      return indexSwitchOp.getOperation();
+    }
+
+    controlFlowCondOp->emitOpError(
+        "Cannot convert unknown control flow op to structured control flow");
+    return failure();
+  }
+
+  LogicalResult
+  createStructuredBranchRegionTerminatorOp(Location loc, OpBuilder &builder,
+                                           Operation *branchRegionOp,
+                                           ValueRange results) override {
+    builder.create<scf::YieldOp>(loc, results);
+    return success();
+  }
+
+  FailureOr<Operation *>
+  createStructuredDoWhileLoopOp(OpBuilder &builder, Operation *replacedOp,
+                                ValueRange loopVariablesInit, Value condition,
+                                ValueRange loopVariablesNextIter,
+                                Region &&loopBody) override {
+    Location loc = replacedOp->getLoc();
+    auto whileOp = builder.create<scf::WhileOp>(
+        loc, loopVariablesInit.getTypes(), loopVariablesInit);
+
+    whileOp.getBefore().takeBody(loopBody);
+
+    builder.setInsertionPointToEnd(&whileOp.getBefore().back());
+    // `getCFGSwitchValue` returns a i32. We therefore need to truncate the
+    // condition to i1 first. It is guaranteed to be either 0 or 1 already.
+    builder.create<scf::ConditionOp>(
+        loc,
+        builder.create<arith::TruncIOp>(loc, builder.getI1Type(), condition),
+        loopVariablesNextIter);
+
+    auto *afterBlock = new Block;
+    whileOp.getAfter().push_back(afterBlock);
+    afterBlock->addArguments(
+        loopVariablesInit.getTypes(),
+        SmallVector<Location>(loopVariablesInit.size(), loc));
+    builder.setInsertionPointToEnd(afterBlock);
+    builder.create<scf::YieldOp>(loc, afterBlock->getArguments());
+
+    return whileOp.getOperation();
+  }
+
+  Value getCFGSwitchValue(Location loc, OpBuilder &builder,
+                          unsigned int value) override {
+    return builder.create<arith::ConstantOp>(loc,
+                                             builder.getI32IntegerAttr(value));
+  }
+
+  void createCFGSwitchOp(Location loc, OpBuilder &builder, Value flag,
+                         ArrayRef<unsigned int> caseValues,
+                         BlockRange caseDestinations,
+                         ArrayRef<ValueRange> caseArguments, Block *defaultDest,
+                         ValueRange defaultArgs) override {
+    builder.create<cf::SwitchOp>(loc, flag, defaultDest, defaultArgs,
+                                 llvm::to_vector_of<int32_t>(caseValues),
+                                 caseDestinations, caseArguments);
+  }
+
+  Value getUndefValue(Location loc, OpBuilder &builder, Type type) override {
+    return builder.create<ub::PoisonOp>(loc, type, nullptr);
+  }
+
+  FailureOr<Operation *> createUnreachableTerminator(Location loc,
+                                                     OpBuilder &builder,
+                                                     Region &region) override {
+
+    // TODO: This should create a `ub.unreachable` op. Once such an operation
+    //       exists to make the pass can be made independent of the func
+    //       dialect. For now just return poison values.
+    auto funcOp = dyn_cast<func::FuncOp>(region.getParentOp());
+    if (!funcOp)
+      return emitError(loc, "Expected '")
+             << func::FuncOp::getOperationName() << "' as top level operation";
+
+    return builder
+        .create<func::ReturnOp>(
+            loc, llvm::map_to_vector(funcOp.getResultTypes(),
+                                     [&](Type type) {
+                                       return getUndefValue(loc, builder, type);
+                                     }))
+        .getOperation();
+  }
+};
+} // namespace
+
 struct CFGToSCFPass
-    : public mlir::PassWrapper<CFGToSCFPass, mlir::OperationPass<void>> {
+    : public mlir::PassWrapper<CFGToSCFPass,
+                               mlir::OperationPass<mlir::func::FuncOp>> {
   MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(CFGToSCFPass)
 
   virtual void
@@ -1561,6 +1691,21 @@ struct CFGToSCFPass
   }
 
   void runOnOperation() override {
+    auto &dom = getAnalysis<mlir::DominanceInfo>();
+
+    ControlFlowToSCFTransformation transformation;
+    auto visitor = [&](mlir::Operation *op) -> mlir::WalkResult {
+      for (mlir::Region &reg : op->getRegions()) {
+        if (mlir::failed(mlir::transformCFGToSCF(reg, transformation, dom)))
+          return mlir::WalkResult::interrupt();
+      }
+      return mlir::WalkResult::advance();
+    };
+
+    auto op = getOperation();
+    if (op->walk<mlir::WalkOrder::PostOrder>(visitor).wasInterrupted())
+      return signalPassFailure();
+
     auto context = &getContext();
 
     mlir::RewritePatternSet patterns(context);
@@ -1594,7 +1739,6 @@ struct CFGToSCFPass
 
     numba::populatePoisonOptsPatterns(patterns);
 
-    auto op = getOperation();
     if (mlir::failed(
             mlir::applyPatternsAndFoldGreedily(op, std::move(patterns))))
       return signalPassFailure();
