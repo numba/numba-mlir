@@ -89,6 +89,7 @@ func.func @if_test4() {
 // CHECK-LABEL: func @if_test4
 // CHECK: %[[COND:.*]] = "test.test1"() : () -> i1
 // CHECK: scf.if %[[COND]] {
+// CHECK: else {
 // CHECK: "test.test3"() : () -> ()
 // CHECK: }
 // CHECK: "test.test4"() : () -> ()
