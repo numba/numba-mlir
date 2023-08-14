@@ -148,6 +148,7 @@ endif()
 unset(__offsetof_flag)
 
 target_link_libraries(${MLIR_EXTENSIONS_LIB} PRIVATE
+    MLIRControlFlowToSCF
     MLIRControlFlowToSPIRV
     MLIRFuncTransforms
     MLIRIR
