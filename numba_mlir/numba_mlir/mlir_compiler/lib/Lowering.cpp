@@ -221,6 +221,33 @@ struct InstHandles {
   std::array<py::handle, plier::OperatorsCount> opsHandles;
 };
 
+static mlir::Attribute parseAttr(mlir::OpBuilder &builder, py::handle obj) {
+  if (obj.is_none())
+    return builder.getUnitAttr();
+
+  if (py::isinstance<py::str>(obj))
+    return builder.getStringAttr(obj.cast<std::string>());
+
+  if (py::isinstance<py::bool_>(obj))
+    return builder.getBoolAttr(obj.cast<bool>());
+
+  if (py::isinstance<py::int_>(obj))
+    return builder.getI64IntegerAttr(obj.cast<int64_t>());
+
+  numba::reportError(llvm::Twine("Invalid attribute: ") +
+                     py::str(obj).cast<std::string>());
+}
+
+static void parseAttributes(mlir::Operation *op, py::handle dict) {
+  assert(op && "Invalid op");
+  mlir::OpBuilder builder(op->getContext());
+  for (auto &&[key, value] : dict.cast<py::dict>()) {
+    auto attr = parseAttr(builder, value);
+    auto keyName = key.cast<std::string>();
+    op->setAttr(keyName, attr);
+  }
+}
+
 struct PlierLowerer final {
   PlierLowerer(mlir::MLIRContext &context, PyTypeConverter &conv)
       : ctx(context), builder(&ctx), typeConverter(conv) {
@@ -301,21 +328,8 @@ private:
     auto typ = getFuncType(compilationContext["fnargs"],
                            compilationContext["restype"]);
     func = mlir::func::FuncOp::create(builder.getUnknownLoc(), name, typ);
-    if (compilationContext["fastmath"]().cast<bool>())
-      func->setAttr(numba::util::attributes::getFastmathName(),
-                    builder.getUnitAttr());
 
-    if (compilationContext["force_inline"]().cast<bool>())
-      func->setAttr(numba::util::attributes::getForceInlineName(),
-                    builder.getUnitAttr());
-
-    func->setAttr(numba::util::attributes::getOptLevelName(),
-                  builder.getI64IntegerAttr(
-                      compilationContext["opt_level"]().cast<int64_t>()));
-    auto maxConcurrency = compilationContext["max_concurrency"]().cast<int>();
-    if (maxConcurrency > 0)
-      func->setAttr(numba::util::attributes::getMaxConcurrencyName(),
-                    builder.getI64IntegerAttr(maxConcurrency));
+    parseAttributes(func, compilationContext["func_attrs"]);
 
     auto fp64_truncate = compilationContext["fp64_truncate"]();
     if (fp64_truncate.equal(py::str("auto"))) {
