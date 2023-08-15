@@ -161,16 +161,26 @@ class MlirBackendBase(FunctionPass):
         ctx["restype"] = lambda: state.return_type
         ctx["fnname"] = lambda: fn_name
         ctx["resolve_func"] = self._resolve_func_name
-        ctx["fastmath"] = lambda: state.targetctx.fastmath
-        ctx["force_inline"] = lambda: state.flags.inline.is_always_inline
-        ctx["max_concurrency"] = (
-            lambda: get_thread_count() if state.flags.auto_parallel.enabled else 0
-        )
-        ctx["opt_level"] = lambda: OPT_LEVEL
         ctx["globals"] = lambda: state.func_id.func.__globals__
-        ctx["fp64_truncate"] = lambda: self._fp64_truncate
-        ctx["use_64bit_index"] = lambda: self._use_64bit_index
 
+        func_attrs = {}
+        if state.targetctx.fastmath:
+            func_attrs["numba.fastmath"] = None
+
+        if state.flags.inline.is_always_inline:
+            func_attrs["numba.force_inline"] = None
+
+        if state.flags.auto_parallel.enabled:
+            func_attrs["numba.max_concurrency"] = get_thread_count()
+
+        func_attrs["numba.opt_level"] = OPT_LEVEL
+
+        if self._fp64_truncate != "auto":
+            func_attrs["gpu_runtime.fp64_truncate"] = self._fp64_truncate
+
+        func_attrs["gpu_runtime.use_64bit_index"] = self._use_64bit_index
+
+        ctx["func_attrs"] = func_attrs
         return ctx
 
 
