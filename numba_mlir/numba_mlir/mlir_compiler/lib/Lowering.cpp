@@ -271,7 +271,7 @@ struct PlierLowerer final {
                                  mlir::ModuleOp mod,
                                  const py::object &parforInst) {
     auto newFunc = createFunc(compilationContext, mod);
-    lowerParforBody(parforInst);
+    lowerParforBody(compilationContext, parforInst);
     return newFunc;
   }
 
@@ -365,7 +365,7 @@ private:
     fixupPhis();
   }
 
-  void lowerParforBody(py::handle parforInst) {
+  void lowerParforBody(py::handle ctx, py::handle parforInst) {
     auto block = func.addEntryBlock();
     mlir::ValueRange blockArgs = block->getArguments();
 
@@ -404,6 +404,19 @@ private:
       steps.emplace_back(getIndexVal(loop.attr("step")));
     }
 
+    auto caps = ctx["device_caps"];
+    mlir::Attribute env;
+    if (!caps.is_none()) {
+      auto device = caps.attr("filter_string").cast<std::string>();
+      auto spirvMajor = caps.attr("spirv_major_version").cast<int16_t>();
+      auto spirvMinor = caps.attr("spirv_minor_version").cast<int16_t>();
+      auto hasFP16 = caps.attr("has_fp16").cast<bool>();
+      auto hasFP64 = caps.attr("has_fp64").cast<bool>();
+      env = gpu_runtime::GPURegionDescAttr::get(builder.getContext(), device,
+                                                spirvMajor, spirvMinor, hasFP16,
+                                                hasFP64);
+    }
+
     std::string deviceName = "level_zero:gpu:0"; // TODO: get from parfor node
     bool hasDevice = !deviceName.empty();
 
@@ -419,13 +432,10 @@ private:
     }
 
     numba::util::EnvironmentRegionOp regionOp;
-    if (hasDevice) {
-      // TODO: get caps
-      auto attr = gpu_runtime::GPURegionDescAttr::get(&ctx, deviceName, 1, 2,
-                                                      true, false);
+    if (env) {
       auto loc = getCurrentLoc();
       regionOp = builder.create<numba::util::EnvironmentRegionOp>(
-          loc, attr, /*args*/ std::nullopt, reductionTypes);
+          loc, env, /*args*/ std::nullopt, reductionTypes);
       mlir::Block &regionBlock = regionOp.getRegion().front();
       assert(llvm::hasSingleElement(regionBlock));
       regionBlock.getTerminator()->erase();
@@ -525,12 +535,9 @@ private:
     builder.create<mlir::func::ReturnOp>(loc, result);
     fixupPhis();
 
-    if (!deviceName.empty()) {
+    if (env) {
       builder.setInsertionPointToStart(block);
 
-      // TODO: get caps
-      auto newEnv = gpu_runtime::GPURegionDescAttr::get(
-          builder.getContext(), deviceName, 1, 2, true, false);
       llvm::SmallVector<mlir::Type> newArgsTypes;
       for (auto arg : block->getArguments()) {
         auto argType = arg.getType();
@@ -541,7 +548,7 @@ private:
 
         auto newType = numba::ntensor::NTensorType::get(
             builder.getContext(), origType.getShape(),
-            origType.getElementType(), newEnv, origType.getLayout());
+            origType.getElementType(), env, origType.getLayout());
         arg.setType(newType);
         auto cast = builder.create<numba::ntensor::CastOp>(getCurrentLoc(),
                                                            origType, arg);
