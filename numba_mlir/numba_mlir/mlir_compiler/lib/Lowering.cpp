@@ -417,9 +417,6 @@ private:
                                                 hasFP64);
     }
 
-    std::string deviceName = "level_zero:gpu:0"; // TODO: get from parfor node
-    bool hasDevice = !deviceName.empty();
-
     llvm::SmallVector<mlir::Value> reductionInits;
     llvm::SmallVector<mlir::Type> reductionTypes;
     std::unordered_map<std::string, unsigned> reductionIndices;
@@ -515,7 +512,7 @@ private:
         begins, ends, steps, reductionInits, bodyBuilder);
     auto loc = getCurrentLoc();
 
-    if (hasDevice) {
+    if (env) {
       builder.create<numba::util::EnvironmentRegionYieldOp>(loc, results);
       results = regionOp.getResults();
       builder.setInsertionPointToEnd(block);
