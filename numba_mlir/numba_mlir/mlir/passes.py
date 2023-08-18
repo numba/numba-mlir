@@ -324,11 +324,14 @@ class MlirReplaceParfors(MlirBackendBase):
                 fn_name = f"parfor_impl{inst.id}"
                 arg_types = self._get_parfor_args_types(state, inst)
                 res_type = self._get_parfor_return_type(state, inst)
+                device_caps = self._get_parfor_device_caps(arg_types)
 
                 ctx = self._get_func_context(state)
                 ctx["fnname"] = lambda: fn_name
                 ctx["fnargs"] = lambda: arg_types
                 ctx["restype"] = lambda: res_type
+
+                ctx["device_caps"] = device_caps
 
                 mlir_compiler.lower_parfor(ctx, module, inst)
                 parfor_funcs[inst] = fn_name
@@ -362,6 +365,17 @@ class MlirReplaceParfors(MlirBackendBase):
                 ret.append(typemap[v.name])
 
         return ret
+
+    def _get_parfor_device_caps(self, types):
+        from numba_dpex.core.types import USMNdArray
+        from .dpctl_interop import _get_device_caps
+        import dpctl
+
+        for t in types:
+            if isinstance(t, USMNdArray):
+                return _get_device_caps(dpctl.SyclDevice(t.device))
+
+        return None
 
     def _get_parfor_return_type(self, state, parfor):
         typemap = state.typemap
