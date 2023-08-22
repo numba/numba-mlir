@@ -309,16 +309,15 @@ class MlirReplaceParfors(MlirBackendBase):
             from numba_dpex.core.types import USMNdArray
             from .dpctl_interop import _get_device_caps
             import dpctl
+
             self._usmarray_type = USMNdArray
             self._get_device_caps = _get_device_caps
             self._device_ctor = dpctl.SyclDevice
         except ImportError:
-            self._usmarray_type = None;
+            self._usmarray_type = None
 
     def run_pass(self, state):
-        print("-=-=-=-=-=- MlirReplaceParfors -=-=-=-=-=-")
         ir = state.func_ir
-        ir.dump()
         module = None
         parfor_funcs = {}
         for _, block in ir.blocks.items():
@@ -326,7 +325,6 @@ class MlirReplaceParfors(MlirBackendBase):
                 if not isinstance(inst, numba.parfors.parfor.Parfor):
                     continue
 
-                inst.dump()
                 if module is None:
                     mod_settings = {"enable_gpu_pipeline": True}
                     module = mlir_compiler.create_module(mod_settings)
@@ -404,9 +402,6 @@ class MlirReplaceParfors(MlirBackendBase):
         return types.Tuple(ret)
 
     def _lower_parfor(self, func_ptr, lowerer, parfor):
-        print("-=-=-=-=-=-=- lowerer")
-        print(lowerer)
-
         context = lowerer.context
         builder = lowerer.builder
         typemap = lowerer.fndesc.typemap
@@ -431,14 +426,11 @@ class MlirReplaceParfors(MlirBackendBase):
         args += self._enumerate_parfor_args(parfor, get_arg)
 
         fnty = llvmlite.ir.FunctionType(llvmlite.ir.IntType(32), [a.type for a in args])
-        print(fnty)
-        print(func_ptr)
 
         fnptr = context.get_constant(types.uintp, func_ptr)
         fnptr = builder.inttoptr(fnptr, llvmlite.ir.PointerType(fnty))
-        print(fnptr)
+
         status = builder.call(fnptr, args)
-        print(status)
         # Func returns exception status, but exceptions are not implemented yet.
 
         # Unpack reduction values
@@ -463,7 +455,6 @@ class MlirReplaceParfors(MlirBackendBase):
         if isinstance(typ, llvmlite.ir.BaseStructType):
             usmarray_type = self._usmarray_type
             is_usm_array = usmarray_type and isinstance(orig_type, usmarray_type)
-            print('asdsadasdsasdsa', is_usm_array)
             # USM array data model mostly follows numpy model except additional
             # sycl queue pointer. Queue can be extracted from meminfo, so just
             # skip it.

@@ -1316,7 +1316,6 @@ py::capsule lowerParfor(const pybind11::object &compilationContext,
   auto &module = mod->module;
   auto func = PlierLowerer(context, mod->typeConverter)
                   .lowerParfor(compilationContext, module, parforInst);
-  func->dump();
   return py::capsule(func.getOperation()); // no dtor, func owned by the module.
 }
 
