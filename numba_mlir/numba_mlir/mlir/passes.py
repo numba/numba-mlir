@@ -463,12 +463,13 @@ class MlirReplaceParfors(MlirBackendBase):
         if isinstance(typ, llvmlite.ir.BaseStructType):
             usmarray_type = self._usmarray_type
             is_usm_array = usmarray_type and isinstance(orig_type, usmarray_type)
+            print('asdsadasdsasdsa', is_usm_array)
             # USM array data model mostly follows numpy model except additional
             # sycl queue pointer. Queue can be extracted from meminfo, so just
             # skip it.
             # TODO: Actually parse data models instead of hardcoding index?
             for i in range(len(typ)):
-                if i == 5:
+                if is_usm_array and i == 5:
                     continue
 
                 ret.append(builder.extract_value(arg, i))
