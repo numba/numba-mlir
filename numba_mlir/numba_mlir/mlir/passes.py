@@ -347,23 +347,28 @@ class MlirReplaceParfors(MlirBackendBase):
             func_ptr = mlir_compiler.get_function_pointer(
                 global_compiler_context, compiled_mod, func_name
             )
-            # TODO: replace inst with call to func_ptr
+            inst.lowerer = functools.partial(self._lower_parfor, func_ptr)
 
         return True
 
-    def _get_parfor_args_types(self, state, parfor):
-        typemap = state.typemap
-        ret = []
+    def _enumerate_parfor_args(self, parfor, func):
         for param in parfor.params:
-            ret.append(typemap[param])
+            func(param)
 
         for loop in parfor.loop_nests:
             for v in (loop.start, loop.stop, loop.step):
                 if isinstance(v, int):
                     continue
 
-                ret.append(typemap[v.name])
+                func(v.name)
 
+    def _get_parfor_args_types(self, state, parfor):
+        typemap = state.typemap
+        ret = []
+        def add_arg(v):
+            ret.append(typemap[v])
+
+        self._enumerate_parfor_args(parfor, add_arg)
         return ret
 
     def _get_parfor_device_caps(self, types):
@@ -391,3 +396,41 @@ class MlirReplaceParfors(MlirBackendBase):
             return ret[0]
 
         return types.Tuple(ret)
+
+
+    def _lower_parfor(self, func_ptr, lowerer, parfor):
+        print('-=-=-=-=-=-=- lowerer')
+        print(lowerer)
+        import llvmlite.ir
+
+        context = lowerer.context
+        builder = lowerer.builder
+
+        # void_ptr = llvmlite.ir.PointerType(llvmlite.ir.IntType(8))
+        nullptr = context.get_constant_null(types.voidptr)
+
+        args = []
+
+        # First arg is pointer to return value storage - parfor funcs never
+        # return values.
+        args.append(nullptr)
+
+        # First arg is exception info - exceptions is not implemented yet.
+        args.append(nullptr)
+
+        def add_arg(v):
+            args.append(lowerer.loadvar(v))
+
+        self._enumerate_parfor_args(parfor, add_arg)
+
+        fnty = llvmlite.ir.FunctionType(llvmlite.ir.IntType(32), [a.type for a in args])
+        print(fnty)
+        print(func_ptr)
+
+        fnptr = context.get_constant(types.uintp, func_ptr)
+        fnptr = builder.inttoptr(fnptr, llvmlite.ir.PointerType(fnty))
+        print(fnptr)
+        status = builder.call(fnptr, args)
+        print(status)
+        # Func return exception status, but exceptions are not implemented yet.
+
