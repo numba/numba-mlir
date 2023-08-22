@@ -4,7 +4,8 @@
 
 import functools
 
-from numba.core import types
+import llvmlite.ir
+from numba.core import types, cgutils
 from numba.core.compiler import Flags, compile_result
 from numba.core.compiler_machinery import FunctionPass, register_pass
 from numba.core.funcdesc import qualifying_prefix
@@ -321,9 +322,10 @@ class MlirReplaceParfors(MlirBackendBase):
                     mod_settings = {"enable_gpu_pipeline": True}
                     module = mlir_compiler.create_module(mod_settings)
 
+                typemap = state.typemap
                 fn_name = f"parfor_impl{inst.id}"
-                arg_types = self._get_parfor_args_types(state, inst)
-                res_type = self._get_parfor_return_type(state, inst)
+                arg_types = self._get_parfor_args_types(typemap, inst)
+                res_type = self._get_parfor_return_type(typemap, inst)
                 device_caps = self._get_parfor_device_caps(arg_types)
 
                 ctx = self._get_func_context(state)
@@ -352,24 +354,21 @@ class MlirReplaceParfors(MlirBackendBase):
         return True
 
     def _enumerate_parfor_args(self, parfor, func):
+        ret = []
         for param in parfor.params:
-            func(param)
+            ret += func(param)
 
         for loop in parfor.loop_nests:
             for v in (loop.start, loop.stop, loop.step):
                 if isinstance(v, int):
                     continue
 
-                func(v.name)
+                ret += func(v.name)
 
-    def _get_parfor_args_types(self, state, parfor):
-        typemap = state.typemap
-        ret = []
-        def add_arg(v):
-            ret.append(typemap[v])
-
-        self._enumerate_parfor_args(parfor, add_arg)
         return ret
+
+    def _get_parfor_args_types(self, typemap, parfor):
+        return self._enumerate_parfor_args(parfor, lambda v: [typemap[v]])
 
     def _get_parfor_device_caps(self, types):
         from numba_dpex.core.types import USMNdArray
@@ -382,8 +381,7 @@ class MlirReplaceParfors(MlirBackendBase):
 
         return None
 
-    def _get_parfor_return_type(self, state, parfor):
-        typemap = state.typemap
+    def _get_parfor_return_type(self, typemap, parfor):
         ret = []
         for param in parfor.redvars:
             ret.append(typemap[param])
@@ -401,27 +399,29 @@ class MlirReplaceParfors(MlirBackendBase):
     def _lower_parfor(self, func_ptr, lowerer, parfor):
         print('-=-=-=-=-=-=- lowerer')
         print(lowerer)
-        import llvmlite.ir
 
         context = lowerer.context
         builder = lowerer.builder
+        typemap = lowerer.fndesc.typemap
 
-        # void_ptr = llvmlite.ir.PointerType(llvmlite.ir.IntType(8))
+        res_type = self._get_parfor_return_type(typemap, parfor)
+        res_type = context.get_value_type(res_type)
+
         nullptr = context.get_constant_null(types.voidptr)
 
         args = []
 
-        # First arg is pointer to return value storage - parfor funcs never
-        # return values.
+        # First arg is pointer to return value(s) storage.
+        res_storage = cgutils.alloca_once(builder, res_type)
+        args.append(res_storage)
+
+        # Second arg is exception info - exceptions is not implemented yet.
         args.append(nullptr)
 
-        # First arg is exception info - exceptions is not implemented yet.
-        args.append(nullptr)
+        def get_arg(v):
+            return self._repack_arg(builder, typemap[v], lowerer.loadvar(v));
 
-        def add_arg(v):
-            args.append(lowerer.loadvar(v))
-
-        self._enumerate_parfor_args(parfor, add_arg)
+        args += self._enumerate_parfor_args(parfor, get_arg)
 
         fnty = llvmlite.ir.FunctionType(llvmlite.ir.IntType(32), [a.type for a in args])
         print(fnty)
@@ -432,5 +432,33 @@ class MlirReplaceParfors(MlirBackendBase):
         print(fnptr)
         status = builder.call(fnptr, args)
         print(status)
-        # Func return exception status, but exceptions are not implemented yet.
+        # Func returns exception status, but exceptions are not implemented yet.
+
+        # Unpack reduction values
+        red_vals = []
+        num_reds = len(parfor.redvars)
+        if num_reds == 0:
+            # nothing
+            pass
+        elif num_reds == 1:
+            red_vals.append(builder.load(res_storage))
+        else:
+            struct = builder.load(res_storage)
+            for i in range(num_reds):
+                red_vals.append(builder.extract_value(struct, i))
+
+        for red_val, red_var in zip(red_vals, parfor.redvars):
+            lowerer.storevar(red_val, name=red_var)
+
+
+    def _repack_arg(self, builder, orig_type, arg):
+        ret = []
+        typ = arg.type
+        if isinstance(typ, llvmlite.ir.BaseStructType):
+            for i in range(len(typ)):
+                ret.append(builder.extract_value(arg, i))
+        else:
+            ret.append(arg)
+
+        return ret
 
