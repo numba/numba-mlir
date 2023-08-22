@@ -52,7 +52,6 @@ def mlir_jit(
     options.pop("gpu_use_64bit_index", None)
 
     if options.get("replace_parfors", False):
-        assert False, "replace_parfors is not implemented yet"
         pipeline = mlir_compiler_replace_parfors_pipeline
     elif options.get("enable_gpu_pipeline", True):
         pipeline = get_gpu_pipeline(fp64_truncate, use_64bit_index)
