@@ -395,9 +395,8 @@ class MlirReplaceParfors(MlirBackendBase):
 
         return types.Tuple(ret)
 
-
     def _lower_parfor(self, func_ptr, lowerer, parfor):
-        print('-=-=-=-=-=-=- lowerer')
+        print("-=-=-=-=-=-=- lowerer")
         print(lowerer)
 
         context = lowerer.context
@@ -419,7 +418,7 @@ class MlirReplaceParfors(MlirBackendBase):
         args.append(nullptr)
 
         def get_arg(v):
-            return self._repack_arg(builder, typemap[v], lowerer.loadvar(v));
+            return self._repack_arg(builder, typemap[v], lowerer.loadvar(v))
 
         args += self._enumerate_parfor_args(parfor, get_arg)
 
@@ -450,7 +449,6 @@ class MlirReplaceParfors(MlirBackendBase):
         for red_val, red_var in zip(red_vals, parfor.redvars):
             lowerer.storevar(red_val, name=red_var)
 
-
     def _repack_arg(self, builder, orig_type, arg):
         ret = []
         typ = arg.type
@@ -461,4 +459,3 @@ class MlirReplaceParfors(MlirBackendBase):
             ret.append(arg)
 
         return ret
-
