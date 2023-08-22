@@ -305,6 +305,15 @@ class MlirReplaceParfors(MlirBackendBase):
 
     def __init__(self):
         MlirBackendBase.__init__(self, push_func_stack=False)
+        try:
+            from numba_dpex.core.types import USMNdArray
+            from .dpctl_interop import _get_device_caps
+            import dpctl
+            self._usmarray_type = USMNdArray
+            self._get_device_caps = _get_device_caps
+            self._device_ctor = dpctl.SyclDevice
+        except ImportError:
+            self._usmarray_type = None;
 
     def run_pass(self, state):
         print("-=-=-=-=-=- MlirReplaceParfors -=-=-=-=-=-")
@@ -371,13 +380,12 @@ class MlirReplaceParfors(MlirBackendBase):
         return self._enumerate_parfor_args(parfor, lambda v: [typemap[v]])
 
     def _get_parfor_device_caps(self, types):
-        from numba_dpex.core.types import USMNdArray
-        from .dpctl_interop import _get_device_caps
-        import dpctl
+        if self._usmarray_type is None:
+            return None
 
         for t in types:
-            if isinstance(t, USMNdArray):
-                return _get_device_caps(dpctl.SyclDevice(t.device))
+            if isinstance(t, self._usmarray_type):
+                return self._get_device_caps(self._device_ctor(t.device))
 
         return None
 
@@ -453,7 +461,16 @@ class MlirReplaceParfors(MlirBackendBase):
         ret = []
         typ = arg.type
         if isinstance(typ, llvmlite.ir.BaseStructType):
+            usmarray_type = self._usmarray_type
+            is_usm_array = usmarray_type and isinstance(orig_type, usmarray_type)
+            # USM array data model mostly follows numpy model except additional
+            # sycl queue pointer. Queue can be extracted from meminfo, so just
+            # skip it.
+            # TODO: Actually parse data models instead of hardcoding index?
             for i in range(len(typ)):
+                if i == 5:
+                    continue
+
                 ret.append(builder.extract_value(arg, i))
         else:
             ret.append(arg)
