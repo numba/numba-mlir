@@ -20,8 +20,7 @@ set(SOURCES_LIST
 )
 set(HEADERS_LIST
     lib/GpuModule.hpp
-    ../numba_mlir_gpu_common/LevelZeroPrinting.hpp
-    ../numba_mlir_gpu_common/LevelZeroWrapper.hpp
+    lib/Utils.hpp
 )
 
 add_library(${PROJECT_NAME} SHARED ${SOURCES_LIST} ${HEADERS_LIST})
