@@ -12,6 +12,8 @@
 
 #include "numba-mlir-gpu-runtime-sycl_export.h"
 
+#include "Utils.hpp"
+
 #include "GpuCommon.hpp"
 #include "GpuModule.hpp"
 
@@ -40,20 +42,6 @@ private:
 #endif
 
 namespace {
-template <typename F> static auto catchAll(F &&func) {
-  try {
-    return func();
-  } catch (const std::exception &e) {
-    fprintf(stdout, "An exception was thrown: %s\n", e.what());
-    fflush(stdout);
-    abort();
-  } catch (...) {
-    fprintf(stdout, "An unknown exception was thrown\n");
-    fflush(stdout);
-    abort();
-  }
-}
-
 static numba::MemInfoAllocFuncT AllocFunc = nullptr;
 
 static auto getDeviceSelector(std::string deviceName) {
@@ -78,9 +66,10 @@ static auto countEvents(sycl::event **events) {
 }
 
 struct EventStorage {
-  sycl::event event; // Must be first
+  sycl::event event;
   std::unique_ptr<EventStorage> next;
 };
+static_assert(offsetof(EventStorage, event) == 0, "Event must be first");
 
 class Stream : public numba::GPUStreamInterface {
 public:
@@ -88,7 +77,7 @@ public:
     LOG_FUNC();
     queue = sycl::queue{sycl::device{getDeviceSelector(deviceName)}};
   }
-
+  Stream(const Stream &) = delete;
   ~Stream() { LOG_FUNC(); }
 
   std::string_view getDeviceName() override { return deviceName; }
@@ -104,7 +93,7 @@ public:
 
   struct Releaser {
     Releaser(Stream *s) : stream(s) { assert(stream); }
-
+    Releaser(const Releaser &) = delete;
     ~Releaser() { stream->release(); }
 
   private:

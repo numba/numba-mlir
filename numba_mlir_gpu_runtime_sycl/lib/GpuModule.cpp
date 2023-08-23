@@ -4,6 +4,8 @@
 
 #include "GpuModule.hpp"
 
+#include "Utils.hpp"
+
 #include <algorithm>
 #include <memory>
 #include <stdexcept>
@@ -32,7 +34,6 @@
 namespace {
 class DynamicLibHelper final {
 public:
-  DynamicLibHelper &operator=(const DynamicLibHelper &) = delete;
   DynamicLibHelper() = delete;
   DynamicLibHelper(const DynamicLibHelper &) = delete;
   DynamicLibHelper(const char *libName) {
@@ -195,7 +196,7 @@ static void checkZeResult(ze_result_t res, const char *func) {
 
 struct ZeModuleDeleter {
   void operator()(ze_module_handle_t module) const {
-    CHECK_ZE_RESULT(getZeLoader().zeModuleDestroy(module));
+    catchAll([&]() { CHECK_ZE_RESULT(getZeLoader().zeModuleDestroy(module)); });
   }
 };
 using ZeModule =
@@ -203,7 +204,8 @@ using ZeModule =
 
 struct ZeBuildLogDeleter {
   void operator()(ze_module_build_log_handle_t log) const {
-    CHECK_ZE_RESULT(getZeLoader().zeModuleBuildLogDestroy(log));
+    catchAll(
+        [&]() { CHECK_ZE_RESULT(getZeLoader().zeModuleBuildLogDestroy(log)); });
   }
 };
 using ZeBuildLog =
@@ -212,7 +214,7 @@ using ZeBuildLog =
 
 struct ZeKernelDeleter {
   void operator()(ze_kernel_handle_t module) const {
-    CHECK_ZE_RESULT(getZeLoader().zeKernelDestroy(module));
+    catchAll([&]() { CHECK_ZE_RESULT(getZeLoader().zeKernelDestroy(module)); });
   }
 };
 using ZeKernel =
@@ -287,7 +289,8 @@ static void checkClResult(const char *func, cl_int res) {
 
 struct ClProgramDeleter {
   void operator()(cl_program program) const {
-    CHECK_CL_RESULT(getClLoader().clReleaseProgram(program));
+    catchAll(
+        [&]() { CHECK_CL_RESULT(getClLoader().clReleaseProgram(program)); });
   }
 };
 using ClProgram =
@@ -295,7 +298,7 @@ using ClProgram =
 
 struct ClKernelDeleter {
   void operator()(cl_kernel kernel) const {
-    CHECK_CL_RESULT(getClLoader().clReleaseKernel(kernel));
+    catchAll([&]() { CHECK_CL_RESULT(getClLoader().clReleaseKernel(kernel)); });
   }
 };
 using ClKernel =
@@ -431,7 +434,8 @@ GPUKernel *getGPUKernel(GPUModule *mod, const char *name) {
 
     auto syclKernel =
         sycl::make_kernel<ze_be>({mod->kernelBundle, zeKernel.get()}, ctx);
-    return new GPUKernel{syclKernel, std::move(zeKernel), nullptr, maxWgSize};
+    return new GPUKernel{std::move(syclKernel), std::move(zeKernel), nullptr,
+                         maxWgSize};
   }
   if (mod->clProgram) {
     auto &loader = getClLoader();
@@ -442,7 +446,8 @@ GPUKernel *getGPUKernel(GPUModule *mod, const char *name) {
     checkClResult("clCreateKernel", errCode);
 
     auto syclKernel = sycl::make_kernel<cl_be>(clKernel.get(), ctx);
-    return new GPUKernel{syclKernel, nullptr, std::move(clKernel), maxWgSize};
+    return new GPUKernel{std::move(syclKernel), nullptr, std::move(clKernel),
+                         maxWgSize};
   }
   reportError("Invalid module");
 }
