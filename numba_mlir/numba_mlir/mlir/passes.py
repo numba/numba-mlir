@@ -4,7 +4,8 @@
 
 import functools
 
-from numba.core import types
+import llvmlite.ir
+from numba.core import types, cgutils
 from numba.core.compiler import Flags, compile_result
 from numba.core.compiler_machinery import FunctionPass, register_pass
 from numba.core.funcdesc import qualifying_prefix
@@ -304,11 +305,19 @@ class MlirReplaceParfors(MlirBackendBase):
 
     def __init__(self):
         MlirBackendBase.__init__(self, push_func_stack=False)
+        try:
+            from numba_dpex.core.types import USMNdArray
+            from .dpctl_interop import _get_device_caps
+            import dpctl
+
+            self._usmarray_type = USMNdArray
+            self._get_device_caps = _get_device_caps
+            self._device_ctor = dpctl.SyclDevice
+        except ImportError:
+            self._usmarray_type = None
 
     def run_pass(self, state):
-        print("-=-=-=-=-=- MlirReplaceParfors -=-=-=-=-=-")
         ir = state.func_ir
-        ir.dump()
         module = None
         parfor_funcs = {}
         for _, block in ir.blocks.items():
@@ -316,14 +325,14 @@ class MlirReplaceParfors(MlirBackendBase):
                 if not isinstance(inst, numba.parfors.parfor.Parfor):
                     continue
 
-                inst.dump()
                 if module is None:
                     mod_settings = {"enable_gpu_pipeline": True}
                     module = mlir_compiler.create_module(mod_settings)
 
+                typemap = state.typemap
                 fn_name = f"parfor_impl{inst.id}"
-                arg_types = self._get_parfor_args_types(state, inst)
-                res_type = self._get_parfor_return_type(state, inst)
+                arg_types = self._get_parfor_args_types(typemap, inst)
+                res_type = self._get_parfor_return_type(typemap, inst)
                 device_caps = self._get_parfor_device_caps(arg_types)
 
                 ctx = self._get_func_context(state)
@@ -347,38 +356,38 @@ class MlirReplaceParfors(MlirBackendBase):
             func_ptr = mlir_compiler.get_function_pointer(
                 global_compiler_context, compiled_mod, func_name
             )
-            # TODO: replace inst with call to func_ptr
+            inst.lowerer = functools.partial(self._lower_parfor, func_ptr)
 
         return True
 
-    def _get_parfor_args_types(self, state, parfor):
-        typemap = state.typemap
+    def _enumerate_parfor_args(self, parfor, func):
         ret = []
         for param in parfor.params:
-            ret.append(typemap[param])
+            ret += func(param)
 
         for loop in parfor.loop_nests:
             for v in (loop.start, loop.stop, loop.step):
                 if isinstance(v, int):
                     continue
 
-                ret.append(typemap[v.name])
+                ret += func(v.name)
 
         return ret
 
+    def _get_parfor_args_types(self, typemap, parfor):
+        return self._enumerate_parfor_args(parfor, lambda v: [typemap[v]])
+
     def _get_parfor_device_caps(self, types):
-        from numba_dpex.core.types import USMNdArray
-        from .dpctl_interop import _get_device_caps
-        import dpctl
+        if self._usmarray_type is None:
+            return None
 
         for t in types:
-            if isinstance(t, USMNdArray):
-                return _get_device_caps(dpctl.SyclDevice(t.device))
+            if isinstance(t, self._usmarray_type):
+                return self._get_device_caps(self._device_ctor(t.device))
 
         return None
 
-    def _get_parfor_return_type(self, state, parfor):
-        typemap = state.typemap
+    def _get_parfor_return_type(self, typemap, parfor):
         ret = []
         for param in parfor.redvars:
             ret.append(typemap[param])
@@ -391,3 +400,71 @@ class MlirReplaceParfors(MlirBackendBase):
             return ret[0]
 
         return types.Tuple(ret)
+
+    def _lower_parfor(self, func_ptr, lowerer, parfor):
+        context = lowerer.context
+        builder = lowerer.builder
+        typemap = lowerer.fndesc.typemap
+
+        res_type = self._get_parfor_return_type(typemap, parfor)
+        res_type = context.get_value_type(res_type)
+
+        nullptr = context.get_constant_null(types.voidptr)
+
+        args = []
+
+        # First arg is pointer to return value(s) storage.
+        res_storage = cgutils.alloca_once(builder, res_type)
+        args.append(res_storage)
+
+        # Second arg is exception info - exceptions is not implemented yet.
+        args.append(nullptr)
+
+        def get_arg(v):
+            return self._repack_arg(builder, typemap[v], lowerer.loadvar(v))
+
+        args += self._enumerate_parfor_args(parfor, get_arg)
+
+        fnty = llvmlite.ir.FunctionType(llvmlite.ir.IntType(32), [a.type for a in args])
+
+        fnptr = context.get_constant(types.uintp, func_ptr)
+        fnptr = builder.inttoptr(fnptr, llvmlite.ir.PointerType(fnty))
+
+        status = builder.call(fnptr, args)
+        # Func returns exception status, but exceptions are not implemented yet.
+
+        # Unpack reduction values
+        red_vals = []
+        num_reds = len(parfor.redvars)
+        if num_reds == 0:
+            # nothing
+            pass
+        elif num_reds == 1:
+            red_vals.append(builder.load(res_storage))
+        else:
+            struct = builder.load(res_storage)
+            for i in range(num_reds):
+                red_vals.append(builder.extract_value(struct, i))
+
+        for red_val, red_var in zip(red_vals, parfor.redvars):
+            lowerer.storevar(red_val, name=red_var)
+
+    def _repack_arg(self, builder, orig_type, arg):
+        ret = []
+        typ = arg.type
+        if isinstance(typ, llvmlite.ir.BaseStructType):
+            usmarray_type = self._usmarray_type
+            is_usm_array = usmarray_type and isinstance(orig_type, usmarray_type)
+            # USM array data model mostly follows numpy model except additional
+            # sycl queue pointer. Queue can be extracted from meminfo, so just
+            # skip it.
+            # TODO: Actually parse data models instead of hardcoding index?
+            for i in range(len(typ)):
+                if is_usm_array and i == 5:
+                    continue
+
+                ret.append(builder.extract_value(arg, i))
+        else:
+            ret.append(arg)
+
+        return ret
