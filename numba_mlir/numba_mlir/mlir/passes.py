@@ -348,14 +348,10 @@ class MlirReplaceParfors(MlirBackendBase):
         module = None
         parfor_funcs = {}
         ctx = None
-        # print("-=-=-=-=-=-=-=-=-=-=-=-")
-        # ir.dump()
         for _, block in ir.blocks.items():
             for inst in block.body:
                 if not isinstance(inst, numba.parfors.parfor.Parfor):
                     continue
-
-                print(inst)
 
                 if module is None:
                     mod_settings = {"enable_gpu_pipeline": True}
@@ -374,14 +370,36 @@ class MlirReplaceParfors(MlirBackendBase):
 
                 ctx["device_caps"] = device_caps
 
+                output_arrays = numba.parfors.parfor.get_parfor_outputs(
+                    inst, inst.params
+                )
+                ctx["parfor_params"] = self._get_parfor_params(inst)
+                ctx["parfor_output_arrays"] = output_arrays
+
                 mlir_compiler.lower_parfor(ctx, module, inst)
                 parfor_funcs[inst] = fn_name
 
         return module, parfor_funcs, ctx
 
+    def _get_parfor_params(self, parfor):
+        params = []
+        init_block_vars = set()
+        for instr in parfor.init_block.body:
+            if hasattr(instr, "target"):
+                init_block_vars.add(instr.target.name)
+
+        for param in parfor.params:
+            if param in init_block_vars:
+                continue
+
+            params.append(param)
+
+        return params
+
     def _enumerate_parfor_args(self, parfor, func):
         ret = []
-        for param in parfor.params:
+
+        for param in self._get_parfor_params(parfor):
             ret += func(param)
 
         for loop in parfor.loop_nests:
@@ -408,6 +426,11 @@ class MlirReplaceParfors(MlirBackendBase):
 
     def _get_parfor_return_type(self, typemap, parfor):
         ret = []
+        output_arrays = numba.parfors.parfor.get_parfor_outputs(parfor, parfor.params)
+
+        for out in output_arrays:
+            ret.append(typemap[out])
+
         for param in parfor.redvars:
             ret.append(typemap[param])
 
@@ -452,21 +475,24 @@ class MlirReplaceParfors(MlirBackendBase):
         status = builder.call(fnptr, args)
         # Func returns exception status, but exceptions are not implemented yet.
 
-        # Unpack reduction values
-        red_vals = []
-        num_reds = len(parfor.redvars)
-        if num_reds == 0:
+        # Unpack returned values
+        ret_vals = []
+
+        output_arrays = numba.parfors.parfor.get_parfor_outputs(parfor, parfor.params)
+
+        num_rets = len(output_arrays) + len(parfor.redvars)
+        if num_rets == 0:
             # nothing
             pass
-        elif num_reds == 1:
-            red_vals.append(builder.load(res_storage))
+        elif num_rets == 1:
+            ret_vals.append(builder.load(res_storage))
         else:
             struct = builder.load(res_storage)
-            for i in range(num_reds):
-                red_vals.append(builder.extract_value(struct, i))
+            for i in range(num_rets):
+                ret_vals.append(builder.extract_value(struct, i))
 
-        for red_val, red_var in zip(red_vals, parfor.redvars):
-            lowerer.storevar(red_val, name=red_var)
+        for ret_val, ret_var in zip(ret_vals, output_arrays + parfor.redvars):
+            lowerer.storevar(ret_val, name=ret_var)
 
     def _repack_arg(self, builder, orig_type, arg):
         ret = []

@@ -376,7 +376,7 @@ private:
       return res;
     };
 
-    for (auto param : parforInst.attr("params")) {
+    for (auto param : ctx["parfor_params"].cast<py::list>()) {
       auto name = param.cast<std::string>();
       varsMap[name] = getNextBlockArg();
     }
@@ -444,6 +444,15 @@ private:
       lowerBlock(block, parforInst.attr("init_block"));
     }
 
+    llvm::SmallVector<mlir::Value> results;
+
+    for (auto var : ctx["parfor_output_arrays"].cast<py::list>()) {
+      auto varName = var.cast<std::string>();
+      auto it = varsMap.find(varName);
+      assert(it != varsMap.end());
+      results.emplace_back(it->second);
+    }
+
     auto bodyBuilder = [&](mlir::OpBuilder &b, mlir::Location l,
                            mlir::ValueRange indices,
                            mlir::ValueRange iterVars) -> mlir::ValueRange {
@@ -509,9 +518,10 @@ private:
       return regionOp.getResults();
     };
 
-    mlir::ValueRange results = buildNestedParallelLoop(
+    mlir::ValueRange loopResults = buildNestedParallelLoop(
         begins, ends, steps, reductionInits, bodyBuilder);
     auto loc = getCurrentLoc();
+    results.append(loopResults.begin(), loopResults.end());
 
     if (env) {
       builder.create<numba::util::EnvironmentRegionYieldOp>(loc, results);
@@ -526,7 +536,8 @@ private:
     } else if (results.size() == 1) {
       result = results.front();
     } else {
-      auto resType = builder.getTupleType(results.getTypes());
+      mlir::ValueRange resultsRange(results);
+      auto resType = builder.getTupleType(resultsRange.getTypes());
       result = builder.create<numba::util::BuildTupleOp>(loc, resType, results);
     }
 

@@ -324,6 +324,17 @@ _gen_tests()
 del _gen_tests
 
 
+def test_replace_parfor_numpy():
+    def py_func(a, b):
+        return np.add(a, b)
+
+    a = np.arange(10)
+    b = np.arange(10, 20)
+
+    jit_func = njit(py_func, parallel=True, replace_parfors=True)
+    assert_equal(py_func(a, b), jit_func(a, b))
+
+
 def test_replace_parfor():
     def py_func(c):
         res = 0
