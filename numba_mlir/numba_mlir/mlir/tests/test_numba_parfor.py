@@ -353,7 +353,21 @@ def test_replace_parfor_numpy_operator():
         assert len(ir) > 0  # Check some code was actually generated
 
 
-def test_replace_parfor():
+def test_replace_parfor_prange():
+    def py_func(c):
+        for i in numba.prange(len(c)):
+            c[i] = i * i
+
+    a = np.arange(10)
+
+    jit_func = njit(py_func, parallel=True, replace_parfors=True)
+    with print_pass_ir([], ["CFGToSCFPass"]):
+        assert_equal(py_func(a), jit_func(a))
+        ir = get_print_buffer()
+        assert len(ir) > 0  # Check some code was actually generated
+
+
+def test_replace_parfor_prange_reduction1():
     def py_func(c):
         res = 0
         for i in numba.prange(len(c)):
@@ -361,6 +375,24 @@ def test_replace_parfor():
             # res = res + c[ind]
             res = res + c[i]
         return res
+
+    a = np.arange(10)
+
+    jit_func = njit(py_func, parallel=True, replace_parfors=True)
+    with print_pass_ir([], ["CFGToSCFPass"]):
+        assert_equal(py_func(a), jit_func(a))
+        ir = get_print_buffer()
+        assert len(ir) > 0  # Check some code was actually generated
+
+
+def test_replace_parfor_prange_reduction2():
+    def py_func(c):
+        res1 = 0
+        res2 = 1
+        for i in numba.prange(len(c)):
+            res1 = res1 + c[i]
+            res2 = res2 * c[i]
+        return res1, res2
 
     a = np.arange(10)
 
