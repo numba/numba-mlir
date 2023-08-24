@@ -332,7 +332,25 @@ def test_replace_parfor_numpy():
     b = np.arange(10, 20)
 
     jit_func = njit(py_func, parallel=True, replace_parfors=True)
-    assert_equal(py_func(a, b), jit_func(a, b))
+    with print_pass_ir([], ["CFGToSCFPass"]):
+        assert_equal(py_func(a, b), jit_func(a, b))
+        ir = get_print_buffer()
+        assert len(ir) > 0  # Check some code was actually generated
+
+
+@pytest.mark.xfail(reason="Operators doesn't generate parfor nodes")
+def test_replace_parfor_numpy_operator():
+    def py_func(a, b):
+        return a + b
+
+    a = np.arange(10)
+    b = np.arange(10, 20)
+
+    jit_func = njit(py_func, parallel=True, replace_parfors=True)
+    with print_pass_ir([], ["CFGToSCFPass"]):
+        assert_equal(py_func(a, b), jit_func(a, b))
+        ir = get_print_buffer()
+        assert len(ir) > 0  # Check some code was actually generated
 
 
 def test_replace_parfor():
@@ -347,7 +365,10 @@ def test_replace_parfor():
     a = np.arange(10)
 
     jit_func = njit(py_func, parallel=True, replace_parfors=True)
-    assert_equal(py_func(a), jit_func(a))
+    with print_pass_ir([], ["CFGToSCFPass"]):
+        assert_equal(py_func(a), jit_func(a))
+        ir = get_print_buffer()
+        assert len(ir) > 0  # Check some code was actually generated
 
 
 @pytest.mark.skip(reason="for debugging purposes only!")
