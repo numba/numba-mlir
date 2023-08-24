@@ -8,6 +8,7 @@ import numbers
 import pytest
 import numpy as np
 import types as pytypes
+from numpy.testing import assert_equal, assert_allclose
 
 from numba_mlir.mlir.utils import readenv
 from numba_mlir import njit, jit, vectorize
@@ -321,3 +322,37 @@ def _gen_tests():
 
 _gen_tests()
 del _gen_tests
+
+
+def test_replace_parfor():
+    def py_func(c):
+        res = 0
+        for i in numba.prange(len(c)):
+            # ind = 2 if i == 4 else i
+            # res = res + c[ind]
+            res = res + c[i]
+        return res
+
+    a = np.arange(10)
+
+    jit_func = njit(py_func, parallel=True, replace_parfors=True)
+    assert_equal(py_func(a), jit_func(a))
+
+
+@pytest.mark.skip(reason="for debugging purposes only!")
+def test_replace_parfor_dpnp():
+    import numba_dpex
+    import dpnp
+
+    def py_func(c):
+        res = 0
+        for i in numba.prange(len(c)):
+            # ind = 2 if i == 4 else i
+            # res = res + c[ind]
+            res = res + c[i]
+        return res
+
+    a = dpnp.arange(10)
+
+    jit_func = njit(py_func, parallel=True, replace_parfors=True)
+    assert_equal(py_func(a), jit_func(a))
