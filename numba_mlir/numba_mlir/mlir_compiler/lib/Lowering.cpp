@@ -391,6 +391,7 @@ private:
       }
 
       auto var = getNextBlockArg();
+      varsMap[obj.attr("name").cast<std::string>()] = var;
       return builder.create<plier::CastOp>(loc, indexType, var);
     };
 
