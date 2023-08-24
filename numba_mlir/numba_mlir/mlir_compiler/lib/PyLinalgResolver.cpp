@@ -1939,31 +1939,37 @@ std::optional<PyLinalgResolver::Values>
 PyLinalgResolver::rewrite(llvm::StringRef name, mlir::Location loc,
                           mlir::OpBuilder &builder, mlir::ValueRange args,
                           KWArgs kwargs) const {
-  assert(!name.empty());
-  if (!isCompatibleTypes(args) ||
-      !isCompatibleTypes(llvm::make_second_range(kwargs)))
-    return {};
+  try {
+    assert(!name.empty());
+    if (!isCompatibleTypes(args) ||
+        !isCompatibleTypes(llvm::make_second_range(kwargs)))
+      return {};
 
-  auto builderFunc = context->lookupFunc(py::str(name.data(), name.size()));
-  if (builderFunc.is_none())
-    return {};
+    auto builderFunc = context->lookupFunc(py::str(name.data(), name.size()));
+    if (builderFunc.is_none())
+      return {};
 
-  PyBuilderContext pyBuilderContext{loc, builder, *context};
-  auto pyContext = py::capsule(&pyBuilderContext);
-  auto pyArgs = getArgs(
-      context->inspect, builderFunc,
-      [&](auto val) { return context->createVar(pyContext, val); }, args,
-      kwargs);
-  if (pyArgs.is_none())
-    return {};
+    PyBuilderContext pyBuilderContext{loc, builder, *context};
+    auto pyContext = py::capsule(&pyBuilderContext);
+    auto pyArgs = getArgs(
+        context->inspect, builderFunc,
+        [&](auto val) { return context->createVar(pyContext, val); }, args,
+        kwargs);
+    if (pyArgs.is_none())
+      return {};
 
-  auto pyBuilder = context->builder(pyContext);
-  setupPyBuilder(pyBuilder, builder,
-                 [&](auto type) { return context->createType(type); });
+    auto pyBuilder = context->builder(pyContext);
+    setupPyBuilder(pyBuilder, builder,
+                   [&](auto type) { return context->createType(type); });
 
-  auto result = builderFunc(pyBuilder, *pyArgs);
-  if (result.is_none())
-    return {};
+    auto result = builderFunc(pyBuilder, *pyArgs);
+    if (result.is_none())
+      return {};
 
-  return unpackResults(pyBuilderContext, result);
+    return unpackResults(pyBuilderContext, result);
+  } catch (const std::exception &e) {
+    mlir::emitError(loc, e.what());
+  }
+
+  return {};
 }
