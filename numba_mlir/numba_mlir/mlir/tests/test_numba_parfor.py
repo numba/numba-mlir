@@ -8,6 +8,7 @@ import numbers
 import pytest
 import numpy as np
 import types as pytypes
+from numpy.testing import assert_equal, assert_allclose
 
 from numba_mlir.mlir.utils import readenv
 from numba_mlir import njit, jit, vectorize
@@ -321,3 +322,69 @@ def _gen_tests():
 
 _gen_tests()
 del _gen_tests
+
+
+def test_replace_parfor_numpy():
+    def py_func(a, b):
+        return np.add(a, b)
+
+    a = np.arange(10)
+    b = np.arange(10, 20)
+
+    jit_func = njit(py_func, parallel=True, replace_parfors=True)
+    with print_pass_ir([], ["CFGToSCFPass"]):
+        assert_equal(py_func(a, b), jit_func(a, b))
+        ir = get_print_buffer()
+        assert len(ir) > 0  # Check some code was actually generated
+
+
+@pytest.mark.xfail(reason="Operators doesn't generate parfor nodes")
+def test_replace_parfor_numpy_operator():
+    def py_func(a, b):
+        return a + b
+
+    a = np.arange(10)
+    b = np.arange(10, 20)
+
+    jit_func = njit(py_func, parallel=True, replace_parfors=True)
+    with print_pass_ir([], ["CFGToSCFPass"]):
+        assert_equal(py_func(a, b), jit_func(a, b))
+        ir = get_print_buffer()
+        assert len(ir) > 0  # Check some code was actually generated
+
+
+def test_replace_parfor():
+    def py_func(c):
+        res = 0
+        for i in numba.prange(len(c)):
+            # ind = 2 if i == 4 else i
+            # res = res + c[ind]
+            res = res + c[i]
+        return res
+
+    a = np.arange(10)
+
+    jit_func = njit(py_func, parallel=True, replace_parfors=True)
+    with print_pass_ir([], ["CFGToSCFPass"]):
+        assert_equal(py_func(a), jit_func(a))
+        ir = get_print_buffer()
+        assert len(ir) > 0  # Check some code was actually generated
+
+
+@pytest.mark.skip(reason="for debugging purposes only!")
+def test_replace_parfor_dpnp():
+    import numba_dpex
+    import dpnp
+
+    def py_func(c):
+        res = 0
+        for i in numba.prange(len(c)):
+            # ind = 2 if i == 4 else i
+            # res = res + c[ind]
+            res = res + c[i]
+        return res
+
+    a = dpnp.arange(10)
+
+    jit_func = njit(py_func, parallel=True, replace_parfors=True)
+    assert_equal(py_func(a), jit_func(a))
