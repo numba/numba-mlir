@@ -317,6 +317,8 @@ class MlirReplaceParfors(MlirBackendBase):
             self._usmarray_type = None
 
     def run_pass(self, state):
+        global _mlir_active_module
+        old_module = _mlir_active_module
         func_registry.push_active_funcs_stack()
         try:
             module, parfor_funcs, ctx = self._gen_module(state)
@@ -324,11 +326,14 @@ class MlirReplaceParfors(MlirBackendBase):
             if not module:
                 return False
 
+            _mlir_active_module = module
+
             compiled_mod = mlir_compiler.compile_module(
                 global_compiler_context, ctx, module
             )
         finally:
             func_registry.pop_active_funcs_stack()
+            _mlir_active_module = old_module
 
         for inst, func_name in parfor_funcs.items():
             func_ptr = mlir_compiler.get_function_pointer(
