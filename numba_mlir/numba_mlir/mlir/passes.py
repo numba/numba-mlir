@@ -317,13 +317,40 @@ class MlirReplaceParfors(MlirBackendBase):
             self._usmarray_type = None
 
     def run_pass(self, state):
+        func_registry.push_active_funcs_stack()
+        try:
+            module, parfor_funcs, ctx = self._gen_module(state)
+
+            if not module:
+                return False
+
+            compiled_mod = mlir_compiler.compile_module(
+                global_compiler_context, ctx, module
+            )
+        finally:
+            func_registry.pop_active_funcs_stack()
+
+        for inst, func_name in parfor_funcs.items():
+            func_ptr = mlir_compiler.get_function_pointer(
+                global_compiler_context, compiled_mod, func_name
+            )
+            inst.lowerer = functools.partial(self._lower_parfor, func_ptr)
+
+        return True
+
+    def _gen_module(self, state):
         ir = state.func_ir
         module = None
         parfor_funcs = {}
+        ctx = None
+        # print("-=-=-=-=-=-=-=-=-=-=-=-")
+        # ir.dump()
         for _, block in ir.blocks.items():
             for inst in block.body:
                 if not isinstance(inst, numba.parfors.parfor.Parfor):
                     continue
+
+                print(inst)
 
                 if module is None:
                     mod_settings = {"enable_gpu_pipeline": True}
@@ -345,20 +372,7 @@ class MlirReplaceParfors(MlirBackendBase):
                 mlir_compiler.lower_parfor(ctx, module, inst)
                 parfor_funcs[inst] = fn_name
 
-        if not module:
-            return False
-
-        compiled_mod = mlir_compiler.compile_module(
-            global_compiler_context, ctx, module
-        )
-
-        for inst, func_name in parfor_funcs.items():
-            func_ptr = mlir_compiler.get_function_pointer(
-                global_compiler_context, compiled_mod, func_name
-            )
-            inst.lowerer = functools.partial(self._lower_parfor, func_ptr)
-
-        return True
+        return module, parfor_funcs, ctx
 
     def _enumerate_parfor_args(self, parfor, func):
         ret = []
