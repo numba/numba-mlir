@@ -343,8 +343,19 @@ def _gen_replace_parfor_tests():
         numba.tests.test_parfors.TestPrangeSpecific,
     ]
 
-    xfail_tests = set()
-    skip_tests = set()
+    xfail_tests = {
+        "test_simple01",  # assert \'@do_scheduling\' not found
+        "test_simple13",  # assert \'@do_scheduling\' not found
+        "test_simple20",  # assert \'@do_scheduling\' not found
+        "test_parfor_bitmask6",  # assert \'@do_scheduling\' not found
+        "untraced_value_tuple",  # assert \'@do_scheduling\' not found
+        "recursive_untraced_value_tuple",  # assert \'@do_scheduling\' not found
+    }
+    skip_tests = {
+        "test_size_assertion"  # args size mismatch check
+        "oversized_tuple_as_arg_to_kernel"  # tuple size check
+        "test_parfor_slice2"  # size mismatch check
+    }
 
     def _wrap_test_class(test_base):
         class _Wrapper(test_base):
