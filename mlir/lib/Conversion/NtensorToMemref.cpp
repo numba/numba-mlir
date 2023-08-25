@@ -467,17 +467,43 @@ struct NtensorToMemrefPass
     // Convert unknown types to itself
     converter.addConversion([](mlir::Type type) { return type; });
 
+    auto indexType = mlir::IndexType::get(&context);
+    auto tuple3 =
+        mlir::TupleType::get(&context, {indexType, indexType, indexType});
+    converter.addConversion(
+        [tuple3](numba::ntensor::SliceType) -> mlir::Type { return tuple3; });
+
     numba::populateTupleTypeConverter(converter);
 
-    auto addUnrealizedCast = [](mlir::OpBuilder &builder, mlir::Type type,
-                                mlir::ValueRange inputs, mlir::Location loc) {
+    auto materialize =
+        [tuple3](mlir::OpBuilder &builder, mlir::Type type,
+                 mlir::ValueRange inputs,
+                 mlir::Location loc) -> std::optional<mlir::Value> {
+      if (inputs.size() == 1 && inputs.front().getType() == tuple3 &&
+          mlir::isa<numba::ntensor::SliceType>(type)) {
+        auto startInd = builder.create<mlir::arith::ConstantIndexOp>(loc, 0);
+        auto endInd = builder.create<mlir::arith::ConstantIndexOp>(loc, 1);
+        auto stepInd = builder.create<mlir::arith::ConstantIndexOp>(loc, 2);
+        auto input = inputs.front();
+        auto indexType = builder.getIndexType();
+        auto start = builder.createOrFold<numba::util::TupleExtractOp>(
+            loc, indexType, input, startInd);
+        auto end = builder.createOrFold<numba::util::TupleExtractOp>(
+            loc, indexType, input, endInd);
+        auto step = builder.createOrFold<numba::util::TupleExtractOp>(
+            loc, indexType, input, stepInd);
+        mlir::Value res =
+            builder.create<numba::ntensor::BuildSliceOp>(loc, start, end, step);
+        return res;
+      }
+
       auto cast =
           builder.create<mlir::UnrealizedConversionCastOp>(loc, type, inputs);
-      return std::optional<mlir::Value>(cast.getResult(0));
+      return cast.getResult(0);
     };
-    converter.addArgumentMaterialization(addUnrealizedCast);
-    converter.addSourceMaterialization(addUnrealizedCast);
-    converter.addTargetMaterialization(addUnrealizedCast);
+    converter.addArgumentMaterialization(materialize);
+    converter.addSourceMaterialization(materialize);
+    converter.addTargetMaterialization(materialize);
 
     numba::populateTupleTypeConversionRewritesAndTarget(converter, patterns,
                                                         target);
