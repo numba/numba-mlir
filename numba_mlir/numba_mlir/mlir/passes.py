@@ -383,13 +383,15 @@ class MlirReplaceParfors(MlirBackendBase):
 
     def _get_parfor_params(self, parfor):
         params = []
-        init_block_vars = set()
-        for instr in parfor.init_block.body:
-            if hasattr(instr, "target"):
-                init_block_vars.add(instr.target.name)
+        usedefs = numba.core.analysis.compute_use_defs({0: parfor.init_block})
+
+        init_block_uses = usedefs.usemap[0]
+        init_block_defs = usedefs.defmap[0]
+
+        params += sorted(list(init_block_uses))
 
         for param in parfor.params:
-            if param in init_block_vars:
+            if param in init_block_defs:
                 continue
 
             params.append(param)

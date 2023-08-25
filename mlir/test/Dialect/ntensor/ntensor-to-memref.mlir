@@ -289,3 +289,21 @@ func.func @test(%arg1: !ntensor.ntensor<?xf32>) -> !ntensor.ntensor<5xf32> {
 //  CHECK-NEXT:   numba_util.env_region_yield %[[RES1]] : memref<5xf32>
 //  CHECK-NEXT:   }
 //  CHECK-NEXT:   return %[[RES]] : memref<5xf32>
+
+// -----
+
+func.func @test(%arg1: index, %arg2: !ntensor.slice) -> (index, index, index, index) {
+  %0:4 = ntensor.resolve_slice %arg2, %arg1
+  return %0#0, %0#1, %0#2, %0#3 : index, index, index, index
+}
+// CHECK-LABEL: func @test
+//  CHECK-SAME:   (%[[ARG1:.*]]: index, %[[ARG2:.*]]: tuple<index, index, index>)
+//       CHECK:   %[[C0:.*]] = arith.constant 0 : index
+//       CHECK:   %[[C1:.*]] = arith.constant 1 : index
+//       CHECK:   %[[C2:.*]] = arith.constant 2 : index
+//       CHECK:   %[[BEGIN:.*]] = numba_util.tuple_extract %[[ARG2]] : tuple<index, index, index>, %[[C0]] -> index
+//       CHECK:   %[[END:.*]] = numba_util.tuple_extract %[[ARG2]] : tuple<index, index, index>, %[[C1]] -> index
+//       CHECK:   %[[STEP:.*]] = numba_util.tuple_extract %[[ARG2]] : tuple<index, index, index>, %[[C2]] -> index
+//       CHECK:   %[[SLICE:.*]] = ntensor.build_slice(%[[BEGIN]] : %[[END]] : %[[STEP]])
+//       CHECK:   %[[BEGIN1:.*]], %[[END1:.*]], %[[STEP1:.*]] = ntensor.resolve_slice %[[SLICE]], %[[ARG1]]
+//       CHECK:   return %[[BEGIN1]], %[[END1]], %[[STEP1]] : index, index, index

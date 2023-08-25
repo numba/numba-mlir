@@ -1791,6 +1791,16 @@ def test_slice3(count):
     assert_equal(py_func(arr.copy()[::2]), jit_func(arr.copy()[::2]))
 
 
+@pytest.mark.parametrize("s", [slice(1), slice(2, 3), slice(3, 4, 2)])
+def test_slice_arg(s):
+    def py_func(a, s):
+        return a[s]
+
+    jit_func = njit(py_func)
+    arr = np.arange(10)
+    assert_equal(py_func(arr, s), jit_func(arr, s))
+
+
 def test_multidim_slice():
     def py_func(a, b):
         return a[1, b, :]
