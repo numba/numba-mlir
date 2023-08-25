@@ -113,7 +113,7 @@ class mlir_PassBuilder(orig_DefaultPassBuilder):
 
         import numba_mlir.mlir.settings
 
-        if numba_mlir.mlir.settings.USE_MLIR:
+        if numba_mlir.mlir.settings.USE_MLIR and  state.flags.auto_parallel.enabled:
             pm.add_pass_after(MlirReplaceParfors, ParforPreLoweringPass)
 
         pm.finalize()
