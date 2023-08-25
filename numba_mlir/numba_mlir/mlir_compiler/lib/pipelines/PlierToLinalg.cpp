@@ -53,6 +53,7 @@
 #include "numba/Transforms/CastUtils.hpp"
 #include "numba/Transforms/CommonOpts.hpp"
 #include "numba/Transforms/CompositePass.hpp"
+#include "numba/Transforms/ExpandTuple.hpp"
 #include "numba/Transforms/FuncTransforms.hpp"
 #include "numba/Transforms/InlineUtils.hpp"
 #include "numba/Transforms/LoopUtils.hpp"
@@ -3585,6 +3586,7 @@ static void populatePlierToLinalgOptPipeline(mlir::OpPassManager &pm) {
       }));
 
   pm.addPass(numba::createNtensorToMemrefPass());
+  pm.addPass(numba::createExpandTuplePass());
   pm.addPass(mlir::createCanonicalizerPass());
 
   pm.addPass(numba::createMakeSignlessPass());
