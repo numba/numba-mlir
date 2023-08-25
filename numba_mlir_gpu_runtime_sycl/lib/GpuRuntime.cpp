@@ -19,27 +19,37 @@
 
 #include <CL/sycl.hpp>
 
-#if 0 // Log functions
 namespace {
-struct FuncScope {
-  FuncScope(const char *funcName) : name(funcName) {
-    fprintf(stdout, "%s enter\n", name);
-    fflush(stdout);
-  }
+static bool islogFunctionsEnabled() {
+  static bool enable = []() -> bool {
+    auto env = std::getenv("NUMBA_MLIR_LOG_GPU_RUNTIME_CALLS");
+    return env && std::atoi(env) != 0;
+  }();
+  return enable;
+}
 
+struct FuncScope {
+  FuncScope(const char *funcName)
+      : name(funcName), enable(islogFunctionsEnabled()) {
+    if (enable) {
+      fprintf(stdout, "%s enter\n", name);
+      fflush(stdout);
+    }
+  }
+  FuncScope(const FuncScope &) = delete;
   ~FuncScope() {
-    fprintf(stdout, "%s exit\n", name);
-    fflush(stdout);
+    if (enable) {
+      fprintf(stdout, "%s exit\n", name);
+      fflush(stdout);
+    }
   }
 
 private:
   const char *name;
+  bool enable;
 };
 } // namespace
 #define LOG_FUNC() FuncScope _scope(__func__)
-#else
-#define LOG_FUNC() (void)0
-#endif
 
 namespace {
 static numba::MemInfoAllocFuncT AllocFunc = nullptr;
