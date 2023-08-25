@@ -325,6 +325,72 @@ _gen_tests()
 del _gen_tests
 
 
+def _gen_replace_parfor_tests():
+    testcases = [
+        numba.tests.test_parfors.TestParforBasic,
+        numba.tests.test_parfors.TestParforNumericalMisc,
+        numba.tests.test_parfors.TestParforNumPy,
+        numba.tests.test_parfors.TestParfors,
+        numba.tests.test_parfors.TestParforsBitMask,
+        numba.tests.test_parfors.TestParforsDiagnostics,
+        numba.tests.test_parfors.TestParforsLeaks,
+        numba.tests.test_parfors.TestParforsMisc,
+        numba.tests.test_parfors.TestParforsOptions,
+        numba.tests.test_parfors.TestParforsUnsupported,
+        numba.tests.test_parfors.TestParforsSlice,
+        numba.tests.test_parfors.TestParforsVectorizer,
+        numba.tests.test_parfors.TestPrangeBasic,
+        numba.tests.test_parfors.TestPrangeSpecific,
+    ]
+
+    xfail_tests = set()
+    skip_tests = set()
+
+    def _wrap_test_class(test_base):
+        class _Wrapper(test_base):
+            def check_scheduling(self, cres, scheduler_type):
+                pass
+
+        return _Wrapper
+
+    def _replace_global(func, name, newval):
+        if name in func.__globals__:
+            func.__globals__[name] = newval
+
+    def _njit_wrapper(*args, **kwargs):
+        kwa = copy.copy(kwargs)
+        kwa["replace_parfors"] = True
+        return njit(*args, **kwa)
+
+    def _gen_test_func(func):
+        _replace_global(func, "njit", njit)
+
+        def wrapper():
+            return func()
+
+        return wrapper
+
+    this_module = sys.modules[__name__]
+    for tc in testcases:
+        inst = _wrap_test_class(tc)()
+        for func_name in dir(tc):
+            if func_name.startswith("test"):
+                func = getattr(inst, func_name)
+                if callable(func):
+                    func = _gen_test_func(func)
+                    func = pytest.mark.numba_parfor(func)
+                    if func_name in xfail_tests:
+                        func = pytest.mark.xfail(func)
+                    elif func_name in skip_tests:
+                        func = pytest.mark.skip(func)
+
+                    setattr(this_module, "test_replace_parfors_" + func_name, func)
+
+
+_gen_replace_parfor_tests()
+del _gen_replace_parfor_tests
+
+
 def test_replace_parfor_numpy():
     def py_func(a, b):
         return np.add(a, b)
