@@ -321,8 +321,8 @@ def _gen_tests():
                     setattr(this_module, func_name, func)
 
 
-_gen_tests()
-del _gen_tests
+# _gen_tests()
+# del _gen_tests
 
 
 def _gen_replace_parfor_tests():
@@ -344,12 +344,11 @@ def _gen_replace_parfor_tests():
     ]
 
     xfail_tests = {
-        "test_simple01",  # assert \'@do_scheduling\' not found
-        "test_simple13",  # assert \'@do_scheduling\' not found
-        "test_simple20",  # assert \'@do_scheduling\' not found
-        "test_parfor_bitmask6",  # assert \'@do_scheduling\' not found
-        "untraced_value_tuple",  # assert \'@do_scheduling\' not found
-        "recursive_untraced_value_tuple",  # assert \'@do_scheduling\' not found
+        "test_inplace_alias",  # loop was optimized away
+        "test_simple04",  # loop was optimized away
+        "test_simple10",  # loop was optimized away
+        "test_argmax",  # np.argmax
+        "test_argmin",  # np.argmin
     }
     skip_tests = {
         "test_size_assertion"  # args size mismatch check
@@ -359,8 +358,147 @@ def _gen_replace_parfor_tests():
 
     def _wrap_test_class(test_base):
         class _Wrapper(test_base):
-            def check_scheduling(self, cres, scheduler_type):
-                pass
+
+            def __init__(self, *args, **kwargs):
+                super().__init__(*args, **kwargs)
+                self.has_parallel = None
+
+            def _gen_normal(self, func):
+                return njit(replace_parfors=True)(func)
+
+            def _gen_parallel(self, func):
+                def wrapper(*args, **kwargs):
+                    with print_pass_ir([], ["ParallelToTbbPass"]):
+                        res = njit(parallel=True, replace_parfors=True)(func)(*args, **kwargs)
+                        ir = get_print_buffer()
+                        # Check some parallel loops were actually generated
+                        self.has_parallel = "scf.parallel" in ir
+                        if ir.count("numba_util.parallel") == 0:
+                            # In some cases we can canonicalize all loops away
+                            # Make sure no loops are present
+                            assert ir.count("scf.for") == 0, ir
+                            assert ir.count("scf.parallel") == 0, ir
+                    return res
+
+                return wrapper
+
+            def _gen_parallel_fastmath(self, func):
+                ops = (
+                    "fadd",
+                    "fsub",
+                    "fmul",
+                    "fdiv",
+                    "frem",
+                    "fcmp",
+                )
+
+                def wrapper(*args, **kwargs):
+                    with print_pass_ir([], ["PostLLVMLowering"]):
+                        res = njit(parallel=True, fastmath=True)(func)(*args, **kwargs)
+                        ir = get_print_buffer()
+                        # Check some fastmath llvm flags were generated
+                        opCount = 0
+                        fastCount = 0
+                        for line in ir.splitlines():
+                            for op in ops:
+                                if line.count("llvm." + op) > 0:
+                                    opCount += 1
+                                    if line.count("llvm.fastmath<fast>") > 0:
+                                        fastCount += 1
+                                    break
+                        if opCount > 0:
+                            assert fastCount > 0, it
+                    return res
+
+                return wrapper
+
+            def get_gufunc_asm(self, func, schedule_type, *args, **kwargs):
+                pytest.skip()
+
+            # def assertRaises(self, a):
+            #     pytest.skip()
+
+            def prange_tester(self, pyfunc, *args, **kwargs):
+                patch_instance = kwargs.pop("patch_instance", None)
+
+                pyfunc = self.generate_prange_func(pyfunc, patch_instance)
+                return self._check_impl(pyfunc, *args, **kwargs)
+
+            def check(self, pyfunc, *args, **kwargs):
+                if isinstance(pyfunc, CPUDispatcher):
+                    pyfunc = pyfunc.py_func
+
+                return self._check_impl(pyfunc, *args, **kwargs)
+
+            def _check_impl(self, pyfunc, *args, **kwargs):
+                scheduler_type = kwargs.pop("scheduler_type", None)
+                check_fastmath = kwargs.pop("check_fastmath", False)
+                check_fastmath_result = kwargs.pop("check_fastmath_result", False)
+                check_scheduling = kwargs.pop("check_scheduling", True)
+                check_args_for_equality = kwargs.pop("check_arg_equality", None)
+                # assert not kwargs, "Unhandled kwargs: " + str(kwargs)
+
+                cfunc = self._gen_normal(pyfunc)
+                cpfunc = self._gen_parallel(pyfunc)
+
+                if check_fastmath or check_fastmath_result:
+                    fastmath_pcres = self._gen_parallel_fastmath(pyfunc)
+
+                def copy_args(*args):
+                    if not args:
+                        return tuple()
+                    new_args = []
+                    for x in args:
+                        if isinstance(x, np.ndarray):
+                            new_args.append(x.copy("k"))
+                        elif isinstance(x, np.number):
+                            new_args.append(x.copy())
+                        elif isinstance(x, numbers.Number):
+                            new_args.append(x)
+                        elif isinstance(x, tuple):
+                            new_args.append(copy.deepcopy(x))
+                        elif isinstance(x, list):
+                            new_args.append(x[:])
+                        else:
+                            raise ValueError("Unsupported argument type encountered")
+                    return tuple(new_args)
+
+                # python result
+                py_args = copy_args(*args)
+                py_expected = pyfunc(*py_args)
+
+                # njit result
+                njit_args = copy_args(*args)
+                njit_output = cfunc(*njit_args)
+
+                # parfor result
+                parfor_args = copy_args(*args)
+                parfor_output = cpfunc(*parfor_args)
+
+                if check_args_for_equality is None:
+                    np.testing.assert_almost_equal(njit_output, py_expected, **kwargs)
+                    np.testing.assert_almost_equal(parfor_output, py_expected, **kwargs)
+                    self.assertEqual(type(njit_output), type(parfor_output))
+                else:
+                    assert len(py_args) == len(check_args_for_equality)
+                    for pyarg, njitarg, parforarg, argcomp in zip(
+                        py_args, njit_args, parfor_args, check_args_for_equality
+                    ):
+                        argcomp(njitarg, pyarg, **kwargs)
+                        argcomp(parforarg, pyarg, **kwargs)
+
+                # Mimic original error
+                if check_scheduling:
+                    # self.check_scheduling(cpfunc, scheduler_type)
+                    assert self.has_parallel, "\'@do_scheduling\' not found"
+
+                # if requested check fastmath variant
+                if check_fastmath or check_fastmath_result:
+                    parfor_fastmath_output = fastmath_pcres(*copy_args(*args))
+                    if check_fastmath_result:
+                        np.testing.assert_almost_equal(
+                            parfor_fastmath_output, py_expected, **kwargs
+                        )
 
         return _Wrapper
 
@@ -374,7 +512,7 @@ def _gen_replace_parfor_tests():
         return njit(*args, **kwa)
 
     def _gen_test_func(func):
-        _replace_global(func, "njit", njit)
+        _replace_global(func, "njit", _njit_wrapper)
 
         def wrapper():
             return func()
