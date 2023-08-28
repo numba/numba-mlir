@@ -983,8 +983,10 @@ private:
   }
 
   mlir::Value loadvar(py::handle inst) {
-    auto it = varsMap.find(inst.attr("name").cast<std::string>());
-    assert(varsMap.end() != it);
+    auto name = inst.attr("name").cast<std::string>();
+    auto it = varsMap.find(name);
+    if (varsMap.end() == it)
+      numba::reportError(llvm::Twine("Invalid var: ") + name);
     return it->second;
   }
 
