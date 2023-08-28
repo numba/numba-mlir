@@ -344,21 +344,20 @@ def _gen_replace_parfor_tests():
     ]
 
     xfail_tests = {
-        "test_inplace_alias",  # loop was optimized away
-        "test_simple04",  # loop was optimized away
-        "test_simple10",  # loop was optimized away
-        "test_argmax",  # np.argmax
-        "test_argmin",  # np.argmin
+        # "test_inplace_alias",  # loop was optimized away
+        # "test_simple04",  # loop was optimized away
+        # "test_simple10",  # loop was optimized away
+        # "test_argmax",  # np.argmax
+        # "test_argmin",  # np.argmin
     }
     skip_tests = {
-        "test_size_assertion"  # args size mismatch check
-        "oversized_tuple_as_arg_to_kernel"  # tuple size check
-        "test_parfor_slice2"  # size mismatch check
+        # "test_size_assertion"  # args size mismatch check
+        # "oversized_tuple_as_arg_to_kernel"  # tuple size check
+        # "test_parfor_slice2"  # size mismatch check
     }
 
     def _wrap_test_class(test_base):
         class _Wrapper(test_base):
-
             def __init__(self, *args, **kwargs):
                 super().__init__(*args, **kwargs)
                 self.has_parallel = None
@@ -369,7 +368,9 @@ def _gen_replace_parfor_tests():
             def _gen_parallel(self, func):
                 def wrapper(*args, **kwargs):
                     with print_pass_ir([], ["ParallelToTbbPass"]):
-                        res = njit(parallel=True, replace_parfors=True)(func)(*args, **kwargs)
+                        res = njit(parallel=True, replace_parfors=True)(func)(
+                            *args, **kwargs
+                        )
                         ir = get_print_buffer()
                         # Check some parallel loops were actually generated
                         self.has_parallel = "scf.parallel" in ir
@@ -490,7 +491,7 @@ def _gen_replace_parfor_tests():
                 # Mimic original error
                 if check_scheduling:
                     # self.check_scheduling(cpfunc, scheduler_type)
-                    assert self.has_parallel, "\'@do_scheduling\' not found"
+                    assert self.has_parallel, "'@do_scheduling' not found"
 
                 # if requested check fastmath variant
                 if check_fastmath or check_fastmath_result:
