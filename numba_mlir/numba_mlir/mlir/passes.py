@@ -461,7 +461,7 @@ class MlirReplaceParfors(MlirBackendBase):
         res_storage = cgutils.alloca_once(builder, res_type)
         args.append(res_storage)
 
-        # Second arg is exception info - exceptions is not implemented yet.
+        # Second arg is exception info - exceptions are not implemented yet.
         args.append(nullptr)
 
         def get_arg(v):
