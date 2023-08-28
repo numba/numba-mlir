@@ -398,11 +398,13 @@ private:
     llvm::SmallVector<mlir::Value, 4> begins;
     llvm::SmallVector<mlir::Value, 4> ends;
     llvm::SmallVector<mlir::Value, 4> steps;
+    llvm::SmallVector<py::object, 4> indexVars;
 
     for (auto loop : parforInst.attr("loop_nests")) {
       begins.emplace_back(getIndexVal(loop.attr("start")));
       ends.emplace_back(getIndexVal(loop.attr("stop")));
       steps.emplace_back(getIndexVal(loop.attr("step")));
+      indexVars.emplace_back(loop.attr("index_variable"));
     }
 
     auto caps = ctx["device_caps"];
@@ -457,12 +459,24 @@ private:
                            mlir::ValueRange indices,
                            mlir::ValueRange iterVars) -> mlir::ValueRange {
       assert(!indices.empty());
-      mlir::Value index;
-      if (indices.size() == 1) {
-        index = indices.front();
-      } else {
-        auto resType = b.getTupleType(indices.getTypes());
-        index = b.create<numba::util::BuildTupleOp>(l, resType, indices);
+
+      auto setIndexVar = [&](py::handle indexVar, mlir::Value index) {
+        auto indexType = getObjType(typemap(indexVar));
+        index = b.create<plier::CastOp>(l, indexType, index);
+        auto indexVarName = indexVar.attr("name").cast<std::string>();
+        varsMap[indexVarName] = index;
+      };
+
+      {
+        mlir::Value index;
+        if (indices.size() == 1) {
+          index = indices.front();
+        } else {
+          auto resType = b.getTupleType(indices.getTypes());
+          index = b.create<numba::util::BuildTupleOp>(l, resType, indices);
+        }
+
+        setIndexVar(parforInst.attr("index_var"), index);
       }
 
       for (auto &&[i, redvar] : llvm::enumerate(parforInst.attr("redvars"))) {
@@ -471,11 +485,8 @@ private:
         varsMap[name] = iterVars[i];
       }
 
-      auto indexVar = parforInst.attr("index_var");
-      auto indexType = getObjType(typemap(indexVar));
-      index = b.create<plier::CastOp>(l, indexType, index);
-      auto indexVarName = indexVar.attr("name").cast<std::string>();
-      varsMap[indexVarName] = index;
+      for (auto &&[idx, indexVar] : llvm::zip(indices, indexVars))
+        setIndexVar(indexVar, idx);
 
       auto regionOp = b.create<mlir::scf::ExecuteRegionOp>(l, reductionTypes);
       auto &region = regionOp.getRegion();
