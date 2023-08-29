@@ -900,13 +900,12 @@ private:
   }
 
   std::optional<mlir::Attribute> resolveConstant(py::handle val) {
-    if (py::isinstance<py::int_>(val) || py::isinstance(val, insts.npInt)) {
-      auto type = mlir::IntegerType::get(builder.getContext(), 64,
-                                         mlir::IntegerType::Signed);
+    if (py::isinstance<py::int_>(val)) {
+      auto type = builder.getIntegerType(64, /*isSigned*/ true);
       return builder.getIntegerAttr(type, val.cast<int64_t>());
     }
 
-    if (py::isinstance<py::float_>(val) || py::isinstance(val, insts.npFloat))
+    if (py::isinstance<py::float_>(val))
       return builder.getF64FloatAttr(val.cast<double>());
 
     if (py::isinstance<dummy_complex>(val)) {
@@ -914,6 +913,9 @@ private:
       auto type = mlir::ComplexType::get(builder.getF64Type());
       return mlir::complex::NumberAttr::get(type, c.real(), c.imag());
     }
+
+    if (py::isinstance<py::none>(val))
+      return builder.getUnitAttr();
 
     if (py::isinstance<py::array>(val)) {
       auto a = val.cast<py::array>();
@@ -928,8 +930,13 @@ private:
       return makeElementsAttr(resType, a);
     }
 
-    if (py::isinstance<py::none>(val))
-      return builder.getUnitAttr();
+    if (py::isinstance(val, insts.npInt)) {
+      auto type = builder.getIntegerType(64, /*isSigned*/ true);
+      return builder.getIntegerAttr(type, val.cast<int64_t>());
+    }
+
+    if (py::isinstance(val, insts.npFloat))
+      return builder.getF64FloatAttr(val.cast<double>());
 
     return std::nullopt;
   }
