@@ -201,24 +201,31 @@ struct InstHandles {
         std::get<1>(elem) = ops.attr(str.data());
       }
     }
+
+    auto numpy = py::module::import("numpy");
+    npInt = numpy.attr("integer");
+    npFloat = numpy.attr("floating");
   }
 
-  py::handle Assign;
-  py::handle Del;
-  py::handle Return;
-  py::handle Branch;
-  py::handle Jump;
-  py::handle SetItem;
-  py::handle StaticSetItem;
+  py::object Assign;
+  py::object Del;
+  py::object Return;
+  py::object Branch;
+  py::object Jump;
+  py::object SetItem;
+  py::object StaticSetItem;
 
-  py::handle Arg;
-  py::handle Expr;
-  py::handle Var;
-  py::handle Const;
-  py::handle Global;
-  py::handle FreeVar;
+  py::object Arg;
+  py::object Expr;
+  py::object Var;
+  py::object Const;
+  py::object Global;
+  py::object FreeVar;
 
-  std::array<py::handle, plier::OperatorsCount> opsHandles;
+  std::array<py::object, plier::OperatorsCount> opsHandles;
+
+  py::object npInt;
+  py::object npFloat;
 };
 
 static mlir::Attribute parseAttr(mlir::OpBuilder &builder, py::handle obj) {
@@ -420,17 +427,11 @@ private:
                                                 hasFP64);
     }
 
-    llvm::SmallVector<mlir::Value> reductionInits;
-    llvm::SmallVector<mlir::Type> reductionTypes;
-    std::unordered_map<std::string, unsigned> reductionIndices;
-    for (auto &&[i, redvar] : llvm::enumerate(parforInst.attr("redvars"))) {
-      auto name = redvar.cast<std::string>();
-      reductionInits.emplace_back(loadvar(name));
-      reductionTypes.emplace_back(reductionInits.back().getType());
-      reductionIndices[name] = static_cast<unsigned>(i);
-    }
-
     numba::util::EnvironmentRegionOp regionOp;
+    auto redVars = parforInst.attr("redvars");
+    llvm::SmallVector<mlir::Type> reductionTypes(py::len(redVars),
+                                                 builder.getNoneType());
+
     if (env) {
       auto loc = getCurrentLoc();
       regionOp = builder.create<numba::util::EnvironmentRegionOp>(
@@ -443,6 +444,15 @@ private:
       lowerBlock(&regionBlock, parforInst.attr("init_block"));
     } else {
       lowerBlock(block, parforInst.attr("init_block"));
+    }
+
+    llvm::SmallVector<mlir::Value> reductionInits;
+    std::unordered_map<std::string, unsigned> reductionIndices;
+    for (auto &&[i, redvar] : llvm::enumerate(redVars)) {
+      auto name = redvar.cast<std::string>();
+      reductionInits.emplace_back(loadvar(name));
+      reductionTypes[i] = reductionInits.back().getType();
+      reductionIndices[name] = static_cast<unsigned>(i);
     }
 
     llvm::SmallVector<mlir::Value> results;
@@ -478,7 +488,7 @@ private:
         setIndexVar(parforInst.attr("index_var"), index);
       }
 
-      for (auto &&[i, redvar] : llvm::enumerate(parforInst.attr("redvars"))) {
+      for (auto &&[i, redvar] : llvm::enumerate(redVars)) {
         assert(i < iterVars.size());
         auto name = redvar.cast<std::string>();
         varsMap[name] = iterVars[i];
@@ -535,6 +545,9 @@ private:
 
     if (env) {
       builder.create<numba::util::EnvironmentRegionYieldOp>(loc, results);
+      for (auto &&[i, res] : llvm::enumerate(reductionTypes))
+        regionOp->getResult(i).setType(res);
+
       results = regionOp.getResults();
       builder.setInsertionPointToEnd(block);
     }
@@ -881,13 +894,13 @@ private:
   }
 
   std::optional<mlir::Attribute> resolveConstant(py::handle val) {
-    if (py::isinstance<py::int_>(val)) {
+    if (py::isinstance<py::int_>(val) || py::isinstance(val, insts.npInt)) {
       auto type = mlir::IntegerType::get(builder.getContext(), 64,
                                          mlir::IntegerType::Signed);
       return builder.getIntegerAttr(type, val.cast<int64_t>());
     }
 
-    if (py::isinstance<py::float_>(val))
+    if (py::isinstance<py::float_>(val) || py::isinstance(val, insts.npFloat))
       return builder.getF64FloatAttr(val.cast<double>());
 
     if (py::isinstance<dummy_complex>(val)) {
@@ -992,7 +1005,7 @@ private:
     varsMap[inst.attr("name").cast<std::string>()] = val;
   }
 
-  mlir::Value loadvar(const std::string& name) const {
+  mlir::Value loadvar(const std::string &name) const {
     auto it = varsMap.find(name);
     if (varsMap.end() == it)
       numba::reportError(llvm::Twine("Invalid var: ") + name);

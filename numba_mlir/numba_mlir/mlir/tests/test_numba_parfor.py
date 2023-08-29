@@ -6,6 +6,7 @@ import sys
 import copy
 import numbers
 import pytest
+import math
 import numpy as np
 import types as pytypes
 from numpy.testing import assert_equal, assert_allclose
@@ -345,6 +346,23 @@ def test_replace_parfor_numpy_multidim():
     jit_func = njit(py_func, parallel=True, replace_parfors=True)
     with print_pass_ir([], ["CFGToSCFPass"]):
         assert_equal(py_func(), jit_func())
+        ir = get_print_buffer()
+        assert len(ir) > 0  # Check some code was actually generated
+
+
+def test_replace_parfor_numpy_reduction():
+    def py_func(a, b):
+        return np.sum(a + b)
+
+    shape = (3, 4)
+    count = math.prod(shape)
+
+    a = np.arange(count).reshape(shape)
+    b = np.arange(count, count + count).reshape(shape)
+
+    jit_func = njit(py_func, parallel=True, replace_parfors=True)
+    with print_pass_ir([], ["CFGToSCFPass"]):
+        assert_equal(py_func(a, b), jit_func(a, b))
         ir = get_print_buffer()
         assert len(ir) > 0  # Check some code was actually generated
 
