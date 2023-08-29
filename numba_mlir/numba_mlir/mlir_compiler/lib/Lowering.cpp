@@ -425,8 +425,7 @@ private:
     std::unordered_map<std::string, unsigned> reductionIndices;
     for (auto &&[i, redvar] : llvm::enumerate(parforInst.attr("redvars"))) {
       auto name = redvar.cast<std::string>();
-      assert(varsMap.count(name));
-      reductionInits.emplace_back(varsMap.find(name)->second);
+      reductionInits.emplace_back(loadvar(name));
       reductionTypes.emplace_back(reductionInits.back().getType());
       reductionIndices[name] = static_cast<unsigned>(i);
     }
@@ -993,12 +992,16 @@ private:
     varsMap[inst.attr("name").cast<std::string>()] = val;
   }
 
-  mlir::Value loadvar(py::handle inst) {
-    auto name = inst.attr("name").cast<std::string>();
+  mlir::Value loadvar(const std::string& name) const {
     auto it = varsMap.find(name);
     if (varsMap.end() == it)
       numba::reportError(llvm::Twine("Invalid var: ") + name);
     return it->second;
+  }
+
+  mlir::Value loadvar(py::handle inst) const {
+    auto name = inst.attr("name").cast<std::string>();
+    return loadvar(name);
   }
 
   void delvar(py::handle inst) {
