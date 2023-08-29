@@ -228,6 +228,11 @@ struct InstHandles {
   py::object npFloat;
 };
 
+static InstHandles &getInstHandles() {
+  static InstHandles ret;
+  return ret;
+}
+
 static mlir::Attribute parseAttr(mlir::OpBuilder &builder, py::handle obj) {
   if (obj.is_none())
     return builder.getUnitAttr();
@@ -257,7 +262,8 @@ static void parseAttributes(mlir::Operation *op, py::handle dict) {
 
 struct PlierLowerer final {
   PlierLowerer(mlir::MLIRContext &context, PyTypeConverter &conv)
-      : ctx(context), builder(&ctx), typeConverter(conv) {
+      : ctx(context), builder(&ctx), insts(getInstHandles()),
+        typeConverter(conv) {
     ctx.loadDialect<gpu_runtime::GpuRuntimeDialect>();
     ctx.loadDialect<mlir::cf::ControlFlowDialect>();
     ctx.loadDialect<mlir::func::FuncDialect>();
@@ -287,7 +293,7 @@ private:
   mlir::OpBuilder builder;
   std::vector<mlir::Block *> blocks;
   std::unordered_map<int, mlir::Block *> blocksMap;
-  InstHandles insts;
+  InstHandles &insts;
   mlir::func::FuncOp func;
   std::unordered_map<std::string, mlir::Value> varsMap;
   struct BlockInfo {
