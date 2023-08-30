@@ -338,24 +338,24 @@ struct CastOpLowering
                   numba::ntensor::CastOp::Adaptor adaptor,
                   mlir::ConversionPatternRewriter &rewriter) const override {
     auto src = adaptor.getSource();
-    auto srcType = src.getType().dyn_cast<mlir::MemRefType>();
+    auto srcType = mlir::dyn_cast<mlir::MemRefType>(src.getType());
     if (!srcType)
       return mlir::failure();
 
     auto origSrcType =
-        op.getSource().getType().dyn_cast<numba::ntensor::NTensorType>();
+        mlir::dyn_cast<numba::ntensor::NTensorType>(op.getSource().getType());
     if (!origSrcType)
       return mlir::failure();
 
-    auto origDstType = op.getType().dyn_cast<numba::ntensor::NTensorType>();
+    auto origDstType =
+        mlir::dyn_cast<numba::ntensor::NTensorType>(op.getType());
     if (!origDstType)
       return mlir::failure();
 
     auto *converter = getTypeConverter();
     assert(converter && "Type converter is not set");
 
-    auto retType = converter->convertType(origDstType)
-                       .dyn_cast_or_null<mlir::MemRefType>();
+    auto retType = converter->convertType<mlir::MemRefType>(origDstType);
 
     if (!retType)
       return mlir::failure();
