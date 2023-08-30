@@ -201,25 +201,37 @@ struct InstHandles {
         std::get<1>(elem) = ops.attr(str.data());
       }
     }
+
+    auto numpy = py::module::import("numpy");
+    npInt = numpy.attr("integer");
+    npFloat = numpy.attr("floating");
   }
 
-  py::handle Assign;
-  py::handle Del;
-  py::handle Return;
-  py::handle Branch;
-  py::handle Jump;
-  py::handle SetItem;
-  py::handle StaticSetItem;
+  py::object Assign;
+  py::object Del;
+  py::object Return;
+  py::object Branch;
+  py::object Jump;
+  py::object SetItem;
+  py::object StaticSetItem;
 
-  py::handle Arg;
-  py::handle Expr;
-  py::handle Var;
-  py::handle Const;
-  py::handle Global;
-  py::handle FreeVar;
+  py::object Arg;
+  py::object Expr;
+  py::object Var;
+  py::object Const;
+  py::object Global;
+  py::object FreeVar;
 
-  std::array<py::handle, plier::OperatorsCount> opsHandles;
+  std::array<py::object, plier::OperatorsCount> opsHandles;
+
+  py::object npInt;
+  py::object npFloat;
 };
+
+static InstHandles &getInstHandles() {
+  static InstHandles ret;
+  return ret;
+}
 
 static mlir::Attribute parseAttr(mlir::OpBuilder &builder, py::handle obj) {
   if (obj.is_none())
@@ -250,7 +262,8 @@ static void parseAttributes(mlir::Operation *op, py::handle dict) {
 
 struct PlierLowerer final {
   PlierLowerer(mlir::MLIRContext &context, PyTypeConverter &conv)
-      : ctx(context), builder(&ctx), typeConverter(conv) {
+      : ctx(context), builder(&ctx), insts(getInstHandles()),
+        typeConverter(conv) {
     ctx.loadDialect<gpu_runtime::GpuRuntimeDialect>();
     ctx.loadDialect<mlir::cf::ControlFlowDialect>();
     ctx.loadDialect<mlir::func::FuncDialect>();
@@ -280,7 +293,7 @@ private:
   mlir::OpBuilder builder;
   std::vector<mlir::Block *> blocks;
   std::unordered_map<int, mlir::Block *> blocksMap;
-  InstHandles insts;
+  InstHandles &insts;
   mlir::func::FuncOp func;
   std::unordered_map<std::string, mlir::Value> varsMap;
   struct BlockInfo {
@@ -420,18 +433,11 @@ private:
                                                 hasFP64);
     }
 
-    llvm::SmallVector<mlir::Value> reductionInits;
-    llvm::SmallVector<mlir::Type> reductionTypes;
-    std::unordered_map<std::string, unsigned> reductionIndices;
-    for (auto &&[i, redvar] : llvm::enumerate(parforInst.attr("redvars"))) {
-      auto name = redvar.cast<std::string>();
-      assert(varsMap.count(name));
-      reductionInits.emplace_back(varsMap.find(name)->second);
-      reductionTypes.emplace_back(reductionInits.back().getType());
-      reductionIndices[name] = static_cast<unsigned>(i);
-    }
-
     numba::util::EnvironmentRegionOp regionOp;
+    auto redVars = parforInst.attr("redvars");
+    llvm::SmallVector<mlir::Type> reductionTypes(py::len(redVars),
+                                                 builder.getNoneType());
+
     if (env) {
       auto loc = getCurrentLoc();
       regionOp = builder.create<numba::util::EnvironmentRegionOp>(
@@ -444,6 +450,15 @@ private:
       lowerBlock(&regionBlock, parforInst.attr("init_block"));
     } else {
       lowerBlock(block, parforInst.attr("init_block"));
+    }
+
+    llvm::SmallVector<mlir::Value> reductionInits;
+    std::unordered_map<std::string, unsigned> reductionIndices;
+    for (auto &&[i, redvar] : llvm::enumerate(redVars)) {
+      auto name = redvar.cast<std::string>();
+      reductionInits.emplace_back(loadvar(name));
+      reductionTypes[i] = reductionInits.back().getType();
+      reductionIndices[name] = static_cast<unsigned>(i);
     }
 
     llvm::SmallVector<mlir::Value> results;
@@ -479,7 +494,7 @@ private:
         setIndexVar(parforInst.attr("index_var"), index);
       }
 
-      for (auto &&[i, redvar] : llvm::enumerate(parforInst.attr("redvars"))) {
+      for (auto &&[i, redvar] : llvm::enumerate(redVars)) {
         assert(i < iterVars.size());
         auto name = redvar.cast<std::string>();
         varsMap[name] = iterVars[i];
@@ -536,6 +551,9 @@ private:
 
     if (env) {
       builder.create<numba::util::EnvironmentRegionYieldOp>(loc, results);
+      for (auto &&[i, res] : llvm::enumerate(reductionTypes))
+        regionOp->getResult(i).setType(res);
+
       results = regionOp.getResults();
       builder.setInsertionPointToEnd(block);
     }
@@ -883,8 +901,7 @@ private:
 
   std::optional<mlir::Attribute> resolveConstant(py::handle val) {
     if (py::isinstance<py::int_>(val)) {
-      auto type = mlir::IntegerType::get(builder.getContext(), 64,
-                                         mlir::IntegerType::Signed);
+      auto type = builder.getIntegerType(64, /*isSigned*/ true);
       return builder.getIntegerAttr(type, val.cast<int64_t>());
     }
 
@@ -896,6 +913,9 @@ private:
       auto type = mlir::ComplexType::get(builder.getF64Type());
       return mlir::complex::NumberAttr::get(type, c.real(), c.imag());
     }
+
+    if (py::isinstance<py::none>(val))
+      return builder.getUnitAttr();
 
     if (py::isinstance<py::array>(val)) {
       auto a = val.cast<py::array>();
@@ -910,8 +930,13 @@ private:
       return makeElementsAttr(resType, a);
     }
 
-    if (py::isinstance<py::none>(val))
-      return builder.getUnitAttr();
+    if (py::isinstance(val, insts.npInt)) {
+      auto type = builder.getIntegerType(64, /*isSigned*/ true);
+      return builder.getIntegerAttr(type, val.cast<int64_t>());
+    }
+
+    if (py::isinstance(val, insts.npFloat))
+      return builder.getF64FloatAttr(val.cast<double>());
 
     return std::nullopt;
   }
@@ -993,12 +1018,16 @@ private:
     varsMap[inst.attr("name").cast<std::string>()] = val;
   }
 
-  mlir::Value loadvar(py::handle inst) {
-    auto name = inst.attr("name").cast<std::string>();
+  mlir::Value loadvar(const std::string &name) const {
     auto it = varsMap.find(name);
     if (varsMap.end() == it)
       numba::reportError(llvm::Twine("Invalid var: ") + name);
     return it->second;
+  }
+
+  mlir::Value loadvar(py::handle inst) const {
+    auto name = inst.attr("name").cast<std::string>();
+    return loadvar(name);
   }
 
   void delvar(py::handle inst) {
