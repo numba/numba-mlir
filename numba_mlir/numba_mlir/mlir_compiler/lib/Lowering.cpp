@@ -207,25 +207,27 @@ struct InstHandles {
     npFloat = numpy.attr("floating");
   }
 
-  py::object Assign;
-  py::object Del;
-  py::object Return;
-  py::object Branch;
-  py::object Jump;
-  py::object SetItem;
-  py::object StaticSetItem;
+  // Use py::handle to avoid extending python obects lifetime beyound
+  // interpreter lifetime.
+  py::handle Assign;
+  py::handle Del;
+  py::handle Return;
+  py::handle Branch;
+  py::handle Jump;
+  py::handle SetItem;
+  py::handle StaticSetItem;
 
-  py::object Arg;
-  py::object Expr;
-  py::object Var;
-  py::object Const;
-  py::object Global;
-  py::object FreeVar;
+  py::handle Arg;
+  py::handle Expr;
+  py::handle Var;
+  py::handle Const;
+  py::handle Global;
+  py::handle FreeVar;
 
-  std::array<py::object, plier::OperatorsCount> opsHandles;
+  std::array<py::handle, plier::OperatorsCount> opsHandles;
 
-  py::object npInt;
-  py::object npFloat;
+  py::handle npInt;
+  py::handle npFloat;
 };
 
 static InstHandles &getInstHandles() {
