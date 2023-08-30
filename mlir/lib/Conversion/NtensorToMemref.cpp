@@ -441,7 +441,7 @@ void numba::populateNtensorToMemrefRewritesAndTarget(
         auto shape = type.getShape();
         mlir::MemRefLayoutAttrInterface layout = {};
         auto nlayout = type.getLayout();
-        if (!nlayout || nlayout != "C") {
+        if (nlayout && nlayout != "C") {
           auto strideVal = mlir::ShapedType::kDynamic;
           llvm::SmallVector<int64_t> strides(shape.size(), strideVal);
           layout = mlir::StridedLayoutAttr::get(type.getContext(), strideVal,
