@@ -459,9 +459,6 @@ struct ReshapeToReinterpret
   }
 };
 
-static constexpr llvm::StringLiteral
-    kContigiousArraysAttr("plier.contigious_arrays");
-
 struct MakeStridedLayoutPass
     : public mlir::PassWrapper<MakeStridedLayoutPass,
                                mlir::OperationPass<mlir::ModuleOp>> {
@@ -472,79 +469,17 @@ struct MakeStridedLayoutPass
     auto mod = getOperation();
 
     mlir::OpBuilder builder(mod);
-    auto loc = builder.getUnknownLoc();
-    auto attrStr = builder.getStringAttr(kContigiousArraysAttr);
-
-    llvm::SmallVector<bool> contigiousArrayArg;
-
-    auto isContigiousArrayArg = [&](unsigned i) {
-      if (contigiousArrayArg.empty())
-        return false;
-
-      assert(i < contigiousArrayArg.size());
-      return contigiousArrayArg[i];
-    };
-
-    llvm::SmallVector<mlir::Type> newArgTypes;
     llvm::SmallVector<mlir::Type> newResTypes;
-    llvm::SmallVector<mlir::Value> newOperands;
     for (auto func : mod.getOps<mlir::func::FuncOp>()) {
-      auto contAttr = func->getAttrOfType<mlir::ArrayAttr>(attrStr);
-      if (contAttr) {
-        auto contAttrRange = contAttr.getAsValueRange<mlir::BoolAttr>();
-        contigiousArrayArg.assign(contAttrRange.begin(), contAttrRange.end());
-      } else {
-        contigiousArrayArg.clear();
-      }
-
       auto funcType = func.getFunctionType();
       auto argTypes = funcType.getInputs();
       auto resTypes = funcType.getResults();
 
-      if (contigiousArrayArg.size() != argTypes.size()) {
-        func->emitError(llvm::Twine("Invalid '") + kContigiousArraysAttr +
-                        "' attr len: expected " + llvm::Twine(argTypes.size()) +
-                        " got " + llvm::Twine(contigiousArrayArg.size()));
-        return signalPassFailure();
-      }
-
-      newArgTypes.assign(argTypes.begin(), argTypes.end());
       newResTypes.assign(resTypes.begin(), resTypes.end());
       auto &body = func.getBody();
       bool hasBody = !body.empty();
       if (hasBody)
         builder.setInsertionPointToStart(&body.front());
-
-      for (auto &&[ind, type] : llvm::enumerate(argTypes)) {
-        auto i = static_cast<unsigned>(ind);
-        auto memrefType = type.dyn_cast<mlir::MemRefType>();
-        if (!memrefType || isContigiousArrayArg(i) ||
-            !memrefType.getLayout().isIdentity())
-          continue;
-
-        auto rank = static_cast<unsigned>(memrefType.getRank());
-        auto makeShape = [&](int64_t val) {
-          return llvm::SmallVector<int64_t>(rank, val);
-        };
-        auto strideVal = mlir::ShapedType::kDynamic;
-        auto layout = mlir::StridedLayoutAttr::get(context, strideVal,
-                                                   makeShape(strideVal));
-        auto newMemrefType =
-            mlir::MemRefType::get(makeShape(mlir::ShapedType::kDynamic),
-                                  memrefType.getElementType(), layout);
-
-        if (newMemrefType != memrefType) {
-          newArgTypes[i] = newMemrefType;
-
-          if (hasBody) {
-            auto arg = body.front().getArgument(i);
-            arg.setType(newMemrefType);
-            auto dst = builder.create<numba::util::ChangeLayoutOp>(
-                loc, memrefType, arg);
-            arg.replaceAllUsesExcept(dst, dst);
-          }
-        }
-      }
 
       for (auto &&[i, type] : llvm::enumerate(resTypes)) {
         auto memrefType = type.dyn_cast<mlir::MemRefType>();
@@ -565,7 +500,7 @@ struct MakeStridedLayoutPass
       }
 
       auto newFuncType =
-          mlir::FunctionType::get(&getContext(), newArgTypes, newResTypes);
+          mlir::FunctionType::get(&getContext(), argTypes, newResTypes);
       if (newFuncType != funcType) {
         func.setType(newFuncType);
         func.walk([&](mlir::func::ReturnOp ret) {
@@ -586,30 +521,12 @@ struct MakeStridedLayoutPass
         auto funcUses = mlir::SymbolTable::getSymbolUses(func, mod);
         if (funcUses) {
           for (auto use : *funcUses) {
-            auto call = mlir::cast<mlir::func::CallOp>(use.getUser());
-            auto loc = call.getLoc();
-
-            builder.setInsertionPoint(call);
-            assert(newArgTypes.size() == call.getOperands().size());
-            auto argsCount = static_cast<unsigned>(newArgTypes.size());
-            newOperands.resize(argsCount);
-            for (auto i : llvm::seq(0u, argsCount)) {
-              auto arg = call.getOperands()[i];
-              auto oldType = arg.getType();
-              auto newType = newArgTypes[i];
-              if (oldType != newType) {
-                assert(oldType.isa<mlir::MemRefType>());
-                assert(newType.isa<mlir::MemRefType>());
-                auto newArg =
-                    builder
-                        .create<numba::util::ChangeLayoutOp>(loc, newType, arg)
-                        .getResult();
-                newOperands[i] = newArg;
-              } else {
-                newOperands[i] = arg;
-              }
+            auto call = mlir::dyn_cast<mlir::func::CallOp>(use.getUser());
+            if (!call) {
+              use.getUser()->emitError("Unsupported func user");
+              return signalPassFailure();
             }
-            call.getOperandsMutable().assign(newOperands);
+            auto loc = call.getLoc();
 
             builder.setInsertionPointAfter(call);
             assert(newResTypes.size() == call.getNumResults());
@@ -2828,45 +2745,6 @@ static bool isContigiousArray(mlir::Type type) {
   return layout.getValue() == "C";
 }
 
-struct MarkContigiousArraysPass
-    : public mlir::PassWrapper<MarkContigiousArraysPass,
-                               mlir::OperationPass<mlir::func::FuncOp>> {
-  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(MarkContigiousArraysPass)
-
-  void runOnOperation() override {
-    auto func = getOperation();
-    if (func.isPrivate())
-      return;
-
-    auto funcType = func.getFunctionType();
-
-    mlir::OpBuilder builder(&getContext());
-    auto attrStr = builder.getStringAttr(kContigiousArraysAttr);
-    if (func->hasAttr(attrStr)) {
-      markAllAnalysesPreserved();
-      return;
-    }
-
-    bool needAttr = false;
-    llvm::SmallVector<bool> result;
-    result.reserve(funcType.getNumInputs());
-
-    auto visitor = [&](mlir::Type type) {
-      auto res = isContigiousArray(type);
-      result.emplace_back(res);
-      needAttr = needAttr || res;
-    };
-
-    for (auto type : (func.getFunctionType().getInputs()))
-      visitTypeRecursive(type, visitor);
-
-    if (needAttr)
-      func->setAttr(attrStr, builder.getBoolArrayAttr(result));
-
-    markAllAnalysesPreserved();
-  }
-};
-
 struct LinalgOptInnerPass
     : public mlir::PassWrapper<LinalgOptInnerPass, mlir::OperationPass<void>> {
   MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(LinalgOptInnerPass)
@@ -3551,8 +3429,8 @@ static void populateCommonOptPass(mlir::OpPassManager &pm) {
 }
 
 static void populatePlierToLinalgGenPipeline(mlir::OpPassManager &pm) {
-  pm.addNestedPass<mlir::func::FuncOp>(
-      std::make_unique<MarkContigiousArraysPass>());
+  //  pm.addNestedPass<mlir::func::FuncOp>(
+  //      std::make_unique<MarkContigiousArraysPass>());
   pm.addPass(std::make_unique<MarkArgsRestrictPass>());
   pm.addPass(std::make_unique<PlierToNtensorPass>());
   pm.addNestedPass<mlir::func::FuncOp>(mlir::createCanonicalizerPass());
