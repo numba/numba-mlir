@@ -424,17 +424,33 @@ void numba::populateNtensorToMemrefRewritesAndTarget(
   converter.addConversion(
       [](numba::ntensor::NTensorType type) -> std::optional<mlir::Type> {
         auto elemType = type.getElementType();
-        if (mlir::MemRefType::isValidElementType(elemType))
-          return mlir::MemRefType::get(type.getShape(), elemType);
+        if (!mlir::MemRefType::isValidElementType(elemType))
+          return std::nullopt;
 
-        return std::nullopt;
+        auto shape = type.getShape();
+        mlir::MemRefLayoutAttrInterface layout;
+        if (type.getLayout() != "C") {
+          auto strideVal = mlir::ShapedType::kDynamic;
+          llvm::SmallVector<int64_t> strides(shape.size(), strideVal);
+          layout = mlir::StridedLayoutAttr::get(type.getContext(), strideVal,
+                                                strides);
+        }
+
+        return mlir::MemRefType::get(shape, elemType, layout);
       });
+
+  auto context = patterns.getContext();
+  auto indexType = mlir::IndexType::get(context);
+  auto tuple3 =
+      mlir::TupleType::get(context, {indexType, indexType, indexType});
+  converter.addConversion(
+      [tuple3](numba::ntensor::SliceType) -> mlir::Type { return tuple3; });
 
   patterns.insert<DimOpLowering, CreateOpLowering, SubviewOpLowering,
                   LoadOpLowering, StoreOpLowering, ToTensorOpLowering,
                   FromTensorOpLowering, ToMemrefOpLowering,
                   FromMemrefOpLowering, CastOpLowering, CopyOpLowering>(
-      converter, patterns.getContext());
+      converter, context);
 
   target.addIllegalOp<numba::ntensor::DimOp, numba::ntensor::CreateArrayOp,
                       numba::ntensor::SubviewOp, numba::ntensor::LoadOp,
@@ -470,8 +486,6 @@ struct NtensorToMemrefPass
     auto indexType = mlir::IndexType::get(&context);
     auto tuple3 =
         mlir::TupleType::get(&context, {indexType, indexType, indexType});
-    converter.addConversion(
-        [tuple3](numba::ntensor::SliceType) -> mlir::Type { return tuple3; });
 
     numba::populateTupleTypeConverter(converter);
 
