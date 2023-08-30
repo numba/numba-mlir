@@ -621,6 +621,7 @@ def FromTensorOp : NTensor_OpBase<"from_tensor",
   let assemblyFormat = "$tensor attr-dict `:` type($tensor) `to` qualified(type($result))";
 
   let hasFolder = 1;
+  let hasCanonicalizer = 1;
 }
 
 def ToTensorOp : NTensor_OpBase<"to_tensor",

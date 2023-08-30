@@ -733,6 +733,40 @@ mlir::OpFoldResult numba::ntensor::FromTensorOp::fold(FoldAdaptor) {
   return nullptr;
 }
 
+namespace {
+struct FromTensorChain
+    : public mlir::OpRewritePattern<numba::ntensor::FromTensorOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(numba::ntensor::FromTensorOp op,
+                  mlir::PatternRewriter &rewriter) const override {
+    auto srcOp = op.getTensor().getDefiningOp<numba::ntensor::ToTensorOp>();
+    if (!srcOp)
+      return mlir::failure();
+
+    auto src = srcOp.getArray();
+    auto srcType = mlir::cast<numba::ntensor::NTensorType>(src.getType());
+    auto dstType = mlir::cast<numba::ntensor::NTensorType>(op.getType());
+    if (srcType == dstType) {
+      rewriter.replaceOp(op, src);
+      return mlir::success();
+    }
+
+    if (!numba::ntensor::CastOp::areCastCompatible(srcType, dstType))
+      return mlir::failure();
+
+    rewriter.replaceOpWithNewOp<numba::ntensor::CastOp>(op, dstType, src);
+    return mlir::success();
+  }
+};
+} // namespace
+
+void numba::ntensor::FromTensorOp::getCanonicalizationPatterns(
+    ::mlir::RewritePatternSet &results, ::mlir::MLIRContext *context) {
+  results.insert<FromTensorChain>(context);
+}
+
 mlir::OpFoldResult numba::ntensor::ToTensorOp::fold(FoldAdaptor) {
   if (auto from = getArray().getDefiningOp<numba::ntensor::FromTensorOp>()) {
     auto val = from.getTensor();
