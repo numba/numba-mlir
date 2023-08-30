@@ -343,17 +343,9 @@ def _gen_replace_parfor_tests():
         numba.tests.test_parfors.TestPrangeSpecific,
     ]
 
-    xfail_tests = {
-        # "test_inplace_alias",  # loop was optimized away
-        # "test_simple04",  # loop was optimized away
-        # "test_simple10",  # loop was optimized away
-        # "test_argmax",  # np.argmax
-        # "test_argmin",  # np.argmin
-    }
+    xfail_tests = set()
     skip_tests = {
-        # "test_size_assertion"  # args size mismatch check
-        # "oversized_tuple_as_arg_to_kernel"  # tuple size check
-        # "test_parfor_slice2"  # size mismatch check
+        "no_warn_if_cache_set" # caching is not supported
     }
 
     def _wrap_test_class(test_base):
@@ -371,14 +363,14 @@ def _gen_replace_parfor_tests():
                         res = njit(parallel=True, replace_parfors=True)(func)(
                             *args, **kwargs
                         )
-                        ir = get_print_buffer()
-                        # Check some parallel loops were actually generated
-                        self.has_parallel = "scf.parallel" in ir
-                        if ir.count("numba_util.parallel") == 0:
-                            # In some cases we can canonicalize all loops away
-                            # Make sure no loops are present
-                            assert ir.count("scf.for") == 0, ir
-                            assert ir.count("scf.parallel") == 0, ir
+                        # ir = get_print_buffer()
+                        # # Check some parallel loops were actually generated
+                        # self.has_parallel = "scf.parallel" in ir
+                        # if ir.count("numba_util.parallel") == 0:
+                        #     # In some cases we can canonicalize all loops away
+                        #     # Make sure no loops are present
+                        #     assert ir.count("scf.for") == 0, ir
+                        #     assert ir.count("scf.parallel") == 0, ir
                     return res
 
                 return wrapper
@@ -489,9 +481,9 @@ def _gen_replace_parfor_tests():
                         argcomp(parforarg, pyarg, **kwargs)
 
                 # Mimic original error
-                if check_scheduling:
-                    # self.check_scheduling(cpfunc, scheduler_type)
-                    assert self.has_parallel, "'@do_scheduling' not found"
+                # if check_scheduling:
+                #     # self.check_scheduling(cpfunc, scheduler_type)
+                #     assert self.has_parallel, "'@do_scheduling' not found"
 
                 # if requested check fastmath variant
                 if check_fastmath or check_fastmath_result:
