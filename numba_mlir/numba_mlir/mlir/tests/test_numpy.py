@@ -1508,19 +1508,20 @@ def test_contigious_layout_opt():
     def py_func(a):
         return a[0, 1]
 
-    jit_func = njit(py_func)
+    jit_func1 = njit(py_func)
+    jit_func2 = njit(py_func)
 
     a = np.array([[1, 2], [3, 4]])
     b = a.T
 
     layoutStr = "strided<[?, ?], offset: ?>"
     with print_pass_ir([], ["MakeStridedLayoutPass"]):
-        assert_equal(py_func(a), jit_func(a))
+        assert_equal(py_func(a), jit_func1(a))
         ir = get_print_buffer()
         assert ir.count(layoutStr) == 0, ir
 
     with print_pass_ir([], ["MakeStridedLayoutPass"]):
-        assert_equal(py_func(b), jit_func(b))
+        assert_equal(py_func(b), jit_func2(b))
         ir = get_print_buffer()
         assert ir.count(layoutStr) != 0, ir
 
