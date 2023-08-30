@@ -1527,11 +1527,11 @@ def test_contigious_layout_opt1():
 
 def test_contigious_layout_opt2():
     def py_func(s, a):
-        return a[s]
+        return a[s, 1]
 
     jit_func = njit(py_func)
 
-    a = np.array([[1, 2, 3, 4]])
+    a = np.array([[1, 2, 3], [4, 5, 6]])
     b = a.T
     s = slice(2, 3)
 
