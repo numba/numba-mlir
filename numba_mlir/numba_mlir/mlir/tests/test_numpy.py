@@ -1504,24 +1504,45 @@ def test_fortran_layout(arr):
     assert_equal(py_func(arr), jit_func(arr))
 
 
-def test_contigious_layout_opt():
+def test_contigious_layout_opt1():
     def py_func(a):
         return a[0, 1]
 
-    jit_func1 = njit(py_func)
-    jit_func2 = njit(py_func)
+    jit_func = njit(py_func)
 
     a = np.array([[1, 2], [3, 4]])
     b = a.T
 
     layoutStr = "strided<[?, ?], offset: ?>"
     with print_pass_ir([], ["MakeStridedLayoutPass"]):
-        assert_equal(py_func(a), jit_func1(a))
+        assert_equal(py_func(a), jit_func(a))
         ir = get_print_buffer()
         assert ir.count(layoutStr) == 0, ir
 
     with print_pass_ir([], ["MakeStridedLayoutPass"]):
-        assert_equal(py_func(b), jit_func2(b))
+        assert_equal(py_func(b), jit_func(b))
+        ir = get_print_buffer()
+        assert ir.count(layoutStr) != 0, ir
+
+
+def test_contigious_layout_opt2():
+    def py_func(s, a):
+        return a[s]
+
+    jit_func = njit(py_func)
+
+    a = np.array([[1, 2, 3, 4]])
+    b = a.T
+    s = slice(2, 3)
+
+    layoutStr = "strided<[?, ?], offset: ?>"
+    with print_pass_ir([], ["MakeStridedLayoutPass"]):
+        assert_equal(py_func(s, a), jit_func(s, a))
+        ir = get_print_buffer()
+        assert ir.count(layoutStr) == 0, ir
+
+    with print_pass_ir([], ["MakeStridedLayoutPass"]):
+        assert_equal(py_func(s, b), jit_func(s, b))
         ir = get_print_buffer()
         assert ir.count(layoutStr) != 0, ir
 
