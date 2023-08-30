@@ -262,13 +262,8 @@ struct FromTensorOpLowering
     auto results = numba::util::wrapEnvRegion(
         rewriter, op.getLoc(), origType.getEnvironment(), retType,
         [&](mlir::OpBuilder &builder, mlir::Location loc) {
-          auto contType = mlir::MemRefType::get(
-              retType.getShape(), retType.getElementType(),
-              mlir::MemRefLayoutAttrInterface{}, retType.getMemorySpace());
           mlir::Value res = builder.create<mlir::bufferization::ToMemrefOp>(
               loc, retType, tensor);
-          if (contType != retType)
-            res = builder.create<mlir::memref::CastOp>(loc, retType, res);
 
           return res;
         });
