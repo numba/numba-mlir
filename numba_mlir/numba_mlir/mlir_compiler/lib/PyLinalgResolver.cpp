@@ -1055,10 +1055,12 @@ static py::object externalCallImpl(py::capsule context, py::str funcName,
   auto unwrapVal = [&](py::handle obj) {
     auto tensor =
         toNTensor(loc, builder, ctx.context.unwrapVal(loc, builder, obj));
-    auto tensorType = tensor.getType().dyn_cast<numba::ntensor::NTensorType>();
+    auto tensorType =
+        mlir::dyn_cast<numba::ntensor::NTensorType>(tensor.getType());
     if (tensorType) {
       auto commonType = numba::ntensor::NTensorType::get(
-          getDynShape(tensorType.getRank()), tensorType.getElementType());
+          getDynShape(tensorType.getRank()), tensorType.getElementType(),
+          tensorType.getEnvironment(), tensorType.getLayout());
       if (commonType != tensorType)
         tensor =
             builder.create<numba::ntensor::CastOp>(loc, commonType, tensor);
