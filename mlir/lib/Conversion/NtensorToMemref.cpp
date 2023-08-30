@@ -316,22 +316,26 @@ struct FromMemrefOpLowering
                   numba::ntensor::FromMemrefOp::Adaptor adaptor,
                   mlir::ConversionPatternRewriter &rewriter) const override {
     auto src = adaptor.getMemref();
-    auto srcType = src.getType().dyn_cast<mlir::MemRefType>();
+    auto srcType = mlir::dyn_cast<mlir::MemRefType>(src.getType());
     if (!srcType)
       return mlir::failure();
 
     auto *converter = getTypeConverter();
     assert(converter && "Type converter is not set");
 
-    auto retType = converter->convertType(op.getType())
-                       .dyn_cast_or_null<mlir::MemRefType>();
+    auto retType = converter->convertType<mlir::MemRefType>(op.getType());
     if (!retType)
       return mlir::failure();
 
-    if (srcType != retType)
+    if (srcType == retType) {
+      rewriter.replaceOp(op, src);
+      return mlir::success();
+    }
+
+    if (!mlir::memref::CastOp::areCastCompatible(srcType, retType))
       return mlir::failure();
 
-    rewriter.replaceOp(op, src);
+    rewriter.replaceOpWithNewOp<mlir::memref::CastOp>(op, retType, src);
     return mlir::success();
   }
 };
