@@ -1058,9 +1058,10 @@ static py::object externalCallImpl(py::capsule context, py::str funcName,
     auto tensorType =
         mlir::dyn_cast<numba::ntensor::NTensorType>(tensor.getType());
     if (tensorType) {
+      auto layout = builder.getStringAttr("A");
       auto commonType = numba::ntensor::NTensorType::get(
           getDynShape(tensorType.getRank()), tensorType.getElementType(),
-          tensorType.getEnvironment(), tensorType.getLayout());
+          tensorType.getEnvironment(), layout);
       if (commonType != tensorType)
         tensor =
             builder.create<numba::ntensor::CastOp>(loc, commonType, tensor);
