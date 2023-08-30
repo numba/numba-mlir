@@ -500,6 +500,14 @@ struct MakeStridedLayoutPass
       auto funcType = func.getFunctionType();
       auto argTypes = funcType.getInputs();
       auto resTypes = funcType.getResults();
+
+      if (contigiousArrayArg.size() != argTypes.size()) {
+        func->emitError(llvm::Twine("Invalid '") + kContigiousArraysAttr +
+                        "' attr len: expected " + llvm::Twine(argTypes.size()) +
+                        " got " + llvm::Twine(contigiousArrayArg.size()));
+        return signalPassFailure();
+      }
+
       newArgTypes.assign(argTypes.begin(), argTypes.end());
       newResTypes.assign(resTypes.begin(), resTypes.end());
       auto &body = func.getBody();
