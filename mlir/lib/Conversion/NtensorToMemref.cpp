@@ -241,24 +241,29 @@ struct FromTensorOpLowering
                   numba::ntensor::FromTensorOp::Adaptor adaptor,
                   mlir::ConversionPatternRewriter &rewriter) const override {
     auto tensor = adaptor.getTensor();
-    if (!tensor.getType().isa<mlir::RankedTensorType>())
+    if (!mlir::isa<mlir::RankedTensorType>(tensor.getType()))
       return mlir::failure();
 
     auto *converter = getTypeConverter();
     assert(converter && "Type converter is not set");
 
-    auto origType = op.getType().cast<numba::ntensor::NTensorType>();
-    auto retType =
-        converter->convertType(origType).dyn_cast_or_null<mlir::MemRefType>();
+    auto origType = mlir::cast<numba::ntensor::NTensorType>(op.getType());
+    auto retType = converter->convertType<mlir::MemRefType>(origType);
     if (!retType)
       return mlir::failure();
 
     auto results = numba::util::wrapEnvRegion(
-        rewriter, op->getLoc(), origType.getEnvironment(), retType,
+        rewriter, op.getLoc(), origType.getEnvironment(), retType,
         [&](mlir::OpBuilder &builder, mlir::Location loc) {
-          return builder
-              .create<mlir::bufferization::ToMemrefOp>(loc, retType, tensor)
-              .getResult();
+          auto contType = mlir::MemRefType::get(
+              retType.getShape(), retType.getElementType(),
+              mlir::MemRefLayoutAttrInterface{}, retType.getMemorySpace());
+          mlir::Value res = builder.create<mlir::bufferization::ToMemrefOp>(
+              loc, retType, tensor);
+          if (contType != retType)
+            res = builder.create<mlir::memref::CastOp>(loc, retType, res);
+
+          return res;
         });
 
     rewriter.replaceOp(op, results);
@@ -428,8 +433,9 @@ void numba::populateNtensorToMemrefRewritesAndTarget(
           return std::nullopt;
 
         auto shape = type.getShape();
-        mlir::MemRefLayoutAttrInterface layout;
-        if (type.getLayout() != "C") {
+        mlir::MemRefLayoutAttrInterface layout = {};
+        auto nlayout = type.getLayout();
+        if (!nlayout || nlayout != "C") {
           auto strideVal = mlir::ShapedType::kDynamic;
           llvm::SmallVector<int64_t> strides(shape.size(), strideVal);
           layout = mlir::StridedLayoutAttr::get(type.getContext(), strideVal,
