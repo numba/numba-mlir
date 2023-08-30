@@ -53,17 +53,20 @@ struct CreateOpLowering
   matchAndRewrite(numba::ntensor::CreateArrayOp op,
                   numba::ntensor::CreateArrayOp::Adaptor adaptor,
                   mlir::ConversionPatternRewriter &rewriter) const override {
-    auto srcType = op.getType().dyn_cast<numba::ntensor::NTensorType>();
+    auto srcType = mlir::dyn_cast<numba::ntensor::NTensorType>(op.getType());
     if (!srcType)
       return mlir::failure();
 
     auto *converter = getTypeConverter();
     assert(converter && "Type converter is not set");
 
-    auto dstType = converter->convertType(op.getType())
-                       .dyn_cast_or_null<mlir::MemRefType>();
+    auto dstType = converter->convertType<mlir::MemRefType>(op.getType());
     if (!dstType)
       return mlir::failure();
+
+    auto dstTypeContigious = mlir::MemRefType::get(
+        dstType.getShape(), dstType.getElementType(),
+        mlir::MemRefLayoutAttrInterface{}, dstType.getMemorySpace());
 
     auto elemType = dstType.getElementType();
     auto initValue = adaptor.getInitValue();
@@ -71,12 +74,16 @@ struct CreateOpLowering
       return mlir::failure();
 
     auto results = numba::util::wrapEnvRegion(
-        rewriter, op->getLoc(), srcType.getEnvironment(), dstType,
+        rewriter, op.getLoc(), srcType.getEnvironment(), dstType,
         [&](mlir::OpBuilder &builder, mlir::Location loc) {
           mlir::Value result = builder.create<mlir::memref::AllocOp>(
-              loc, dstType, adaptor.getDynamicSizes());
+              loc, dstTypeContigious, adaptor.getDynamicSizes());
           if (initValue)
             builder.create<mlir::linalg::FillOp>(loc, initValue, result);
+
+          if (dstTypeContigious != dstType)
+            result = builder.create<mlir::memref::CastOp>(loc, dstType, result);
+
           return result;
         });
 
