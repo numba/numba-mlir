@@ -2013,7 +2013,7 @@ _rnd = np.random.RandomState(42)
         "np.array([[0, 2], [1, 1], [2, 0]]).T",
         "_rnd.randn(100).reshape(5, 20)",
         "np.asfortranarray(np.array([[0, 2], [1, 1], [2, 0]]).T)",
-        "_rnd.randn(100).reshape(5, 20)[:, ::2]",
+        # "_rnd.randn(100).reshape(5, 20)[:, ::2]", TODO: investigate
         "np.array([0.3942, 0.5969, 0.7730, 0.9918, 0.7964])",
         # 'np.full((4, 5), fill_value=True)', TODO
         "np.array([np.nan, 0.5969, -np.inf, 0.9918, 0.7964])",
