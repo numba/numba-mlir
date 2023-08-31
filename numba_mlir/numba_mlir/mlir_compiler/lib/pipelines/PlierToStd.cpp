@@ -45,6 +45,12 @@ static bool isSupportedType(mlir::Type type) {
   return type.isa<mlir::IntegerType, mlir::FloatType, mlir::ComplexType>();
 }
 
+static bool isSupportedConst(mlir::Type type) {
+  assert(type);
+  return type.isa<mlir::IntegerType, mlir::FloatType, mlir::ComplexType,
+                  mlir::TupleType, mlir::NoneType, numba::util::TypeVarType>();
+}
+
 static bool isInt(mlir::Type type) {
   assert(type);
   return type.isa<mlir::IntegerType>();
@@ -60,6 +66,52 @@ static bool isComplex(mlir::Type type) {
   return type.isa<mlir::ComplexType>();
 }
 
+static mlir::FailureOr<mlir::Value>
+lowerConst(mlir::OpBuilder &builder, mlir::Location loc, mlir::Attribute attr) {
+  if (auto intAttr = mlir::dyn_cast<mlir::IntegerAttr>(attr)) {
+    auto intVal = intAttr.getValue().getSExtValue();
+    auto origType = intAttr.getType().cast<mlir::IntegerType>();
+    auto type = numba::makeSignlessType(origType);
+    mlir::Value res = builder.create<mlir::arith::ConstantIntOp>(
+        loc, intVal, type.getWidth());
+    return numba::doConvert(builder, loc, res, origType);
+  }
+
+  if (auto floatAttr = mlir::dyn_cast<mlir::FloatAttr>(attr)) {
+    return builder.create<mlir::arith::ConstantOp>(loc, floatAttr).getResult();
+    return mlir::success();
+  }
+
+  if (auto complexAttr = mlir::dyn_cast<mlir::complex::NumberAttr>(attr)) {
+    const double vals[] = {
+        complexAttr.getReal().convertToDouble(),
+        complexAttr.getImag().convertToDouble(),
+    };
+    auto arr = builder.getF64ArrayAttr(vals);
+    return builder
+        .create<mlir::complex::ConstantOp>(loc, complexAttr.getType(), arr)
+        .getResult();
+  }
+
+  if (auto array = mlir::dyn_cast<mlir::ArrayAttr>(attr)) {
+    llvm::SmallVector<mlir::Value> values(array.size());
+    for (auto &&[i, elemAttr] : llvm::enumerate(array)) {
+      auto val = lowerConst(builder, loc, elemAttr);
+      if (mlir::failed(val))
+        return mlir::failure();
+
+      values[i] = *val;
+    }
+
+    mlir::ValueRange valRange(values);
+    auto retType = builder.getTupleType(valRange);
+    return builder.create<numba::util::BuildTupleOp>(loc, retType, values)
+        .getResult();
+  }
+
+  return mlir::failure();
+}
+
 struct ConstOpLowering : public mlir::OpConversionPattern<plier::ConstOp> {
   using OpConversionPattern::OpConversionPattern;
 
@@ -71,47 +123,18 @@ struct ConstOpLowering : public mlir::OpConversionPattern<plier::ConstOp> {
     if (!expectedType)
       return mlir::failure();
 
-    auto typeAttr =
-        mlir::dyn_cast_or_null<mlir::TypedAttr>(adaptor.getValAttr());
-    if (typeAttr && isSupportedType(typeAttr.getType())) {
-      if (auto intAttr = mlir::dyn_cast<mlir::IntegerAttr>(typeAttr)) {
-        auto intVal = intAttr.getValue().getSExtValue();
-        auto origType = intAttr.getType().cast<mlir::IntegerType>();
-        auto type = numba::makeSignlessType(origType);
-        auto loc = op.getLoc();
-        mlir::Value res = rewriter.create<mlir::arith::ConstantIntOp>(
-            loc, intVal, type.getWidth());
-        res = numba::doConvert(rewriter, loc, res, origType);
-        rewriter.replaceOp(op, res);
-        return mlir::success();
-      }
-
-      if (auto floatAttr = mlir::dyn_cast<mlir::FloatAttr>(typeAttr)) {
-        rewriter.replaceOpWithNewOp<mlir::arith::ConstantOp>(op, floatAttr);
-        return mlir::success();
-      }
-
-      if (auto complexAttr =
-              mlir::dyn_cast<mlir::complex::NumberAttr>(typeAttr)) {
-        const double vals[] = {
-            complexAttr.getReal().convertToDouble(),
-            complexAttr.getImag().convertToDouble(),
-        };
-        auto arr = rewriter.getF64ArrayAttr(vals);
-        rewriter.replaceOpWithNewOp<mlir::complex::ConstantOp>(
-            op, complexAttr.getType(), arr);
-        return mlir::success();
-      }
-
-      return mlir::failure();
-    }
-
     if (mlir::isa<mlir::NoneType>(expectedType)) {
       rewriter.replaceOpWithNewOp<mlir::ub::PoisonOp>(op, expectedType,
                                                       nullptr);
       return mlir::success();
     }
-    return mlir::failure();
+
+    auto value = lowerConst(rewriter, op.getLoc(), adaptor.getValAttr());
+    if (mlir::failed(value))
+      return mlir::failure();
+
+    rewriter.replaceOp(op, *value);
+    return mlir::success();
   }
 };
 
@@ -1042,10 +1065,7 @@ void PlierToStdPass::runOnOperation() {
         if (!type)
           return true;
 
-        if (mlir::isa<mlir::NoneType, numba::util::TypeVarType>(type))
-          return false;
-
-        return !isSupportedType(type);
+        return !isSupportedConst(type);
       });
 
   target.addDynamicallyLegalOp<plier::GetItemOp>(
