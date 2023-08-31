@@ -10,8 +10,11 @@ from numba.core.compiler import Flags, compile_result
 from numba.core.compiler_machinery import FunctionPass, register_pass
 from numba.core.funcdesc import qualifying_prefix
 from numba.np.ufunc.parallel import get_thread_count
+
 import numba.core.types.functions
-import numba.parfors.parfor
+import numba.parfors.parfor as parfor
+import numba.core.ir as ir
+from numba.core.ir_utils import mk_unique_var
 from contextlib import contextmanager
 
 from .settings import DUMP_IR, OPT_LEVEL, DUMP_DIAGNOSTICS
@@ -353,11 +356,13 @@ class MlirReplaceParfors(MlirBackendBase):
                 if not isinstance(inst, numba.parfors.parfor.Parfor):
                     continue
 
+                typemap = state.typemap
+                self._reconstruct_parfor_ssa(inst, typemap)
+
                 if module is None:
                     mod_settings = {"enable_gpu_pipeline": True}
                     module = mlir_compiler.create_module(mod_settings)
 
-                typemap = state.typemap
                 fn_name = f"parfor_impl{inst.id}"
                 arg_types = self._get_parfor_args_types(typemap, inst)
                 res_type = self._get_parfor_return_type(typemap, inst)
@@ -380,6 +385,41 @@ class MlirReplaceParfors(MlirBackendBase):
                 parfor_funcs[inst] = fn_name
 
         return module, parfor_funcs, ctx
+
+    def _reconstruct_parfor_ssa(self, parfor, typemap):
+        loop_body = parfor.loop_body
+
+        # Add dummy return
+        last_label = max(loop_body.keys())
+        scope = loop_body[last_label].scope
+        const = ir.Var(scope, mk_unique_var("$const"), ir.Loc("parfors_dummy", -1))
+        loop_body[last_label].body.append(ir.Return(const, ir.Loc("parfors_dummy", -1)))
+
+        # Reconstruct loop body SSA
+        loop_body = numba.core.ssa._run_ssa(loop_body)
+
+        # remove dummy return
+        loop_body[last_label].body.pop()
+        parfor.loop_body = loop_body
+
+        for block in loop_body.values():
+            for inst in block.body:
+                if (
+                    isinstance(inst, ir.Assign)
+                    and isinstance(inst.value, ir.Expr)
+                    and inst.value.op == "phi"
+                ):
+                    for inc in inst.value.incoming_values:
+                        try:
+                            t = typemap[inc.name]
+                        except KeyError:
+                            continue
+                        typemap[inst.target.name] = t
+                        break
+
+                    for inc in inst.value.incoming_values:
+                        if inc.name not in typemap:
+                            typemap[inc.name] = t
 
     def _get_parfor_params(self, parfor):
         params = []
