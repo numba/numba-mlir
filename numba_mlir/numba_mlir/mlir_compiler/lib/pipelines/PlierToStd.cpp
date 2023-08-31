@@ -988,6 +988,9 @@ void PlierToStdPass::runOnOperation() {
   typeConverter.addConversion([](mlir::Type type) { return type; });
 
   auto context = &getContext();
+  typeConverter.addConversion([](plier::FunctionType type) {
+    return numba::util::OpaqueType::get(type.getContext());
+  });
   typeConverter.addConversion(
       [](mlir::Type type, llvm::SmallVectorImpl<mlir::Type> &retTypes)
           -> std::optional<mlir::LogicalResult> {
