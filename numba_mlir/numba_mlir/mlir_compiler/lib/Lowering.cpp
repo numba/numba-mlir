@@ -916,6 +916,19 @@ private:
       return mlir::complex::NumberAttr::get(type, c.real(), c.imag());
     }
 
+    if (py::isinstance<py::tuple>(val)) {
+      auto tup = val.cast<py::tuple>();
+      llvm::SmallVector<mlir::Attribute> values(tup.size());
+      for (auto &&[i, elem] : llvm::enumerate(tup)) {
+        auto val = resolveConstant(elem);
+        if (!val)
+          return std::nullopt;
+
+        values[i] = *val;
+      }
+      return builder.getArrayAttr(values);
+    }
+
     if (py::isinstance<py::none>(val))
       return builder.getUnitAttr();
 
