@@ -378,6 +378,20 @@ def test_replace_parfor_numpy_reduction():
         assert len(ir) > 0  # Check some code was actually generated
 
 
+def test_replace_parfor_dot():
+    def py_func(a, b):
+        return np.dot(a, b)
+
+    a = np.linspace(0, 1, 20).reshape(2, 10)
+    b = np.linspace(2, 1, 10)
+
+    jit_func = njit(py_func, parallel=True, replace_parfors=True)
+    with print_pass_ir([], ["CFGToSCFPass"]):
+        assert_allclose(py_func(a, b), jit_func(a, b), rtol=1e-4, atol=1e-7)
+        ir = get_print_buffer()
+        assert len(ir) > 0  # Check some code was actually generated
+
+
 @pytest.mark.xfail(reason="Operators doesn't generate parfor nodes")
 def test_replace_parfor_numpy_operator():
     def py_func(a, b):
