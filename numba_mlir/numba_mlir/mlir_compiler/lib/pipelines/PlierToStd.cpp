@@ -42,8 +42,13 @@
 namespace {
 static bool isSupportedType(mlir::Type type) {
   assert(type);
+  return type.isa<mlir::IntegerType, mlir::FloatType, mlir::ComplexType>();
+}
+
+static bool isSupportedConst(mlir::Type type) {
+  assert(type);
   return type.isa<mlir::IntegerType, mlir::FloatType, mlir::ComplexType,
-                  mlir::TupleType>();
+                  mlir::TupleType, mlir::NoneType, numba::util::TypeVarType>();
 }
 
 static bool isInt(mlir::Type type) {
@@ -1060,10 +1065,7 @@ void PlierToStdPass::runOnOperation() {
         if (!type)
           return true;
 
-        if (mlir::isa<mlir::NoneType, numba::util::TypeVarType>(type))
-          return false;
-
-        return !isSupportedType(type);
+        return !isSupportedConst(type);
       });
 
   target.addDynamicallyLegalOp<plier::GetItemOp>(
