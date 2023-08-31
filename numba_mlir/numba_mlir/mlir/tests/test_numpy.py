@@ -1639,6 +1639,7 @@ def test_reshape_non_contiguous():
     [
         # 'lambda a: a.flat', TODO: flat support
         "lambda a: a.flatten()",
+        "lambda a: np.ravel(a)",
     ],
 )
 @pytest.mark.parametrize("array", _test_reshape_test_arrays)

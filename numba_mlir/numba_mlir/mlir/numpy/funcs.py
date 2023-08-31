@@ -941,6 +941,7 @@ def reshape_impl(builder, arg, *new_shape):
 
 # @register_attr('array.flat')
 @register_func("array.flatten")
+@register_func("numpy.ravel", numpy.ravel)
 def flatten_impl(builder, arg):
     size = size_impl(builder, arg)
     return builder.reshape(arg, (size))
