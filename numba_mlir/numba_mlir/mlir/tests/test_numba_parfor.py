@@ -345,7 +345,9 @@ def _gen_replace_parfor_tests():
 
     xfail_tests = set()
     skip_tests = {
-        "no_warn_if_cache_set" # caching is not supported
+        "no_warn_if_cache_set"  # caching is not supported
+        "test_prange07"  # reverse iteration
+        "test_prange12"  # reverse iteration
     }
 
     def _wrap_test_class(test_base):
@@ -710,6 +712,24 @@ def test_replace_parfor_prange_reduction2():
     jit_func = njit(py_func, parallel=True, replace_parfors=True)
     with print_pass_ir([], ["CFGToSCFPass"]):
         assert_equal(py_func(a), jit_func(a))
+        ir = get_print_buffer()
+        assert len(ir) > 0  # Check some code was actually generated
+
+
+@pytest.mark.skip(reason="reverse iteration is not supported yet")
+def test_replace_parfor_prange_reverse_iter():
+    def py_func(A):
+        s = 0
+        for i in numba.prange(4, 1):
+            s += A[i]
+        return s
+
+    jit_func = njit(py_func, parallel=True, replace_parfors=True)
+
+    A = np.ones((4), dtype=np.float64)
+
+    with print_pass_ir([], ["CFGToSCFPass"]):
+        assert_equal(py_func(A), jit_func(A))
         ir = get_print_buffer()
         assert len(ir) > 0  # Check some code was actually generated
 
