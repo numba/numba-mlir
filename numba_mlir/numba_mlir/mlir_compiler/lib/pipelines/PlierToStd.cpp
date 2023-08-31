@@ -66,20 +66,20 @@ static bool isComplex(mlir::Type type) {
   return type.isa<mlir::ComplexType>();
 }
 
-static mlir::FailureOr<mlir::Value>
-lowerConst(mlir::OpBuilder &builder, mlir::Location loc, mlir::Attribute attr) {
+static mlir::Value lowerConst(mlir::OpBuilder &builder, mlir::Location loc,
+                              mlir::Type type, mlir::Attribute attr) {
   if (auto intAttr = mlir::dyn_cast<mlir::IntegerAttr>(attr)) {
     auto intVal = intAttr.getValue().getSExtValue();
-    auto origType = intAttr.getType().cast<mlir::IntegerType>();
-    auto type = numba::makeSignlessType(origType);
+    auto origType = mlir::cast<mlir::IntegerType>(intAttr.getType());
+    auto constType = numba::makeSignlessType(origType);
     mlir::Value res = builder.create<mlir::arith::ConstantIntOp>(
-        loc, intVal, type.getWidth());
-    return numba::doConvert(builder, loc, res, origType);
+        loc, intVal, constType.getWidth());
+    return numba::doConvert(builder, loc, res, type);
   }
 
   if (auto floatAttr = mlir::dyn_cast<mlir::FloatAttr>(attr)) {
-    return builder.create<mlir::arith::ConstantOp>(loc, floatAttr).getResult();
-    return mlir::success();
+    mlir::Value res = builder.create<mlir::arith::ConstantOp>(loc, floatAttr);
+    return numba::doConvert(builder, loc, res, type);
   }
 
   if (auto complexAttr = mlir::dyn_cast<mlir::complex::NumberAttr>(attr)) {
@@ -88,19 +88,23 @@ lowerConst(mlir::OpBuilder &builder, mlir::Location loc, mlir::Attribute attr) {
         complexAttr.getImag().convertToDouble(),
     };
     auto arr = builder.getF64ArrayAttr(vals);
-    return builder
-        .create<mlir::complex::ConstantOp>(loc, complexAttr.getType(), arr)
-        .getResult();
+    mlir::Value res = builder.create<mlir::complex::ConstantOp>(
+        loc, complexAttr.getType(), arr);
+    return numba::doConvert(builder, loc, res, type);
   }
 
   if (auto array = mlir::dyn_cast<mlir::ArrayAttr>(attr)) {
+    auto tupleType = mlir::dyn_cast<mlir::TupleType>(type);
+    if (!tupleType || tupleType.size() != array.size())
+      return nullptr;
+
     llvm::SmallVector<mlir::Value> values(array.size());
     for (auto &&[i, elemAttr] : llvm::enumerate(array)) {
-      auto val = lowerConst(builder, loc, elemAttr);
-      if (mlir::failed(val))
-        return mlir::failure();
+      auto val = lowerConst(builder, loc, tupleType.getType(i), elemAttr);
+      if (!val)
+        return nullptr;
 
-      values[i] = *val;
+      values[i] = val;
     }
 
     mlir::ValueRange valRange(values);
@@ -109,7 +113,7 @@ lowerConst(mlir::OpBuilder &builder, mlir::Location loc, mlir::Attribute attr) {
         .getResult();
   }
 
-  return mlir::failure();
+  return nullptr;
 }
 
 struct ConstOpLowering : public mlir::OpConversionPattern<plier::ConstOp> {
@@ -129,11 +133,12 @@ struct ConstOpLowering : public mlir::OpConversionPattern<plier::ConstOp> {
       return mlir::success();
     }
 
-    auto value = lowerConst(rewriter, op.getLoc(), adaptor.getValAttr());
-    if (mlir::failed(value))
+    auto value =
+        lowerConst(rewriter, op.getLoc(), expectedType, adaptor.getValAttr());
+    if (!value)
       return mlir::failure();
 
-    rewriter.replaceOp(op, *value);
+    rewriter.replaceOp(op, value);
     return mlir::success();
   }
 };

@@ -132,16 +132,16 @@ static mlir::Value intCast(mlir::OpBuilder &rewriter, mlir::Location loc,
 
 static mlir::Value intFloatCast(mlir::OpBuilder &rewriter, mlir::Location loc,
                                 mlir::Value val, mlir::Type dstType) {
-  auto srcIntType = val.getType().cast<mlir::IntegerType>();
+  auto srcIntType = mlir::cast<mlir::IntegerType>(val.getType());
   auto signlessType = numba::makeSignlessType(srcIntType);
   if (val.getType() != signlessType)
     val =
         rewriter.createOrFold<numba::util::SignCastOp>(loc, signlessType, val);
 
-  if (srcIntType.isSigned()) {
-    return rewriter.createOrFold<mlir::arith::SIToFPOp>(loc, dstType, val);
-  } else {
+  if (!srcIntType.isSigned()) {
     return rewriter.createOrFold<mlir::arith::UIToFPOp>(loc, dstType, val);
+  } else {
+    return rewriter.createOrFold<mlir::arith::SIToFPOp>(loc, dstType, val);
   }
 }
 
