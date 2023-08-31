@@ -345,7 +345,7 @@ def _gen_replace_parfor_tests():
 
     xfail_tests = set()
     skip_tests = {
-        "no_warn_if_cache_set",  # caching is not supported
+        "test_no_warn_if_cache_set",  # caching is not supported
         "test_prange07",  # reverse iteration
         "test_prange12",  # reverse iteration
     }
