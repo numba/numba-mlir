@@ -327,6 +327,7 @@ struct PlierLowerer final {
                                                 hasFP64);
     }
 
+    builder.setInsertionPointToStart(block);
     lowerParforBody(compilationContext, parforInst, block, env);
 
     fixupPhis();
@@ -451,7 +452,6 @@ private:
 
   void lowerParforBody(py::handle ctx, py::handle parforInst,
                        mlir::Block *entryBlock, mlir::Attribute env) {
-    builder.setInsertionPointToStart(entryBlock);
     auto indexType = builder.getIndexType();
     auto getIndexVal = [&](py::handle obj) -> mlir::Value {
       auto loc = getCurrentLoc();
