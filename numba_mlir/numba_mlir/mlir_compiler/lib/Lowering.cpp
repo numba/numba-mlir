@@ -507,9 +507,7 @@ private:
 
     for (auto var : ctx["parfor_output_arrays"].cast<py::list>()) {
       auto varName = var.cast<std::string>();
-      auto it = varsMap.find(varName);
-      assert(it != varsMap.end());
-      results.emplace_back(it->second);
+      results.emplace_back(loadvar(varName));
     }
 
     auto bodyBuilder = [&](mlir::OpBuilder &b, mlir::Location l,
