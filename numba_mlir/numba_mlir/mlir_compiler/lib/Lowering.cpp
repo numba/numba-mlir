@@ -287,8 +287,34 @@ struct PlierLowerer final {
                                  const py::object &parforInst) {
     auto newFunc = createFunc(compilationContext, mod);
     auto block = func.addEntryBlock();
-    lowerParforBody(compilationContext, parforInst, block,
-                    block->getArguments());
+    mlir::ValueRange blockArgs = block->getArguments();
+    auto getNextBlockArg = [&]() -> mlir::Value {
+      assert(!blockArgs.empty());
+      auto res = blockArgs.front();
+      blockArgs = blockArgs.drop_front();
+      return res;
+    };
+
+    for (auto param : compilationContext["parfor_params"].cast<py::list>()) {
+      auto name = param.cast<std::string>();
+      varsMap[name] = getNextBlockArg();
+    }
+
+    auto getIndexVal = [&](py::handle obj) {
+      if (py::isinstance<py::int_>(obj))
+        return;
+
+      auto var = getNextBlockArg();
+      varsMap[obj.attr("name").cast<std::string>()] = var;
+    };
+
+    for (auto loop : parforInst.attr("loop_nests")) {
+      getIndexVal(loop.attr("start"));
+      getIndexVal(loop.attr("stop"));
+      getIndexVal(loop.attr("step"));
+    }
+
+    lowerParforBody(compilationContext, parforInst, block);
     return newFunc;
   }
 
@@ -383,19 +409,7 @@ private:
   }
 
   void lowerParforBody(py::handle ctx, py::handle parforInst,
-                       mlir::Block *entryBlock, mlir::ValueRange blockArgs) {
-    auto getNextBlockArg = [&]() -> mlir::Value {
-      assert(!blockArgs.empty());
-      auto res = blockArgs.front();
-      blockArgs = blockArgs.drop_front();
-      return res;
-    };
-
-    for (auto param : ctx["parfor_params"].cast<py::list>()) {
-      auto name = param.cast<std::string>();
-      varsMap[name] = getNextBlockArg();
-    }
-
+                       mlir::Block *entryBlock) {
     builder.setInsertionPointToStart(entryBlock);
     auto indexType = builder.getIndexType();
     auto getIndexVal = [&](py::handle obj) -> mlir::Value {
@@ -404,9 +418,7 @@ private:
         auto val = obj.cast<int64_t>();
         return builder.create<mlir::arith::ConstantIndexOp>(loc, val);
       }
-
-      auto var = getNextBlockArg();
-      varsMap[obj.attr("name").cast<std::string>()] = var;
+      auto var = loadvar(obj);
       return builder.create<plier::CastOp>(loc, indexType, var);
     };
 
