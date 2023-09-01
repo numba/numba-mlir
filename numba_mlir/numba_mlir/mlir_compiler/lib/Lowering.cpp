@@ -343,10 +343,9 @@ struct PlierLowerer final {
       builder.setInsertionPointToStart(&regionBlock);
     }
 
-    auto loopResults =
-        lowerParforBody(compilationContext, parforInst, block, env);
-    llvm::SmallVector<mlir::Value> results;
+    auto loopResults = lowerParforBody(parforInst);
 
+    llvm::SmallVector<mlir::Value> results;
     for (auto var :
          compilationContext["parfor_output_arrays"].cast<py::list>()) {
       auto varName = var.cast<std::string>();
@@ -499,9 +498,7 @@ private:
     fixupPhis();
   }
 
-  mlir::ValueRange lowerParforBody(py::handle ctx, py::handle parforInst,
-                                   mlir::Block *entryBlock,
-                                   mlir::Attribute env) {
+  mlir::ValueRange lowerParforBody(py::handle parforInst) {
     auto indexType = builder.getIndexType();
     auto getIndexVal = [&](py::handle obj) -> mlir::Value {
       auto loc = getCurrentLoc();
