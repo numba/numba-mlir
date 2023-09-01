@@ -580,14 +580,18 @@ private:
       auto irBlocks = getBlocks(parforInst.attr("loop_body"));
 
       mlir::OpBuilder::InsertionGuard g(b);
+
+      // Make a separate copy as `blocks` vector can be reallocated during
+      // lowerInst.
+      llvm::SmallVector<mlir::Block *> addedBlocks;
+      addedBlocks.reserve(irBlocks.size());
       for (auto &&irBlock : irBlocks) {
         auto block = b.createBlock(&region, region.end());
         blocks.emplace_back(block);
+        addedBlocks.emplace_back(block);
         blocksMap[irBlock.first] = block;
       }
 
-      auto numBlocks = irBlocks.size();
-      auto addedBlocks = llvm::ArrayRef(blocks).take_back(numBlocks);
       llvm::SmallVector<mlir::Value> reductionsRet(reductionInits.size());
       for (auto &&[bb, irBlock] : llvm::zip(addedBlocks, irBlocks)) {
         b.setInsertionPointToEnd(bb);
