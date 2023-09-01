@@ -286,7 +286,9 @@ struct PlierLowerer final {
                                  mlir::ModuleOp mod,
                                  const py::object &parforInst) {
     auto newFunc = createFunc(compilationContext, mod);
-    lowerParforBody(compilationContext, parforInst);
+    auto block = func.addEntryBlock();
+    lowerParforBody(compilationContext, parforInst, block,
+                    block->getArguments());
     return newFunc;
   }
 
@@ -380,10 +382,8 @@ private:
     fixupPhis();
   }
 
-  void lowerParforBody(py::handle ctx, py::handle parforInst) {
-    auto block = func.addEntryBlock();
-    mlir::ValueRange blockArgs = block->getArguments();
-
+  void lowerParforBody(py::handle ctx, py::handle parforInst,
+                       mlir::Block *entryBlock, mlir::ValueRange blockArgs) {
     auto getNextBlockArg = [&]() -> mlir::Value {
       assert(!blockArgs.empty());
       auto res = blockArgs.front();
@@ -396,7 +396,7 @@ private:
       varsMap[name] = getNextBlockArg();
     }
 
-    builder.setInsertionPointToStart(block);
+    builder.setInsertionPointToStart(entryBlock);
     auto indexType = builder.getIndexType();
     auto getIndexVal = [&](py::handle obj) -> mlir::Value {
       auto loc = getCurrentLoc();
@@ -451,7 +451,7 @@ private:
 
       lowerBlock(&regionBlock, parforInst.attr("init_block"));
     } else {
-      lowerBlock(block, parforInst.attr("init_block"));
+      lowerBlock(entryBlock, parforInst.attr("init_block"));
     }
 
     llvm::SmallVector<mlir::Value> reductionInits;
@@ -557,7 +557,7 @@ private:
         regionOp->getResult(i).setType(res);
 
       results = regionOp.getResults();
-      builder.setInsertionPointToEnd(block);
+      builder.setInsertionPointToEnd(entryBlock);
     }
 
     mlir::Value result;
@@ -576,10 +576,10 @@ private:
     fixupPhis();
 
     if (env) {
-      builder.setInsertionPointToStart(block);
+      builder.setInsertionPointToStart(entryBlock);
 
       llvm::SmallVector<mlir::Type> newArgsTypes;
-      for (auto arg : block->getArguments()) {
+      for (auto arg : entryBlock->getArguments()) {
         auto argType = arg.getType();
         newArgsTypes.emplace_back(argType);
         auto origType = argType.dyn_cast<numba::ntensor::NTensorType>();
