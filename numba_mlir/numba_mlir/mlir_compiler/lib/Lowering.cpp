@@ -807,7 +807,7 @@ private:
       auto step = lowerStaticIndex(loc, obj.attr("step"));
       return builder.create<plier::BuildSliceOp>(loc, start, stop, step);
     }
-    if (py::isinstance<py::iterable>(obj)) {
+    if (py::isinstance<py::tuple>(obj)) {
       auto len = py::len(obj);
       llvm::SmallVector<mlir::Value> args(len);
       llvm::SmallVector<mlir::Type> types(len);
