@@ -328,9 +328,33 @@ struct PlierLowerer final {
     }
 
     builder.setInsertionPointToStart(block);
+    numba::util::EnvironmentRegionOp regionOp;
+    auto redVars = parforInst.attr("redvars");
+    llvm::SmallVector<mlir::Type> reductionTypes(py::len(redVars),
+                                                 builder.getNoneType());
+
+    if (env) {
+      auto loc = getCurrentLoc();
+      regionOp = builder.create<numba::util::EnvironmentRegionOp>(
+          loc, env, /*args*/ std::nullopt, reductionTypes);
+      mlir::Block &regionBlock = regionOp.getRegion().front();
+      assert(llvm::hasSingleElement(regionBlock));
+      regionBlock.getTerminator()->erase();
+      builder.setInsertionPointToStart(&regionBlock);
+    }
+
     auto results = lowerParforBody(compilationContext, parforInst, block, env);
 
     auto loc = getCurrentLoc();
+    if (env) {
+      builder.create<numba::util::EnvironmentRegionYieldOp>(loc, results);
+      for (auto &&[i, res] : llvm::enumerate(reductionTypes))
+        regionOp->getResult(i).setType(res);
+
+      results = regionOp.getResults();
+      builder.setInsertionPointToEnd(block);
+    }
+
     mlir::Value result;
     if (results.empty()) {
       result =
@@ -492,24 +516,11 @@ private:
       indexVars.emplace_back(loop.attr("index_variable"));
     }
 
-    numba::util::EnvironmentRegionOp regionOp;
     auto redVars = parforInst.attr("redvars");
     llvm::SmallVector<mlir::Type> reductionTypes(py::len(redVars),
                                                  builder.getNoneType());
 
-    if (env) {
-      auto loc = getCurrentLoc();
-      regionOp = builder.create<numba::util::EnvironmentRegionOp>(
-          loc, env, /*args*/ std::nullopt, reductionTypes);
-      mlir::Block &regionBlock = regionOp.getRegion().front();
-      assert(llvm::hasSingleElement(regionBlock));
-      regionBlock.getTerminator()->erase();
-      builder.setInsertionPointToStart(&regionBlock);
-
-      lowerBlock(&regionBlock, parforInst.attr("init_block"));
-    } else {
-      lowerBlock(entryBlock, parforInst.attr("init_block"));
-    }
+    lowerBlock(entryBlock, parforInst.attr("init_block"));
 
     llvm::SmallVector<mlir::Value> reductionInits;
     std::unordered_map<std::string, unsigned> reductionIndices;
@@ -603,18 +614,7 @@ private:
 
     mlir::ValueRange loopResults = buildNestedParallelLoop(
         begins, ends, steps, reductionInits, bodyBuilder);
-    auto loc = getCurrentLoc();
     results.append(loopResults.begin(), loopResults.end());
-
-    if (env) {
-      builder.create<numba::util::EnvironmentRegionYieldOp>(loc, results);
-      for (auto &&[i, res] : llvm::enumerate(reductionTypes))
-        regionOp->getResult(i).setType(res);
-
-      results = regionOp.getResults();
-      builder.setInsertionPointToEnd(entryBlock);
-    }
-
     return results;
   }
 
