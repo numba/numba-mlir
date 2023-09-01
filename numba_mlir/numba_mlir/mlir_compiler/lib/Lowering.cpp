@@ -343,7 +343,17 @@ struct PlierLowerer final {
       builder.setInsertionPointToStart(&regionBlock);
     }
 
-    auto results = lowerParforBody(compilationContext, parforInst, block, env);
+    auto loopResults =
+        lowerParforBody(compilationContext, parforInst, block, env);
+    llvm::SmallVector<mlir::Value> results;
+
+    for (auto var :
+         compilationContext["parfor_output_arrays"].cast<py::list>()) {
+      auto varName = var.cast<std::string>();
+      results.emplace_back(loadvar(varName));
+    }
+
+    results.append(loopResults.begin(), loopResults.end());
 
     auto loc = getCurrentLoc();
     if (env) {
@@ -489,10 +499,9 @@ private:
     fixupPhis();
   }
 
-  llvm::SmallVector<mlir::Value> lowerParforBody(py::handle ctx,
-                                                 py::handle parforInst,
-                                                 mlir::Block *entryBlock,
-                                                 mlir::Attribute env) {
+  mlir::ValueRange lowerParforBody(py::handle ctx, py::handle parforInst,
+                                   mlir::Block *entryBlock,
+                                   mlir::Attribute env) {
     auto indexType = builder.getIndexType();
     auto getIndexVal = [&](py::handle obj) -> mlir::Value {
       auto loc = getCurrentLoc();
@@ -529,13 +538,6 @@ private:
       reductionInits.emplace_back(loadvar(name));
       reductionTypes[i] = reductionInits.back().getType();
       reductionIndices[name] = static_cast<unsigned>(i);
-    }
-
-    llvm::SmallVector<mlir::Value> results;
-
-    for (auto var : ctx["parfor_output_arrays"].cast<py::list>()) {
-      auto varName = var.cast<std::string>();
-      results.emplace_back(loadvar(varName));
     }
 
     auto bodyBuilder = [&](mlir::OpBuilder &b, mlir::Location l,
@@ -612,10 +614,8 @@ private:
       return regionOp.getResults();
     };
 
-    mlir::ValueRange loopResults = buildNestedParallelLoop(
-        begins, ends, steps, reductionInits, bodyBuilder);
-    results.append(loopResults.begin(), loopResults.end());
-    return results;
+    return buildNestedParallelLoop(begins, ends, steps, reductionInits,
+                                   bodyBuilder);
   }
 
   mlir::ValueRange buildNestedParallelLoop(
