@@ -328,7 +328,22 @@ struct PlierLowerer final {
     }
 
     builder.setInsertionPointToStart(block);
-    lowerParforBody(compilationContext, parforInst, block, env);
+    auto results = lowerParforBody(compilationContext, parforInst, block, env);
+
+    auto loc = getCurrentLoc();
+    mlir::Value result;
+    if (results.empty()) {
+      result =
+          builder.create<plier::ConstOp>(loc, builder.getNoneType(), nullptr);
+    } else if (results.size() == 1) {
+      result = results.front();
+    } else {
+      mlir::ValueRange resultsRange(results);
+      auto resType = builder.getTupleType(resultsRange.getTypes());
+      result = builder.create<numba::util::BuildTupleOp>(loc, resType, results);
+    }
+
+    builder.create<mlir::func::ReturnOp>(loc, result);
 
     fixupPhis();
 
@@ -450,8 +465,10 @@ private:
     fixupPhis();
   }
 
-  void lowerParforBody(py::handle ctx, py::handle parforInst,
-                       mlir::Block *entryBlock, mlir::Attribute env) {
+  llvm::SmallVector<mlir::Value> lowerParforBody(py::handle ctx,
+                                                 py::handle parforInst,
+                                                 mlir::Block *entryBlock,
+                                                 mlir::Attribute env) {
     auto indexType = builder.getIndexType();
     auto getIndexVal = [&](py::handle obj) -> mlir::Value {
       auto loc = getCurrentLoc();
@@ -598,19 +615,7 @@ private:
       builder.setInsertionPointToEnd(entryBlock);
     }
 
-    mlir::Value result;
-    if (results.empty()) {
-      result =
-          builder.create<plier::ConstOp>(loc, builder.getNoneType(), nullptr);
-    } else if (results.size() == 1) {
-      result = results.front();
-    } else {
-      mlir::ValueRange resultsRange(results);
-      auto resType = builder.getTupleType(resultsRange.getTypes());
-      result = builder.create<numba::util::BuildTupleOp>(loc, resType, results);
-    }
-
-    builder.create<mlir::func::ReturnOp>(loc, result);
+    return results;
   }
 
   mlir::ValueRange buildNestedParallelLoop(
