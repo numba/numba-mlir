@@ -7,7 +7,7 @@ from ..func_registry import add_func
 from . import helper_funcs
 
 import math
-from numba.parfors.array_analysis import wrap_index
+from numba.parfors.array_analysis import wrap_index, assert_equiv
 
 add_func(slice, "slice")
 add_func(range, "range")
@@ -244,3 +244,9 @@ def wrap_index_impl(builder, idx, size):
     idx = builder.select(undeflow, 0, idx)
     idx = builder.select(overflow, size, idx)
     return idx
+
+
+@register_func("parfor.assert_equiv", assert_equiv)
+def wrap_index_impl(builder, *val):
+    # TODO: implement
+    return 0
