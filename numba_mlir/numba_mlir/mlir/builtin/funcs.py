@@ -7,6 +7,7 @@ from ..func_registry import add_func
 from . import helper_funcs
 
 import math
+from numba.parfors.array_analysis import wrap_index
 
 add_func(slice, "slice")
 add_func(range, "range")
@@ -232,3 +233,14 @@ def abs_impl(builder, arg):
 
     res = builder.cast(0, t)
     return builder.external_call(fname, arg, res, decorate=False)
+
+
+@register_func("parfor.wrap_index", wrap_index)
+def wrap_index_impl(builder, idx, size):
+    neg = idx < 0
+    idx = builder.select(neg, size - idx, idx)
+    undeflow = idx < 0
+    overflow = idx > size
+    idx = builder.select(undeflow, 0, idx)
+    idx = builder.select(overflow, size, idx)
+    return idx
