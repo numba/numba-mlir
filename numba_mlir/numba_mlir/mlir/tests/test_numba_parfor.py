@@ -459,6 +459,7 @@ def test_replace_parfor_prange_nested_reduction():
         for i in numba.prange(c.shape[0]):
             for j in numba.prange(c.shape[1]):
                 acc += c[i, j]
+        return acc
 
     a = np.arange(3 * 4).reshape(3, 4)
 
