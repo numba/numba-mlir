@@ -442,6 +442,25 @@ def test_replace_parfor_prange_nested():
                 c[i, j] = i * j
 
     a = np.empty((3, 4))
+    b = a.copy()
+
+    jit_func = njit(py_func, parallel=True, replace_parfors=True)
+    with print_pass_ir([], ["CFGToSCFPass"]):
+        py_func(a)
+        jit_func(b)
+        assert_equal(a, b)
+        ir = get_print_buffer()
+        assert len(ir) > 0  # Check some code was actually generated
+
+
+def test_replace_parfor_prange_nested_reduction():
+    def py_func(c):
+        acc = 0
+        for i in numba.prange(c.shape[0]):
+            for j in numba.prange(c.shape[1]):
+                acc += c[i, j]
+
+    a = np.arange(3 * 4).reshape(3, 4)
 
     jit_func = njit(py_func, parallel=True, replace_parfors=True)
     with print_pass_ir([], ["CFGToSCFPass"]):
