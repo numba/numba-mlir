@@ -182,6 +182,9 @@ struct InstHandles {
     SetItem = mod.attr("SetItem");
     StaticSetItem = mod.attr("StaticSetItem");
 
+    auto parforMod = py::module::import("numba.parfors.parfor");
+    Parfor = parforMod.attr("Parfor");
+
     Arg = mod.attr("Arg");
     Expr = mod.attr("Expr");
     Var = mod.attr("Var");
@@ -216,6 +219,7 @@ struct InstHandles {
   py::handle Jump;
   py::handle SetItem;
   py::handle StaticSetItem;
+  py::handle Parfor;
 
   py::handle Arg;
   py::handle Expr;
@@ -575,7 +579,6 @@ private:
 
       auto irBlocks = getBlocks(parforInst.attr("loop_body"));
 
-      blocks.reserve(irBlocks.size());
       mlir::OpBuilder::InsertionGuard g(b);
       for (auto &&irBlock : irBlocks) {
         auto block = b.createBlock(&region, region.end());
@@ -583,10 +586,11 @@ private:
         blocksMap[irBlock.first] = block;
       }
 
+      auto numBlocks = irBlocks.size();
+      auto addedBlocks = llvm::ArrayRef(blocks).take_back(numBlocks);
       llvm::SmallVector<mlir::Value> reductionsRet(reductionInits.size());
-      for (auto &&[i, irBlock] : llvm::enumerate(irBlocks)) {
-        auto bb = blocks[i];
-        builder.setInsertionPointToEnd(bb);
+      for (auto &&[bb, irBlock] : llvm::zip(addedBlocks, irBlocks)) {
+        b.setInsertionPointToEnd(bb);
         for (auto inst : getBody(irBlock.second)) {
           if (py::isinstance(inst, insts.Assign)) {
             auto target = inst.attr("target");
@@ -691,6 +695,8 @@ private:
       branch(inst.attr("cond"), inst.attr("truebr"), inst.attr("falsebr"));
     } else if (py::isinstance(inst, insts.Jump)) {
       jump(inst.attr("target"));
+    } else if (py::isinstance(inst, insts.Parfor)) {
+      lowerParforBody(inst);
     } else {
       numba::reportError(llvm::Twine("lower_inst not handled: \"") +
                          py::str(inst.get_type()).cast<std::string>() + "\"");

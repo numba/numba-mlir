@@ -426,7 +426,22 @@ def test_replace_parfor_prange():
         for i in numba.prange(len(c)):
             c[i] = i * i
 
-    a = np.arange(10)
+    a = np.empty(10)
+
+    jit_func = njit(py_func, parallel=True, replace_parfors=True)
+    with print_pass_ir([], ["CFGToSCFPass"]):
+        assert_equal(py_func(a), jit_func(a))
+        ir = get_print_buffer()
+        assert len(ir) > 0  # Check some code was actually generated
+
+
+def test_replace_parfor_prange_nested():
+    def py_func(c):
+        for i in numba.prange(c.shape[0]):
+            for j in numba.prange(c.shape[1]):
+                c[i, j] = i * j
+
+    a = np.empty((3, 4))
 
     jit_func = njit(py_func, parallel=True, replace_parfors=True)
     with print_pass_ir([], ["CFGToSCFPass"]):
