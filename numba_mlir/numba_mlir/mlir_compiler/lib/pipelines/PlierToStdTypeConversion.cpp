@@ -17,6 +17,10 @@
 
 namespace py = pybind11;
 
+static mlir::Type getStrType(mlir::MLIRContext &ctx) {
+  return numba::util::StringType::get(&ctx);
+}
+
 static mlir::Type getBoolType(mlir::MLIRContext &ctx) {
   return mlir::IntegerType::get(&ctx, 1, mlir::IntegerType::Signless);
 }
@@ -193,6 +197,9 @@ struct Conversion {
 
       if (py::isinstance<py::bool_>(value))
         return getBoolType(context);
+
+      if (py::isinstance<py::str>(value))
+        return getStrType(context);
 
       return std::nullopt;
     }
