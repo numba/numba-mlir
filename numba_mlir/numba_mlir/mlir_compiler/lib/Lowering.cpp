@@ -529,7 +529,7 @@ private:
     llvm::SmallVector<mlir::Type> reductionTypes(py::len(redVars),
                                                  builder.getNoneType());
 
-    lowerBlock(entryBlock, parforInst.attr("init_block"));
+    lowerBlock(parforInst.attr("init_block"));
 
     llvm::SmallVector<mlir::Value> reductionInits;
     std::unordered_map<std::string, unsigned> reductionIndices;
@@ -663,12 +663,16 @@ private:
     return loop.getResults();
   }
 
+  void lowerBlock(py::handle irBlock) {
+    for (auto it : getBody(irBlock))
+      lowerInst(it);
+  }
+
   void lowerBlock(mlir::Block *bb, py::handle irBlock) {
     assert(nullptr != bb);
     mlir::OpBuilder::InsertionGuard g(builder);
     builder.setInsertionPointToEnd(bb);
-    for (auto it : getBody(irBlock))
-      lowerInst(it);
+    lowerBlock(irBlock);
   }
 
   void lowerInst(py::handle inst) {
