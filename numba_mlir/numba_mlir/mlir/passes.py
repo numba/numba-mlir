@@ -356,6 +356,7 @@ class MlirReplaceParfors(MlirBackendBase):
                     continue
 
                 typemap = state.typemap
+                self._update_parfor_redvars(inst, state)
                 self._reconstruct_parfor_ssa(inst, typemap)
 
                 if module is None:
@@ -384,6 +385,16 @@ class MlirReplaceParfors(MlirBackendBase):
                 parfor_funcs[inst] = fn_name
 
         return module, parfor_funcs, ctx
+
+    def _update_parfor_redvars(self, parfor, state):
+        parfor.redvars, parfor.reddict = numba.parfors.parfor.get_parfor_reductions(
+            state.func_ir, parfor, parfor.params, state.calltypes
+        )
+
+        for block in parfor.loop_body.values():
+            for inst in block.body:
+                if isinstance(inst, numba.parfors.parfor.Parfor):
+                    self._update_parfor_redvars(inst, state)
 
     def _reconstruct_parfor_ssa(self, parfor, typemap):
         loop_body = parfor.loop_body

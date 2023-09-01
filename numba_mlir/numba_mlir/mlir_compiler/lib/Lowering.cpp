@@ -619,8 +619,14 @@ private:
       return regionOp.getResults();
     };
 
-    return buildNestedParallelLoop(begins, ends, steps, reductionInits,
-                                   bodyBuilder);
+    auto results = buildNestedParallelLoop(begins, ends, steps, reductionInits,
+                                           bodyBuilder);
+    for (auto &&[i, redvar] : llvm::enumerate(redVars)) {
+      assert(i < results.size());
+      auto name = redvar.cast<std::string>();
+      varsMap[name] = results[i];
+    }
+    return results;
   }
 
   mlir::ValueRange buildNestedParallelLoop(
