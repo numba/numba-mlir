@@ -12,7 +12,6 @@ from numba.core.funcdesc import qualifying_prefix
 from numba.np.ufunc.parallel import get_thread_count
 
 import numba.core.types.functions
-import numba.parfors.parfor as parfor
 import numba.core.ir as ir
 from numba.core.ir_utils import mk_unique_var
 from contextlib import contextmanager
@@ -420,6 +419,8 @@ class MlirReplaceParfors(MlirBackendBase):
                     for inc in inst.value.incoming_values:
                         if inc.name not in typemap:
                             typemap[inc.name] = t
+                elif isinstance(inst, numba.parfors.parfor.Parfor):
+                    self._reconstruct_parfor_ssa(inst, typemap)
 
     def _get_parfor_params(self, parfor):
         params = []
