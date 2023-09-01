@@ -301,7 +301,7 @@ struct PlierLowerer final {
     }
 
     auto getIndexVal = [&](py::handle obj) {
-      if (py::isinstance<py::int_>(obj))
+      if (!py::isinstance(obj, insts.Var))
         return;
 
       auto var = getNextBlockArg();
@@ -414,12 +414,12 @@ private:
     auto indexType = builder.getIndexType();
     auto getIndexVal = [&](py::handle obj) -> mlir::Value {
       auto loc = getCurrentLoc();
-      if (py::isinstance<py::int_>(obj)) {
-        auto val = obj.cast<int64_t>();
-        return builder.create<mlir::arith::ConstantIndexOp>(loc, val);
+      if (py::isinstance(obj, insts.Var)) {
+        auto var = loadvar(obj);
+        return builder.create<plier::CastOp>(loc, indexType, var);
       }
-      auto var = loadvar(obj);
-      return builder.create<plier::CastOp>(loc, indexType, var);
+      auto val = obj.cast<int64_t>();
+      return builder.create<mlir::arith::ConstantIndexOp>(loc, val);
     };
 
     llvm::SmallVector<mlir::Value, 4> begins;
