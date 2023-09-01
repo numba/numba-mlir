@@ -314,7 +314,20 @@ struct PlierLowerer final {
       getIndexVal(loop.attr("step"));
     }
 
-    lowerParforBody(compilationContext, parforInst, block);
+    auto caps = compilationContext["device_caps"];
+    mlir::Attribute env;
+    if (!caps.is_none()) {
+      auto device = caps.attr("filter_string").cast<std::string>();
+      auto spirvMajor = caps.attr("spirv_major_version").cast<int16_t>();
+      auto spirvMinor = caps.attr("spirv_minor_version").cast<int16_t>();
+      auto hasFP16 = caps.attr("has_fp16").cast<bool>();
+      auto hasFP64 = caps.attr("has_fp64").cast<bool>();
+      env = gpu_runtime::GPURegionDescAttr::get(builder.getContext(), device,
+                                                spirvMajor, spirvMinor, hasFP16,
+                                                hasFP64);
+    }
+
+    lowerParforBody(compilationContext, parforInst, block, env);
     return newFunc;
   }
 
@@ -409,7 +422,7 @@ private:
   }
 
   void lowerParforBody(py::handle ctx, py::handle parforInst,
-                       mlir::Block *entryBlock) {
+                       mlir::Block *entryBlock, mlir::Attribute env) {
     builder.setInsertionPointToStart(entryBlock);
     auto indexType = builder.getIndexType();
     auto getIndexVal = [&](py::handle obj) -> mlir::Value {
@@ -432,19 +445,6 @@ private:
       ends.emplace_back(getIndexVal(loop.attr("stop")));
       steps.emplace_back(getIndexVal(loop.attr("step")));
       indexVars.emplace_back(loop.attr("index_variable"));
-    }
-
-    auto caps = ctx["device_caps"];
-    mlir::Attribute env;
-    if (!caps.is_none()) {
-      auto device = caps.attr("filter_string").cast<std::string>();
-      auto spirvMajor = caps.attr("spirv_major_version").cast<int16_t>();
-      auto spirvMinor = caps.attr("spirv_minor_version").cast<int16_t>();
-      auto hasFP16 = caps.attr("has_fp16").cast<bool>();
-      auto hasFP64 = caps.attr("has_fp64").cast<bool>();
-      env = gpu_runtime::GPURegionDescAttr::get(builder.getContext(), device,
-                                                spirvMajor, spirvMinor, hasFP16,
-                                                hasFP64);
     }
 
     numba::util::EnvironmentRegionOp regionOp;
