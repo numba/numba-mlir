@@ -8,6 +8,12 @@ from . import helper_funcs
 
 import math
 from numba.parfors.array_analysis import wrap_index, assert_equiv
+from numba.parfors.parfor import (
+    max_checker,
+    min_checker,
+    argmax_checker,
+    argmin_checker,
+)
 
 add_func(slice, "slice")
 add_func(range, "range")
@@ -248,5 +254,14 @@ def wrap_index_impl(builder, idx, size):
 
 @register_func("parfor.assert_equiv", assert_equiv)
 def wrap_index_impl(builder, *val):
+    # TODO: implement
+    return 0
+
+
+@register_func("parfor.max_checker", max_checker)
+@register_func("parfor.min_checker", min_checker)
+@register_func("parfor.argmax_checker", argmax_checker)
+@register_func("parfor.argmin_checker", argmin_checker)
+def parfor_checker(buidler, size):
     # TODO: implement
     return 0
