@@ -807,7 +807,7 @@ private:
       auto step = lowerStaticIndex(loc, obj.attr("step"));
       return builder.create<plier::BuildSliceOp>(loc, start, stop, step);
     }
-    if (py::isinstance<py::iterable>(obj)) {
+    if (py::isinstance<py::tuple>(obj)) {
       auto len = py::len(obj);
       llvm::SmallVector<mlir::Value> args(len);
       llvm::SmallVector<mlir::Type> types(len);
@@ -961,6 +961,9 @@ private:
       }
       return builder.getArrayAttr(values);
     }
+
+    if (py::isinstance<py::str>(val))
+      return builder.getStringAttr(val.cast<std::string>());
 
     if (py::isinstance<py::none>(val))
       return builder.getUnitAttr();
@@ -1120,7 +1123,7 @@ private:
   mlir::Value getConst(py::handle val) {
     auto ret = getConstOrNull(val);
     if (!ret)
-      numba::reportError(llvm::Twine("get_const unhandled type \"") +
+      numba::reportError(llvm::Twine("getConst unhandled type \"") +
                          py::str(val.get_type()).cast<std::string>() + "\"");
     return *ret;
   }

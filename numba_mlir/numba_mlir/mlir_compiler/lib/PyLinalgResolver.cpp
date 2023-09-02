@@ -128,7 +128,7 @@ static bool isCompatibleType(mlir::Type type) {
   return type.isa<mlir::IntegerType, mlir::IndexType, mlir::FloatType,
                   mlir::ComplexType, mlir::RankedTensorType, mlir::MemRefType,
                   mlir::NoneType, numba::util::TypeVarType,
-                  numba::ntensor::NTensorType>();
+                  numba::util::StringType, numba::ntensor::NTensorType>();
 }
 
 static bool isCompatibleTypeVal(mlir::Value val) {

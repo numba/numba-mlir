@@ -1173,9 +1173,8 @@ struct LowerParallel : public mlir::OpRewritePattern<numba::util::ParallelOp> {
       return mlir::LLVM::LLVMStructType::getLiteral(op.getContext(), fields);
     }();
 
-    if (!contextType) {
+    if (!contextType)
       return mlir::failure();
-    }
 
     numba::AllocaInsertionPoint allocaInsertionPoint(op);
 

@@ -48,7 +48,8 @@ static bool isSupportedType(mlir::Type type) {
 static bool isSupportedConst(mlir::Type type) {
   assert(type);
   return type.isa<mlir::IntegerType, mlir::FloatType, mlir::ComplexType,
-                  mlir::TupleType, mlir::NoneType, numba::util::TypeVarType>();
+                  mlir::TupleType, mlir::NoneType, numba::util::TypeVarType,
+                  numba::util::StringType>();
 }
 
 static bool isInt(mlir::Type type) {
@@ -111,6 +112,13 @@ static mlir::Value lowerConst(mlir::OpBuilder &builder, mlir::Location loc,
     auto retType = builder.getTupleType(valRange);
     return builder.create<numba::util::BuildTupleOp>(loc, retType, values)
         .getResult();
+  }
+
+  if (auto string = mlir::dyn_cast<mlir::StringAttr>(attr)) {
+    if (!mlir::isa<numba::util::StringType>(type))
+      return nullptr;
+
+    return builder.create<numba::util::StringConstOp>(loc, string);
   }
 
   return nullptr;

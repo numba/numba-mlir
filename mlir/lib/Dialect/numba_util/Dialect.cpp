@@ -2101,6 +2101,10 @@ mlir::OpFoldResult MemrefBitcastOp::fold(FoldAdaptor) {
 
   return nullptr;
 }
+
+mlir::OpFoldResult StringConstOp::fold(FoldAdaptor adaptor) {
+  return getValueAttr();
+}
 } // namespace util
 } // namespace numba
 

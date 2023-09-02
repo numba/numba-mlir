@@ -42,6 +42,8 @@ class NumbaUtil_Op<string mnemonic, list<Trait> traits = []>
 
 def NumbaUtil_OpaqueType : NumbaUtil_Type<"Opaque", "opaque", [], "::mlir::Type">;
 
+def NumbaUtil_StringType : NumbaUtil_Type<"String", "string", [], "::mlir::Type">;
+
 def NumbaUtil_TypeVar : NumbaUtil_Type<"TypeVar", "typevar", [], "::mlir::Type"> {
   let parameters = (ins
     "::mlir::Type":$type
@@ -345,6 +347,17 @@ def MemrefBitcastOp : NumbaUtil_Op<"memref_bitcast", [
   let hasVerifier = 1;
 
   let assemblyFormat = "$source attr-dict `:` type($source) `to` type($result)";
+}
+
+def StringConstOp : NumbaUtil_Op<"str_constant",
+    [ConstantLike, Pure]> {
+  let summary = "integer or floating point constant";
+
+  let arguments = (ins StrAttr:$value);
+  let results = (outs NumbaUtil_StringType:$result);
+
+  let assemblyFormat = "attr-dict $value";
+  let hasFolder = 1;
 }
 
 #endif // PLIER_UTIL_OPS
