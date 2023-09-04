@@ -366,7 +366,6 @@ def _gen_replace_parfor_tests():
         "test_parfor_array_access_lower_slice",
         "test_issue6102",
         "test_no_state_change_in_gufunc_lowering_on_error",
-        "test_two_d_array_reduction_with_float_sizes",
         "test_issue5001",
         "test_function_replacement",
         "test_parfor_options",
@@ -392,6 +391,7 @@ def _gen_replace_parfor_tests():
         "test_two_d_array_reduction_reuse",  # We intentionally do not detect data races
         "test_two_d_array_reduction",  # We intentionally do not detect data races
         "test_two_d_array_reduction_prod",  # We intentionally do not detect data races
+        "test_two_d_array_reduction_with_float_sizes",  # We intentionally do not detect data races
     }
 
     def _wrap_test_class(test_base):
