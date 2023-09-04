@@ -53,7 +53,6 @@ def _gen_tests():
         "test_prange_two_instances_same_reduction_var",  # Non-trivial reduction
         "test_prange_conflicting_reduction_ops",  # Conflicting reduction reduction check
         "test_ssa_false_reduction",  # Frontend: object has no attribute 'name'
-        "test_argument_alias_recarray_field",  # Record support
         "test_mutable_list_param",  # List support
         "test_kde_example",  # List suport
         "test_simple01",  # Empty shape not failed
@@ -92,14 +91,11 @@ def _gen_tests():
         "test_issue3169",  # list support
         "test_issue5001",  # list suport
         "test_issue5167",  # np.full
-        "test_issue6095_numpy_max",  # operand #1 does not dominate this use
         "test_issue5065",  # tuple unpack
         "test_no_state_change_in_gufunc_lowering_on_error",  # custom pipeline
         "test_namedtuple3",  # namedtuple
         "test_issue6102",  # list support
         "test_oversized_tuple_as_arg_to_kernel",  # UnsupportedParforsError not raised
-        "test_parfor_ufunc_typing",  # np.isinf
-        "test_issue_5098",  # list support and more
         "test_ufunc_expr",  # np.bitwise_and(
         "test_parfor_generate_fuse",  # operand #0 does not dominate this use
         "test_parfor_slice7",  # array.transpose
@@ -112,7 +108,6 @@ def _gen_tests():
         "test_real_imag_attr",
         "test_tuple_arg_not_whole_array",
         "test_tuple_for_pndindex",
-        "test_tuple_of_literal_nonliteral",
         "test_if_not_else_reduction",
         "test_int_arg_pndindex",
         "test_non_identity_initial",
@@ -321,8 +316,8 @@ def _gen_tests():
                     setattr(this_module, func_name, func)
 
 
-# _gen_tests()
-# del _gen_tests
+_gen_tests()
+del _gen_tests
 
 
 def _gen_replace_parfor_tests():
