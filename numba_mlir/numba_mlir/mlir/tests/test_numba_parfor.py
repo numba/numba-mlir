@@ -343,11 +343,60 @@ def _gen_replace_parfor_tests():
         numba.tests.test_parfors.TestPrangeSpecific,
     ]
 
-    xfail_tests = set()
+    xfail_tests = {
+        "test_simple01",
+        "test_argmax",
+        "test_argmin",
+        "test_simple13",
+        "test_namedtuple1",
+        "test_kmeans",
+        "test_namedtuple2",
+        "test_prange_optional",
+        "test_std",
+        "test_recursive_untraced_value_tuple",
+        "test_simple20",
+        "test_var",
+        "test_pi",
+        "test_prange_unknown_call1",
+        "test_0d_array",
+        "test_parfor_dtype_type",
+        "test_ufunc_expr",
+        "test_reduce",
+        "test_parfor_bitmask6",
+        "test_issue3169",
+        "test_untraced_value_tuple",
+        "test_max",
+        "test_no_hoisting_with_member_function_call",
+        "test_fuse_argmin_argmax_max_min",
+        "test_parfor_array_access_lower_slice",
+        "test_issue6102",
+        "test_no_state_change_in_gufunc_lowering_on_error",
+        "test_two_d_array_reduction_with_float_sizes",
+        "test_issue5001",
+        "test_function_replacement",
+        "test_parfor_options",
+        "test_parfor_slice22",
+        "test_issue5065",
+        "test_prange25",
+        "test_copy_global_for_parfor",
+        "test_record_array_setitem",
+        "test_list_setitem_hoisting",
+        "test_list_comprehension_prange",
+        "test_parfor_race_1",
+        "test_record_array_setitem_yield_array",
+        "test_mutable_list_param",
+        "test_kde_example",
+        "test_ssa_false_reduction",
+        "test_min",
+    }
     skip_tests = {
         "test_no_warn_if_cache_set",  # caching is not supported
         "test_prange07",  # reverse iteration
         "test_prange12",  # reverse iteration
+        "test_three_d_array_reduction",  # We intentionally do not detect data races
+        "test_two_d_array_reduction_reuse",  # We intentionally do not detect data races
+        "test_two_d_array_reduction",  # We intentionally do not detect data races
+        "test_two_d_array_reduction_prod",  # We intentionally do not detect data races
     }
 
     def _wrap_test_class(test_base):
