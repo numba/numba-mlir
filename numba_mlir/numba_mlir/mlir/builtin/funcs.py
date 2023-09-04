@@ -7,6 +7,7 @@ from ..func_registry import add_func
 from . import helper_funcs
 
 import math
+from numba.cpython.builtins import get_type_min_value, get_type_max_value
 from numba.parfors.array_analysis import wrap_index, assert_equiv
 from numba.parfors.parfor import (
     max_checker,
@@ -239,6 +240,44 @@ def abs_impl(builder, arg):
 
     res = builder.cast(0, t)
     return builder.external_call(fname, arg, res, decorate=False)
+
+
+def _get_min_max_values(builder, dtype):
+    values = [
+        (builder.int8, -128, 127),
+        (builder.uint8, 0, 255),
+        (builder.int16, -32768, 32767),
+        (builder.uint16, 0, 65535),
+        (builder.int32, -2147483648, 2147483647),
+        (builder.uint32, 0, 4294967295),
+        (builder.int64, -9223372036854775808, 9223372036854775807),
+        (builder.uint64, 0, 18446744073709551615),
+        (builder.float32, -math.inf, math.inf),
+        (builder.float64, -math.inf, math.inf),
+    ]
+    for t, min_val, max_val in values:
+        if t == dtype:
+            return (min_val, max_val)
+
+    return None
+
+
+@register_func("builtin.get_type_min_value", get_type_min_value)
+def get_type_min_value_impl(builder, dtype):
+    val = _get_min_max_values(builder, dtype)
+    if val is None:
+        return
+
+    return val[0]
+
+
+@register_func("builtin.get_type_max_value", get_type_max_value)
+def get_type_max_value_impl(builder, dtype):
+    val = _get_min_max_values(builder, dtype)
+    if val is None:
+        return
+
+    return val[1]
 
 
 @register_func("parfor.wrap_index", wrap_index)
