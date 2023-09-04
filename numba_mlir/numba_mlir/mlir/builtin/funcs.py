@@ -7,6 +7,14 @@ from ..func_registry import add_func
 from . import helper_funcs
 
 import math
+from numba.cpython.builtins import get_type_min_value, get_type_max_value
+from numba.parfors.array_analysis import wrap_index, assert_equiv
+from numba.parfors.parfor import (
+    max_checker,
+    min_checker,
+    argmax_checker,
+    argmin_checker,
+)
 
 add_func(slice, "slice")
 add_func(range, "range")
@@ -232,3 +240,67 @@ def abs_impl(builder, arg):
 
     res = builder.cast(0, t)
     return builder.external_call(fname, arg, res, decorate=False)
+
+
+def _get_min_max_values(builder, dtype):
+    values = [
+        (builder.int8, -128, 127),
+        (builder.uint8, 0, 255),
+        (builder.int16, -32768, 32767),
+        (builder.uint16, 0, 65535),
+        (builder.int32, -2147483648, 2147483647),
+        (builder.uint32, 0, 4294967295),
+        (builder.int64, -9223372036854775808, 9223372036854775807),
+        (builder.uint64, 0, 18446744073709551615),
+        (builder.float32, -math.inf, math.inf),
+        (builder.float64, -math.inf, math.inf),
+    ]
+    for t, min_val, max_val in values:
+        if t == dtype:
+            return (min_val, max_val)
+
+    return None
+
+
+@register_func("builtin.get_type_min_value", get_type_min_value)
+def get_type_min_value_impl(builder, dtype):
+    val = _get_min_max_values(builder, dtype)
+    if val is None:
+        return
+
+    return val[0]
+
+
+@register_func("builtin.get_type_max_value", get_type_max_value)
+def get_type_max_value_impl(builder, dtype):
+    val = _get_min_max_values(builder, dtype)
+    if val is None:
+        return
+
+    return val[1]
+
+
+@register_func("parfor.wrap_index", wrap_index)
+def wrap_index_impl(builder, idx, size):
+    neg = idx < 0
+    idx = builder.select(neg, size - idx, idx)
+    undeflow = idx < 0
+    overflow = idx > size
+    idx = builder.select(undeflow, 0, idx)
+    idx = builder.select(overflow, size, idx)
+    return idx
+
+
+@register_func("parfor.assert_equiv", assert_equiv)
+def wrap_index_impl(builder, *val):
+    # TODO: implement
+    return 0
+
+
+@register_func("parfor.max_checker", max_checker)
+@register_func("parfor.min_checker", min_checker)
+@register_func("parfor.argmax_checker", argmax_checker)
+@register_func("parfor.argmin_checker", argmin_checker)
+def parfor_checker(buidler, size):
+    # TODO: implement
+    return 0

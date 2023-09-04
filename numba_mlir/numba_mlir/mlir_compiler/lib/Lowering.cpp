@@ -604,6 +604,8 @@ private:
               assert(it->second < reductionsRet.size());
               auto val = lowerAssign(inst, target);
               reductionsRet[it->second] = val;
+              storevar(val, target);
+              continue;
             }
           }
 

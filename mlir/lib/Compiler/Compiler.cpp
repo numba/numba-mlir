@@ -10,6 +10,7 @@
 
 #include <mlir/IR/BuiltinOps.h>
 #include <mlir/IR/Diagnostics.h>
+#include <mlir/IR/Verifier.h>
 #include <mlir/Pass/Pass.h>
 #include <mlir/Pass/PassManager.h>
 
@@ -189,7 +190,8 @@ public:
   CompilerContextImpl(mlir::MLIRContext &ctx,
                       const CompilerContext::Settings &settings,
                       const numba::PipelineRegistry &registry)
-      : schedule(ctx, settings, registry), dumpDiag(settings.diagDumpStderr) {}
+      : schedule(ctx, settings, registry), verify(settings.verify),
+        dumpDiag(settings.diagDumpStderr) {}
 
   void run(mlir::ModuleOp module) {
     std::string err;
@@ -202,18 +204,25 @@ public:
         printDiag(errStream, diag);
     };
 
+    auto getErr = [&]() -> const std::string & {
+      errStream << "\n";
+      module.print(errStream);
+      errStream.flush();
+      return err;
+    };
+
     numba::scopedDiagHandler(*module.getContext(), diagHandler, [&]() {
-      if (mlir::failed(schedule.run(module))) {
-        errStream << "\n";
-        module.print(errStream);
-        errStream.flush();
-        numba::reportError(llvm::Twine("MLIR pipeline failed\n") + err);
-      }
+      if (verify && mlir::failed(mlir::verify(module)))
+        numba::reportError(llvm::Twine("MLIR broken module\n") + getErr());
+
+      if (mlir::failed(schedule.run(module)))
+        numba::reportError(llvm::Twine("MLIR pipeline failed\n") + getErr());
     });
   }
 
 private:
   PassManagerSchedule schedule;
+  bool verify = false;
   bool dumpDiag = false;
 };
 
