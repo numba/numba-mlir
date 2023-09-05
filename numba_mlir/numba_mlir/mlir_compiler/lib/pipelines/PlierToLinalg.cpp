@@ -2356,11 +2356,6 @@ struct SliceOfGeneric : public mlir::OpRewritePattern<mlir::linalg::GenericOp> {
     if (!mlir::isa<mlir::tensor::ExtractSliceOp, mlir::tensor::ExtractOp>(user))
       return mlir::failure();
 
-    mlir::DominanceInfo dom;
-    for (auto arg : user->getOperands())
-      if (!dom.dominates(arg, op))
-        return mlir::failure();
-
     auto output = op.getOutputs().front();
 
     auto resType = res.getType().cast<mlir::RankedTensorType>();
@@ -2486,7 +2481,10 @@ struct SliceOfGeneric : public mlir::OpRewritePattern<mlir::linalg::GenericOp> {
 
     maps.back() = updateMap(resMap);
 
-    auto loc = op->getLoc();
+    mlir::OpBuilder::InsertionGuard g(rewriter);
+    rewriter.setInsertionPoint(user);
+
+    auto loc = op.getLoc();
     llvm::SmallVector<mlir::OpFoldResult, 4> tempOffsets;
     llvm::SmallVector<mlir::OpFoldResult, 4> tempSizes;
     llvm::SmallVector<mlir::OpFoldResult, 4> tempStrides;
