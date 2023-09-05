@@ -725,28 +725,9 @@ def _dot1d(builder, a, b):
     return builder.extract(res, 0)
 
 
-@register_func("numpy.dot", numpy.dot, out="out")
-def dot_impl(builder, a, b):
-    shape1 = a.shape
-    shape2 = b.shape
-    if len(shape1) == 1 and len(shape2) == 1:
-        return _dot1d(builder, a, b)
-    if len(shape1) == 2 and len(shape2) == 2:
-        return _matmul2d(builder, a, b, shape1, shape2)
-
-
-@register_func("operator.matmul")
-def matmul_impl(builder, a, b):
-    shape1 = a.shape
-    shape2 = b.shape
+def _dot_broadcasted(builder, a, b, shape1, shape2):
     dim1 = len(shape1)
     dim2 = len(shape2)
-    if dim1 > 2 or dim2 > 2:
-        return
-
-    if dim1 == 1 and dim2 == 1:
-        return _dot1d(builder, a, b)
-
     if dim1 == 1:
         x = shape2[0]
         y = shape1[0]
@@ -764,7 +745,7 @@ def matmul_impl(builder, a, b):
         tmp = builder.insert(tmp_b, tmp, (0, 0), (1, 1))
         b = tmp
 
-    res = _matmul2d(builder, a, b, a.shape, b.shape)
+    res = _linalg_matmul2d(builder, a, b, a.shape, b.shape)
 
     if dim1 == 1:
         res = builder.subview(res, (shape2[0] - 1, 0), (1, shape2[1]), result_rank=1)
@@ -772,6 +753,36 @@ def matmul_impl(builder, a, b):
         res = builder.subview(res, (0, 0), (shape1[0], 1), result_rank=1)
 
     return res
+
+
+@register_func("numpy.dot", numpy.dot, out="out")
+def dot_impl(builder, a, b):
+    shape1 = a.shape
+    shape2 = b.shape
+    dim1 = len(shape1)
+    dim2 = len(shape2)
+    if dim1 == 1 and dim2 == 1:
+        return _dot1d(builder, a, b)
+    if dim1 == 2 and dim2 == 2:
+        return _matmul2d(builder, a, b, shape1, shape2)
+
+
+@register_func("operator.matmul")
+def matmul_impl(builder, a, b):
+    shape1 = a.shape
+    shape2 = b.shape
+    dim1 = len(shape1)
+    dim2 = len(shape2)
+    if dim1 > 2 or dim2 > 2:
+        return
+
+    if dim1 == 1 and dim2 == 1:
+        return _dot1d(builder, a, b)
+
+    if dim1 == 1 or dim2 == 1:
+        return _dot_broadcasted(builder, a, b, shape1, shape2)
+
+    return _matmul2d(builder, a, b, shape1, shape2)
 
 
 @register_func("numpy.where", numpy.where)
