@@ -239,6 +239,22 @@ static mlir::Value intFloatComplexCast(mlir::OpBuilder &rewriter,
   return complexFromReal(rewriter, loc, val, complexType);
 }
 
+static mlir::Value complexComplexCast(mlir::OpBuilder &rewriter,
+                                      mlir::Location loc, mlir::Value val,
+                                      mlir::Type dstType) {
+  auto complexType = mlir::cast<mlir::ComplexType>(dstType);
+  assert(mlir::isa<mlir::ComplexType>(val.getType()));
+  auto elemType = complexType.getElementType();
+  assert(mlir::isa<mlir::FloatType>(elemType));
+
+  mlir::Value re = rewriter.create<mlir::complex::ReOp>(loc, val);
+  mlir::Value im = rewriter.create<mlir::complex::ImOp>(loc, val);
+  re = floatCastImpl(rewriter, loc, re, elemType);
+  im = floatCastImpl(rewriter, loc, im, elemType);
+
+  return rewriter.create<mlir::complex::CreateOp>(loc, complexType, re, im);
+}
+
 struct CastHandler {
   using selector_t = bool (*)(mlir::Type);
   using cast_op_t = mlir::Value (*)(mlir::OpBuilder &, mlir::Location,
@@ -260,6 +276,7 @@ static const CastHandler castHandlers[] = {
     {&isFloat, &isIndex, &indexCastImpl},
     {&isInt, &isFloatComplex, &intFloatComplexCast},
     {&isFloat, &isFloatComplex, &floatFloatComplexCast},
+    {&isFloatComplex, &isFloatComplex, &complexComplexCast},
     // clang-format on
 };
 
