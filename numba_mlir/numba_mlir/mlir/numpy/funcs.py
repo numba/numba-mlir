@@ -725,13 +725,52 @@ def _dot1d(builder, a, b):
     return builder.extract(res, 0)
 
 
+def _dot_expand_dim(builder, src, dim, x, y):
+    iterators = ["parallel", "parallel"]
+    expr1 = f"(d0,d1) -> (d{1 - dim})"
+    expr2 = "(d0,d1) -> (d0,d1)"
+    maps = [expr1, expr2]
+    init = builder.init_tensor((x, y), src.dtype)
+
+    one = builder.cast(1, src.dtype)
+
+    def body(a, b):
+        i = _linalg_index(dim)
+        res = a if i == 0 else 1
+        return res
+
+    return builder.linalg_generic(src, init, iterators, maps, body)
+
+
+def _dot_broadcasted(builder, a, b, shape1, shape2):
+    dim1 = len(shape1)
+    dim2 = len(shape2)
+    x = shape2[0]
+    y = shape1[0]
+    if dim1 == 1:
+        a = _dot_expand_dim(builder, a, 0, x, y)
+    elif dim2 == 1:
+        b = _dot_expand_dim(builder, b, 1, x, y)
+
+    res = _linalg_matmul2d(builder, a, b, a.shape, b.shape)
+
+    if dim1 == 1:
+        res = builder.subview(res, (0, 0), (1, shape2[1]), result_rank=1)
+    elif dim2 == 1:
+        res = builder.subview(res, (0, 0), (shape1[0], 1), result_rank=1)
+
+    return res
+
+
 @register_func("numpy.dot", numpy.dot, out="out")
 def dot_impl(builder, a, b):
     shape1 = a.shape
     shape2 = b.shape
-    if len(shape1) == 1 and len(shape2) == 1:
+    dim1 = len(shape1)
+    dim2 = len(shape2)
+    if dim1 == 1 and dim2 == 1:
         return _dot1d(builder, a, b)
-    if len(shape1) == 2 and len(shape2) == 2:
+    if dim1 == 2 and dim2 == 2:
         return _matmul2d(builder, a, b, shape1, shape2)
 
 
@@ -747,31 +786,10 @@ def matmul_impl(builder, a, b):
     if dim1 == 1 and dim2 == 1:
         return _dot1d(builder, a, b)
 
-    if dim1 == 1:
-        x = shape2[0]
-        y = shape1[0]
-        dst_shape = (x, y)
-        tmp = builder.init_tensor(dst_shape, a.dtype, 1)
-        tmp_a = builder.reshape(a, (1, y))
-        tmp = builder.insert(tmp_a, tmp, (x - 1, 0), (1, 1))
-        a = tmp
-    elif dim2 == 1:
-        x = shape2[0]
-        y = shape1[0]
-        dst_shape = (x, y)
-        tmp = builder.init_tensor(dst_shape, b.dtype, 1)
-        tmp_b = builder.reshape(b, (x, 1))
-        tmp = builder.insert(tmp_b, tmp, (0, 0), (1, 1))
-        b = tmp
+    if dim1 == 1 or dim2 == 1:
+        return _dot_broadcasted(builder, a, b, shape1, shape2)
 
-    res = _matmul2d(builder, a, b, a.shape, b.shape)
-
-    if dim1 == 1:
-        res = builder.subview(res, (shape2[0] - 1, 0), (1, shape2[1]), result_rank=1)
-    elif dim2 == 1:
-        res = builder.subview(res, (0, 0), (shape1[0], 1), result_rank=1)
-
-    return res
+    return _matmul2d(builder, a, b, shape1, shape2)
 
 
 @register_func("numpy.where", numpy.where)
