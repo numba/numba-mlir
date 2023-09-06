@@ -6,6 +6,8 @@
 Define @jit and related decorators.
 """
 
+import warnings
+
 from .mlir.compiler import (
     mlir_compiler_pipeline,
     get_gpu_pipeline,
