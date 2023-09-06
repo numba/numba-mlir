@@ -185,3 +185,6 @@ _install
 
 # pip wheels
 *.whl
+
+# Airspeed velocoty
+.asv
