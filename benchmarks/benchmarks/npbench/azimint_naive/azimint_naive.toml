@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2014 Jérôme Kieffer et al.
+# SPDX-FileCopyrightText: 2021 ETH Zurich and the NPBench authors
+# SPDX-FileCopyrightText: 2022 - 2023 Intel Corporation
+#
+# SPDX-License-Identifier: BSD-3-Clause
+
+[benchmark]
+name = "Azimuthal Integration - Naive"
+
+[benchmark.parameters.S]
+N = 400000
+npt = 1000
+
+[benchmark.parameters.M]
+N = 4000000
+npt = 1000
+
+[benchmark.parameters.L]
+N = 40000000
+npt = 1000
+
+[benchmark.parameters.paper]
+N = 1000000
+npt = 1000
