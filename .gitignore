@@ -186,5 +186,5 @@ _install
 # pip wheels
 *.whl
 
-# Airspeed velocoty
+# airspeed velocity cache
 .asv
