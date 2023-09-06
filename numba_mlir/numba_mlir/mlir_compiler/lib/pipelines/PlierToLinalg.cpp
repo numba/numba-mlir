@@ -2342,7 +2342,7 @@ struct SliceOfGeneric : public mlir::OpRewritePattern<mlir::linalg::GenericOp> {
   mlir::LogicalResult
   matchAndRewrite(mlir::linalg::GenericOp op,
                   mlir::PatternRewriter &rewriter) const override {
-    if (!op.hasTensorSemantics() || op.hasIndexSemantics())
+    if (!op.hasTensorSemantics())
       return mlir::failure();
 
     if (op->getNumResults() != 1)
@@ -2561,6 +2561,44 @@ struct SliceOfGeneric : public mlir::OpRewritePattern<mlir::linalg::GenericOp> {
     auto &newRegion = newOp.getRegion();
 
     rewriter.inlineRegionBefore(op.getRegion(), newRegion, newRegion.end());
+
+    assert(droppedDims.size() == offsets.size());
+    auto updateLinagIndexOps =
+        [&](mlir::Operation *innerOp) -> mlir::WalkResult {
+      if (mlir::isa<mlir::linalg::GenericOp>(innerOp))
+        return mlir::WalkResult::skip();
+
+      auto indexOp = mlir::dyn_cast<mlir::linalg::IndexOp>(innerOp);
+      if (!indexOp)
+        return mlir::WalkResult::advance();
+
+      uint64_t dim = indexOp.getDim();
+      if (dim >= droppedDims.size())
+        return mlir::WalkResult::interrupt();
+
+      if (droppedDims[dim]) {
+        mlir::OpBuilder::InsertionGuard g(rewriter);
+        rewriter.setInsertionPoint(indexOp);
+        auto loc = indexOp.getLoc();
+        auto val =
+            mlir::getValueOrCreateConstantIndexOp(rewriter, loc, offsets[dim]);
+        rewriter.replaceOp(indexOp, val);
+        return mlir::WalkResult::advance();
+      }
+
+      uint64_t newIndex = 0;
+      for (auto i : llvm::seq<uint64_t>(0, dim)) {
+        (void)i;
+        if (!droppedDims[dim])
+          ++newIndex;
+      }
+      rewriter.updateRootInPlace(indexOp, [&]() { indexOp.setDim(newIndex); });
+
+      return mlir::WalkResult::advance();
+    };
+
+    if (newOp.getRegion().walk(updateLinagIndexOps).wasInterrupted())
+      return mlir::failure();
 
     mlir::Value result = newOp.getResult(0);
     if (extractElem)
