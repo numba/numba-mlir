@@ -12,6 +12,7 @@ TODO: Move to separate package
 from collections import namedtuple
 import numpy as np
 import numba as nb
+import timeit
 from ..decorators import njit
 from .utils import readenv
 from numpy.testing import assert_allclose
@@ -129,6 +130,8 @@ VALIDATE = readenv("NUMBA_MLIR_BENCH_VALIDATE", int, 1)
 
 
 class BenchmarkBase:
+    timer = timeit.default_timer
+
     def get_func(self, *args, **kwargs):
         raise NotImplementedError
 
