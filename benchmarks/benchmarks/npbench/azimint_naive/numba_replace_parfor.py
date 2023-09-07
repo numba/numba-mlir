@@ -16,25 +16,23 @@ from numba_mlir.mlir.benchmarking import (
     get_numba_replace_parfor_context,
     get_numpy_context,
     assert_allclose_recursive,
-    to_device,
-    from_device,
 )
 
 
 class Benchmark(numba_mlir.mlir.benchmarking.BenchmarkBase):
-    params = (presets, [""])
-    param_names = ["preset", "device"]
+    params = presets
+    param_names = ["preset"]
 
-    def get_func(self, preset, device):
+    def get_func(self, preset):
         return get_impl(get_numba_replace_parfor_context())
 
-    def initialize(self, preset, device):
+    def initialize(self, preset):
         preset = parameters[preset]
         N = preset["N"]
         npt = preset["npt"]
-        return to_device(initialize(N, npt), device)
+        return initialize(N, npt)
 
     def validate(self, args, res):
         np_ver = get_impl(get_numpy_context())
-        np_res = np_ver(*from_device(args))
-        assert_allclose_recursive(from_device(res), np_res)
+        np_res = np_ver(*args)
+        assert_allclose_recursive(res, np_res)
