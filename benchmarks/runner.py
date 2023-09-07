@@ -9,8 +9,6 @@ import subprocess
 import glob
 import json
 from math import isnan
-from asv.util import human_value
-from asv_runner.statistics import get_err
 import itertools
 
 
@@ -48,6 +46,8 @@ def load_results(commit):
 
 
 def convert_results(raw_results):
+    from asv_runner.statistics import get_err
+
     result_columns = raw_results["result_columns"]
 
     ret = []
@@ -60,25 +60,28 @@ def convert_results(raw_results):
 
         params = list(itertools.product(*res["params"]))
         result = res["result"]
-        q25stats = res["stats_q_25"]
-        q75stats = res["stats_q_75"]
+
+        empty = [None] * len(params)
+        q25stats = res.get("stats_q_25", empty)
+        q75stats = res.get("stats_q_75", empty)
+
         if result is None:
-            result = [None] * len(params)
-            q25stats = result
-            q75stats = result
+            result = empty
 
         for r, q25, q75, p in zip(result, q25stats, q75stats, params):
             full_bench = bench + str(list(p)).replace("'", "").replace(",", ";")
-            if r is not None:
-                err = get_err(r, {"q_25": q25, "q_75": q75})
-            else:
+            if r is None or (isinstance(r, float) and isnan(r)):
                 err = None
+            else:
+                err = get_err(r, {"q_25": q25, "q_75": q75})
             ret.append((full_bench, framework, r, err))
 
     return ret
 
 
 def results_to_csv(results):
+    from asv.util import human_value
+
     frameworks = {}
     for bench, framework, value, err in results:
         if framework not in frameworks:
