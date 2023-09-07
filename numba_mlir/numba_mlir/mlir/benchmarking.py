@@ -129,6 +129,10 @@ def filter_presets(presets):
 VALIDATE = readenv("NUMBA_MLIR_BENCH_VALIDATE", int, 1)
 
 
+# TODO: actually enumerate devices
+DEVICES = [""]
+
+
 class BenchmarkBase:
     timer = timeit.default_timer
 

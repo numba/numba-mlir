@@ -18,11 +18,12 @@ from numba_mlir.mlir.benchmarking import (
     assert_allclose_recursive,
     to_device,
     from_device,
+    DEVICES,
 )
 
 
 class Benchmark(numba_mlir.mlir.benchmarking.BenchmarkBase):
-    params = (presets, [""])
+    params = (presets, DEVICES)
     param_names = ["preset", "device"]
 
     def get_func(self, preset, device):
