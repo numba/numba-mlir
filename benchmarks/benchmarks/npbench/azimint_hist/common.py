@@ -30,7 +30,6 @@ def get_impl(ctx):
         histw = np.histogram(radius, npt, weights=data)[0]
         return histw / histu
 
-
     return jit(azimint_hist)
 
 
@@ -51,7 +50,6 @@ def get_impl_prange(ctx):
         bin_edges[-1] = a_max  # Avoid roundoff error on last point
         return bin_edges
 
-
     @jit
     def compute_bin(x, bin_edges):
         # assuming uniform bins for now
@@ -65,7 +63,6 @@ def get_impl_prange(ctx):
 
         return int(n * (x - a_min) / (a_max - a_min))
 
-
     @jit
     def histogram_prange(a, bins, weights):
         hist = np.zeros((bins,), dtype=a.dtype)
@@ -76,7 +73,6 @@ def get_impl_prange(ctx):
             hist[bin] += weights[i]
 
         return hist, bin_edges
-
 
     @jit
     def azimint_hist(data, radius, npt):
