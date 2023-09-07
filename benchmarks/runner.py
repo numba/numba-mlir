@@ -10,6 +10,7 @@ import glob
 import json
 from math import isnan
 from asv.util import human_value
+from asv_runner.statistics import get_err
 import itertools
 
 
@@ -59,30 +60,36 @@ def convert_results(raw_results):
 
         params = list(itertools.product(*res["params"]))
         result = res["result"]
+        q25stats = res["stats_q_25"]
+        q75stats = res["stats_q_75"]
         if result is None:
             result = [None] * len(params)
 
-        for r, p in zip(result, params):
+        for r, q25, q75, p in zip(result, q25stats, q75stats, params):
             full_bench = bench + str(list(p)).replace("'", "").replace(",", ";")
-            ret.append((full_bench, framework, r))
+            if r is not None:
+                err = get_err(r, {"q_25": q25, "q_75": q75})
+            else:
+                err = None
+            ret.append((full_bench, framework, r, err))
 
     return ret
 
 
 def results_to_csv(results):
     frameworks = {}
-    for bench, framework, value in results:
+    for bench, framework, value, err in results:
         if framework not in frameworks:
             c = len(frameworks)
             frameworks[framework] = c
 
     count = len(frameworks)
     res = {}
-    for bench, framework, value in results:
+    for bench, framework, value, err in results:
         if bench not in res:
             res[bench] = [""] * count
 
-        value = human_value(value, "seconds")
+        value = human_value(value, "seconds", err)
 
         res[bench][frameworks[framework]] = value
 
