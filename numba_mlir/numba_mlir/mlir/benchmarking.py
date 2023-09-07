@@ -45,6 +45,13 @@ def get_numba_mlir_context():
     return _BenchmarkContext(_nm_njit, np, nb.prange)
 
 
+_rp_njit = njit(parallel=True, fastmath=True, replace_parfors=True)
+
+
+def get_numba_replace_parfor_context():
+    return _BenchmarkContext(_rp_njit, np, nb.prange)
+
+
 def parse_config(file_path):
     import tomli
 
