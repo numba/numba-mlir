@@ -94,7 +94,7 @@ def results_to_csv(results):
         if bench not in res:
             res[bench] = [""] * count
 
-        value = human_value(value, "seconds", err)
+        value = human_value(value, "seconds", err).replace("n/a", "skipped")
 
         res[bench][frameworks[framework]] = value
 
