@@ -136,15 +136,28 @@ DEVICES = [""]
 class BenchmarkBase:
     timer = timeit.default_timer
 
+    def __init__(self):
+        self.is_validate = VALIDATE
+        self.is_expected_failure = False
+
     def get_func(self, *args, **kwargs):
         raise NotImplementedError
 
     def setup(self, *args, **kwargs):
         self.func = self.get_func(*args, **kwargs)
         self.args = self.initialize(*args, **kwargs)
-        res = self.func(*self.args)
-        if VALIDATE:
-            self.validate(self.args, res)
+        try:
+            res = self.func(*self.args)
+            if self.is_validate:
+                self.validate(self.args, res)
+        except:
+            if self.is_expected_failure:
+                raise NotImplementedError
+            else:
+                raise
+        else:
+            if self.is_expected_failure:
+                raise ValueError("Unexpected success")
 
     def teardown(self, *args, **kwargs):
         if hasattr(self, "args"):
