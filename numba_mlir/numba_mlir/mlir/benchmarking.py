@@ -118,6 +118,9 @@ def filter_presets(presets):
     return [x for x in presets if x in TEST_PRESETS]
 
 
+VALIDATE = readenv("NUMBA_MLIR_BENCH_VALIDATE", int, 1)
+
+
 class BenchmarkBase:
     def get_func(self, *args, **kwargs):
         raise NotImplementedError
@@ -126,7 +129,8 @@ class BenchmarkBase:
         self.func = self.get_func(*args, **kwargs)
         self.args = self.initialize(*args, **kwargs)
         res = self.func(*self.args)
-        self.validate(self.args, res)
+        if VALIDATE:
+            self.validate(self.args, res)
 
     def teardown(self, *args, **kwargs):
         if hasattr(self, "args"):
