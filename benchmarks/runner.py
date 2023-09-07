@@ -9,6 +9,8 @@ import subprocess
 import glob
 import json
 from math import isnan
+from asv.util import human_value
+import itertools
 
 
 def asv_run(args):
@@ -55,9 +57,13 @@ def convert_results(raw_results):
         framework = parts[-3]
         bench = ".".join(parts[:-3])
 
-        params = list(zip(*res["params"]))
-        for r, p in zip(res["result"], params):
-            full_bench = bench + str(list(p)).replace("'", "")
+        params = list(itertools.product(*res["params"]))
+        result = res["result"]
+        if result is None:
+            result = [None] * len(params)
+
+        for r, p in zip(result, params):
+            full_bench = bench + str(list(p)).replace("'", "").replace(",", ";")
             ret.append((full_bench, framework, r))
 
     return ret
@@ -76,12 +82,7 @@ def results_to_csv(results):
         if bench not in res:
             res[bench] = [""] * count
 
-        if value is None:
-            value = "failed"
-        elif isinstance(value, float) and isnan(value):
-            value = "skipped"
-        else:
-            value = str(value)
+        value = human_value(value, "seconds")
 
         res[bench][frameworks[framework]] = value
 
