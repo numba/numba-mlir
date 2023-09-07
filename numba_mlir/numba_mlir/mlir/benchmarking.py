@@ -13,6 +13,7 @@ from collections import namedtuple
 import numpy as np
 import numba as nb
 from ..decorators import njit
+from .utils import readenv
 from numpy.testing import assert_allclose
 
 
@@ -106,6 +107,15 @@ def assert_allclose_recursive(actual, desired, rtol=1e-07, atol=0):
         return
 
     assert_allclose(actual, desired, rtol, atol)
+
+
+TEST_PRESETS = set(
+    filter(None, readenv("NUMBA_MLIR_BENCH_PRESETS", str, "S").split(","))
+)
+
+
+def filter_presets(presets):
+    return [x for x in presets if x in TEST_PRESETS]
 
 
 class BenchmarkBase:
