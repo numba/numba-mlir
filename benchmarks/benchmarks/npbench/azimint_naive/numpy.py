@@ -10,7 +10,7 @@ high performance azimuthal integration on gpu, 2014. In Proceedings of the
 7th European Conference on Python in Science (EuroSciPy 2014).
 """
 
-from .azimint_naive import initialize, get_impl, parameters, presets
+from .common import initialize, get_impl, parameters, presets
 import numba_mlir.mlir.benchmarking
 from numba_mlir.mlir.benchmarking import get_numpy_context
 
