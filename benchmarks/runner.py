@@ -9,22 +9,36 @@ import subprocess
 
 
 def run_asv(args):
-    os.environ["NUMBA_MLIR_BENCH_PRESETS"] = "S"
-    os.environ["NUMBA_MLIR_BENCH_VALIDATE"] = "1"
     subprocess.check_call(["python", "-m", "asv", "run"] + args)
 
 
 def run_test():
+    os.environ["NUMBA_MLIR_BENCH_PRESETS"] = "S"
+    os.environ["NUMBA_MLIR_BENCH_VALIDATE"] = "1"
     run_asv(["--python=same", "--quick", "--show-stderr", "--dry-run"])
 
 
-def run_bench(params):
-    if "test" in params:
-        return run_test()
+def run_bench():
+    os.environ["NUMBA_MLIR_BENCH_PRESETS"] = "S,M,paper"
+    os.environ["NUMBA_MLIR_BENCH_VALIDATE"] = "0"
+    run_asv(["--python=same", "--show-stderr", "--dry-run"])
+
+
+def run_cmd(params):
+    cmds = [
+        ("test", run_test),
+        ("bench", run_bench),
+    ]
+
+    for name, cmd in cmds:
+        if name in params:
+            return cmd()
+
+    assert False, f"Invalid params: {params}"
 
 
 if __name__ == "__main__":
     import numba_mlir
 
     args = set(sys.argv[1:])
-    run_bench(args)
+    run_cmd(args)
