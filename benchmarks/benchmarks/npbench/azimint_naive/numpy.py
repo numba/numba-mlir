@@ -24,9 +24,7 @@ class Benchmark(numba_mlir.mlir.benchmarking.BenchmarkBase):
 
     def initialize(self, preset):
         preset = parameters[preset]
-        N = preset["N"]
-        npt = preset["npt"]
-        return initialize(N, npt)
+        return initialize(**preset)
 
     def validate(self, args, res):
         # Assume numpy impl is valid
