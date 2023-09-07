@@ -125,5 +125,5 @@ class BenchmarkBase:
         if hasattr(self, "func"):
             del self.func
 
-    def time_run(self, *args, **kwargs):
+    def time_benchmark(self, *args, **kwargs):
         self.func(*self.args)
