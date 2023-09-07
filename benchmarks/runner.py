@@ -64,6 +64,8 @@ def convert_results(raw_results):
         q75stats = res["stats_q_75"]
         if result is None:
             result = [None] * len(params)
+            q25stats = result
+            q75stats = result
 
         for r, q25, q75, p in zip(result, q25stats, q75stats, params):
             full_bench = bench + str(list(p)).replace("'", "").replace(",", ";")
