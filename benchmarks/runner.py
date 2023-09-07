@@ -6,6 +6,9 @@
 import os
 import sys
 import subprocess
+import glob
+import json
+from math import isnan
 
 
 def asv_run(args):
@@ -24,6 +27,71 @@ def get_head_hash():
     )
 
 
+def load_results(commit):
+    res_path = os.path.join(os.getcwd(), ".asv", "results")
+    machine_dirs = list(
+        filter(lambda a: os.path.isdir(os.path.join(res_path, a)), os.listdir(res_path))
+    )
+    assert len(machine_dirs) == 1
+
+    pattern = os.path.join(res_path, machine_dirs[0], f"{commit}-existing*.json")
+    files = glob.glob(pattern)
+    assert len(files) == 1
+
+    with open(files[0]) as file:
+        file_contents = file.read()
+
+    return json.loads(file_contents)
+
+
+def convert_results(raw_results):
+    result_columns = raw_results["result_columns"]
+
+    ret = []
+    for name, val in raw_results["results"].items():
+        res = {k: v for k, v in zip(result_columns, val)}
+
+        parts = name.split(".")
+        framework = parts[-3]
+        bench = ".".join(parts[:-3])
+
+        params = list(zip(*res["params"]))
+        for r, p in zip(res["result"], params):
+            full_bench = bench + str(list(p)).replace("'", "")
+            ret.append((full_bench, framework, r))
+
+    return ret
+
+
+def results_to_csv(results):
+    frameworks = {}
+    for bench, framework, value in results:
+        if framework not in frameworks:
+            c = len(frameworks)
+            frameworks[framework] = c
+
+    count = len(frameworks)
+    res = {}
+    for bench, framework, value in results:
+        if bench not in res:
+            res[bench] = [""] * count
+
+        if value is None:
+            value = "failed"
+        elif isinstance(value, float) and isnan(value):
+            value = "skipped"
+        else:
+            value = str(value)
+
+        res[bench][frameworks[framework]] = value
+
+    csv_str = f"bench\\framework," + ",".join(frameworks.keys()) + "\n"
+    for name, val in res.items():
+        csv_str += name + "," + ",".join(val) + "\n"
+
+    return csv_str
+
+
 def run_test(params):
     os.environ["NUMBA_MLIR_BENCH_PRESETS"] = "S"
     os.environ["NUMBA_MLIR_BENCH_VALIDATE"] = "1"
@@ -34,14 +102,23 @@ def run_bench(params):
     os.environ["NUMBA_MLIR_BENCH_PRESETS"] = "S,M,paper"
     os.environ["NUMBA_MLIR_BENCH_VALIDATE"] = "0"
     commit = get_head_hash()
-    asv_run(
-        [
-            "--environment=existing:python",
-            "--show-stderr",
-            f"--set-commit-hash={commit}",
-        ]
-    )
-    asv_show([commit])
+    try:
+        asv_run(
+            [
+                "--environment=existing:python",
+                "--show-stderr",
+                f"--set-commit-hash={commit}",
+            ]
+        )
+        asv_show([commit])
+    except:
+        pass
+
+    results = load_results(commit)
+    results = convert_results(results)
+    results = results_to_csv(results)
+    print()
+    print(results)
 
 
 def run_cmd(cmd, params):
