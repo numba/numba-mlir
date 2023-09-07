@@ -17,7 +17,11 @@ def asv_show(args):
 
 
 def get_head_hash():
-    return subprocess.check_output(["git", "rev-parse", "HEAD"]).decode("utf-8").strip()
+    return (
+        subprocess.check_output(["git", "rev-parse", "--short", "HEAD"])
+        .decode("utf-8")
+        .strip()
+    )
 
 
 def run_test(params):
