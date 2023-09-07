@@ -8,7 +8,7 @@ from numba_mlir.mlir.benchmarking import parse_config, filter_presets
 from os import path
 
 config = parse_config(path.join(path.dirname(__file__), "config.toml"))
-parameters = config["benchmark"]["parameters"]
+parameters = dict(config["benchmark"]["parameters"])
 presets = filter_presets(parameters.keys())
 
 

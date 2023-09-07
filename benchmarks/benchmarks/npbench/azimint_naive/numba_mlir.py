@@ -30,9 +30,7 @@ class Benchmark(numba_mlir.mlir.benchmarking.BenchmarkBase):
 
     def initialize(self, preset, device):
         preset = parameters[preset]
-        N = preset["N"]
-        npt = preset["npt"]
-        return to_device(initialize(N, npt), device)
+        return to_device(initialize(**preset), device)
 
     def validate(self, args, res):
         np_ver = get_impl(get_numpy_context())
