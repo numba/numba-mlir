@@ -23,6 +23,13 @@ def asv_show(args):
     subprocess.check_call(["python", "-m", "asv", "show"] + args)
 
 
+def add_bench_arg(args, bench):
+    if bench is not None:
+        return args + [f"--bench={bench}"]
+
+    return args
+
+
 def get_head_hash():
     return (
         subprocess.check_output(["git", "rev-parse", "--short", "HEAD"])
@@ -131,23 +138,37 @@ def save_report(data, commit, machine, reports_dir):
         file.write(data)
 
 
+def get_bench_arg(params):
+    if len(params) > 0:
+        return params[0]
+
+    return None
+
+
 def run_test(params):
+    bench = get_bench_arg(params)
     os.environ["NUMBA_MLIR_BENCH_PRESETS"] = "S"
     os.environ["NUMBA_MLIR_BENCH_VALIDATE"] = "1"
-    asv_run(["--python=same", "--quick", "--show-stderr", "--dry-run"])
+    asv_run(
+        add_bench_arg(["--python=same", "--quick", "--show-stderr", "--dry-run"], bench)
+    )
 
 
 def run_bench(params):
+    bench = get_bench_arg(params)
     os.environ["NUMBA_MLIR_BENCH_PRESETS"] = "S,M,paper"
     os.environ["NUMBA_MLIR_BENCH_VALIDATE"] = "0"
     commit = get_head_hash()
     try:
         asv_run(
-            [
-                "--environment=existing:python",
-                "--show-stderr",
-                f"--set-commit-hash={commit}",
-            ]
+            add_bench_arg(
+                [
+                    "--environment=existing:python",
+                    "--show-stderr",
+                    f"--set-commit-hash={commit}",
+                ],
+                bench,
+            )
         )
         asv_show([commit])
     except:
