@@ -139,12 +139,15 @@ class BenchmarkBase:
     def __init__(self):
         self.is_validate = VALIDATE
         self.is_expected_failure = False
+        self.func = None
 
     def get_func(self, *args, **kwargs):
         raise NotImplementedError
 
     def setup(self, *args, **kwargs):
-        self.func = self.get_func(*args, **kwargs)
+        if self.func is None:
+            self.func = self.get_func(*args, **kwargs)
+
         self.args = self.initialize(*args, **kwargs)
         try:
             res = self.func(*self.args)
@@ -162,9 +165,6 @@ class BenchmarkBase:
     def teardown(self, *args, **kwargs):
         if hasattr(self, "args"):
             del self.args
-
-        if hasattr(self, "func"):
-            del self.func
 
     def time_benchmark(self, *args, **kwargs):
         self.func(*self.args)
