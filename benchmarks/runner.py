@@ -134,8 +134,8 @@ def save_report(data, commit, machine, reports_dir):
     file_name = sanitize_filename(f"{commit}_{machine}_{str(datetime.now())}") + ".csv"
     file_path = os.path.join(reports_dir, file_name)
 
-    with open(file_path, "w") as file:
-        file.write(data)
+    with open(file_path, "wb") as file:
+        file.write(data.encode("utf-8"))
 
 
 def get_bench_arg(params):
