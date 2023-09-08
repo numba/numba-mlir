@@ -1,0 +1,48 @@
+# SPDX-FileCopyrightText: 2017 Nicolas P. Rougier
+# SPDX-FileCopyrightText: 2021 ETH Zurich and the NPBench authors
+# SPDX-FileCopyrightText: 2022 - 2023 Intel Corporation
+#
+# SPDX-License-Identifier: BSD-3-Clause
+
+[benchmark]
+name = "Mandelbrot1"
+
+[benchmark.parameters.S]
+xmin = -1.75
+xmax = 0.25
+xn = 125
+ymin = -1.0
+ymax = 1.0
+yn = 125
+maxiter = 60
+horizon = 2.0
+
+[benchmark.parameters.M]
+xmin = -1.75
+xmax = 0.25
+xn = 250
+ymin = -1.0
+ymax = 1.0
+yn = 250
+maxiter = 150
+horizon = 2.0
+
+[benchmark.parameters.L]
+xmin = -2.0
+xmax = 0.5
+xn = 833
+ymin = -1.25
+ymax = 1.25
+yn = 833
+maxiter = 200
+horizon = 2.0
+
+[benchmark.parameters.paper]
+xmin = -2.25
+xmax = 0.75
+xn = 1000
+ymin = -1.25
+ymax = 1.25
+yn = 1000
+maxiter = 200
+horizon = 2.0
