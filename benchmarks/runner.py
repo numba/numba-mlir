@@ -10,6 +10,9 @@ import glob
 import json
 from math import isnan
 import itertools
+from datetime import datetime
+
+BASE_PATH = os.path.join(os.getcwd(), ".asv")
 
 
 def asv_run(args):
@@ -29,10 +32,12 @@ def get_head_hash():
 
 
 def load_results(commit):
-    res_path = os.path.join(os.getcwd(), ".asv", "results")
-    machine_dirs = list(
-        filter(lambda a: os.path.isdir(os.path.join(res_path, a)), os.listdir(res_path))
-    )
+    res_path = os.path.join(BASE_PATH, "results")
+
+    def isdir(a):
+        return os.path.isdir(os.path.join(res_path, a))
+
+    machine_dirs = list(filter(isdir, os.listdir(res_path)))
     assert len(machine_dirs) == 1
 
     pattern = os.path.join(res_path, machine_dirs[0], f"{commit}-existing*.json")
@@ -105,6 +110,27 @@ def results_to_csv(results):
     return csv_str
 
 
+def ensure_dir(dir_path):
+    try:
+        os.makedirs(dir_path)
+    except FileExistsError:
+        pass
+
+
+def sanitize_filename(name):
+    chars = ":#. "
+    return name.translate(str.maketrans(chars, "_" * len(chars)))
+
+
+def save_report(data, commit, reports_dir):
+    ensure_dir(reports_dir)
+    file_name = sanitize_filename(f"{commit} {str(datetime.now())}") + ".csv"
+    file_path = os.path.join(reports_dir, file_name)
+
+    with open(file_path, "w") as file:
+        file.write(data)
+
+
 def run_test(params):
     os.environ["NUMBA_MLIR_BENCH_PRESETS"] = "S"
     os.environ["NUMBA_MLIR_BENCH_VALIDATE"] = "1"
@@ -130,8 +156,11 @@ def run_bench(params):
     results = load_results(commit)
     results = convert_results(results)
     results = results_to_csv(results)
-    print()
+    print("csv report:")
     print(results)
+
+    reports_dir = os.path.join(BASE_PATH, "csv_reports")
+    save_report(results, commit, reports_dir)
 
 
 def run_cmd(cmd, params):
