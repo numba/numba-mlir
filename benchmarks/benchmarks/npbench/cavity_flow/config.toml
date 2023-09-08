@@ -1,0 +1,41 @@
+# SPDX-FileCopyrightText: 2017 Lorena A. Barba, Gilbert F. Forsyth.
+# SPDX-FileCopyrightText: 2018 Barba, Lorena A., and Forsyth, Gilbert F.
+# SPDX-FileCopyrightText: 2021 ETH Zurich and the NPBench authors
+# SPDX-FileCopyrightText: 2022 - 2023 Intel Corporation
+#
+# SPDX-License-Identifier: BSD-3-Clause
+
+[benchmark]
+name = "Cavity Flow"
+
+[benchmark.parameters.S]
+ny = 61
+nx = 61
+nt = 25
+nit = 5
+rho = 1.0
+nu = 0.1
+
+[benchmark.parameters.M]
+ny = 121
+nx = 121
+nt = 50
+nit = 10
+rho = 1.0
+nu = 0.1
+
+[benchmark.parameters.L]
+ny = 201
+nx = 201
+nt = 100
+nit = 20
+rho = 1.0
+nu = 0.1
+
+[benchmark.parameters.paper]
+ny = 101
+nx = 101
+nt = 700
+nit = 50
+rho = 1.0
+nu = 0.1
