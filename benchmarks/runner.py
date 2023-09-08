@@ -31,16 +31,16 @@ def get_head_hash():
     )
 
 
-def load_results(commit):
+def get_machine_name():
+    from asv.machine import Machine
+
+    return Machine.get_unique_machine_name()
+
+
+def load_results(commit, machine):
     res_path = os.path.join(BASE_PATH, "results")
 
-    def isdir(a):
-        return os.path.isdir(os.path.join(res_path, a))
-
-    machine_dirs = list(filter(isdir, os.listdir(res_path)))
-    assert len(machine_dirs) == 1
-
-    pattern = os.path.join(res_path, machine_dirs[0], f"{commit}-existing*.json")
+    pattern = os.path.join(res_path, machine, f"{commit}-existing*.json")
     files = glob.glob(pattern)
     assert len(files) == 1
 
@@ -122,9 +122,9 @@ def sanitize_filename(name):
     return name.translate(str.maketrans(chars, "_" * len(chars)))
 
 
-def save_report(data, commit, reports_dir):
+def save_report(data, commit, machine, reports_dir):
     ensure_dir(reports_dir)
-    file_name = sanitize_filename(f"{commit} {str(datetime.now())}") + ".csv"
+    file_name = sanitize_filename(f"{commit}_{machine}_{str(datetime.now())}") + ".csv"
     file_path = os.path.join(reports_dir, file_name)
 
     with open(file_path, "w") as file:
@@ -153,14 +153,15 @@ def run_bench(params):
     except:
         pass
 
-    results = load_results(commit)
+    machine = get_machine_name()
+    results = load_results(commit, machine)
     results = convert_results(results)
     results = results_to_csv(results)
     print("csv report:")
     print(results)
 
     reports_dir = os.path.join(BASE_PATH, "csv_reports")
-    save_report(results, commit, reports_dir)
+    save_report(results, commit, machine, reports_dir)
 
 
 def run_cmd(cmd, params):
