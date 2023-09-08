@@ -1,8 +1,8 @@
+# SPDX-FileCopyrightText: 2018 Øystein Sture
 # SPDX-FileCopyrightText: 2021 ETH Zurich and the NPBench authors
 # SPDX-FileCopyrightText: 2022 - 2023 Intel Corporation
 #
 # SPDX-License-Identifier: BSD-3-Clause
-
 
 from .common import initialize, get_impl, parameters, presets
 import numba_mlir.mlir.benchmarking
@@ -21,7 +21,7 @@ class Benchmark(numba_mlir.mlir.benchmarking.BenchmarkBase):
         return get_impl(get_numba_mlir_context())
 
     def initialize(self, preset):
-        self.is_expected_failure = True  # np.linalg.inv
+        self.is_expected_failure = True  # iteration over array
         preset = parameters[preset]
         return initialize(**preset)
 
