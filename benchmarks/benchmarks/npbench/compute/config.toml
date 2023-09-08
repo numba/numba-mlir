@@ -1,0 +1,25 @@
+# SPDX-FileCopyrightText: 2023 Stefan Behnel, Robert Bradshaw,
+#   Dag Sverre Seljebotn, Greg Ewing, William Stein, Gabriel Gellner, et al.
+# SPDX-FileCopyrightText: 2021 ETH Zurich and the NPBench authors
+# SPDX-FileCopyrightText: 2022 - 2023 Intel Corporation
+#
+# SPDX-License-Identifier: BSD-3-Clause
+
+[benchmark]
+name = "Compute"
+
+[benchmark.parameters.S]
+M = 2000
+N = 2000
+
+[benchmark.parameters.M]
+M = 5000
+N = 5000
+
+[benchmark.parameters.L]
+M = 16000
+N = 16000
+
+[benchmark.parameters.paper]
+M = 12500
+N = 12500
