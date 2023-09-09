@@ -1,0 +1,23 @@
+# SPDX-FileCopyrightText: 2021 ETH Zurich and the NPBench authors
+# SPDX-FileCopyrightText: 2022 - 2023 Intel Corporation
+#
+# SPDX-License-Identifier: BSD-3-Clause
+
+[benchmark]
+name = "Stockham FFT"
+
+[benchmark.parameters.S]
+R = 2
+K = 15
+
+[benchmark.parameters.M]
+R = 2
+K = 18
+
+[benchmark.parameters.L]
+R = 2
+K = 21
+
+[benchmark.parameters.paper]
+R = 4
+K = 10
