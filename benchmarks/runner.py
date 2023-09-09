@@ -24,7 +24,7 @@ def asv_show(args):
 
 
 def asv_machine(args):
-    subprocess.check_call(["python", "-m", "asv", "machine "] + args)
+    subprocess.check_call(["python", "-m", "asv", "machine"] + args)
 
 
 def add_bench_arg(args, bench):
