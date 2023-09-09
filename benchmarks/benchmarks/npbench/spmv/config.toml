@@ -1,0 +1,27 @@
+# SPDX-FileCopyrightText: 2021 ETH Zurich and the NPBench authors
+# SPDX-FileCopyrightText: 2022 - 2023 Intel Corporation
+#
+# SPDX-License-Identifier: BSD-3-Clause
+
+[benchmark]
+name = "Sparse Matrix-Vector Multiplication"
+
+[benchmark.parameters.S]
+M = 4096
+N = 4096
+nnz = 8192
+
+[benchmark.parameters.M]
+M = 32768
+N = 32768
+nnz = 65536
+
+[benchmark.parameters.L]
+M = 262144
+N = 262144
+nnz = 262144
+
+[benchmark.parameters.paper]
+M = 131072
+N = 131072
+nnz = 262144
