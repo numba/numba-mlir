@@ -2769,18 +2769,6 @@ static void visitTypeRecursive(mlir::Type type, F &&visitor) {
   }
 }
 
-static bool isContigiousArray(mlir::Type type) {
-  auto tensor = type.dyn_cast<numba::ntensor::NTensorType>();
-  if (!tensor)
-    return false;
-
-  auto layout = tensor.getLayout();
-  if (!layout)
-    return false;
-
-  return layout.getValue() == "C";
-}
-
 struct LinalgOptInnerPass
     : public mlir::PassWrapper<LinalgOptInnerPass, mlir::OperationPass<void>> {
   MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(LinalgOptInnerPass)
