@@ -1,0 +1,27 @@
+# SPDX-FileCopyrightText: 2021 ETH Zurich and the NPBench authors
+# SPDX-FileCopyrightText: 2022 - 2023 Intel Corporation
+#
+# SPDX-License-Identifier: BSD-3-Clause
+
+[benchmark]
+name = "Lenet-5"
+
+[benchmark.parameters.S]
+N = 4
+H = 28
+W = 28
+
+[benchmark.parameters.M]
+N = 8
+H = 56
+W = 56
+
+[benchmark.parameters.L]
+N = 8
+H = 176
+W = 176
+
+[benchmark.parameters.paper]
+N = 16
+H = 256
+W = 256
