@@ -279,8 +279,9 @@ jobs:
         run: |
           cd benchmarks
           conda activate test-env
-          conda install asv -c intel -c conda-forge
+          conda install asv asv_runner py-cpuinfo -c intel -c conda-forge
           conda list
+          python runner.py machine
           python runner.py test
 
       - name: Build wheels
@@ -674,8 +675,9 @@ jobs:
         run: |
           cd benchmarks
           source $CONDA/bin/activate test-env
-          conda install asv -c intel -c conda-forge
+          conda install asv asv_runner py-cpuinfo -c intel -c conda-forge
           conda list
+          python runner.py machine
           python runner.py test
 
 
