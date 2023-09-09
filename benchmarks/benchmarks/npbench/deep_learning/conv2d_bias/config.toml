@@ -1,0 +1,39 @@
+# SPDX-FileCopyrightText: 2021 ETH Zurich and the NPBench authors
+# SPDX-FileCopyrightText: 2022 - 2023 Intel Corporation
+#
+# SPDX-License-Identifier: BSD-3-Clause
+
+[benchmark]
+name = "Conv2D with Bias"
+
+[benchmark.parameters.S]
+N = 8
+C_in = 3
+C_out = 16
+K = 2
+H = 32
+W = 32
+
+[benchmark.parameters.M]
+N = 8
+C_in = 3
+C_out = 8
+K = 5
+H = 64
+W = 64
+
+[benchmark.parameters.L]
+N = 8
+C_in = 3
+C_out = 8
+K = 10
+H = 128
+W = 128
+
+[benchmark.parameters.paper]
+N = 8
+C_in = 3
+C_out = 16
+K = 20
+H = 256
+W = 256
