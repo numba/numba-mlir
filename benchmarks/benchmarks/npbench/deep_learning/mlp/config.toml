@@ -1,0 +1,35 @@
+# SPDX-FileCopyrightText: 2021 ETH Zurich and the NPBench authors
+# SPDX-FileCopyrightText: 2022 - 2023 Intel Corporation
+#
+# SPDX-License-Identifier: BSD-3-Clause
+
+[benchmark]
+name = "Multi-layer Perceptron"
+
+[benchmark.parameters.S]
+C_in = 3
+N = 8
+S0 = 30000
+S1 = 2000
+S2 = 2000
+
+[benchmark.parameters.M]
+C_in = 3
+N = 8
+S0 = 30000
+S1 = 10000
+S2 = 10000
+
+[benchmark.parameters.L]
+C_in = 3
+N = 8
+S0 = 30000
+S1 = 30000
+S2 = 30000
+
+[benchmark.parameters.paper]
+C_in = 3
+N = 8
+S0 = 30000
+S1 = 10000
+S2 = 1000
