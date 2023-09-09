@@ -51,7 +51,6 @@ jobs:
         uses: conda-incubator/setup-miniconda@v2
         with:
           auto-update-conda: true
-          use-only-tar-bz2: true
           run-post: false
           miniforge-variant: Mambaforge
           miniforge-version: latest
@@ -197,7 +196,6 @@ jobs:
         uses: conda-incubator/setup-miniconda@v2
         with:
           auto-update-conda: true
-          use-only-tar-bz2: true
           run-post: false
           miniforge-variant: Mambaforge
           miniforge-version: latest
@@ -238,7 +236,6 @@ jobs:
       - name: Build Python frontend
         run: |
           cd numba_mlir
-          conda search asv -c conda-forge -c intel
           conda create -y -n test-env python=${{ matrix.python }} "pip>=22" numba=0.57 numpy=1.23 "setuptools<65.6" scikit-learn pytest-xdist ninja scipy pybind11 pytest "tbb>=$env:TBB_VER" "tbb-devel>=$env:TBB_VER" cmake "mkl-devel-dpcpp>=2023.1" zlib dpcpp_win-64 -c conda-forge -c intel -c numba
           conda info
           conda activate test-env
@@ -337,7 +334,6 @@ jobs:
         uses: conda-incubator/setup-miniconda@v2
         with:
           auto-update-conda: true
-          use-only-tar-bz2: true
           run-post: false
           miniforge-variant: Mambaforge
           miniforge-version: latest
@@ -440,7 +436,6 @@ jobs:
         uses: conda-incubator/setup-miniconda@v2
         with:
           auto-update-conda: true
-          use-only-tar-bz2: true
           run-post: false
           miniforge-variant: Mambaforge
           miniforge-version: latest
@@ -591,7 +586,6 @@ jobs:
         uses: conda-incubator/setup-miniconda@v2
         with:
           auto-update-conda: true
-          use-only-tar-bz2: true
           run-post: false
           miniforge-variant: Mambaforge
           miniforge-version: latest
@@ -632,7 +626,6 @@ jobs:
 
         run: |
           cd numba_mlir
-          conda search asv -c conda-forge -c intel
           conda create -y -n test-env python=${{ matrix.python }} "pip>=22" numba=0.57 numpy=1.23 "setuptools<65.6" scikit-learn pytest-xdist ninja scipy pybind11 pytest "tbb>=${TBB_VER}" "tbb-devel>=${TBB_VER}" cmake "mkl-devel-dpcpp>=2023.1" dpcpp_linux-64 -c conda-forge -c intel -c numba
           conda info
           source $CONDA/bin/activate test-env
@@ -736,7 +729,6 @@ jobs:
         uses: conda-incubator/setup-miniconda@v2
         with:
           auto-update-conda: true
-          use-only-tar-bz2: true
           run-post: false
           miniforge-variant: Mambaforge
           miniforge-version: latest
@@ -809,7 +801,6 @@ jobs:
       - uses: conda-incubator/setup-miniconda@v2
         with:
           auto-update-conda: true
-          use-only-tar-bz2: true
           run-post: false
           auto-activate-base: true
           activate-environment: ""
@@ -851,7 +842,6 @@ jobs:
       - uses: conda-incubator/setup-miniconda@v2
         with:
           auto-update-conda: true
-          use-only-tar-bz2: true
           run-post: false
           auto-activate-base: true
           activate-environment: ""
