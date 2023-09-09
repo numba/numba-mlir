@@ -10,7 +10,8 @@ import glob
 import json
 from math import isnan
 import itertools
-from datetime import datetime
+from datetime import datetime, timedelta
+from timeit import default_timer as timer
 
 BASE_PATH = os.path.join(os.getcwd(), ".asv")
 
@@ -226,6 +227,11 @@ def run_cmd(cmd, params):
 
 
 if __name__ == "__main__":
-    args = sys.argv[1:]
-    cmd = args[0]
-    run_cmd(cmd, args[1:])
+    start = timer()
+    try:
+        args = sys.argv[1:]
+        cmd = args[0]
+        run_cmd(cmd, args[1:])
+    finally:
+        end = timer()
+        print(f"Execution took: {timedelta(seconds=end-start)}")
