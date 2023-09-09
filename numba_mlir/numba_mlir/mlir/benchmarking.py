@@ -142,35 +142,47 @@ class BenchmarkBase:
         self.is_validate = VALIDATE
         self.is_expected_failure = False
         func = self.get_func()
-        self.func = func
 
-        def wrapper(*arg, **kwargs):
+        def setup(*args, **kwargs):
+            self.args = self.initialize(*args, **kwargs)
+            try:
+                res = func(*self.args)
+                if self.is_validate:
+                    self.validate(self.args, res)
+            except:
+                if self.is_expected_failure:
+                    raise NotImplementedError
+                else:
+                    raise
+            else:
+                if self.is_expected_failure:
+                    raise ValueError("Unexpected success")
+
+        setup.pretty_source = inspect.getsource(self.initialize)
+        self.setup = setup
+
+        def teardown(*args, **kwargs):
+            if hasattr(self, "args"):
+                del self.args
+
+        self.teardown = teardown
+
+        def time_benchmark(*arg, **kwargs):
             func(*self.args)
 
-        wrapper.pretty_source = inspect.getsource(func)
-        self.time_benchmark = wrapper
+        time_benchmark.pretty_source = inspect.getsource(func)
+        self.time_benchmark = time_benchmark
 
     def get_func(self, *args, **kwargs):
         raise NotImplementedError
 
     def setup(self, *args, **kwargs):
-        self.args = self.initialize(*args, **kwargs)
-        try:
-            res = self.func(*self.args)
-            if self.is_validate:
-                self.validate(self.args, res)
-        except:
-            if self.is_expected_failure:
-                raise NotImplementedError
-            else:
-                raise
-        else:
-            if self.is_expected_failure:
-                raise ValueError("Unexpected success")
+        # Dummy method, will be overriden
+        pass
 
     def teardown(self, *args, **kwargs):
-        if hasattr(self, "args"):
-            del self.args
+        # Dummy method, will be overriden
+        pass
 
     def time_benchmark(self, *args, **kwargs):
         # Dummy method, will be overriden
