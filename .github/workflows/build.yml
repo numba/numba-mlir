@@ -238,7 +238,7 @@ jobs:
       - name: Build Python frontend
         run: |
           cd numba_mlir
-          conda create -y -n test-env python=${{ matrix.python }} asv=0.6 py-cpuinfo "pip>=22" numba=0.57 numpy=1.23 "setuptools<65.6" scikit-learn pytest-xdist ninja scipy pybind11 pytest "tbb>=$env:TBB_VER" "tbb-devel>=$env:TBB_VER" cmake "mkl-devel-dpcpp>=2023.1" zlib dpcpp_win-64 -c conda-forge -c intel -c numba
+          conda create -y -n test-env python=${{ matrix.python }} "pip>=22" numba=0.57 numpy=1.23 "setuptools<65.6" scikit-learn pytest-xdist ninja scipy pybind11 pytest "tbb>=$env:TBB_VER" "tbb-devel>=$env:TBB_VER" cmake "mkl-devel-dpcpp>=2023.1" zlib dpcpp_win-64 -c conda-forge -c intel -c numba
           conda info
           conda activate test-env
           echo "Conda prefix: $env:CONDA_PREFIX"
@@ -279,6 +279,8 @@ jobs:
         run: |
           cd benchmarks
           conda activate test-env
+          conda install asv=0.6 py-cpuinfo -c conda-forge
+          conda list
           python runner.py machine
           python runner.py test
 
@@ -629,7 +631,7 @@ jobs:
 
         run: |
           cd numba_mlir
-          conda create -y -n test-env python=${{ matrix.python }} asv=0.6 py-cpuinfo "pip>=22" numba=0.57 numpy=1.23 "setuptools<65.6" scikit-learn pytest-xdist ninja scipy pybind11 pytest "tbb>=${TBB_VER}" "tbb-devel>=${TBB_VER}" cmake "mkl-devel-dpcpp>=2023.1" dpcpp_linux-64 -c conda-forge -c intel -c numba
+          conda create -y -n test-env python=${{ matrix.python }} "pip>=22" numba=0.57 numpy=1.23 "setuptools<65.6" scikit-learn pytest-xdist ninja scipy pybind11 pytest "tbb>=${TBB_VER}" "tbb-devel>=${TBB_VER}" cmake "mkl-devel-dpcpp>=2023.1" dpcpp_linux-64 -c conda-forge -c intel -c numba
           conda info
           source $CONDA/bin/activate test-env
           conda install gxx_linux-64 -c conda-forge --override-channels
@@ -673,6 +675,8 @@ jobs:
         run: |
           cd benchmarks
           source $CONDA/bin/activate test-env
+          conda install asv=0.6 py-cpuinfo -c conda-forge
+          conda list
           python runner.py machine
           python runner.py test
 
