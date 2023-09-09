@@ -275,6 +275,14 @@ jobs:
           $env:NUMBA_MLIR_DEFAULT_DEVICE="opencl:cpu:0"
           python "$env:GITHUB_WORKSPACE/numba_mlir/conda-recipe/run_package_tests.py" verbose gpu
 
+      - name: Test bench
+        run: |
+          cd benchmarks
+          conda activate test-env
+          conda install asv -c intel -c conda-forge
+          conda list
+          python runner.py test
+
       - name: Build wheels
         run: |
           mkdir numba_mlir_wheels
@@ -659,6 +667,16 @@ jobs:
           export NUMBA_MLIR_GPU_RUNTIME=sycl
           export NUMBA_MLIR_DEFAULT_DEVICE=opencl:cpu:0
           python $GITHUB_WORKSPACE/numba_mlir/conda-recipe/run_package_tests.py verbose gpu
+
+      - name: Test bench
+        shell: bash -l {0}
+
+        run: |
+          cd benchmarks
+          source $CONDA/bin/activate test-env
+          conda install asv -c intel -c conda-forge
+          conda list
+          python runner.py test
 
 
       - name: Build wheels
