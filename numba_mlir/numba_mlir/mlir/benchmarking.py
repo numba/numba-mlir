@@ -17,7 +17,7 @@ from ..decorators import njit
 from .utils import readenv
 from numpy.testing import assert_allclose
 import inspect
-
+from asv_runner.benchmarks.mark import SkipNotImplemented
 
 _BenchmarkContext = namedtuple(
     "_BenchmarkContext",
@@ -151,7 +151,7 @@ class BenchmarkBase:
                     self.validate(self.args, res)
             except:
                 if self.is_expected_failure:
-                    raise NotImplementedError
+                    raise SkipNotImplemented("Expected failure")
                 else:
                     raise
             else:
@@ -174,7 +174,7 @@ class BenchmarkBase:
         self.time_benchmark = time_benchmark
 
     def get_func(self, *args, **kwargs):
-        raise NotImplementedError
+        raise SkipNotImplemented("No function was provided")
 
     def setup(self, *args, **kwargs):
         # Dummy method, will be overriden
