@@ -77,8 +77,8 @@ def get_impl(ctx):
         output = np.empty((N, H_out, W_out, C_out), dtype=np.float32)
 
         # Loop structure adapted from https://github.com/SkalskiP/ILearnDeepLearning.py/blob/ba0b5ba589d4e656141995e8d1a06d44db6ce58d/01_mysteries_of_neural_networks/06_numpy_convolutional_neural_net/src/layers/convolutional.py#L88
-        for i in range(H_out):
-            for j in range(W_out):
+        for i in prange(H_out):
+            for j in prange(W_out):
                 output[:, i, j, :] = np.sum(
                     input[:, i : i + K, j : j + K, :, np.newaxis]
                     * weights[np.newaxis, :, :, :],
@@ -94,8 +94,8 @@ def get_impl(ctx):
             [x.shape[0], x.shape[1] // 2, x.shape[2] // 2, x.shape[3]],
             dtype=x.dtype,
         )
-        for i in range(x.shape[1] // 2):
-            for j in range(x.shape[2] // 2):
+        for i in prange(x.shape[1] // 2):
+            for j in prange(x.shape[2] // 2):
                 output[:, i, j, :] = np.max(
                     x[:, 2 * i : 2 * i + 2, 2 * j : 2 * j + 2, :], axis=(1, 2)
                 )
