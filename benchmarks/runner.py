@@ -23,6 +23,10 @@ def asv_show(args):
     subprocess.check_call(["python", "-m", "asv", "show"] + args)
 
 
+def asv_machine(args):
+    subprocess.check_call(["python", "-m", "asv", "machine "] + args)
+
+
 def add_bench_arg(args, bench):
     if bench is not None:
         return args + [f"--bench={bench}"]
@@ -49,7 +53,7 @@ def load_results(commit, machine):
 
     pattern = os.path.join(res_path, machine, f"{commit}-existing*.json")
     files = glob.glob(pattern)
-    assert len(files) == 1
+    assert len(files) == 1, files
 
     with open(files[0]) as file:
         file_contents = file.read()
@@ -185,10 +189,28 @@ def run_bench(params):
     save_report(results, commit, machine, reports_dir)
 
 
+def setup_machine(params):
+    import cpuinfo
+
+    machine = get_machine_name()
+    info = cpuinfo.get_cpu_info()
+    arch = info.get("arch")
+    cpu = info.get("brand_raw")
+    num_cpu = info.get("count")
+    args = [
+        f"--machine={machine}",
+        f"--arch={arch}",
+        f"--cpu={cpu}",
+        f"--num_cpu={num_cpu}",
+    ]
+    asv_machine(args)
+
+
 def run_cmd(cmd, params):
     cmds = [
         ("test", run_test),
         ("bench", run_bench),
+        ("machine", setup_machine),
     ]
 
     for n, c in cmds:
