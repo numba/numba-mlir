@@ -279,7 +279,7 @@ jobs:
         run: |
           cd benchmarks
           conda activate test-env
-          conda install asv py-cpuinfo -c intel -c conda-forge
+          conda install "asv>=0.6" py-cpuinfo -c intel -c conda-forge
           conda list
           python runner.py machine
           python runner.py test
@@ -675,7 +675,7 @@ jobs:
         run: |
           cd benchmarks
           source $CONDA/bin/activate test-env
-          conda install asv py-cpuinfo -c intel -c conda-forge
+          conda install "asv>=0.6" py-cpuinfo -c intel -c conda-forge
           conda list
           python runner.py machine
           python runner.py test
