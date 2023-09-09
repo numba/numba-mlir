@@ -198,11 +198,16 @@ def setup_machine(params):
     cpu = info.get("brand_raw")
     num_cpu = info.get("count")
     args = [
-        f"--machine={machine}",
-        f"--arch={arch}",
-        f"--cpu={cpu}",
-        f"--num_cpu={num_cpu}",
+        "--machine",
+        str(machine),
+        "--arch",
+        str(arch),
+        "--cpu",
+        str(cpu),
+        "--num_cpu",
+        str(num_cpu),
     ]
+    asv_machine(["--yes"])
     asv_machine(args)
 
 
