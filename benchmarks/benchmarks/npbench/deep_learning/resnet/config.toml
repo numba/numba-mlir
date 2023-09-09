@@ -1,0 +1,35 @@
+# SPDX-FileCopyrightText: 2021 ETH Zurich and the NPBench authors
+# SPDX-FileCopyrightText: 2022 - 2023 Intel Corporation
+#
+# SPDX-License-Identifier: BSD-3-Clause
+
+[benchmark]
+name = "ResNet-50 Bottleneck Residual Block"
+
+[benchmark.parameters.S]
+N = 8
+W = 14
+H = 14
+C1 = 32
+C2 = 8
+
+[benchmark.parameters.M]
+N = 8
+W = 28
+H = 28
+C1 = 64
+C2 = 16
+
+[benchmark.parameters.L]
+N = 8
+W = 56
+H = 56
+C1 = 128
+C2 = 32
+
+[benchmark.parameters.paper]
+N = 8
+W = 56
+H = 56
+C1 = 256
+C2 = 64
