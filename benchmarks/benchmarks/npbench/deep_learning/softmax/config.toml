@@ -1,0 +1,27 @@
+# SPDX-FileCopyrightText: 2021 ETH Zurich and the NPBench authors
+# SPDX-FileCopyrightText: 2022 - 2023 Intel Corporation
+#
+# SPDX-License-Identifier: BSD-3-Clause
+
+[benchmark]
+name = "Softmax"
+
+[benchmark.parameters.S]
+N = 16
+H = 16
+SM = 128
+
+[benchmark.parameters.M]
+N = 32
+H = 8
+SM = 256
+
+[benchmark.parameters.L]
+N = 64
+H = 16
+SM = 448
+
+[benchmark.parameters.paper]
+N = 64
+H = 16
+SM = 512
