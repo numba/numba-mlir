@@ -24,7 +24,7 @@ class Benchmark(numba_mlir.mlir.benchmarking.BenchmarkBase):
     params = presets
     param_names = ["preset"]
 
-    def get_func(self, preset):
+    def get_func(self):
         return get_impl(get_numba_replace_parfor_context())
 
     def initialize(self, preset):

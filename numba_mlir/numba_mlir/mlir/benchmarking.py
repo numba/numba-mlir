@@ -135,19 +135,17 @@ DEVICES = [""]
 
 class BenchmarkBase:
     timer = timeit.default_timer
+    version = "base"
 
     def __init__(self):
         self.is_validate = VALIDATE
         self.is_expected_failure = False
-        self.func = None
+        self.func = self.get_func()
 
     def get_func(self, *args, **kwargs):
         raise NotImplementedError
 
     def setup(self, *args, **kwargs):
-        if self.func is None:
-            self.func = self.get_func(*args, **kwargs)
-
         self.args = self.initialize(*args, **kwargs)
         try:
             res = self.func(*self.args)
