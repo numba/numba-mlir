@@ -16,6 +16,7 @@ import timeit
 from ..decorators import njit
 from .utils import readenv
 from numpy.testing import assert_allclose
+import inspect
 
 
 _BenchmarkContext = namedtuple(
@@ -140,7 +141,14 @@ class BenchmarkBase:
     def __init__(self):
         self.is_validate = VALIDATE
         self.is_expected_failure = False
-        self.func = self.get_func()
+        func = self.get_func()
+        self.func = func
+
+        def wrapper(*arg, **kwargs):
+            func(*self.args)
+
+        wrapper.pretty_source = inspect.getsource(func)
+        self.time_benchmark = wrapper
 
     def get_func(self, *args, **kwargs):
         raise NotImplementedError
@@ -165,4 +173,5 @@ class BenchmarkBase:
             del self.args
 
     def time_benchmark(self, *args, **kwargs):
-        self.func(*self.args)
+        # Dummy method, will be overriden
+        pass
