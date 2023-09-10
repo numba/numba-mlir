@@ -3,10 +3,13 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 import inspect
+from numba.core.typing.templates import CallableTemplate
+from numba.core import types
+
+from .target import infer_global
 from .linalg_builder import eltwise
 from .numpy.funcs import register_func
-from numba.core.typing.templates import infer_global, CallableTemplate
-from numba.core import types
+
 import sys
 
 

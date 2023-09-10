@@ -27,12 +27,12 @@ import math
 from numba import prange
 
 from numba.core import types
-from numba.core.typing.templates import ConcreteTemplate, signature, infer_global
+from numba.core.typing.templates import ConcreteTemplate, signature
 from inspect import signature as sig
 from collections import namedtuple
 
+from .target import infer_global
 from ..builtin import helper_funcs
-
 from ..settings import MKL_AVAILABLE
 
 

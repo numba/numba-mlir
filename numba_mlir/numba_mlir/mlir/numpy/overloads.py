@@ -7,9 +7,9 @@ import numpy as np
 from numba.np.numpy_support import is_nonelike
 from numba.core.extending import overload
 from numba.core.typing.templates import signature, AbstractTemplate
-from numba.core.typing import npydecl
 from numba.core.types.npytypes import Array
 from numba.core import types
+from ..target import registry, overload, register_global
 
 
 def _get_init_like_impl(init_func, dtype, shape):
@@ -109,6 +109,6 @@ def get_reduction_id(prefer_float):
 ReductionId = get_reduction_id(False)
 ReductionFloatId = get_reduction_id(True)
 for func in [np.sum, np.max, np.min, np.amax, np.amin, np.prod]:
-    _replace_global(npydecl.registry, func, ReductionId)
+    _replace_global(registry, func, ReductionId)
 
-_replace_global(npydecl.registry, np.mean, ReductionFloatId)
+_replace_global(registry, np.mean, ReductionFloatId)

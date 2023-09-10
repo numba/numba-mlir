@@ -6,8 +6,9 @@ from numba.core import types
 from numba.core.typing.templates import (
     ConcreteTemplate,
     signature,
-    infer_global,
 )
+
+from .target import infer_global
 
 
 def _stub_error():
