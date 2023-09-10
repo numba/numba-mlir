@@ -8,11 +8,7 @@ Define @jit and related decorators.
 
 import warnings
 
-from .mlir.compiler import (
-    mlir_compiler_pipeline,
-    get_gpu_pipeline,
-    mlir_compiler_replace_parfors_pipeline,
-)
+from .mlir.target import numba_mlir_jit
 from .mlir.vectorize import vectorize as mlir_vectorize
 from .mlir.settings import USE_MLIR
 
@@ -21,55 +17,7 @@ from numba.core.decorators import njit as orig_njit
 from numba.np.ufunc import vectorize as orig_vectorize
 
 
-def mlir_jit(
-    signature_or_function=None,
-    locals={},
-    cache=False,
-    pipeline_class=None,
-    boundscheck=False,
-    **options
-):
-    if not options.get("nopython", False):
-        return orig_jit(
-            signature_or_function=signature_or_function,
-            locals=locals,
-            cache=cache,
-            boundscheck=boundscheck,
-            **options
-        )
-
-    fp64_truncate = options.get("gpu_fp64_truncate", False)
-    assert fp64_truncate in [
-        True,
-        False,
-        "auto",
-    ], 'gpu_fp64_truncate supported values are True/False/"auto"'
-    options.pop("gpu_fp64_truncate", None)
-
-    use_64bit_index = options.get("gpu_use_64bit_index", True)
-    assert use_64bit_index in [
-        True,
-        False,
-    ], "gpu_use_64bit_index supported values are True/False"
-    options.pop("gpu_use_64bit_index", None)
-
-    if options.get("enable_gpu_pipeline", True):
-        pipeline = get_gpu_pipeline(fp64_truncate, use_64bit_index)
-    else:
-        pipeline = mlir_compiler_pipeline
-
-    options.pop("enable_gpu_pipeline", None)
-    options.pop(
-        "access_types", None
-    )  # pop them to ignore since they are not a part of numba but dppy.
-    return orig_jit(
-        signature_or_function=signature_or_function,
-        locals=locals,
-        cache=cache,
-        pipeline_class=pipeline,
-        boundscheck=boundscheck,
-        **options
-    )
+mlir_jit = numba_mlir_jit
 
 
 def mlir_njit(*args, **kws):
@@ -84,7 +32,7 @@ def mlir_njit(*args, **kws):
         warnings.warn("forceobj is set for njit and is ignored", RuntimeWarning)
         del kws["forceobj"]
     kws.update({"nopython": True})
-    return jit(*args, **kws)
+    return mlir_jit(*args, **kws)
 
 
 def mlir_njit_replace_parfors(

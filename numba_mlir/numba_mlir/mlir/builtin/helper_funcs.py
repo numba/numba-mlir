@@ -8,7 +8,7 @@ from numba.core.typing.templates import (
     signature,
 )
 
-from .target import infer_global
+from ..target import infer_global
 
 
 def _stub_error():
