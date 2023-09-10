@@ -5,7 +5,7 @@
 import copy
 from functools import singledispatch, cached_property
 
-from numba.core import types, cpu
+from numba.core import types, cpu, utils
 from numba.extending import typeof_impl as numba_typeof_impl
 from numba.core.typing import Context
 from numba.core.registry import CPUTarget

@@ -61,7 +61,7 @@ def mlir_jit(
         pipeline = mlir_compiler_pipeline
 
     options.pop("enable_gpu_pipeline", None)
-    options["target_backend"] = target_name
+    options["_target"] = target_name
     return orig_jit(
         signature_or_function=signature_or_function,
         locals=locals,
