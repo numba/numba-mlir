@@ -9,7 +9,7 @@ from numba.core.extending import overload
 from numba.core.typing.templates import signature, AbstractTemplate
 from numba.core.types.npytypes import Array
 from numba.core import types
-from ..target import registry, overload, register_global
+from ..target import registry
 
 
 def _get_init_like_impl(init_func, dtype, shape):
