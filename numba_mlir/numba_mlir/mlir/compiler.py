@@ -7,7 +7,6 @@ Define compiler pipelines.
 """
 
 from .lowering import mlir_NativeLowering
-from .array_type import ensure_types_resgistered
 
 import functools
 
@@ -123,7 +122,6 @@ class mlir_PassBuilder(orig_DefaultPassBuilder):
 
 class mlir_compiler_pipeline(orig_CompilerBase):
     def define_pipelines(self):
-        ensure_types_resgistered()
         # this maintains the objmode fallback behaviour
         pms = []
         if not self.state.flags.force_pyobject:
@@ -137,7 +135,6 @@ class mlir_compiler_pipeline(orig_CompilerBase):
 def get_gpu_pipeline(fp64_truncate, use_64bit_index):
     class mlir_compiler_gpu_pipeline(orig_CompilerBase):
         def define_pipelines(self):
-            ensure_types_resgistered()
             # this maintains the objmode fallback behaviour
             pms = []
             if not self.state.flags.force_pyobject:

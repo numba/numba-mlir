@@ -4,13 +4,15 @@
 
 import numpy as np
 
-from numba.extending import overload_classmethod, register_model, typeof_impl
+from numba.extending import overload_classmethod, register_model
 from numba.core import errors
 from numba.core.types.npytypes import Array
 from numba.core.datamodel.models import ArrayModel
 from numba.np import numpy_support
 from numba.np.arrayobj import intrin_alloc
 from numba.core.imputils import lower_cast
+
+from .target import typeof_impl
 
 
 class FixedArray(Array):
@@ -53,49 +55,41 @@ def get_fixed_dims(shape):
     return tuple(d if (d == 0 or d == 1) else None for d in shape)
 
 
-def register_types():
-    register_model(FixedArray)(ArrayModel)
-
-    @lower_cast(FixedArray, Array)
-    def array_to_array(context, builder, fromty, toty, val):
-        return val
-
-    @lower_cast(Array, FixedArray)
-    def array_to_array(context, builder, fromty, toty, val):
-        return val
-
-    @lower_cast(FixedArray, FixedArray)
-    def array_to_array(context, builder, fromty, toty, val):
-        return val
-
-    @overload_classmethod(FixedArray, "_allocate")
-    def _ol_array_allocate(cls, allocsize, align):
-        """Implements a Numba-only default target (cpu) classmethod on the array type."""
-
-        def impl(cls, allocsize, align):
-            return intrin_alloc(allocsize, align)
-
-        return impl
-
-    @typeof_impl.register(np.ndarray)
-    def _typeof_ndarray(val, c):
-        try:
-            dtype = numpy_support.from_dtype(val.dtype)
-        except errors.NumbaNotImplementedError:
-            raise errors.NumbaValueError(f"Unsupported array dtype: {val.dtype}")
-        layout = numpy_support.map_layout(val)
-        readonly = not val.flags.writeable
-        fixed_dims = get_fixed_dims(val.shape)
-        return FixedArray(
-            dtype, val.ndim, layout, fixed_dims=fixed_dims, readonly=readonly
-        )
+register_model(FixedArray)(ArrayModel)
 
 
-_registred = False
+@lower_cast(FixedArray, Array)
+def array_to_array(context, builder, fromty, toty, val):
+    return val
 
 
-def ensure_types_resgistered():
-    global _registred
-    if not _registred:
-        register_types()
-        _registred = True
+@lower_cast(Array, FixedArray)
+def array_to_array(context, builder, fromty, toty, val):
+    return val
+
+
+@lower_cast(FixedArray, FixedArray)
+def array_to_array(context, builder, fromty, toty, val):
+    return val
+
+
+@overload_classmethod(FixedArray, "_allocate")
+def _ol_array_allocate(cls, allocsize, align):
+    """Implements a Numba-only default target (cpu) classmethod on the array type."""
+
+    def impl(cls, allocsize, align):
+        return intrin_alloc(allocsize, align)
+
+    return impl
+
+
+@typeof_impl.register(np.ndarray)
+def _typeof_ndarray(val, c):
+    try:
+        dtype = numpy_support.from_dtype(val.dtype)
+    except errors.NumbaNotImplementedError:
+        raise errors.NumbaValueError(f"Unsupported array dtype: {val.dtype}")
+    layout = numpy_support.map_layout(val)
+    readonly = not val.flags.writeable
+    fixed_dims = get_fixed_dims(val.shape)
+    return FixedArray(dtype, val.ndim, layout, fixed_dims=fixed_dims, readonly=readonly)
