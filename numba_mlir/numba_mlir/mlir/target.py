@@ -106,7 +106,7 @@ class NumbaMLIRTarget(CPUTarget):
         return NumbaMLIRContext()
 
 
-numba_mlir_target = NumbaMLIRTarget("numba-mlir")
+numba_mlir_target = NumbaMLIRTarget(target_name)
 
 
 class NumbaMLIRDispatcher(Dispatcher):
