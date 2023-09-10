@@ -1,0 +1,47 @@
+# SPDX-FileCopyrightText: 2021 ETH Zurich and the NPBench authors
+# SPDX-FileCopyrightText: 2022 - 2023 Intel Corporation
+#
+# SPDX-License-Identifier: BSD-3-Clause
+
+[benchmark]
+name = "Scattering Self Energies"
+
+[benchmark.parameters.S]
+Nkz = 2
+NE = 4
+Nqz = 2
+Nw = 2
+N3D = 2
+NA = 6
+NB = 2
+Norb = 3
+
+[benchmark.parameters.M]
+Nkz = 3
+NE = 5
+Nqz = 3
+Nw = 2
+N3D = 2
+NA = 10
+NB = 3
+Norb = 4
+
+[benchmark.parameters.L]
+Nkz = 3
+NE = 10
+Nqz = 3
+Nw = 3
+N3D = 3
+NA = 12
+NB = 4
+Norb = 4
+
+[benchmark.parameters.paper]
+Nkz = 4
+NE = 10
+Nqz = 4
+Nw = 3
+N3D = 3
+NA = 20
+NB = 4
+Norb = 4

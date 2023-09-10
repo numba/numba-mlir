@@ -1,0 +1,29 @@
+# SPDX-FileCopyrightText: 2014-2021 ETH Zurich
+# SPDX-FileCopyrightText: 2007 Free Software Foundation, Inc. <https://fsf.org/>
+# SPDX-FileCopyrightText: 2021 ETH Zurich and the NPBench authors
+# SPDX-FileCopyrightText: 2022 - 2023 Intel Corporation
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+[benchmark]
+name = "Vertical Advection"
+
+[benchmark.parameters.S]
+I = 60
+J = 60
+K = 40
+
+[benchmark.parameters.M]
+I = 112
+J = 112
+K = 80
+
+[benchmark.parameters.L]
+I = 180
+J = 180
+K = 160
+
+[benchmark.parameters.paper]
+I = 256
+J = 256
+K = 160

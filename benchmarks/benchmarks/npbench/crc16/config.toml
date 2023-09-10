@@ -1,0 +1,20 @@
+# SPDX-FileCopyrightText: 2018 Øystein Sture
+# SPDX-FileCopyrightText: 2021 ETH Zurich and the NPBench authors
+# SPDX-FileCopyrightText: 2022 - 2023 Intel Corporation
+#
+# SPDX-License-Identifier: BSD-3-Clause
+
+[benchmark]
+name = "CRC-16"
+
+[benchmark.parameters.S]
+N = 1600
+
+[benchmark.parameters.M]
+N = 16000
+
+[benchmark.parameters.L]
+N = 160000
+
+[benchmark.parameters.paper]
+N = 1000000

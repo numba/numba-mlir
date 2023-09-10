@@ -1,0 +1,36 @@
+# SPDX-FileCopyrightText: 2020 Philip Mocz
+# SPDX-FileCopyrightText: 2021 ETH Zurich and the NPBench authors
+# SPDX-FileCopyrightText: 2022 - 2023 Intel Corporation
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+[benchmark]
+name = "Nbody"
+
+[benchmark.parameters.S]
+N = 25
+tEnd = 2.0
+dt = 0.05
+softening = 0.1
+G = 1.0
+
+[benchmark.parameters.M]
+N = 50
+tEnd = 5.0
+dt = 0.02
+softening = 0.1
+G = 1.0
+
+[benchmark.parameters.L]
+N = 100
+tEnd = 9.0
+dt = 0.01
+softening = 0.1
+G = 1.0
+
+[benchmark.parameters.paper]
+N = 100
+tEnd = 10.0
+dt = 0.01
+softening = 0.1
+G = 1.0
