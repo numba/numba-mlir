@@ -159,9 +159,9 @@ class numba_mlir_jit(JitDecorator):
         else:
             pipeline_class = mlir_compiler_pipeline
 
-        del options["gpu_fp64_truncate"]
-        del options["gpu_use_64bit_index"]
-        del options["enable_gpu_pipeline"]
+        options.pop("gpu_fp64_truncate", None)
+        options.pop("gpu_use_64bit_index", None)
+        options.pop("enable_gpu_pipeline", None)
 
         pipeline_class = self._kwargs.get("pipeline_class", pipeline_class)
         return disp(
