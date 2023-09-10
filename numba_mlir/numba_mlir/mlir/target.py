@@ -112,6 +112,24 @@ numba_mlir_target = NumbaMLIRTarget(target_name)
 class NumbaMLIRDispatcher(Dispatcher):
     targetdescr = numba_mlir_target
 
+    def typeof_pyval(self, val):
+        """
+        Resolve the Numba type of Python value *val*.
+        This is called from numba._dispatcher as a fallback if the native code
+        cannot decide the type.
+        """
+        # Not going through the resolve_argument_type() indirection
+        # can save a couple µs.
+        try:
+            tp = typeof(val, Purpose.argument)
+        except ValueError:
+            tp = types.pyobject
+        else:
+            if tp is None:
+                tp = types.pyobject
+        self._types_active_call.append(tp)
+        return tp
+
 
 dispatcher_registry[target_registry[target_name]] = NumbaMLIRDispatcher
 
