@@ -163,7 +163,7 @@ class numba_mlir_jit(JitDecorator):
         options.pop("gpu_use_64bit_index", None)
         options.pop("enable_gpu_pipeline", None)
 
-        pipeline_class = self._kwargs.get("pipeline_class", pipeline_class)
+        pipeline_class = options.get("pipeline_class", pipeline_class)
         return disp(
             py_func=self.py_func,
             targetoptions=options,
