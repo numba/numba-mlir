@@ -12,7 +12,7 @@ import types as pytypes
 from numpy.testing import assert_equal, assert_allclose
 
 from numba_mlir.mlir.utils import readenv
-from numba_mlir import njit, jit, vectorize
+from numba_mlir import njit, jit, vectorize, njit_replace_parfors
 
 from numba.core.registry import CPUDispatcher
 from numba_mlir.mlir.passes import (
@@ -401,14 +401,12 @@ def _gen_replace_parfor_tests():
                 self.has_parallel = None
 
             def _gen_normal(self, func):
-                return njit(replace_parfors=True)(func)
+                return njit_replace_parfors(func)
 
             def _gen_parallel(self, func):
                 def wrapper(*args, **kwargs):
                     with print_pass_ir([], ["ParallelToTbbPass"]):
-                        res = njit(parallel=True, replace_parfors=True)(func)(
-                            *args, **kwargs
-                        )
+                        res = njit_replace_parfors(parallel=True)(func)(*args, **kwargs)
                         # ir = get_print_buffer()
                         # # Check some parallel loops were actually generated
                         # self.has_parallel = "scf.parallel" in ir
@@ -546,9 +544,7 @@ def _gen_replace_parfor_tests():
             func.__globals__[name] = newval
 
     def _njit_wrapper(*args, **kwargs):
-        kwa = copy.copy(kwargs)
-        kwa["replace_parfors"] = True
-        return njit(*args, **kwa)
+        return njit_replace_parfors(*args, **kwargs)
 
     def _gen_test_func(func):
         _replace_global(func, "njit", _njit_wrapper)
@@ -586,7 +582,7 @@ def test_replace_parfor_numpy():
     a = np.arange(10)
     b = np.arange(10, 20)
 
-    jit_func = njit(py_func, parallel=True, replace_parfors=True)
+    jit_func = njit_replace_parfors(py_func, parallel=True)
     with print_pass_ir([], ["CFGToSCFPass"]):
         assert_equal(py_func(a, b), jit_func(a, b))
         ir = get_print_buffer()
@@ -597,7 +593,7 @@ def test_replace_parfor_numpy_multidim():
     def py_func():
         return np.ones((2, 3, 4))
 
-    jit_func = njit(py_func, parallel=True, replace_parfors=True)
+    jit_func = njit_replace_parfors(py_func, parallel=True)
     with print_pass_ir([], ["CFGToSCFPass"]):
         assert_equal(py_func(), jit_func())
         ir = get_print_buffer()
@@ -608,7 +604,7 @@ def test_replace_parfor_numpy_tuple():
     def py_func():
         return np.ones((10, 10)) + 1.0
 
-    jit_func = njit(py_func, parallel=True, replace_parfors=True)
+    jit_func = njit_replace_parfors(py_func, parallel=True)
     with print_pass_ir([], ["CFGToSCFPass"]):
         assert_equal(py_func(), jit_func())
         ir = get_print_buffer()
@@ -625,7 +621,7 @@ def test_replace_parfor_numpy_reduction():
     a = np.arange(count).reshape(shape)
     b = np.arange(count, count + count).reshape(shape)
 
-    jit_func = njit(py_func, parallel=True, replace_parfors=True)
+    jit_func = njit_replace_parfors(py_func, parallel=True)
     with print_pass_ir([], ["CFGToSCFPass"]):
         assert_equal(py_func(a, b), jit_func(a, b))
         ir = get_print_buffer()
@@ -639,7 +635,7 @@ def test_replace_parfor_dot():
     a = np.linspace(0, 1, 20).reshape(2, 10)
     b = np.linspace(2, 1, 10)
 
-    jit_func = njit(py_func, parallel=True, replace_parfors=True)
+    jit_func = njit_replace_parfors(py_func, parallel=True)
     with print_pass_ir([], ["CFGToSCFPass"]):
         assert_allclose(py_func(a, b), jit_func(a, b), rtol=1e-4, atol=1e-7)
         ir = get_print_buffer()
@@ -654,7 +650,7 @@ def test_replace_parfor_numpy_operator():
     a = np.arange(10)
     b = np.arange(10, 20)
 
-    jit_func = njit(py_func, parallel=True, replace_parfors=True)
+    jit_func = njit_replace_parfors(py_func, parallel=True)
     with print_pass_ir([], ["CFGToSCFPass"]):
         assert_equal(py_func(a, b), jit_func(a, b))
         ir = get_print_buffer()
@@ -668,7 +664,7 @@ def test_replace_parfor_slice_capture():
 
     a = np.ones(1)
 
-    jit_func = njit(py_func, parallel=True, replace_parfors=True)
+    jit_func = njit_replace_parfors(py_func, parallel=True)
     with print_pass_ir([], ["CFGToSCFPass"]):
         assert_equal(py_func(a), jit_func(a))
         ir = get_print_buffer()
@@ -682,7 +678,7 @@ def test_replace_parfor_prange():
 
     a = np.empty(10)
 
-    jit_func = njit(py_func, parallel=True, replace_parfors=True)
+    jit_func = njit_replace_parfors(py_func, parallel=True)
     with print_pass_ir([], ["CFGToSCFPass"]):
         assert_equal(py_func(a), jit_func(a))
         ir = get_print_buffer()
@@ -698,7 +694,7 @@ def test_replace_parfor_prange_nested():
     a = np.empty((3, 4))
     b = a.copy()
 
-    jit_func = njit(py_func, parallel=True, replace_parfors=True)
+    jit_func = njit_replace_parfors(py_func, parallel=True)
     with print_pass_ir([], ["CFGToSCFPass"]):
         py_func(a)
         jit_func(b)
@@ -717,7 +713,7 @@ def test_replace_parfor_prange_nested_reduction():
 
     a = np.arange(3 * 4).reshape(3, 4)
 
-    jit_func = njit(py_func, parallel=True, replace_parfors=True)
+    jit_func = njit_replace_parfors(py_func, parallel=True)
     with print_pass_ir([], ["CFGToSCFPass"]):
         assert_equal(py_func(a), jit_func(a))
         ir = get_print_buffer()
@@ -735,7 +731,7 @@ def test_replace_parfor_prange_reduction1():
 
     a = np.arange(10)
 
-    jit_func = njit(py_func, parallel=True, replace_parfors=True)
+    jit_func = njit_replace_parfors(py_func, parallel=True)
     with print_pass_ir([], ["CFGToSCFPass"]):
         assert_equal(py_func(a), jit_func(a))
         ir = get_print_buffer()
@@ -753,7 +749,7 @@ def test_replace_parfor_prange_reduction2():
 
     a = np.arange(10)
 
-    jit_func = njit(py_func, parallel=True, replace_parfors=True)
+    jit_func = njit_replace_parfors(py_func, parallel=True)
     with print_pass_ir([], ["CFGToSCFPass"]):
         assert_equal(py_func(a), jit_func(a))
         ir = get_print_buffer()
@@ -768,7 +764,7 @@ def test_replace_parfor_prange_reverse_iter():
             s += A[i]
         return s
 
-    jit_func = njit(py_func, parallel=True, replace_parfors=True)
+    jit_func = njit_replace_parfors(py_func, parallel=True)
 
     A = np.ones((4), dtype=np.float64)
 
@@ -793,5 +789,5 @@ def test_replace_parfor_dpnp():
 
     a = dpnp.arange(10)
 
-    jit_func = njit(py_func, parallel=True, replace_parfors=True)
+    jit_func = njit_replace_parfors(py_func, parallel=True)
     assert_equal(py_func(a), jit_func(a))

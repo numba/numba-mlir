@@ -53,14 +53,11 @@ def mlir_jit(
     ], "gpu_use_64bit_index supported values are True/False"
     options.pop("gpu_use_64bit_index", None)
 
-    if options.get("replace_parfors", False):
-        pipeline = mlir_compiler_replace_parfors_pipeline
-    elif options.get("enable_gpu_pipeline", True):
+    if options.get("enable_gpu_pipeline", True):
         pipeline = get_gpu_pipeline(fp64_truncate, use_64bit_index)
     else:
         pipeline = mlir_compiler_pipeline
 
-    options.pop("replace_parfors", None)
     options.pop("enable_gpu_pipeline", None)
     options.pop(
         "access_types", None
@@ -90,14 +87,36 @@ def mlir_njit(*args, **kws):
     return jit(*args, **kws)
 
 
+def mlir_njit_replace_parfors(
+    signature_or_function=None,
+    locals={},
+    cache=False,
+    pipeline_class=None,
+    boundscheck=False,
+    **options
+):
+    options.update({"nopython": True})
+    pipeline = mlir_compiler_replace_parfors_pipeline
+    return orig_jit(
+        signature_or_function=signature_or_function,
+        locals=locals,
+        cache=cache,
+        pipeline_class=pipeline,
+        boundscheck=boundscheck,
+        **options
+    )
+
+
 if USE_MLIR:
     jit = mlir_jit
     njit = mlir_njit
     vectorize = mlir_vectorize
+    njit_replace_parfors = mlir_njit_replace_parfors
 else:
     jit = orig_jit
     njit = orig_njit
     vectorize = orig_vectorize
+    njit_replace_parfors = orig_njit
 
 
 def override_numba_decorators():

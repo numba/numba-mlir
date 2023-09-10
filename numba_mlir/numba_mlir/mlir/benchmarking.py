@@ -13,7 +13,7 @@ from collections import namedtuple
 import numpy as np
 import numba as nb
 import timeit
-from ..decorators import njit
+from ..decorators import njit, njit_replace_parfors
 from .utils import readenv
 from numpy.testing import assert_allclose
 import inspect
@@ -47,7 +47,7 @@ def get_numba_mlir_context():
     return _BenchmarkContext(_nm_njit, np, nb.prange)
 
 
-_rp_njit = njit(parallel=True, fastmath=True, replace_parfors=True)
+_rp_njit = njit_replace_parfors(parallel=True, fastmath=True)
 
 
 def get_numba_replace_parfor_context():
