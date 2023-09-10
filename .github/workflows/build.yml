@@ -12,7 +12,6 @@ on:
 
 env:
   TBB_VER: 2021.10.0
-  LEVEL_ZERO_VER: v1.6.2
   LLVM_SHA_FILE: llvm-sha.txt
   NUMBA_DISABLE_ERROR_MESSAGE_HIGHLIGHTING: "1"
   NUMBA_DISABLE_PERFORMANCE_WARNINGS: "1"
@@ -60,6 +59,7 @@ jobs:
           activate-environment: test-env
           environment-file: ${{ env.CORE_ENV_FILE }}
           python-version: "3.10"
+          channels: conda-forge,intel
 
       - name: Setup Cache Vars
         run: |
@@ -68,14 +68,6 @@ jobs:
           $wspath = (Resolve-Path "$env:GITHUB_WORKSPACE\..\")
           echo "WORKSPACE=$wspath" >> $env:GITHUB_ENV
           cat $env:GITHUB_ENV
-
-      - name: Cache Level-Zero
-        id: cache-level-zero
-        uses: actions/cache@v3
-        with:
-          path: |
-            D:\a\numba-mlir\level-zero\**
-          key: ${{ runner.os }}-build-l0-${{ env.LEVEL_ZERO_VER }}
 
       - name: Cache LLLVM-MLIR
         id: cache-llvm-mlir
@@ -86,35 +78,6 @@ jobs:
           path: |
             D:\a\numba-mlir\llvm-mlir\_mlir_install\**
           key: ${{ runner.os }}-build-llvm-${{ env.LLVM_CACHE_NUMBER }}-${{ env.LLVM_SHA }}
-
-      - name: Download and Build Level-Zero
-        if: steps.cache-level-zero.outputs.cache-hit != 'true'
-        run: |
-          cd $env:WORKSPACE
-          mkdir -ea 0 -p level-zero
-          pushd level-zero
-          if((Test-Path -PathType leaf bundle_id.txt) -and ((cat bundle_id.txt) -eq ($env:LEVEL_ZERO_VER)))
-          {
-            echo "INFO: Using cached build of Level-Zero $env:LEVEL_ZERO_VER"
-          } else {
-            echo "INFO: INFO: Downloading and building Level-Zero $env:LEVEL_ZERO_VER"
-            rm -r *
-            echo "$env:LEVEL_ZERO_VER" > bundle_id.txt
-            cat bundle_id.txt
-            git clone https://github.com/oneapi-src/level-zero.git
-            pushd level-zero
-            git checkout $env:LEVEL_ZERO_VER
-            mkdir level_zero_install
-            mkdir build
-            cd build
-            cmake ..                                                           `
-              -GNinja                                                          `
-              -DCMAKE_BUILD_TYPE=Release                                       `
-              -DCMAKE_INSTALL_PREFIX="$env:WORKSPACE\level-zero\level-zero\level_zero_install"
-            ninja install
-            popd
-          }
-          popd
 
       - name: Build LLVM-MLIR
         if: steps.cache-llvm-mlir.outputs.cache-hit != 'true'
@@ -155,7 +118,6 @@ jobs:
           $external_lit="$env:GITHUB_WORKSPACE\scripts\runlit.py"
           mkdir -p _build
           cd _build
-          $env:LEVEL_ZERO_DIR=(Resolve-Path "$env:WORKSPACE/level-zero/level-zero/level_zero_install")
           $env:LEVEL_ZERO_VERSION_CHECK_OFF="1"
           $env:LLVM_DIR=(Resolve-Path "$env:WORKSPACE/llvm-mlir/_mlir_install")
           cmake "$env:GITHUB_WORKSPACE"                                        `
@@ -217,14 +179,6 @@ jobs:
           echo "WORKSPACE=$wspath" >> $env:GITHUB_ENV
           cat $env:GITHUB_ENV
 
-      - name: Cache Level-Zero
-        id: cache-level-zero
-        uses: actions/cache@v3
-        with:
-          path: |
-            D:\a\numba-mlir\level-zero\**
-          key: ${{ runner.os }}-build-l0-${{ env.LEVEL_ZERO_VER }}
-
       - name: Cache LLLVM-MLIR
         id: cache-llvm-mlir
         uses: actions/cache@v3
@@ -239,7 +193,7 @@ jobs:
       - name: Build Python frontend
         run: |
           cd numba_mlir
-          conda create -y -n test-env python=${{ matrix.python }} "pip>=22" numba=0.57 numpy=1.23 "setuptools<65.6" scikit-learn pytest-xdist ninja scipy pybind11 pytest "tbb>=$env:TBB_VER" "tbb-devel>=$env:TBB_VER" cmake "mkl-devel-dpcpp>=2023.1" zlib dpcpp_win-64 -c conda-forge -c intel -c numba
+          conda create -y -n test-env python=${{ matrix.python }} "pip>=22" numba=0.57 numpy=1.23 "setuptools<65.6" scikit-learn pytest-xdist ninja scipy pybind11 pytest "tbb>=$env:TBB_VER" "tbb-devel>=$env:TBB_VER" cmake "mkl-devel-dpcpp>=2023.1" zlib dpcpp_win-64 level-zero-devel -c conda-forge -c intel -c numba
           conda info
           conda activate test-env
           echo "Conda prefix: $env:CONDA_PREFIX"
@@ -249,7 +203,6 @@ jobs:
           python -c "import numba; print('numba', numba.__version__)"
           python -c "import numpy; print(numpy.get_include())"
           cmake --version
-          $env:LEVEL_ZERO_DIR=(Resolve-Path "$env:WORKSPACE/level-zero/level-zero/level_zero_install")
           $env:LEVEL_ZERO_VERSION_CHECK_OFF="1"
           $env:LLVM_PATH=(Resolve-Path "$env:WORKSPACE/llvm-mlir/_mlir_install")
           $env:NUMBA_MLIR_USE_SYCL="ON"
@@ -290,7 +243,6 @@ jobs:
           mkdir numba_mlir_wheels
           pushd numba_mlir_wheels
           conda activate test-env
-          $env:LEVEL_ZERO_DIR=(Resolve-Path "$env:WORKSPACE/level-zero/level-zero/level_zero_install")
           $env:LEVEL_ZERO_VERSION_CHECK_OFF="1"
           $env:LLVM_PATH=(Resolve-Path "$env:WORKSPACE/llvm-mlir/_mlir_install")
           $env:NUMBA_MLIR_USE_SYCL="ON"
@@ -356,14 +308,6 @@ jobs:
           echo "WORKSPACE=$wspath" >> $env:GITHUB_ENV
           cat $env:GITHUB_ENV
 
-      - name: Cache Level-Zero
-        id: cache-level-zero
-        uses: actions/cache@v3
-        with:
-          path: |
-            D:\a\numba-mlir\level-zero\**
-          key: ${{ runner.os }}-build-l0-${{ env.LEVEL_ZERO_VER }}
-
       - name: Cache LLLVM-MLIR
         id: cache-llvm-mlir
         uses: actions/cache@v3
@@ -388,7 +332,6 @@ jobs:
           Rename-Item -Path "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\Common7\Tools\vsdevcmd\ext\html_help.bat" -NewName "html_help.bat.bak"
           Rename-Item -Path "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\Common7\Tools\vsdevcmd\ext\perf_tools.bat" -NewName "perf_tools.bat.bak"
           Rename-Item -Path "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\Common7\Tools\vsdevcmd\ext\vssdk.bat" -NewName "vssdk.bat.bak"
-          $env:LEVEL_ZERO_DIR=(Resolve-Path "$env:WORKSPACE/level-zero/level-zero/level_zero_install")
           $env:LEVEL_ZERO_VERSION_CHECK_OFF="1"
           $env:LLVM_PATH=(Resolve-Path "$env:WORKSPACE/llvm-mlir/_mlir_install")
           $env:NUMBA_MLIR_USE_SYCL="ON"
@@ -447,20 +390,13 @@ jobs:
           activate-environment: test-env
           environment-file: ${{ env.CORE_ENV_FILE }}
           python-version: "3.10"
+          channels: conda-forge,intel
 
       - name: Setup Cache Vars
         run: |
           echo 'LLVM_SHA<<EOF' >> $GITHUB_ENV
           cat $GITHUB_WORKSPACE/$LLVM_SHA_FILE >> $GITHUB_ENV
           echo 'EOF' >> $GITHUB_ENV
-
-      - name: Cache Level-Zero
-        id: cache-level-zero
-        uses: actions/cache@v3
-        with:
-          path: |
-            /home/runner/work/level-zero/**
-          key: ${{ runner.os }}-build-l0-${{ env.LEVEL_ZERO_VER }}
 
       - name: Cache LLLVM-MLIR
         id: cache-llvm-mlir
@@ -471,34 +407,6 @@ jobs:
           path: |
             /home/runner/work/llvm-mlir/_mlir_install/**
           key: ${{ runner.os }}-build-llvm-${{ env.LLVM_CACHE_NUMBER }}-${{ env.LLVM_SHA }}
-
-      - name: Download and Build Level-Zero
-        if: steps.cache-level-zero.outputs.cache-hit != 'true'
-        shell: bash -l {0}
-        run: |
-          cd /home/runner/work
-          mkdir -p level-zero
-          pushd level-zero
-          tree
-          if [[ -f bundle_id.txt && ( "$(cat bundle_id.txt)" == "${LEVEL_ZERO_VER}" ) ]]; then
-            echo "INFO: Using cached build of Level-Zero ${LEVEL_ZERO_VER}"
-          else
-            echo "INFO: Downloading and building Level-Zero ${LEVEL_ZERO_VER}"
-            rm -rf *
-            echo ${LEVEL_ZERO_VER} > bundle_id.txt || rm -rf bundle_id.txt
-            cat bundle_id.txt || exit 1
-            [ -f bundle_id.txt ] || exit 1
-            git clone https://github.com/oneapi-src/level-zero.git || exit 1
-            pushd level-zero || exit 1
-            git checkout ${LEVEL_ZERO_VER} || exit 1
-            mkdir level_zero_install || exit 1
-            mkdir build || exit 1
-            cd build || exit 1
-            cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=../level_zero_install .. || exit 1
-            make install || exit 1
-            popd
-          fi
-          popd
 
       - name: Build LLVM-MLIR
         if: steps.cache-llvm-mlir.outputs.cache-hit != 'true'
@@ -543,7 +451,6 @@ jobs:
           cd _build
           source $CONDA/bin/activate test-env
           export EXTERNAL_LIT=${GITHUB_WORKSPACE}/scripts/runlit.py
-          export LEVEL_ZERO_DIR=/home/runner/work/level-zero/level-zero/level_zero_install
           export LEVEL_ZERO_VERSION_CHECK_OFF=1
           export LLVM_DIR=/home/runner/work/llvm-mlir/_mlir_install
           export CC=${CONDA_PREFIX}/bin/x86_64-conda-linux-gnu-cc
@@ -607,14 +514,6 @@ jobs:
           cat $GITHUB_WORKSPACE/$LLVM_SHA_FILE >> $GITHUB_ENV
           echo 'EOF' >> $GITHUB_ENV
 
-      - name: Cache Level-Zero
-        id: cache-level-zero
-        uses: actions/cache@v3
-        with:
-          path: |
-            /home/runner/work/level-zero/**
-          key: ${{ runner.os }}-build-l0-${{ env.LEVEL_ZERO_VER }}
-
       - name: Cache LLLVM-MLIR
         id: cache-llvm-mlir
         uses: actions/cache@v3
@@ -631,7 +530,7 @@ jobs:
 
         run: |
           cd numba_mlir
-          conda create -y -n test-env python=${{ matrix.python }} "pip>=22" numba=0.57 numpy=1.23 "setuptools<65.6" scikit-learn pytest-xdist ninja scipy pybind11 pytest "tbb>=${TBB_VER}" "tbb-devel>=${TBB_VER}" cmake "mkl-devel-dpcpp>=2023.1" zlib dpcpp_linux-64 -c conda-forge -c intel -c numba
+          conda create -y -n test-env python=${{ matrix.python }} "pip>=22" numba=0.57 numpy=1.23 "setuptools<65.6" scikit-learn pytest-xdist ninja scipy pybind11 pytest "tbb>=${TBB_VER}" "tbb-devel>=${TBB_VER}" cmake "mkl-devel-dpcpp>=2023.1" zlib dpcpp_linux-64 level-zero-devel -c conda-forge -c intel -c numba
           conda info
           source $CONDA/bin/activate test-env
           conda install gxx_linux-64 -c conda-forge --override-channels
@@ -640,7 +539,6 @@ jobs:
           python -c "import numpy; print(numpy.get_include())"
           cmake --version
           export LLVM_PATH=/home/runner/work/llvm-mlir/_mlir_install
-          export LEVEL_ZERO_DIR=/home/runner/work/level-zero/level-zero/level_zero_install
           export LEVEL_ZERO_VERSION_CHECK_OFF=1
           export NUMBA_MLIR_USE_SYCL=ON
           export CC=$CONDA_PREFIX/bin/x86_64-conda-linux-gnu-cc
@@ -688,7 +586,6 @@ jobs:
           pushd numba_mlir_wheels
           source $CONDA/bin/activate test-env
           export LLVM_PATH=/home/runner/work/llvm-mlir/_mlir_install
-          export LEVEL_ZERO_DIR=/home/runner/work/level-zero/level-zero/level_zero_install
           export LEVEL_ZERO_VERSION_CHECK_OFF=1
           export NUMBA_MLIR_USE_SYCL=ON
           export CC=$CONDA_PREFIX/bin/x86_64-conda-linux-gnu-cc
@@ -750,14 +647,6 @@ jobs:
           cat $GITHUB_WORKSPACE/$LLVM_SHA_FILE >> $GITHUB_ENV
           echo 'EOF' >> $GITHUB_ENV
 
-      - name: Cache Level-Zero
-        id: cache-level-zero
-        uses: actions/cache@v3
-        with:
-          path: |
-            /home/runner/work/level-zero/**
-          key: ${{ runner.os }}-build-l0-${{ env.LEVEL_ZERO_VER }}
-
       - name: Cache LLLVM-MLIR
         id: cache-llvm-mlir
         uses: actions/cache@v3
@@ -778,7 +667,6 @@ jobs:
           conda create -y -n conda-build-env python=${{ matrix.python }} conda-build conda-verify boa -c conda-forge
           conda activate conda-build-env
           export LLVM_PATH=/home/runner/work/llvm-mlir/_mlir_install
-          export LEVEL_ZERO_DIR=/home/runner/work/level-zero/level-zero/level_zero_install
           export LEVEL_ZERO_VERSION_CHECK_OFF=1
           export NUMBA_MLIR_USE_SYCL=ON
           conda mambabuild --output-folder=. ../numba_mlir/conda-recipe --python=${{ matrix.python }} -c intel -c conda-forge -c numba --override-channels || exit 1

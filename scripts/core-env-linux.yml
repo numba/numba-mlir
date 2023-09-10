@@ -10,3 +10,4 @@ dependencies:
   - zlib
   - gxx_linux-64
   - tbb-devel =2021.10.0
+  - level-zero-devel
