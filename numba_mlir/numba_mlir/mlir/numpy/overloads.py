@@ -132,8 +132,12 @@ def get_abstract_template(pattern_func):
     return TemmplateId
 
 
+def is_none(arg):
+    return arg is None or arg == types.none
+
+
 def is_type_or_none(arg, typ):
-    return arg is None or arg == types.none or isinstance(arg, typ)
+    return is_none(arg) or isinstance(arg, typ)
 
 
 @infer_global(np.transpose)
@@ -148,7 +152,10 @@ class TransposeId(get_abstract_template(lambda a, axes: (a, axes))):
             return
 
         res_type = Array(dtype=arr.dtype, ndim=arr.ndim, layout="C")
-        return signature(res_type, axes)
+        if is_none(axes):
+            return signature(res_type, arr)
+        else:
+            return signature(res_type, arr, axes)
 
 
 @infer_global(np.dot)
@@ -163,4 +170,7 @@ class TransposeId(get_abstract_template(lambda a, b, out: (a, b, out))):
             return
 
         res_type = Array(dtype=arr.dtype, ndim=max(a.ndim, b.ndim), layout="C")
-        return signature(res_type, a, b, out)
+        if is_none(out):
+            return signature(res_type, a, b)
+        else:
+            return signature(res_type, a, b, out)
