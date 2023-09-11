@@ -4,12 +4,14 @@
 
 import numpy as np
 
-from numba.np.numpy_support import is_nonelike
-from numba.core.extending import overload
-from numba.core.typing.templates import signature, AbstractTemplate
-from numba.core.typing import npydecl
-from numba.core.types.npytypes import Array
 from numba.core import types
+from numba.core.typing import npydecl
+from numba.core.extending import overload
+from numba.core.types.npytypes import Array
+from numba.np.numpy_support import is_nonelike
+from numba.core.typing.templates import signature, AbstractTemplate
+
+from ..target import typing_registry, infer_global
 
 
 def _get_init_like_impl(init_func, dtype, shape):
@@ -61,7 +63,7 @@ def _remove_infer_global(registry, func):
 
 
 def _replace_global(registry, func, cls):
-    _remove_infer_global(registry, func)
+    # _remove_infer_global(registry, func)
     registry.register_global(func)(cls)
 
 
@@ -109,6 +111,90 @@ def get_reduction_id(prefer_float):
 ReductionId = get_reduction_id(False)
 ReductionFloatId = get_reduction_id(True)
 for func in [np.sum, np.max, np.min, np.amax, np.amin, np.prod]:
-    _replace_global(npydecl.registry, func, ReductionId)
+    _replace_global(typing_registry, func, ReductionId)
 
-_replace_global(npydecl.registry, np.mean, ReductionFloatId)
+_replace_global(typing_registry, np.mean, ReductionFloatId)
+
+
+def get_abstract_template(pattern_func):
+    class TemmplateId(AbstractTemplate):
+        def generic(self, args, kwargs):
+            try:
+                a = pattern_func(*args, **kwargs)
+            except:
+                return
+
+            if isinstance(a, tuple):
+                return self.generic_impl(*a)
+            else:
+                return self.generic_impl(a)
+
+    return TemmplateId
+
+
+def is_none(arg):
+    return arg is None or arg == types.none
+
+
+def is_type_or_none(arg, typ):
+    return is_none(arg) or isinstance(arg, typ)
+
+
+def _transpose_pattern(a, axes=None):
+    return a, axes
+
+
+@infer_global(np.transpose)
+class TransposeId(get_abstract_template(_transpose_pattern)):
+    prefer_literal = True
+
+    def generic_impl(self, arr, axes):
+        if not isinstance(arr, Array):
+            return
+
+        if not is_type_or_none(axes, types.BaseTuple):
+            return
+
+        res_type = Array(dtype=arr.dtype, ndim=arr.ndim, layout="C")
+        if is_none(axes):
+            return signature(res_type, arr)
+        else:
+            return signature(res_type, arr, axes)
+
+
+def _dot_pattern(a, b, out=None):
+    return a, b, out
+
+
+@infer_global(np.dot)
+class DotId(get_abstract_template(_dot_pattern)):
+    prefer_literal = True
+
+    def generic_impl(self, a, b, out):
+        if not isinstance(a, Array) or not isinstance(b, Array):
+            return
+
+        if not is_type_or_none(out, Array):
+            return
+
+        ndims = (a.ndim, b.ndim)
+
+        if not is_none(out):
+            dtype = out.dtype
+        else:
+            # TODO: coerce type
+            dtype = a.dtype
+
+        if ndims == (2, 2):
+            return_type = Array(dtype, 2, "C")
+        elif ndims == (2, 1) or ndims == (1, 2):
+            return_type = Array(dtype, 1, "C")
+        elif ndims == (1, 1):
+            return_type = dtype
+        else:
+            return
+
+        if out is None:
+            return signature(return_type, a, b)
+        else:
+            return signature(return_type, a, b, out)

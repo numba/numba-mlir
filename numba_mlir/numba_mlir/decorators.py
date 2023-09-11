@@ -13,6 +13,8 @@ from .mlir.compiler import (
     get_gpu_pipeline,
     mlir_compiler_replace_parfors_pipeline,
 )
+
+from .mlir.target import numba_mlir_jit, target_name
 from .mlir.vectorize import vectorize as mlir_vectorize
 from .mlir.settings import USE_MLIR
 
@@ -59,9 +61,7 @@ def mlir_jit(
         pipeline = mlir_compiler_pipeline
 
     options.pop("enable_gpu_pipeline", None)
-    options.pop(
-        "access_types", None
-    )  # pop them to ignore since they are not a part of numba but dppy.
+    options["_target"] = target_name
     return orig_jit(
         signature_or_function=signature_or_function,
         locals=locals,
@@ -84,7 +84,7 @@ def mlir_njit(*args, **kws):
         warnings.warn("forceobj is set for njit and is ignored", RuntimeWarning)
         del kws["forceobj"]
     kws.update({"nopython": True})
-    return jit(*args, **kws)
+    return mlir_jit(*args, **kws)
 
 
 def mlir_njit_replace_parfors(

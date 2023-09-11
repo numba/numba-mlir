@@ -64,3 +64,10 @@ class mlir_NativeLowering(orig_NativeLowering):
     @property
     def lowering_class(self):
         return mlir_lower
+
+
+@register_pass(mutates_CFG=True, analysis_only=False)
+class dummy_NativeLowering(mlir_NativeLowering):
+    def run_pass(self, state):
+        state.metadata["mlir_func_ptr"] = 1
+        return super().run_pass(state)

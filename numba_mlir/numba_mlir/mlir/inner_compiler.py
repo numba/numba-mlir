@@ -13,10 +13,11 @@ from numba.core.compiler import (
     compile_extra,
 )
 from numba.core.compiler_machinery import PassManager
-from numba.core.registry import cpu_target
 from numba.core import typing, cpu
 
 from numba_mlir.mlir.passes import get_inner_backend, get_mlir_func
+
+from .target import numba_mlir_target
 
 
 @functools.lru_cache
@@ -41,8 +42,8 @@ def get_temp_backend(fp64_trunc, use_64bit_index):
 
 
 def _compile_isolated(func, args, return_type=None, flags=DEFAULT_FLAGS, locals={}):
-    typingctx = cpu_target.typing_context
-    targetctx = cpu_target.target_context
+    typingctx = numba_mlir_target.typing_context
+    targetctx = numba_mlir_target.target_context
     fp64_truncate = getattr(flags, "fp64_truncate", False)
     use_64bit_index = getattr(flags, "use_64bit_index", True)
 

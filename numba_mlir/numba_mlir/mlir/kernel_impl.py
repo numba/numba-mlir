@@ -12,9 +12,9 @@ from numba.core.typing.templates import (
     AbstractTemplate,
     ConcreteTemplate,
     signature,
-    infer_global,
 )
 
+from .target import infer_global
 from .linalg_builder import is_int, dtype_str, FuncRegistry
 from .numpy.funcs import register_func
 from .func_registry import add_func

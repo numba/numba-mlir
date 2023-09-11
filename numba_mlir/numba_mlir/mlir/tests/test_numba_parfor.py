@@ -353,7 +353,6 @@ def _gen_replace_parfor_tests():
         "test_var",
         "test_pi",
         "test_prange_unknown_call1",
-        "test_0d_array",
         "test_parfor_dtype_type",
         "test_ufunc_expr",
         "test_reduce",
@@ -382,6 +381,10 @@ def _gen_replace_parfor_tests():
         "test_kde_example",
         "test_ssa_false_reduction",
         "test_min",
+        "test_nd_parfor",
+        "test_arraymap",
+        "test_prange04",
+        "test_prange22",
     }
     skip_tests = {
         "test_no_warn_if_cache_set",  # caching is not supported
@@ -642,7 +645,6 @@ def test_replace_parfor_dot():
         assert len(ir) > 0  # Check some code was actually generated
 
 
-@pytest.mark.xfail(reason="Operators doesn't generate parfor nodes")
 def test_replace_parfor_numpy_operator():
     def py_func(a, b):
         return a + b

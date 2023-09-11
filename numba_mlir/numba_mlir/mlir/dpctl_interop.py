@@ -36,11 +36,12 @@ if _is_dpctl_available:
 
     from numba.core.pythonapi import box, unbox, NativeValue
 
-    from numba.extending import register_model, typeof_impl
+    from numba.extending import register_model
     from numba.np import numpy_support
 
     from numba.core.datamodel.models import StructModel
 
+    from .target import typeof_impl
     from . import array_type
 
     def _get_device_caps(device):
