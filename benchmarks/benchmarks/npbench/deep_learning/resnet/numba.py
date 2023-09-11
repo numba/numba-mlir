@@ -21,7 +21,7 @@ class Benchmark(numba_mlir.mlir.benchmarking.BenchmarkBase):
         return get_impl_numba(get_numba_context())
 
     def initialize(self, preset):
-        SkipNotImplemented("timeout")
+        raise SkipNotImplemented("timeout")
         preset = parameters[preset]
         return initialize(**preset)
 
