@@ -70,4 +70,4 @@ class mlir_NativeLowering(orig_NativeLowering):
 class dummy_NativeLowering(mlir_NativeLowering):
     def run_pass(self, state):
         state.metadata["mlir_func_ptr"] = 1
-        return super().run_pass(self, state)
+        return super().run_pass(state)
