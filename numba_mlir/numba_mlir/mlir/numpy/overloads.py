@@ -159,7 +159,7 @@ class TransposeId(get_abstract_template(lambda a, axes: (a, axes))):
 
 
 @infer_global(np.dot)
-class TransposeId(get_abstract_template(lambda a, b, out: (a, b, out))):
+class DotId(get_abstract_template(lambda a, b, out: (a, b, out))):
     prefer_literal = True
 
     def generic_impl(self, a, b, out):
@@ -169,8 +169,23 @@ class TransposeId(get_abstract_template(lambda a, b, out: (a, b, out))):
         if not is_type_or_none(out, Array):
             return
 
-        res_type = Array(dtype=arr.dtype, ndim=max(a.ndim, b.ndim), layout="C")
-        if is_none(out):
-            return signature(res_type, a, b)
+        ndims = (a.ndim, b.ndim)
+
+        if not is_none(out):
+            dtype = out.dtype
         else:
-            return signature(res_type, a, b, out)
+            dtype = a.dtype
+
+        if ndims == (2, 2):
+            return_type = Array(dtype, 2, "C")
+        elif ndims == (2, 1) or ndims == (1, 2):
+            return_type = Array(dtype, 1, "C")
+        elif ndims == (1, 1):
+            return_type = dtype
+        else:
+            return
+
+        if is_none(out):
+            return signature(return_type, a, b)
+        else:
+            return signature(return_type, a, b, out)
