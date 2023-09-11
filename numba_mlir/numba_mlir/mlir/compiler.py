@@ -6,12 +6,11 @@
 Define compiler pipelines.
 """
 
-from .lowering import mlir_NativeLowering
 
 import functools
 
-
-from numba_mlir.mlir.passes import (
+from .lowering import mlir_NativeLowering, dummy_NativeLowering
+from .passes import (
     MlirDumpPlier,
     MlirBackend,
     get_gpu_backend,
@@ -108,6 +107,40 @@ class mlir_PassBuilder(orig_DefaultPassBuilder):
         pm.finalize()
         return pm
 
+    def define_dummy_nopython_pipeline(state):
+        pm = orig_DefaultPassBuilder.define_nopython_pipeline(state, "nopython")
+
+        import numba_mlir.mlir.settings
+
+        if numba_mlir.mlir.settings.USE_MLIR:
+            pm.passes, replaced = _replace_pass(
+                pm.passes, orig_NativeLowering, dummy_NativeLowering
+            )
+            if replaced == 0:
+                pm.passes, replaced = _replace_pass(
+                    pm.passes, orig_NativeParforLowering, dummy_NativeLowering
+                )
+            assert replaced == 1, "Failed to replace lowering pass"
+
+            pm.passes, removed = _remove_passes(
+                pm.passes,
+                [
+                    PreParforPass,
+                    ParforPass,
+                    ParforFusionPass,
+                    ParforPreLoweringPass,
+                    DumpParforDiagnostics,
+                    NopythonRewrites,
+                    PreLowerStripPhis,
+                    InlineOverloads,
+                    NopythonRewrites,
+                    IRLegalization,
+                ],
+            )
+
+        pm.finalize()
+        return pm
+
     def define_replace_parfors_pipeline(state, name="nopython"):
         pm = orig_DefaultPassBuilder.define_nopython_pipeline(state, name)
 
@@ -126,6 +159,17 @@ class mlir_compiler_pipeline(orig_CompilerBase):
         pms = []
         if not self.state.flags.force_pyobject:
             pms.append(mlir_PassBuilder.define_nopython_pipeline(self.state))
+        if self.state.status.can_fallback or self.state.flags.force_pyobject:
+            pms.append(mlir_PassBuilder.define_objectmode_pipeline(self.state))
+        return pms
+
+
+class dummy_compiler_pipeline(orig_CompilerBase):
+    def define_pipelines(self):
+        # this maintains the objmode fallback behaviour
+        pms = []
+        if not self.state.flags.force_pyobject:
+            pms.append(mlir_PassBuilder.define_dummy_nopython_pipeline(self.state))
         if self.state.status.can_fallback or self.state.flags.force_pyobject:
             pms.append(mlir_PassBuilder.define_objectmode_pipeline(self.state))
         return pms
