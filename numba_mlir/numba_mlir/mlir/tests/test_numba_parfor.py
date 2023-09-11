@@ -382,6 +382,7 @@ def _gen_replace_parfor_tests():
         "test_ssa_false_reduction",
         "test_min",
         "test_nd_parfor",
+        "test_arraymap",
     }
     skip_tests = {
         "test_no_warn_if_cache_set",  # caching is not supported
