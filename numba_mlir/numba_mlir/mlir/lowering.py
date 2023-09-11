@@ -33,7 +33,7 @@ class mlir_lower(orig_Lower):
             self.lower_normal_function(self.fndesc)
             self.context.post_lowering(self.module, self.library)
         else:
-            orig_Lower.lower(self)
+            super().lower(self)
 
     def lower_normal_function(self, fndesc):
         if USE_MLIR:
@@ -45,22 +45,13 @@ class mlir_lower(orig_Lower):
             # func_name = self.metadata.pop("mlir_func_name")
 
             # TODO: Construct new ir module instead of globally registering symbol
-            llvm.add_symbol(fndesc.mangled_name, func_ptr)
+            # llvm.add_symbol(fndesc.mangled_name, func_ptr)
         else:
-            orig_Lower.lower_normal_function(self, desc)
+            super().lower_normal_function(self, desc)
 
 
 @register_pass(mutates_CFG=True, analysis_only=False)
 class mlir_NativeLowering(orig_NativeLowering):
-    def __init__(self):
-        orig_NativeLowering.__init__(self)
-
-    def run_pass(self, state):
-        import numba.core.lowering
-
-        numba.core.lowering.Lower = mlir_lower
-        try:
-            res = orig_NativeLowering.run_pass(self, state)
-        finally:
-            numba.core.lowering.Lower = orig_Lower
-        return res
+    @property
+    def lowering_class(self):
+        return mlir_lower
