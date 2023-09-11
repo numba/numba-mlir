@@ -9,6 +9,7 @@ from numba_mlir.mlir.benchmarking import (
     get_numba_context,
     get_numpy_context,
     assert_allclose_recursive,
+    SkipNotImplemented,
 )
 
 
@@ -20,6 +21,7 @@ class Benchmark(numba_mlir.mlir.benchmarking.BenchmarkBase):
         return get_impl_numba(get_numba_context())
 
     def initialize(self, preset):
+        SkipNotImplemented("timeout")
         preset = parameters[preset]
         return initialize(**preset)
 
