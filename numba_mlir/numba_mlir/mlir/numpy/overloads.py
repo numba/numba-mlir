@@ -63,7 +63,7 @@ def _remove_infer_global(registry, func):
 
 
 def _replace_global(registry, func, cls):
-    _remove_infer_global(registry, func)
+    # _remove_infer_global(registry, func)
     registry.register_global(func)(cls)
 
 
@@ -116,15 +116,47 @@ for func in [np.sum, np.max, np.min, np.amax, np.amin, np.prod]:
 _replace_global(registry, np.mean, ReductionFloatId)
 
 
+def get_abstract_template(pattern_func):
+    class TemmplateId(AbstractTemplate):
+        def generic(self, args, kwargs):
+            try:
+                a = pattern_func(*args, **kwargs)
+            except:
+                return
+
+            if not isinstance(a, tuple):
+                a = (a,)
+
+            return self.generic_impl(*a)
+
+    return TemmplateId
+
+
 @infer_global(np.transpose)
-class TransposeId(AbstractTemplate):
+class TransposeId(get_abstract_template(lambda a, axes: (a, axes))):
     prefer_literal = True
 
-    def generic(self, args, kws):
-        if len(args) < 1 or not isinstance(args[0], Array):
+    def generic_impl(self, arr, axes):
+        if not isinstance(arr, Array):
             return
 
-        arr = args[0]
-        res_args = args + tuple(kws.values())
-        arr_type = Array(dtype=arr.dtype, ndim=arr.ndim, layout="C")
-        return signature(arr_type, *res_args)
+        if not isinstance(axes, None, types.none, types.BaseTuple):
+            return
+
+        res_type = Array(dtype=arr.dtype, ndim=arr.ndim, layout="C")
+        return signature(res_type, axes)
+
+
+@infer_global(np.dot)
+class TransposeId(get_abstract_template(lambda a, b, out: (a, b, out))):
+    prefer_literal = True
+
+    def generic_impl(self, a, b, out):
+        if not isinstance(a, Array) or not isinstance(b, Array):
+            return
+
+        if not isinstance(out, None, types.none, Array):
+            return
+
+        res_type = Array(dtype=arr.dtype, ndim=max(a.ndim, b.ndim), layout="C")
+        return signature(res_type, a, b, out)
