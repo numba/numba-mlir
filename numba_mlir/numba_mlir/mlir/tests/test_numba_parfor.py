@@ -383,6 +383,8 @@ def _gen_replace_parfor_tests():
         "test_min",
         "test_nd_parfor",
         "test_arraymap",
+        "test_prange04",
+        "test_prange22",
     }
     skip_tests = {
         "test_no_warn_if_cache_set",  # caching is not supported
