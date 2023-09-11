@@ -124,12 +124,16 @@ def get_abstract_template(pattern_func):
             except:
                 return
 
-            if not isinstance(a, tuple):
-                a = (a,)
-
-            return self.generic_impl(*a)
+            if isinstance(a, tuple):
+                return self.generic_impl(*a)
+            else:
+                return self.generic_impl(a)
 
     return TemmplateId
+
+
+def is_type_or_none(arg, typ):
+    return arg is None or arg == types.none or isinstance(arg, typ)
 
 
 @infer_global(np.transpose)
@@ -140,7 +144,7 @@ class TransposeId(get_abstract_template(lambda a, axes: (a, axes))):
         if not isinstance(arr, Array):
             return
 
-        if not isinstance(axes, None, types.none, types.BaseTuple):
+        if not is_type_or_none(axes, types.BaseTuple):
             return
 
         res_type = Array(dtype=arr.dtype, ndim=arr.ndim, layout="C")
@@ -155,7 +159,7 @@ class TransposeId(get_abstract_template(lambda a, b, out: (a, b, out))):
         if not isinstance(a, Array) or not isinstance(b, Array):
             return
 
-        if not isinstance(out, None, types.none, Array):
+        if not is_type_or_none(out, Array):
             return
 
         res_type = Array(dtype=arr.dtype, ndim=max(a.ndim, b.ndim), layout="C")
