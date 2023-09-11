@@ -140,8 +140,12 @@ def is_type_or_none(arg, typ):
     return is_none(arg) or isinstance(arg, typ)
 
 
+def _transpose_pattern(a, axes=None):
+    return a, axes
+
+
 @infer_global(np.transpose)
-class TransposeId(get_abstract_template(lambda a, axes: (a, axes))):
+class TransposeId(get_abstract_template(_transpose_pattern)):
     prefer_literal = True
 
     def generic_impl(self, arr, axes):
@@ -158,8 +162,12 @@ class TransposeId(get_abstract_template(lambda a, axes: (a, axes))):
             return signature(res_type, arr, axes)
 
 
+def _dot_pattern(a, b, out=None):
+    return a, b, out
+
+
 @infer_global(np.dot)
-class DotId(get_abstract_template(lambda a, b, out: (a, b, out))):
+class DotId(get_abstract_template(_dot_pattern)):
     prefer_literal = True
 
     def generic_impl(self, a, b, out):
