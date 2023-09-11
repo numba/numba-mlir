@@ -183,7 +183,6 @@ class numba_mlir_jit(JitDecorator):
         return NumbaMLIRDispatcher
 
     def dispatcher_wrapper(self):
-        print("dispatcher_wrapper", self.py_func, flush=True)
         disp = self.get_dispatcher()
         # Parse self._kwargs here
         options = copy.deepcopy(self._kwargs)
