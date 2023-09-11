@@ -182,6 +182,7 @@ class DotId(get_abstract_template(_dot_pattern)):
         if not is_none(out):
             dtype = out.dtype
         else:
+            # TODO: coerce type
             dtype = a.dtype
 
         if ndims == (2, 2):
@@ -193,7 +194,7 @@ class DotId(get_abstract_template(_dot_pattern)):
         else:
             return
 
-        if is_none(out):
+        if out is None:
             return signature(return_type, a, b)
         else:
             return signature(return_type, a, b, out)
