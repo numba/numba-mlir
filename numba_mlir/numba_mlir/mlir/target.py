@@ -5,7 +5,7 @@
 import copy
 from functools import singledispatch, cached_property
 
-from numba.core import types, cpu, utils
+from numba.core import types, cpu, utils, compiler
 from numba.extending import typeof_impl as numba_typeof_impl
 from numba.core.typing import Context
 from numba.core.registry import CPUTarget
@@ -172,10 +172,12 @@ class numba_mlir_jit(JitDecorator):
             False,
         ], "gpu_use_64bit_index supported values are True/False"
 
-        if options.get("enable_gpu_pipeline", True):
-            pipeline_class = get_gpu_pipeline(fp64_truncate, use_64bit_index)
-        else:
-            pipeline_class = mlir_compiler_pipeline
+        # if options.get("enable_gpu_pipeline", True):
+        #     pipeline_class = get_gpu_pipeline(fp64_truncate, use_64bit_index)
+        # else:
+        #     pipeline_class = mlir_compiler_pipeline
+
+        pipeline_class = compiler.Compiler
 
         options.pop("gpu_fp64_truncate", None)
         options.pop("gpu_use_64bit_index", None)
