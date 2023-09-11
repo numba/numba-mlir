@@ -11,7 +11,7 @@ from numba.core.types.npytypes import Array
 from numba.np.numpy_support import is_nonelike
 from numba.core.typing.templates import signature, AbstractTemplate
 
-from ..target import registry
+from ..target import registry, infer_global
 
 
 def _get_init_like_impl(init_func, dtype, shape):
@@ -114,3 +114,17 @@ for func in [np.sum, np.max, np.min, np.amax, np.amin, np.prod]:
     _replace_global(registry, func, ReductionId)
 
 _replace_global(registry, np.mean, ReductionFloatId)
+
+
+@infer_global(np.transpose)
+class TransposeId(AbstractTemplate):
+    prefer_literal = True
+
+    def generic(self, args, kws):
+        if len(args) < 1 or not isinstance(args[0], Array):
+            return
+
+        arr = args[0]
+        res_args = args + tuple(kws.values())
+        arr_type = Array(dtype=arr.dtype, ndim=arr.ndim, layout="C")
+        return signature(arr_type, *res_args)
