@@ -4,11 +4,13 @@
 
 import numpy as np
 
-from numba.np.numpy_support import is_nonelike
-from numba.core.extending import overload
-from numba.core.typing.templates import signature, AbstractTemplate
-from numba.core.types.npytypes import Array
 from numba.core import types
+from numba.core.typing import npydecl
+from numba.core.extending import overload
+from numba.core.types.npytypes import Array
+from numba.np.numpy_support import is_nonelike
+from numba.core.typing.templates import signature, AbstractTemplate
+
 from ..target import registry
 
 
