@@ -11,6 +11,7 @@ from .settings import USE_MLIR
 
 from numba.core.compiler_machinery import register_pass
 
+from numba.core import types
 from numba.core.lowering import Lower as orig_Lower
 from numba.core.typed_passes import NativeLowering as orig_NativeLowering
 
@@ -22,6 +23,7 @@ from .math_runtime import *
 from .numba_runtime import *
 from .gpu_runtime import *
 
+import llvmlite.ir as ir
 import llvmlite.binding as llvm
 
 
@@ -32,20 +34,27 @@ class mlir_lower(orig_Lower):
             self.genlower = None
             self.lower_normal_function(self.fndesc)
             self.context.post_lowering(self.module, self.library)
+
+            # Skip check that all numba symbols defined
+            setattr(self.library, "_verify_declare_only_symbols", lambda: None)
+
+            self.library.add_ir_module(self.module)
         else:
             super().lower(self)
 
     def lower_normal_function(self, fndesc):
         if USE_MLIR:
             self.setup_function(fndesc)
+            builder = self.builder
+            context = self.context
 
-            # Skip check that all numba symbols defined
-            setattr(self.library, "_verify_declare_only_symbols", lambda: None)
+            fnty = self.call_conv.get_function_type(fndesc.restype, fndesc.argtypes)
             func_ptr = self.metadata.pop("mlir_func_ptr")
-            # func_name = self.metadata.pop("mlir_func_name")
+            func_ptr = context.get_constant(types.uintp, func_ptr)
+            func_ptr = builder.inttoptr(func_ptr, ir.PointerType(fnty))
 
-            # TODO: Construct new ir module instead of globally registering symbol
-            # llvm.add_symbol(fndesc.mangled_name, func_ptr)
+            ret = builder.call(func_ptr, self.function.args)
+            builder.ret(ret)
         else:
             super().lower_normal_function(self, desc)
 
