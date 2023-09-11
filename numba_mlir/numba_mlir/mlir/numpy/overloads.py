@@ -11,7 +11,7 @@ from numba.core.types.npytypes import Array
 from numba.np.numpy_support import is_nonelike
 from numba.core.typing.templates import signature, AbstractTemplate
 
-from ..target import registry, infer_global
+from ..target import typing_registry, infer_global
 
 
 def _get_init_like_impl(init_func, dtype, shape):
@@ -111,9 +111,9 @@ def get_reduction_id(prefer_float):
 ReductionId = get_reduction_id(False)
 ReductionFloatId = get_reduction_id(True)
 for func in [np.sum, np.max, np.min, np.amax, np.amin, np.prod]:
-    _replace_global(registry, func, ReductionId)
+    _replace_global(typing_registry, func, ReductionId)
 
-_replace_global(registry, np.mean, ReductionFloatId)
+_replace_global(typing_registry, np.mean, ReductionFloatId)
 
 
 def get_abstract_template(pattern_func):

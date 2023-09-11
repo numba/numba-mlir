@@ -9,8 +9,9 @@ from numba.core import types, cpu, utils, compiler
 from numba.extending import typeof_impl as numba_typeof_impl
 from numba.core.typing import Context
 from numba.core.registry import CPUTarget
+from numba.core.imputils import Registry as LowerRegistry
 from numba.core.dispatcher import Dispatcher
-from numba.core.typing.templates import Registry
+from numba.core.typing.templates import Registry as TypingRegistry
 from numba.core.typing.typeof import Purpose, _TypeofContext, _termcolor
 from numba.core.target_extension import (
     JitDecorator,
@@ -20,7 +21,7 @@ from numba.core.target_extension import (
     CPU,
 )
 
-from .compiler import mlir_compiler_pipeline, get_gpu_pipeline
+from .compiler import mlir_compiler_pipeline, dummy_compiler_pipeline, get_gpu_pipeline
 
 
 def typeof(val, purpose=Purpose.argument):
@@ -52,23 +53,36 @@ def _typeof_tuple(val, c):
     return types.BaseTuple.from_types(tys, type(val))
 
 
-registry = Registry()
-infer = registry.register
-infer_global = registry.register_global
-infer_getattr = registry.register_attr
+target_name = "numba-mlir"
+
+typing_registry = TypingRegistry()
+infer = typing_registry.register
+infer_global = typing_registry.register_global
+infer_getattr = typing_registry.register_attr
+
+
+lower_registry = LowerRegistry(target_name)
 
 
 class NumbaMLIR(CPU):
     pass
 
 
-target_name = "numba-mlir"
 target_registry[target_name] = NumbaMLIR
 
 
-class NumbaMLIRContext(Context):
+class NumbaMLIRContext(cpu.CPUContext):
+    def __init__(self, typingctx, target=target_name):
+        super().__init__(typingctx, target)
+
     def load_additional_registries(self):
-        self.install_registry(registry)
+        self.install_registry(lower_registry)
+        super().load_additional_registries()
+
+
+class NumbaMLIRTypingContext(Context):
+    def load_additional_registries(self):
+        self.install_registry(typing_registry)
         super().load_additional_registries()
 
     def resolve_argument_type(self, val):
@@ -109,9 +123,14 @@ class NumbaMLIRContext(Context):
 
 class NumbaMLIRTarget(CPUTarget):
     @cached_property
+    def _toplevel_target_context(self):
+        # Lazily-initialized top-level target context, for all threads
+        return NumbaMLIRContext(self.typing_context, self._target_name)
+
+    @cached_property
     def _toplevel_typing_context(self):
         # Lazily-initialized top-level typing context, for all threads
-        return NumbaMLIRContext()
+        return NumbaMLIRTypingContext()
 
 
 numba_mlir_target = NumbaMLIRTarget(target_name)
@@ -164,6 +183,7 @@ class numba_mlir_jit(JitDecorator):
         return NumbaMLIRDispatcher
 
     def dispatcher_wrapper(self):
+        print("dispatcher_wrapper", self.py_func, flush=True)
         disp = self.get_dispatcher()
         # Parse self._kwargs here
         options = copy.deepcopy(self._kwargs)
@@ -185,7 +205,8 @@ class numba_mlir_jit(JitDecorator):
         # else:
         #     pipeline_class = mlir_compiler_pipeline
 
-        pipeline_class = compiler.Compiler
+        # pipeline_class = compiler.Compiler
+        pipeline_class = dummy_compiler_pipeline
 
         options.pop("gpu_fp64_truncate", None)
         options.pop("gpu_use_64bit_index", None)
