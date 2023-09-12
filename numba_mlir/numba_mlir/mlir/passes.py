@@ -76,6 +76,13 @@ def _create_flags(fp64_truncate, use_64bit_index):
     return flags
 
 
+def _get_flag(flags, name, default):
+    if hasattr(flags, name):
+        return getattr(flags, name)
+
+    return default
+
+
 class MlirBackendBase(FunctionPass):
     def __init__(self, push_func_stack):
         self._push_func_stack = push_func_stack
@@ -100,8 +107,8 @@ class MlirBackendBase(FunctionPass):
         return name
 
     def _resolve_func_impl(self, state, obj):
-        fp64_truncate = state.flags.gpu_fp64_truncate
-        use_64bit_index = state.flags.gpu_use_64bit_index
+        fp64_truncate = _get_flag(state.flags, "gpu_fp64_truncate", "auto")
+        use_64bit_index = _get_flag(state.flags, "gpu_use_64bit_index", True)
         if isinstance(obj, types.Function):
             func = obj.typing_key
             return (
@@ -170,18 +177,21 @@ class MlirBackendBase(FunctionPass):
         if state.targetctx.fastmath:
             func_attrs["numba.fastmath"] = None
 
-        if state.flags.inline.is_always_inline:
+        flags = state.flags
+        if flags.inline.is_always_inline:
             func_attrs["numba.force_inline"] = None
 
-        if state.flags.auto_parallel.enabled:
+        if flags.auto_parallel.enabled:
             func_attrs["numba.max_concurrency"] = get_thread_count()
 
         func_attrs["numba.opt_level"] = OPT_LEVEL
 
-        if state.flags.gpu_fp64_truncate != "auto":
-            func_attrs["gpu_runtime.fp64_truncate"] = state.flags.gpu_fp64_truncate
+        if _get_flag(flags, "gpu_fp64_truncate", "auto") != "auto":
+            func_attrs["gpu_runtime.fp64_truncate"] = flags.gpu_fp64_truncate
 
-        func_attrs["gpu_runtime.use_64bit_index"] = state.flags.gpu_use_64bit_index
+        func_attrs["gpu_runtime.use_64bit_index"] = _get_flag(
+            flags, "gpu_use_64bit_index", True
+        )
 
         ctx["func_attrs"] = func_attrs
         return ctx
