@@ -206,7 +206,7 @@ func.func @test(%arg: i32, %val: i32) -> i32 {
 //       CHECK:  %[[RES:.*]] = scf.parallel (%{{.*}}) = (%{{.*}}) to (%{{.*}}) step (%{{.*}}) init (%[[INIT]]) -> f32 {
 //       CHECK:  scf.reduce(%[[VAL]]) : f32 {
 //       CHECK:  ^bb0(%[[ARG1:.*]]: f32, %[[ARG2:.*]]: f32):
-//       CHECK:  %[[R:.*]] = arith.minf %[[ARG1]], %[[ARG2]] : f32
+//       CHECK:  %[[R:.*]] = arith.minimumf %[[ARG1]], %[[ARG2]] : f32
 //       CHECK:  scf.reduce.return %[[R]] : f32
 //       CHECK:  }
 //       CHECK:  scf.yield
@@ -217,7 +217,7 @@ func.func @test(%arg: f32, %val: f32) -> f32 {
   %c1 = arith.constant 1 : index
   %c10 = arith.constant 10 : index
   %0 = scf.for %i0 = %c0 to %c10 step %c1 iter_args(%arg1 = %arg) -> (f32) {
-    %1 = arith.minf %arg1, %val : f32
+    %1 = arith.minimumf %arg1, %val : f32
     scf.yield %1 : f32
   }
   return %0 : f32
@@ -278,7 +278,7 @@ func.func @test(%arg: i32, %val: i32) -> i32 {
 //       CHECK:  %[[RES:.*]] = scf.parallel (%{{.*}}) = (%{{.*}}) to (%{{.*}}) step (%{{.*}}) init (%[[INIT]]) -> f32 {
 //       CHECK:  scf.reduce(%[[VAL]]) : f32 {
 //       CHECK:  ^bb0(%[[ARG1:.*]]: f32, %[[ARG2:.*]]: f32):
-//       CHECK:  %[[R:.*]] = arith.maxf %[[ARG1]], %[[ARG2]] : f32
+//       CHECK:  %[[R:.*]] = arith.maximumf %[[ARG1]], %[[ARG2]] : f32
 //       CHECK:  scf.reduce.return %[[R]] : f32
 //       CHECK:  }
 //       CHECK:  scf.yield
@@ -289,7 +289,7 @@ func.func @test(%arg: f32, %val: f32) -> f32 {
   %c1 = arith.constant 1 : index
   %c10 = arith.constant 10 : index
   %0 = scf.for %i0 = %c0 to %c10 step %c1 iter_args(%arg1 = %arg) -> (f32) {
-    %1 = arith.maxf %arg1, %val : f32
+    %1 = arith.maximumf %arg1, %val : f32
     scf.yield %1 : f32
   }
   return %0 : f32
