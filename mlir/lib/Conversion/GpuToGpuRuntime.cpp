@@ -687,7 +687,7 @@ public:
       return rewriter.notifyMatchFailure(allocaOp, "unhandled allocation type");
 
     assert(getTypeConverter() && "Invalid type converter");
-    mlir::TypeConverter &converter = *getTypeConverter();
+    const mlir::TypeConverter &converter = *getTypeConverter();
 
     auto elemType = converter.convertType(memrefType.getElementType());
     if (!elemType)
@@ -2412,9 +2412,9 @@ struct AllReduceRemoveRegion
         &convertAllReduceOp<mlir::arith::MulIOp, RedOp::MUL>,
         &convertAllReduceOp<mlir::arith::MulFOp, RedOp::MUL>,
         &convertAllReduceOp<mlir::arith::MaxSIOp, RedOp::MAX>,
-        &convertAllReduceOp<mlir::arith::MaxFOp, RedOp::MAX>,
+        &convertAllReduceOp<mlir::arith::MaximumFOp, RedOp::MAX>,
         &convertAllReduceOp<mlir::arith::MinSIOp, RedOp::MIN>,
-        &convertAllReduceOp<mlir::arith::MinFOp, RedOp::MIN>,
+        &convertAllReduceOp<mlir::arith::MinimumFOp, RedOp::MIN>,
     };
 
     auto result = [&]() -> std::optional<RedOp> {

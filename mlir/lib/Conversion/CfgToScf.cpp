@@ -559,9 +559,9 @@ public:
   }
 
   LogicalResult
-  createStructuredBranchRegionTerminatorOp(Location loc, OpBuilder &builder,
-                                           Operation *branchRegionOp,
-                                           ValueRange results) override {
+  createStructuredBranchRegionTerminatorOp(
+      Location loc, OpBuilder &builder, Operation *branchRegionOp,
+      Operation *replacedControlFlowOp, ValueRange results) override {
     builder.create<scf::YieldOp>(loc, results);
     return success();
   }

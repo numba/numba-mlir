@@ -204,8 +204,8 @@ void numba::populateArithConversionRewritesAndTarget(
 
       ConvertBinaryFMOp<mlir::arith::AddFOp>,
       ConvertBinaryFMOp<mlir::arith::DivFOp>,
-      ConvertBinaryFMOp<mlir::arith::MaxFOp>,
-      ConvertBinaryFMOp<mlir::arith::MinFOp>,
+      ConvertBinaryFMOp<mlir::arith::MaximumFOp>,
+      ConvertBinaryFMOp<mlir::arith::MinimumFOp>,
       ConvertBinaryFMOp<mlir::arith::MulFOp>,
       ConvertBinaryFMOp<mlir::arith::RemFOp>,
       ConvertBinaryFMOp<mlir::arith::SubFOp>,

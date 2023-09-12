@@ -8,7 +8,7 @@
 #include "numba/Dialect/ntensor/IR/NTensorOps.hpp"
 
 #include <mlir/IR/Dominance.h>
-#include <mlir/IR/FunctionInterfaces.h>
+#include <mlir/Interfaces/FunctionInterfaces.h>
 #include <mlir/Pass/Pass.h>
 
 namespace {

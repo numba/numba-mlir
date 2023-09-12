@@ -468,7 +468,7 @@ numba::MemorySSA::Node *memSSAProcessRegion(mlir::Region &region,
         };
 
         llvm::SmallVector<mlir::RegionSuccessor> successorsTemp;
-        branchReg.getSuccessorRegions(/*index*/ std::nullopt, successorsTemp);
+        branchReg.getSuccessorRegions(mlir::RegionBranchPoint::parent(), successorsTemp);
         for (auto &successor : successorsTemp) {
           auto ind = getRegionIndex(successor.getSuccessor());
           if (ind) {
@@ -483,7 +483,7 @@ numba::MemorySSA::Node *memSSAProcessRegion(mlir::Region &region,
             continue;
 
           successorsTemp.clear();
-          branchReg.getSuccessorRegions(i, successorsTemp);
+          branchReg.getSuccessorRegions(op.getRegion(i), successorsTemp);
           for (auto &successor : successorsTemp) {
             auto ind = getRegionIndex(successor.getSuccessor());
             if (ind) {

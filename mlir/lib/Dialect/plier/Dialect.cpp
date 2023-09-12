@@ -13,7 +13,7 @@
 #include <mlir/Transforms/InliningUtils.h>
 
 #include <mlir/Dialect/Arith/IR/Arith.h>
-#include <mlir/IR/FunctionInterfaces.h>
+#include <mlir/Interfaces/FunctionInterfaces.h>
 
 #include <llvm/ADT/TypeSwitch.h>
 

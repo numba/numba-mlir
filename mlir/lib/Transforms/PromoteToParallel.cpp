@@ -121,11 +121,11 @@ static const constexpr std::pair<CheckFunc, LowerFunc> promoteHandlers[] = {
 
     getSimpleHandler<arith::MinSIOp>(),
     getSimpleHandler<arith::MinUIOp>(),
-    getSimpleHandler<arith::MinFOp>(),
+    getSimpleHandler<arith::MinimumFOp>(),
 
     getSimpleHandler<arith::MaxSIOp>(),
     getSimpleHandler<arith::MaxUIOp>(),
-    getSimpleHandler<arith::MaxFOp>(),
+    getSimpleHandler<arith::MaximumFOp>(),
 
     {&lhsArgCheck<arith::SubIOp>, &subLower<arith::SubIOp, arith::AddIOp>},
     {&lhsArgCheck<arith::SubFOp>, &subLower<arith::SubFOp, arith::AddFOp>},

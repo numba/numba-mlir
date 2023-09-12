@@ -1776,16 +1776,15 @@ mlir::OpFoldResult TupleExtractOp::fold(FoldAdaptor adaptor) {
 /// correspond to a constant value for each operand, or null if that operand is
 /// not a constant.
 void EnvironmentRegionOp::getSuccessorRegions(
-    std::optional<unsigned> index,
+    mlir::RegionBranchPoint point,
     mlir::SmallVectorImpl<mlir::RegionSuccessor> &regions) {
-  // Branch into body if we came from parent region.
-  if (!index) {
+  // If the predecessor is the ExecuteRegionOp, branch into the body.
+  if (point.isParent()) {
     regions.push_back(mlir::RegionSuccessor(&getRegion()));
     return;
   }
 
-  // Branch to parent region from body.
-  assert(*index == 0 && "EnvironmentRegionOp must have single region");
+  // Otherwise, the region branches back to the parent operation.
   regions.push_back(mlir::RegionSuccessor(getResults()));
 }
 

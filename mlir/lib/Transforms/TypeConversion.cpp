@@ -11,7 +11,7 @@
 #include <mlir/Dialect/Func/Transforms/FuncConversions.h>
 #include <mlir/Dialect/SCF/IR/SCF.h>
 #include <mlir/Dialect/SCF/Transforms/Patterns.h>
-#include <mlir/IR/FunctionInterfaces.h>
+#include <mlir/Interfaces/FunctionInterfaces.h>
 #include <mlir/Interfaces/CallInterfaces.h>
 #include <mlir/Transforms/DialectConversion.h>
 
@@ -47,7 +47,7 @@ unpackUnrealizedConversionCast(mlir::ValueRange values) {
 
 static std::optional<llvm::SmallVector<mlir::Value>>
 packResults(mlir::OpBuilder &rewriter, mlir::Location loc,
-            mlir::TypeConverter &typeConverter, mlir::TypeRange resTypes,
+            const mlir::TypeConverter &typeConverter, mlir::TypeRange resTypes,
             mlir::ValueRange newResults) {
   llvm::SmallVector<mlir::Type> newResultTypes;
   llvm::SmallVector<unsigned> offsets;

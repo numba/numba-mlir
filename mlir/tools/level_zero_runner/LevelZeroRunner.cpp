@@ -85,7 +85,6 @@ static LogicalResult runMLIRPasses(mlir::Operation *op,
   // GpuRuntime -> LLVM
 
   ConvertFuncToLLVMPassOptions llvmPassOptions;
-  llvmPassOptions.dataLayout = llvmOptions.dataLayout.getStringRepresentation();
   passManager.addPass(createConvertFuncToLLVMPass(llvmPassOptions));
   passManager.addPass(gpu_runtime::createGPUToLLVMPass());
   passManager.addPass(
@@ -94,9 +93,6 @@ static LogicalResult runMLIRPasses(mlir::Operation *op,
   passManager.addPass(mlir::createLowerAffinePass());
   passManager.addPass(createFinalizeMemRefToLLVMConversionPass());
   passManager.addPass(createReconcileUnrealizedCastsPass());
-
-  // TODO: hack as GpuKernelOutlining doesn't register cf as dependency.
-  passManager.getContext()->loadDialect<mlir::cf::ControlFlowDialect>();
 
   return passManager.run(module);
 }

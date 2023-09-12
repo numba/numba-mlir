@@ -721,7 +721,7 @@ enum {
   MeminfoDataIndex = 3,
 };
 
-static mlir::Type getMeminfoType(mlir::LLVMTypeConverter &converter) {
+static mlir::Type getMeminfoType(const mlir::LLVMTypeConverter &converter) {
   auto indexType = converter.getIndexType();
   auto *context = &converter.getContext();
   auto voidPtrType = getLLVMPointerType(mlir::IntegerType::get(context, 8));
