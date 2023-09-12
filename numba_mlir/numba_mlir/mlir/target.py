@@ -3,9 +3,10 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 import copy
+from enum import Enum
 from functools import singledispatch, cached_property
 
-from numba.core import types, cpu, utils, compiler
+from numba.core import types, cpu, utils, compiler, options
 from numba.extending import typeof_impl as numba_typeof_impl
 from numba.core.typing import Context
 from numba.core.registry import CPUTarget
@@ -121,7 +122,46 @@ class NumbaMLIRTypingContext(Context):
         raise typeof_exc
 
 
+_option_mapping = options._mapping
+
+
+class F64Truncate(Enum):
+    Always = 1
+    Never = 2
+    Auto = 3
+
+
+def _map_f64truncate(val):
+    if val is True:
+        return F64Truncate.Always
+    elif val is False:
+        return F64Truncate.Never
+    elif val == "auto":
+        return F64Truncate.Auto
+    else:
+        raise ValueError(f"Invalid f64 truncate value: {val}")
+
+
+def _set_option(flags, name, options, default, mapping=lambda a: a):
+    value = mapping(options.get(name, default))
+    setattr(flags, name, value)
+
+
+class NumbaMLIRTargetOptions(cpu.CPUTargetOptions):
+    gpu_fp64_truncate = _option_mapping("gpu_fp64_truncate", _map_f64truncate)
+    gpu_use_64bit_index = _option_mapping("gpu_use_64bit_index")
+    enable_gpu_pipeline = _option_mapping("enable_gpu_pipeline")
+
+    def finalize(self, flags, options):
+        super().finalize(flags, options)
+        _set_option(flags, "gpu_fp64_truncate", options, False, _map_f64truncate)
+        _set_option(flags, "gpu_use_64bit_index", options, True)
+        _set_option(flags, "enable_gpu_pipeline", options, True)
+
+
 class NumbaMLIRTarget(CPUTarget):
+    options = NumbaMLIRTargetOptions
+
     @cached_property
     def _toplevel_target_context(self):
         # Lazily-initialized top-level target context, for all threads
