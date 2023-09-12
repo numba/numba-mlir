@@ -2,52 +2,46 @@
 #
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-import functools
-
 from numba.core.untyped_passes import ReconstructSSA
 from numba.core.typed_passes import NopythonTypeInference
 from numba.core.compiler import (
+    compile_extra,
     CompilerBase,
     DefaultPassBuilder,
-    DEFAULT_FLAGS,
-    compile_extra,
+    Flags,
 )
 from numba.core.compiler_machinery import PassManager
 from numba.core import typing, cpu
 
-from numba_mlir.mlir.passes import get_inner_backend, get_mlir_func
+from numba_mlir.mlir.passes import MlirBackendInner, get_mlir_func
 
 from .target import numba_mlir_target
 
 
-@functools.lru_cache
-def get_temp_backend(fp64_trunc, use_64bit_index):
-    backend = get_inner_backend(fp64_trunc, use_64bit_index)
+class MlirTempCompiler(CompilerBase):  # custom compiler extends from CompilerBase
+    def define_pipelines(self):
+        dpb = DefaultPassBuilder
+        pm = PassManager("MlirTempCompiler")
+        untyped_passes = dpb.define_untyped_pipeline(self.state)
+        pm.passes.extend(untyped_passes.passes)
 
-    class MlirTempCompiler(CompilerBase):  # custom compiler extends from CompilerBase
-        def define_pipelines(self):
-            dpb = DefaultPassBuilder
-            pm = PassManager("MlirTempCompiler")
-            untyped_passes = dpb.define_untyped_pipeline(self.state)
-            pm.passes.extend(untyped_passes.passes)
+        pm.add_pass(ReconstructSSA, "ssa")
+        pm.add_pass(NopythonTypeInference, "nopython frontend")
+        pm.add_pass(MlirBackendInner, "mlir backend")
 
-            pm.add_pass(ReconstructSSA, "ssa")
-            pm.add_pass(NopythonTypeInference, "nopython frontend")
-            pm.add_pass(backend, "mlir backend")
+        pm.finalize()
+        return [pm]
 
-            pm.finalize()
-            return [pm]
 
-    return MlirTempCompiler
+DEFAULT_FLAGS = Flags()
+DEFAULT_FLAGS.nrt = True
+setattr(DEFAULT_FLAGS, "gpu_fp64_truncate", False)
+setattr(DEFAULT_FLAGS, "gpu_use_64bit_index", False)
 
 
 def _compile_isolated(func, args, return_type=None, flags=DEFAULT_FLAGS, locals={}):
     typingctx = numba_mlir_target.typing_context
     targetctx = numba_mlir_target.target_context
-    fp64_truncate = getattr(flags, "fp64_truncate", False)
-    use_64bit_index = getattr(flags, "use_64bit_index", True)
-
-    pipeline = get_temp_backend(fp64_truncate, use_64bit_index)
 
     return compile_extra(
         typingctx,
@@ -57,7 +51,7 @@ def _compile_isolated(func, args, return_type=None, flags=DEFAULT_FLAGS, locals=
         return_type,
         flags,
         locals,
-        pipeline_class=pipeline,
+        pipeline_class=MlirTempCompiler,
     )
 
 

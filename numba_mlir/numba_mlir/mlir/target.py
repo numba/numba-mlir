@@ -2,10 +2,10 @@
 #
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-import copy
+from enum import Enum
 from functools import singledispatch, cached_property
 
-from numba.core import types, cpu, utils, compiler
+from numba.core import types, cpu, utils, compiler, options
 from numba.extending import typeof_impl as numba_typeof_impl
 from numba.core.typing import Context
 from numba.core.registry import CPUTarget
@@ -21,7 +21,7 @@ from numba.core.target_extension import (
     CPU,
 )
 
-from .compiler import mlir_compiler_pipeline, dummy_compiler_pipeline, get_gpu_pipeline
+from .compiler import mlir_compiler_pipeline, dummy_compiler_pipeline
 
 
 def typeof(val, purpose=Purpose.argument):
@@ -121,7 +121,59 @@ class NumbaMLIRTypingContext(Context):
         raise typeof_exc
 
 
+_option_mapping = options._mapping
+
+
+class F64Truncate(Enum):
+    Always = True
+    Never = False
+    Auto = "auto"
+
+
+def _map_f64truncate(val):
+    if val is True:
+        return F64Truncate.Always
+    elif val is False:
+        return F64Truncate.Never
+    elif val == "auto":
+        return F64Truncate.Auto
+    else:
+        raise ValueError(f"Invalid f64 truncate value: {val}")
+
+
+def _set_option(flags, name, options, default, mapping=lambda a: a):
+    value = mapping(options.get(name, default))
+    setattr(flags, name, value)
+
+
+class NumbaMLIRTargetOptions(cpu.CPUTargetOptions):
+    gpu_fp64_truncate = _option_mapping("gpu_fp64_truncate", _map_f64truncate)
+    gpu_use_64bit_index = _option_mapping("gpu_use_64bit_index")
+    enable_gpu_pipeline = _option_mapping("enable_gpu_pipeline")
+
+    def finalize(self, flags, options):
+        super().finalize(flags, options)
+        _set_option(flags, "gpu_fp64_truncate", options, False)
+        _set_option(flags, "gpu_use_64bit_index", options, True)
+        _set_option(flags, "enable_gpu_pipeline", options, True)
+        assert flags.gpu_fp64_truncate in [
+            True,
+            False,
+            "auto",
+        ], 'gpu_fp64_truncate supported values are True/False/"auto"'
+        assert flags.gpu_use_64bit_index in [
+            True,
+            False,
+        ], "gpu_use_64bit_index supported values are True/False"
+        assert flags.enable_gpu_pipeline in [
+            True,
+            False,
+        ], "enable_gpu_pipeline supported values are True/False"
+
+
 class NumbaMLIRTarget(CPUTarget):
+    options = NumbaMLIRTargetOptions
+
     @cached_property
     def _toplevel_target_context(self):
         # Lazily-initialized top-level target context, for all threads
@@ -185,7 +237,7 @@ class numba_mlir_jit(JitDecorator):
     def dispatcher_wrapper(self):
         disp = self.get_dispatcher()
         # Parse self._kwargs here
-        options = copy.deepcopy(self._kwargs)
+        options = self._kwargs
         fp64_truncate = options.get("gpu_fp64_truncate", False)
         assert fp64_truncate in [
             True,
@@ -199,11 +251,7 @@ class numba_mlir_jit(JitDecorator):
             False,
         ], "gpu_use_64bit_index supported values are True/False"
 
-        # if options.get("enable_gpu_pipeline", True):
-        #     pipeline_class = get_gpu_pipeline(fp64_truncate, use_64bit_index)
-        # else:
-        #     pipeline_class = mlir_compiler_pipeline
-
+        # pipeline_class = mlir_compiler_pipeline
         # pipeline_class = compiler.Compiler
         pipeline_class = dummy_compiler_pipeline
 

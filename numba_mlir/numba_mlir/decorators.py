@@ -10,7 +10,6 @@ import warnings
 
 from .mlir.compiler import (
     mlir_compiler_pipeline,
-    get_gpu_pipeline,
     mlir_compiler_replace_parfors_pipeline,
 )
 
@@ -40,27 +39,7 @@ def mlir_jit(
             **options
         )
 
-    fp64_truncate = options.get("gpu_fp64_truncate", False)
-    assert fp64_truncate in [
-        True,
-        False,
-        "auto",
-    ], 'gpu_fp64_truncate supported values are True/False/"auto"'
-    options.pop("gpu_fp64_truncate", None)
-
-    use_64bit_index = options.get("gpu_use_64bit_index", True)
-    assert use_64bit_index in [
-        True,
-        False,
-    ], "gpu_use_64bit_index supported values are True/False"
-    options.pop("gpu_use_64bit_index", None)
-
-    if options.get("enable_gpu_pipeline", True):
-        pipeline = get_gpu_pipeline(fp64_truncate, use_64bit_index)
-    else:
-        pipeline = mlir_compiler_pipeline
-
-    options.pop("enable_gpu_pipeline", None)
+    pipeline = mlir_compiler_pipeline
     options["_target"] = target_name
     return orig_jit(
         signature_or_function=signature_or_function,

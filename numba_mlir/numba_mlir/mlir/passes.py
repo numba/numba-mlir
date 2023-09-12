@@ -71,17 +71,22 @@ _mlir_active_module = None
 def _create_flags(fp64_truncate, use_64bit_index):
     flags = Flags()
     flags.nrt = True
-    setattr(flags, "fp64_truncate", fp64_truncate)
-    setattr(flags, "use_64bit_index", use_64bit_index)
+    setattr(flags, "gpu_fp64_truncate", fp64_truncate)
+    setattr(flags, "gpu_use_64bit_index", use_64bit_index)
     return flags
+
+
+def _get_flag(flags, name, default):
+    if hasattr(flags, name):
+        return getattr(flags, name)
+
+    return default
 
 
 class MlirBackendBase(FunctionPass):
     def __init__(self, push_func_stack):
         self._push_func_stack = push_func_stack
         self._get_func_name = func_registry.get_func_name
-        self._fp64_truncate = False
-        self._use_64bit_index = True
         FunctionPass.__init__(self)
 
     def run_pass(self, state):
@@ -95,28 +100,30 @@ class MlirBackendBase(FunctionPass):
         else:
             return self.run_pass_impl(state)
 
-    def _resolve_func_name(self, obj):
-        name, func, flags = self._resolve_func_impl(obj)
+    def _resolve_func_name(self, state, obj):
+        name, func, flags = self._resolve_func_impl(state, obj)
         if not (name is None or func is None):
             func_registry.add_active_funcs(name, func, flags)
         return name
 
-    def _resolve_func_impl(self, obj):
+    def _resolve_func_impl(self, state, obj):
+        fp64_truncate = _get_flag(state.flags, "gpu_fp64_truncate", "auto")
+        use_64bit_index = _get_flag(state.flags, "gpu_use_64bit_index", True)
         if isinstance(obj, types.Function):
             func = obj.typing_key
             return (
                 self._get_func_name(func),
                 None,
-                _create_flags(self._fp64_truncate, self._use_64bit_index),
+                _create_flags(fp64_truncate, use_64bit_index),
             )
         if isinstance(obj, types.BoundFunction):
             return (
                 str(obj.typing_key),
                 None,
-                _create_flags(self._fp64_truncate, self._use_64bit_index),
+                _create_flags(fp64_truncate, use_64bit_index),
             )
         if isinstance(obj, numba.core.types.functions.Dispatcher):
-            flags = _create_flags(self._fp64_truncate, self._use_64bit_index)
+            flags = _create_flags(fp64_truncate, use_64bit_index)
             func = obj.dispatcher.py_func
             inline_type = obj.dispatcher.targetoptions.get("inline", None)
             if inline_type is not None:
@@ -135,7 +142,7 @@ class MlirBackendBase(FunctionPass):
             return (
                 "$number." + str(obj.instance_type),
                 None,
-                _create_flags(self._fp64_truncate, self._use_64bit_index),
+                _create_flags(fp64_truncate, use_64bit_index),
             )
         return (None, None, None)
 
@@ -163,25 +170,28 @@ class MlirBackendBase(FunctionPass):
         ctx["fnargs"] = lambda: state.args
         ctx["restype"] = lambda: state.return_type
         ctx["fnname"] = lambda: fn_name
-        ctx["resolve_func"] = self._resolve_func_name
+        ctx["resolve_func"] = lambda obj: self._resolve_func_name(state, obj)
         ctx["globals"] = lambda: state.func_id.func.__globals__
 
         func_attrs = {}
         if state.targetctx.fastmath:
             func_attrs["numba.fastmath"] = None
 
-        if state.flags.inline.is_always_inline:
+        flags = state.flags
+        if flags.inline.is_always_inline:
             func_attrs["numba.force_inline"] = None
 
-        if state.flags.auto_parallel.enabled:
+        if flags.auto_parallel.enabled:
             func_attrs["numba.max_concurrency"] = get_thread_count()
 
         func_attrs["numba.opt_level"] = OPT_LEVEL
 
-        if self._fp64_truncate != "auto":
-            func_attrs["gpu_runtime.fp64_truncate"] = self._fp64_truncate
+        if _get_flag(flags, "gpu_fp64_truncate", "auto") != "auto":
+            func_attrs["gpu_runtime.fp64_truncate"] = flags.gpu_fp64_truncate
 
-        func_attrs["gpu_runtime.use_64bit_index"] = self._use_64bit_index
+        func_attrs["gpu_runtime.use_64bit_index"] = _get_flag(
+            flags, "gpu_use_64bit_index", True
+        )
 
         ctx["func_attrs"] = func_attrs
         return ctx
@@ -213,14 +223,13 @@ class MlirBackend(MlirBackendBase):
 
     def __init__(self):
         MlirBackendBase.__init__(self, push_func_stack=True)
-        self.enable_gpu_pipeline = False
 
     def run_pass_impl(self, state):
         global _mlir_active_module
         old_module = _mlir_active_module
 
         try:
-            mod_settings = {"enable_gpu_pipeline": self.enable_gpu_pipeline}
+            mod_settings = {"enable_gpu_pipeline": state.flags.enable_gpu_pipeline}
             module = mlir_compiler.create_module(mod_settings)
             _mlir_active_module = module
             global _mlir_last_compiled_func
@@ -244,18 +253,6 @@ class MlirBackend(MlirBackendBase):
         return True
 
 
-@functools.lru_cache
-def get_gpu_backend(fp64_trunc, use_64bit_index):
-    class MlirBackendGPU(MlirBackend):
-        def __init__(self):
-            MlirBackend.__init__(self)
-            self.enable_gpu_pipeline = True
-            self._fp64_truncate = fp64_trunc
-            self._use_64bit_index = use_64bit_index
-
-    return register_pass(mutates_CFG=True, analysis_only=False)(MlirBackendGPU)
-
-
 @register_pass(mutates_CFG=True, analysis_only=False)
 class MlirBackendInner(MlirBackendBase):
     _name = "mlir_backend_inner"
@@ -274,31 +271,6 @@ class MlirBackendInner(MlirBackendBase):
         )
         state.cr = compile_result()
         return True
-
-
-@functools.lru_cache
-def get_inner_backend(fp64_trunc, use_64bit_index):
-    class MlirBackendInner(MlirBackendBase):
-        _name = "mlir_backend_inner"
-
-        def __init__(self):
-            MlirBackendBase.__init__(self, push_func_stack=False)
-            self._fp64_truncate = fp64_trunc
-            self._64bit_index = use_64bit_index
-
-        def run_pass_impl(self, state):
-            global _mlir_active_module
-            module = _mlir_active_module
-            assert not module is None
-            global _mlir_last_compiled_func
-            ctx = self._get_func_context(state)
-            _mlir_last_compiled_func = mlir_compiler.lower_function(
-                ctx, module, state.func_ir
-            )
-            state.cr = compile_result()
-            return True
-
-    return register_pass(mutates_CFG=True, analysis_only=False)(MlirBackendInner)
 
 
 @register_pass(mutates_CFG=True, analysis_only=False)
