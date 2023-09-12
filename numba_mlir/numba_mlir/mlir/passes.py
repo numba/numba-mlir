@@ -243,15 +243,6 @@ class MlirBackend(MlirBackendBase):
         return True
 
 
-@functools.lru_cache
-def get_gpu_backend():
-    class MlirBackendGPU(MlirBackend):
-        def __init__(self):
-            MlirBackend.__init__(self)
-
-    return register_pass(mutates_CFG=True, analysis_only=False)(MlirBackendGPU)
-
-
 @register_pass(mutates_CFG=True, analysis_only=False)
 class MlirBackendInner(MlirBackendBase):
     _name = "mlir_backend_inner"

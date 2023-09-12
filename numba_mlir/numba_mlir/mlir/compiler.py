@@ -6,14 +6,10 @@
 Define compiler pipelines.
 """
 
-
-import functools
-
 from .lowering import mlir_NativeLowering, dummy_NativeLowering
 from .passes import (
     MlirDumpPlier,
     MlirBackend,
-    get_gpu_backend,
     MlirReplaceParfors,
 )
 from numba.core.compiler_machinery import PassManager
@@ -61,21 +57,13 @@ def _remove_passes(passes, to_remove):
 
 class mlir_PassBuilder(orig_DefaultPassBuilder):
     @staticmethod
-    def define_nopython_pipeline(
-        state, enable_gpu_pipeline, fp64_truncate, use_64bit_index
-    ):
+    def define_nopython_pipeline(state):
         pm = orig_DefaultPassBuilder.define_nopython_pipeline(state, "nopython")
 
         import numba_mlir.mlir.settings
 
         if numba_mlir.mlir.settings.USE_MLIR:
-            if enable_gpu_pipeline:
-                pm.add_pass_after(
-                    get_gpu_backend(),
-                    NopythonTypeInference,
-                )
-            else:
-                pm.add_pass_after(MlirBackend, NopythonTypeInference)
+            pm.add_pass_after(MlirBackend, NopythonTypeInference)
             pm.passes, replaced = _replace_pass(
                 pm.passes, orig_NativeLowering, mlir_NativeLowering
             )
@@ -173,28 +161,6 @@ class dummy_compiler_pipeline(orig_CompilerBase):
         if self.state.status.can_fallback or self.state.flags.force_pyobject:
             pms.append(mlir_PassBuilder.define_objectmode_pipeline(self.state))
         return pms
-
-
-@functools.lru_cache
-def get_gpu_pipeline(fp64_truncate, use_64bit_index):
-    class mlir_compiler_gpu_pipeline(orig_CompilerBase):
-        def define_pipelines(self):
-            # this maintains the objmode fallback behaviour
-            pms = []
-            if not self.state.flags.force_pyobject:
-                pms.append(
-                    mlir_PassBuilder.define_nopython_pipeline(
-                        self.state,
-                        enable_gpu_pipeline=True,
-                        fp64_truncate=fp64_truncate,
-                        use_64bit_index=use_64bit_index,
-                    )
-                )
-            if self.state.status.can_fallback or self.state.flags.force_pyobject:
-                pms.append(mlir_PassBuilder.define_objectmode_pipeline(self.state))
-            return pms
-
-    return mlir_compiler_gpu_pipeline
 
 
 class mlir_compiler_replace_parfors_pipeline(orig_CompilerBase):

@@ -2,7 +2,6 @@
 #
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-import copy
 from enum import Enum
 from functools import singledispatch, cached_property
 
@@ -22,7 +21,7 @@ from numba.core.target_extension import (
     CPU,
 )
 
-from .compiler import mlir_compiler_pipeline, dummy_compiler_pipeline, get_gpu_pipeline
+from .compiler import mlir_compiler_pipeline, dummy_compiler_pipeline
 
 
 def typeof(val, purpose=Purpose.argument):
@@ -157,6 +156,19 @@ class NumbaMLIRTargetOptions(cpu.CPUTargetOptions):
         _set_option(flags, "gpu_fp64_truncate", options, False)
         _set_option(flags, "gpu_use_64bit_index", options, True)
         _set_option(flags, "enable_gpu_pipeline", options, True)
+        assert flags.gpu_fp64_truncate in [
+            True,
+            False,
+            "auto",
+        ], 'gpu_fp64_truncate supported values are True/False/"auto"'
+        assert flags.gpu_use_64bit_index in [
+            True,
+            False,
+        ], "gpu_use_64bit_index supported values are True/False"
+        assert flags.enable_gpu_pipeline in [
+            True,
+            False,
+        ], "enable_gpu_pipeline supported values are True/False"
 
 
 class NumbaMLIRTarget(CPUTarget):
@@ -225,7 +237,7 @@ class numba_mlir_jit(JitDecorator):
     def dispatcher_wrapper(self):
         disp = self.get_dispatcher()
         # Parse self._kwargs here
-        options = copy.deepcopy(self._kwargs)
+        options = self._kwargs
         fp64_truncate = options.get("gpu_fp64_truncate", False)
         assert fp64_truncate in [
             True,
@@ -239,11 +251,7 @@ class numba_mlir_jit(JitDecorator):
             False,
         ], "gpu_use_64bit_index supported values are True/False"
 
-        # if options.get("enable_gpu_pipeline", True):
-        #     pipeline_class = get_gpu_pipeline(fp64_truncate, use_64bit_index)
-        # else:
-        #     pipeline_class = mlir_compiler_pipeline
-
+        # pipeline_class = mlir_compiler_pipeline
         # pipeline_class = compiler.Compiler
         pipeline_class = dummy_compiler_pipeline
 
