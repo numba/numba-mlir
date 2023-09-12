@@ -5,10 +5,10 @@
 from numba.core.untyped_passes import ReconstructSSA
 from numba.core.typed_passes import NopythonTypeInference
 from numba.core.compiler import (
+    compile_extra,
     CompilerBase,
     DefaultPassBuilder,
-    DEFAULT_FLAGS,
-    compile_extra,
+    Flags,
 )
 from numba.core.compiler_machinery import PassManager
 from numba.core import typing, cpu
@@ -31,6 +31,12 @@ class MlirTempCompiler(CompilerBase):  # custom compiler extends from CompilerBa
 
         pm.finalize()
         return [pm]
+
+
+DEFAULT_FLAGS = Flags()
+DEFAULT_FLAGS.nrt = True
+setattr(DEFAULT_FLAGS, "gpu_fp64_truncate", False)
+setattr(DEFAULT_FLAGS, "gpu_use_64bit_index", False)
 
 
 def _compile_isolated(func, args, return_type=None, flags=DEFAULT_FLAGS, locals={}):
