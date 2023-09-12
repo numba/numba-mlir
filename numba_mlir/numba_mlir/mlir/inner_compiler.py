@@ -44,8 +44,8 @@ def get_temp_backend(fp64_trunc, use_64bit_index):
 def _compile_isolated(func, args, return_type=None, flags=DEFAULT_FLAGS, locals={}):
     typingctx = numba_mlir_target.typing_context
     targetctx = numba_mlir_target.target_context
-    fp64_truncate = getattr(flags, "fp64_truncate", False)
-    use_64bit_index = getattr(flags, "use_64bit_index", True)
+    fp64_truncate = getattr(flags, "gpu_fp64_truncate", False)
+    use_64bit_index = getattr(flags, "gpu_use_64bit_index", True)
 
     pipeline = get_temp_backend(fp64_truncate, use_64bit_index)
 

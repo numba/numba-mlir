@@ -71,8 +71,8 @@ _mlir_active_module = None
 def _create_flags(fp64_truncate, use_64bit_index):
     flags = Flags()
     flags.nrt = True
-    setattr(flags, "fp64_truncate", fp64_truncate)
-    setattr(flags, "use_64bit_index", use_64bit_index)
+    setattr(flags, "gpu_fp64_truncate", fp64_truncate)
+    setattr(flags, "gpu_use_64bit_index", use_64bit_index)
     return flags
 
 
