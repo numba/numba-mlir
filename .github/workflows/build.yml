@@ -179,6 +179,7 @@ jobs:
     needs: build_win
 
     strategy:
+      fail-fast: false
       matrix:
         python: ["3.8", "3.9", "3.10"]
 
@@ -319,6 +320,7 @@ jobs:
     needs: build_win
 
     strategy:
+      fail-fast: false
       matrix:
         python: ["3.8", "3.9", "3.10"]
         is_main:
@@ -571,6 +573,7 @@ jobs:
     needs: build_linux
 
     strategy:
+      fail-fast: false
       matrix:
         python: ["3.8", "3.9", "3.10"]
         is_main:
@@ -714,6 +717,7 @@ jobs:
     needs: build_linux
 
     strategy:
+      fail-fast: false
       matrix:
         python: ["3.8", "3.9", "3.10"]
         is_main:
@@ -829,6 +833,7 @@ jobs:
     timeout-minutes: 450
     needs: [upload_packages_preprocess]
     strategy:
+      fail-fast: false
       matrix:
         os: [ubuntu-20.04, windows-latest]
         python: ["3.8", "3.9", "3.10"]
