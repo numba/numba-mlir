@@ -80,8 +80,6 @@ class MlirBackendBase(FunctionPass):
     def __init__(self, push_func_stack):
         self._push_func_stack = push_func_stack
         self._get_func_name = func_registry.get_func_name
-        self._fp64_truncate = False
-        self._use_64bit_index = True
         FunctionPass.__init__(self)
 
     def run_pass(self, state):
@@ -246,7 +244,7 @@ class MlirBackend(MlirBackendBase):
 
 
 @functools.lru_cache
-def get_gpu_backend(fp64_trunc, use_64bit_index):
+def get_gpu_backend():
     class MlirBackendGPU(MlirBackend):
         def __init__(self):
             MlirBackend.__init__(self)
@@ -275,14 +273,12 @@ class MlirBackendInner(MlirBackendBase):
 
 
 @functools.lru_cache
-def get_inner_backend(fp64_trunc, use_64bit_index):
+def get_inner_backend():
     class MlirBackendInner(MlirBackendBase):
         _name = "mlir_backend_inner"
 
         def __init__(self):
             MlirBackendBase.__init__(self, push_func_stack=False)
-            self._fp64_truncate = fp64_trunc
-            self._64bit_index = use_64bit_index
 
         def run_pass_impl(self, state):
             global _mlir_active_module

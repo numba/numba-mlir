@@ -71,7 +71,7 @@ class mlir_PassBuilder(orig_DefaultPassBuilder):
         if numba_mlir.mlir.settings.USE_MLIR:
             if enable_gpu_pipeline:
                 pm.add_pass_after(
-                    get_gpu_backend(fp64_truncate, use_64bit_index),
+                    get_gpu_backend(),
                     NopythonTypeInference,
                 )
             else:

@@ -21,8 +21,8 @@ from .target import numba_mlir_target
 
 
 @functools.lru_cache
-def get_temp_backend(fp64_trunc, use_64bit_index):
-    backend = get_inner_backend(fp64_trunc, use_64bit_index)
+def get_temp_backend():
+    backend = get_inner_backend()
 
     class MlirTempCompiler(CompilerBase):  # custom compiler extends from CompilerBase
         def define_pipelines(self):
@@ -44,10 +44,7 @@ def get_temp_backend(fp64_trunc, use_64bit_index):
 def _compile_isolated(func, args, return_type=None, flags=DEFAULT_FLAGS, locals={}):
     typingctx = numba_mlir_target.typing_context
     targetctx = numba_mlir_target.target_context
-    fp64_truncate = getattr(flags, "gpu_fp64_truncate", False)
-    use_64bit_index = getattr(flags, "gpu_use_64bit_index", True)
-
-    pipeline = get_temp_backend(fp64_truncate, use_64bit_index)
+    pipeline = get_temp_backend()
 
     return compile_extra(
         typingctx,
