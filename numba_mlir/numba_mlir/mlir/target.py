@@ -154,7 +154,7 @@ class NumbaMLIRTargetOptions(cpu.CPUTargetOptions):
 
     def finalize(self, flags, options):
         super().finalize(flags, options)
-        _set_option(flags, "gpu_fp64_truncate", options, False, _map_f64truncate)
+        _set_option(flags, "gpu_fp64_truncate", options, False)
         _set_option(flags, "gpu_use_64bit_index", options, True)
         _set_option(flags, "enable_gpu_pipeline", options, True)
 
