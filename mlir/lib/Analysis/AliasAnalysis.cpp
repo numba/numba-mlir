@@ -4,7 +4,7 @@
 
 #include "numba/Analysis/AliasAnalysis.hpp"
 
-#include <mlir/IR/FunctionInterfaces.h>
+#include <mlir/Interfaces/FunctionInterfaces.h>
 
 /// Check if value is function argument.
 static bool isFuncArg(mlir::Value val) {

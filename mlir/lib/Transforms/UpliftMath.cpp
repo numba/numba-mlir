@@ -209,9 +209,9 @@ struct UpliftMinMax : public mlir::OpRewritePattern<mlir::arith::SelectOp> {
       using Pred = mlir::arith::CmpFPredicate;
       auto pred = cmp.getPredicate();
       if (pred == Pred::OLT || pred == Pred::ULT) {
-        rewriter.replaceOpWithNewOp<mlir::arith::MinFOp>(op, lhs, rhs);
+        rewriter.replaceOpWithNewOp<mlir::arith::MinimumFOp>(op, lhs, rhs);
       } else if (pred == Pred::OGT || pred == Pred::UGT) {
-        rewriter.replaceOpWithNewOp<mlir::arith::MaxFOp>(op, lhs, rhs);
+        rewriter.replaceOpWithNewOp<mlir::arith::MaximumFOp>(op, lhs, rhs);
       } else {
         return mlir::failure();
       }

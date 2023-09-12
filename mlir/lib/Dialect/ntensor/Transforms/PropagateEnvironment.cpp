@@ -11,8 +11,8 @@
 #include <mlir/Analysis/DataFlow/DeadCodeAnalysis.h>
 #include <mlir/Analysis/DataFlow/SparseAnalysis.h>
 #include <mlir/Dialect/Arith/IR/Arith.h>
-#include <mlir/IR/FunctionInterfaces.h>
 #include <mlir/Interfaces/CallInterfaces.h>
+#include <mlir/Interfaces/FunctionInterfaces.h>
 #include <mlir/Pass/Pass.h>
 #include <mlir/Transforms/GreedyPatternRewriteDriver.h>
 

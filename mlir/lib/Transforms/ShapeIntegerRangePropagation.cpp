@@ -14,8 +14,8 @@
 #include <mlir/Dialect/Arith/Transforms/Passes.h>
 #include <mlir/Dialect/Linalg/IR/Linalg.h>
 #include <mlir/Dialect/Tensor/IR/Tensor.h>
-#include <mlir/IR/FunctionInterfaces.h>
 #include <mlir/IR/PatternMatch.h>
+#include <mlir/Interfaces/FunctionInterfaces.h>
 #include <mlir/Interfaces/ShapedOpInterfaces.h>
 #include <mlir/Pass/Pass.h>
 #include <mlir/Transforms/GreedyPatternRewriteDriver.h>
