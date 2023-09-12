@@ -15,15 +15,13 @@ from numba.core.compiler import (
 from numba.core.compiler_machinery import PassManager
 from numba.core import typing, cpu
 
-from numba_mlir.mlir.passes import get_inner_backend, get_mlir_func
+from numba_mlir.mlir.passes import MlirBackendInner, get_mlir_func
 
 from .target import numba_mlir_target
 
 
 @functools.lru_cache
 def get_temp_backend():
-    backend = get_inner_backend()
-
     class MlirTempCompiler(CompilerBase):  # custom compiler extends from CompilerBase
         def define_pipelines(self):
             dpb = DefaultPassBuilder
@@ -33,7 +31,7 @@ def get_temp_backend():
 
             pm.add_pass(ReconstructSSA, "ssa")
             pm.add_pass(NopythonTypeInference, "nopython frontend")
-            pm.add_pass(backend, "mlir backend")
+            pm.add_pass(MlirBackendInner, "mlir backend")
 
             pm.finalize()
             return [pm]

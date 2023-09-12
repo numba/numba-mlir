@@ -272,29 +272,6 @@ class MlirBackendInner(MlirBackendBase):
         return True
 
 
-@functools.lru_cache
-def get_inner_backend():
-    class MlirBackendInner(MlirBackendBase):
-        _name = "mlir_backend_inner"
-
-        def __init__(self):
-            MlirBackendBase.__init__(self, push_func_stack=False)
-
-        def run_pass_impl(self, state):
-            global _mlir_active_module
-            module = _mlir_active_module
-            assert not module is None
-            global _mlir_last_compiled_func
-            ctx = self._get_func_context(state)
-            _mlir_last_compiled_func = mlir_compiler.lower_function(
-                ctx, module, state.func_ir
-            )
-            state.cr = compile_result()
-            return True
-
-    return register_pass(mutates_CFG=True, analysis_only=False)(MlirBackendInner)
-
-
 @register_pass(mutates_CFG=True, analysis_only=False)
 class MlirReplaceParfors(MlirBackendBase):
     _name = "mlir_replace_parfors"
