@@ -558,8 +558,7 @@ public:
     return failure();
   }
 
-  LogicalResult
-  createStructuredBranchRegionTerminatorOp(
+  LogicalResult createStructuredBranchRegionTerminatorOp(
       Location loc, OpBuilder &builder, Operation *branchRegionOp,
       Operation *replacedControlFlowOp, ValueRange results) override {
     builder.create<scf::YieldOp>(loc, results);

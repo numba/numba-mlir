@@ -17,9 +17,9 @@
 #include <mlir/Dialect/MemRef/IR/MemRef.h>
 #include <mlir/Dialect/SCF/IR/SCF.h>
 #include <mlir/IR/Dominance.h>
-#include <mlir/Interfaces/FunctionInterfaces.h>
 #include <mlir/IR/IRMapping.h>
 #include <mlir/IR/PatternMatch.h>
+#include <mlir/Interfaces/FunctionInterfaces.h>
 #include <mlir/Support/LogicalResult.h>
 
 namespace {

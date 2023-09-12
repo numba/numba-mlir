@@ -11,8 +11,8 @@
 #include <mlir/Dialect/Func/Transforms/FuncConversions.h>
 #include <mlir/Dialect/SCF/IR/SCF.h>
 #include <mlir/Dialect/SCF/Transforms/Patterns.h>
-#include <mlir/Interfaces/FunctionInterfaces.h>
 #include <mlir/Interfaces/CallInterfaces.h>
+#include <mlir/Interfaces/FunctionInterfaces.h>
 #include <mlir/Transforms/DialectConversion.h>
 
 namespace {
