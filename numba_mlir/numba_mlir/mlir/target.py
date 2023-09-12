@@ -126,9 +126,9 @@ _option_mapping = options._mapping
 
 
 class F64Truncate(Enum):
-    Always = 1
-    Never = 2
-    Auto = 3
+    Always = True
+    Never = False
+    Auto = "auto"
 
 
 def _map_f64truncate(val):
