@@ -354,6 +354,84 @@ struct IndexCastOfIndexCast
   }
 };
 
+// TODO: Upstream
+struct TruncfOfExtf : public mlir::OpRewritePattern<mlir::arith::TruncFOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(mlir::arith::TruncFOp op,
+                  mlir::PatternRewriter &rewriter) const override {
+    auto ext = op.getIn().getDefiningOp<mlir::arith::ExtFOp>();
+    if (!ext)
+      return mlir::failure();
+
+    auto in = ext.getIn();
+    if (in.getType() != op.getType())
+      return mlir::failure();
+
+    rewriter.replaceOp(op, in);
+    return mlir::success();
+  }
+};
+
+// TODO: Upstream
+template <typename Op>
+struct ResTruncFUnary : public mlir::OpRewritePattern<Op> {
+  using mlir::OpRewritePattern<Op>::OpRewritePattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(Op op, mlir::PatternRewriter &rewriter) const override {
+    auto res = op.getResult();
+    if (!llvm::hasSingleElement(res.getUsers()))
+      return mlir::failure();
+
+    auto trunc = mlir::dyn_cast<mlir::arith::TruncFOp>(*res.getUsers().begin());
+    if (!trunc)
+      return mlir::failure();
+
+    auto resType = trunc.getType();
+
+    auto loc = op.getLoc();
+    mlir::Value arg =
+        rewriter.create<mlir::arith::TruncFOp>(loc, resType, op.getOperand());
+
+    mlir::Value newRes = rewriter.create<Op>(loc, arg, op.getFastmath());
+    rewriter.replaceOp(trunc, newRes);
+    rewriter.eraseOp(op);
+    return mlir::success();
+  }
+};
+
+// TODO: Upstream
+template <typename Op>
+struct ResTruncFBinary : public mlir::OpRewritePattern<Op> {
+  using mlir::OpRewritePattern<Op>::OpRewritePattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(Op op, mlir::PatternRewriter &rewriter) const override {
+    auto res = op.getResult();
+    if (!llvm::hasSingleElement(res.getUsers()))
+      return mlir::failure();
+
+    auto trunc = mlir::dyn_cast<mlir::arith::TruncFOp>(*res.getUsers().begin());
+    if (!trunc)
+      return mlir::failure();
+
+    auto resType = trunc.getType();
+
+    auto loc = op.getLoc();
+    mlir::Value lhs =
+        rewriter.create<mlir::arith::TruncFOp>(loc, resType, op.getLhs());
+    mlir::Value rhs =
+        rewriter.create<mlir::arith::TruncFOp>(loc, resType, op.getRhs());
+
+    mlir::Value newRes = rewriter.create<Op>(loc, lhs, rhs, op.getFastmath());
+    rewriter.replaceOp(trunc, newRes);
+    rewriter.eraseOp(op);
+    return mlir::success();
+  }
+};
+
 struct GPUGenGlobalId : public mlir::OpRewritePattern<mlir::arith::AddIOp> {
   using OpRewritePattern::OpRewritePattern;
 
@@ -488,6 +566,12 @@ void numba::populateCommonOptsPatterns(mlir::RewritePatternSet &patterns) {
       ExtractStridedMetadataConstStrides,
       ExtractStridedMetadataCast,
       IndexCastOfIndexCast,
+      TruncfOfExtf,
+      ResTruncFUnary<mlir::arith::NegFOp>,
+      ResTruncFBinary<mlir::arith::AddFOp>,
+      ResTruncFBinary<mlir::arith::SubFOp>,
+      ResTruncFBinary<mlir::arith::MulFOp>,
+      ResTruncFBinary<mlir::arith::DivFOp>,
       GPUGenGlobalId
       // clang-format on
       >(patterns.getContext());
