@@ -21,8 +21,6 @@ from numba.core.target_extension import (
     CPU,
 )
 
-from .compiler import mlir_compiler_pipeline, dummy_compiler_pipeline
-
 
 def typeof(val, purpose=Purpose.argument):
     """
@@ -235,6 +233,9 @@ class numba_mlir_jit(JitDecorator):
         return NumbaMLIRDispatcher
 
     def dispatcher_wrapper(self):
+        # Import locally to avoid circular module depdndency
+        from .compiler import mlir_compiler_pipeline, dummy_compiler_pipeline
+
         disp = self.get_dispatcher()
         # Parse self._kwargs here
         options = self._kwargs
