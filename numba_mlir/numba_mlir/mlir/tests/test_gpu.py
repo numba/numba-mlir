@@ -1457,12 +1457,12 @@ def test_cfd_f64_truncate():
     gpu_res = np.zeros(a.shape, a.dtype)
     dgpu_res = _from_host(gpu_res, buffer="device")
 
-    pattern = "arith.addf %[0-9a-zA-Z]+, %[0-9a-zA-Z]+ : f32"
+    pattern = "%arg2: f64"
 
     with print_pass_ir(["TruncateF64ForGPUPass"], []):
         jit_func1(da, b, dgpu_res)
         ir = get_print_buffer()
-        assert re.search(pattern, ir) is None, ir
+        assert re.search(pattern, ir), ir
 
     _to_host(dgpu_res, gpu_res)
     assert_equal(gpu_res, sim_res)
@@ -1470,7 +1470,7 @@ def test_cfd_f64_truncate():
     with print_pass_ir([], ["TruncateF64ForGPUPass"]):
         jit_func2(da, b, dgpu_res)
         ir = get_print_buffer()
-        assert re.search(pattern, ir), ir
+        assert re.search(pattern, ir) is None, ir
 
     _to_host(dgpu_res, gpu_res)
     assert_equal(gpu_res, sim_res)
@@ -1500,12 +1500,12 @@ def test_cfd_f64_truncate_indirect():
     gpu_res = np.zeros(a.shape, a.dtype)
     dgpu_res = _from_host(gpu_res, buffer="device")
 
-    pattern = "arith.addf %[0-9a-zA-Z]+, %[0-9a-zA-Z]+ : f32"
+    pattern = "%arg2: f64"
 
     with print_pass_ir(["TruncateF64ForGPUPass"], []):
         jit_func1(da, b, dgpu_res)
         ir = get_print_buffer()
-        assert re.search(pattern, ir) is None, ir
+        assert re.search(pattern, ir), ir
 
     _to_host(dgpu_res, gpu_res)
     assert_equal(gpu_res, sim_res)
@@ -1513,7 +1513,7 @@ def test_cfd_f64_truncate_indirect():
     with print_pass_ir([], ["TruncateF64ForGPUPass"]):
         jit_func2(da, b, dgpu_res)
         ir = get_print_buffer()
-        assert re.search(pattern, ir), ir
+        assert re.search(pattern, ir) is None, ir
 
     _to_host(dgpu_res, gpu_res)
     assert_equal(gpu_res, sim_res)
