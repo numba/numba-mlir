@@ -436,9 +436,6 @@ fuseIfLegal(scf::ParallelOp firstPloop, scf::ParallelOp &secondPloop,
   auto newSecondPloop = b.create<mlir::scf::ParallelOp>(
       secondPloop.getLoc(), secondPloop.getLowerBound(),
       secondPloop.getUpperBound(), secondPloop.getStep(), newInitVars);
-  if (secondPloop->hasAttr(numba::util::attributes::getParallelName()))
-    newSecondPloop->setAttr(numba::util::attributes::getParallelName(),
-                            mlir::UnitAttr::get(b.getContext()));
 
   newSecondPloop.getRegion().getBlocks().splice(
       newSecondPloop.getRegion().begin(), secondPloop.getRegion().getBlocks());
