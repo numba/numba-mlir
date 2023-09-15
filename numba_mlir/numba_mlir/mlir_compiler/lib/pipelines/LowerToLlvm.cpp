@@ -50,6 +50,7 @@
 #include "numba/Conversion/UtilToLlvm.hpp"
 #include "numba/Dialect/numba_util/Dialect.hpp"
 #include "numba/Transforms/FuncUtils.hpp"
+#include "numba/Transforms/RewriteWrapper.hpp"
 #include "numba/Utils.hpp"
 
 namespace {
@@ -1382,6 +1383,25 @@ private:
   mutable mlir::LLVMTypeConverter converter; // TODO
 };
 
+struct RemoveParallelRegion
+    : public mlir::OpRewritePattern<numba::util::EnvironmentRegionOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(numba::util::EnvironmentRegionOp op,
+                  mlir::PatternRewriter &rewriter) const override {
+    if (!mlir::isa<numba::util::ParallelAttr>(op.getEnvironment()))
+      return mlir::failure();
+
+    numba::util::EnvironmentRegionOp::inlineIntoParent(rewriter, op);
+    return mlir::success();
+  }
+};
+
+struct RemoveParallelRegionPass
+    : public numba::RewriteWrapperPass<RemoveParallelRegionPass, void, void,
+                                       RemoveParallelRegion> {};
+
 struct LowerParallelToCFGPass
     : public mlir::PassWrapper<LowerParallelToCFGPass,
                                mlir::OperationPass<void>> {
@@ -1617,6 +1637,7 @@ static void populatePreLowerToLlvmPipeline(mlir::OpPassManager &pm) {
 }
 
 static void populateLowerToLlvmPipeline(mlir::OpPassManager &pm) {
+  pm.addPass(std::make_unique<RemoveParallelRegionPass>());
   pm.addPass(std::make_unique<LowerParallelToCFGPass>());
   pm.addPass(mlir::createConvertSCFToCFPass());
   pm.addPass(mlir::createCanonicalizerPass());
