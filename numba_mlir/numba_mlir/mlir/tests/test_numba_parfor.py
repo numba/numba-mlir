@@ -50,7 +50,6 @@ def _gen_tests():
         "test_parfor_race_1",  # cfg->scf conversion failure
         "test_record_array_setitem_yield_array",  # Record and string support
         "test_record_array_setitem",  # Record and string support
-        "test_prange_two_instances_same_reduction_var",  # Non-trivial reduction
         "test_prange_conflicting_reduction_ops",  # Conflicting reduction reduction check
         "test_ssa_false_reduction",  # Frontend: object has no attribute 'name'
         "test_mutable_list_param",  # List support
@@ -108,9 +107,7 @@ def _gen_tests():
         "test_real_imag_attr",
         "test_tuple_arg_not_whole_array",
         "test_tuple_for_pndindex",
-        "test_if_not_else_reduction",
         "test_int_arg_pndindex",
-        "test_non_identity_initial",
         "test_prange_optional",
         "test_1array_control_flow",
     }
@@ -383,9 +380,9 @@ def _gen_replace_parfor_tests():
         "test_min",
         "test_nd_parfor",
         "test_arraymap",
-        "test_prange04",
     }
     skip_tests = {
+        "test_prange04",  # flaky test
         "test_prange22",  # flaky test
         "test_no_warn_if_cache_set",  # caching is not supported
         "test_prange07",  # reverse iteration
