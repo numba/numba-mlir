@@ -348,6 +348,24 @@ def _range_nested_while(a, b):
     return res
 
 
+def _range_continue(a, b):
+    res = 0
+    for i in range(a):
+        if a + b % 3 == 0:
+            continue
+        res += i
+    return res
+
+
+def _range_break(a, b):
+    res = 0
+    for i in range(a):
+        if a + b % 3 == 0:
+            break
+        res += i
+    return res
+
+
 @parametrize_function_variants(
     "py_func",
     [
@@ -359,9 +377,11 @@ def _range_nested_while(a, b):
         "_while_py_func_break_middle",
         "_while_py_func_nested_break",
         "_range_nested_while",
+        "_range_continue",
+        "_range_break",
     ],
 )
-def test_while(py_func):
+def test_loop(py_func):
     jit_func = njit(py_func)
     assert_equal(py_func(1, 66), jit_func(1, 66))
 
