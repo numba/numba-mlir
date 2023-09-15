@@ -1963,6 +1963,20 @@ struct ResolveNtensorPass
   }
 };
 
+static bool isInsideParallelRegion(mlir::Operation *op) {
+  assert(op && "Invalid op");
+  while (true) {
+    auto region = op->getParentOfType<numba::util::EnvironmentRegionOp>();
+    if (!region)
+      return false;
+
+    if (mlir::isa<numba::util::ParallelAttr>(region.getEnvironment()))
+      return true;
+
+    op = region;
+  }
+}
+
 struct WrapParforRegionsPass
     : public mlir::PassWrapper<WrapParforRegionsPass,
                                mlir::OperationPass<void>> {
@@ -1989,13 +2003,11 @@ struct WrapParforRegionsPass
     };
 
     mlir::OpBuilder builder(&getContext());
-    auto attrName =
-        builder.getStringAttr(numba::util::attributes::getParallelName());
     llvm::SmallVector<std::pair<mlir::scf::ForOp, mlir::Attribute>>
         opsToProcess;
 
     auto visitor = [&](mlir::scf::ForOp forOp) -> mlir::WalkResult {
-      if (!forOp->hasAttr(attrName))
+      if (!isInsideParallelRegion(forOp))
         return mlir::WalkResult::advance();
 
       std::optional<mlir::Attribute> env;
