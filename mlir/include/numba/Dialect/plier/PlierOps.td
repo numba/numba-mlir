@@ -50,6 +50,10 @@ def Plier_BoundFunctionType : Plier_Type<"BoundFunction", "bound_function", [], 
 
 def Plier_UndefinedType : Plier_Type<"Undefined", "undefined", [], "::mlir::Type">;
 
+def Plier_RangeState : Plier_Type<"RangeState", "range_state", [], "::mlir::Type">;
+
+def Plier_RangeIter : Plier_Type<"RangeIter", "range_iter", [], "::mlir::Type">;
+
 def Plier_Py : Plier_Type<"Py", "pytype", [], "::mlir::Type"> {
   let parameters = (ins "::mlir::StringAttr":$name);
 
