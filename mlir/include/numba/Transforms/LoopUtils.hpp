@@ -8,13 +8,14 @@
 #include <llvm/ADT/SmallVector.h>
 
 namespace mlir {
-struct LogicalResult;
-class PatternRewriter;
-class Value;
 class Location;
 class OpBuilder;
-class Type;
+class Operation;
+class PatternRewriter;
 class Region;
+class Type;
+class Value;
+struct LogicalResult;
 namespace scf {
 class ForOp;
 class WhileOp;
@@ -46,5 +47,7 @@ mlir::LogicalResult lowerWhileToFor(
     llvm::function_ref<void(mlir::scf::ForOp)> results = nullptr);
 
 mlir::LogicalResult naivelyFuseParallelOps(mlir::Region &region);
-mlir::LogicalResult prepareForFusion(mlir::Region &region);
+mlir::LogicalResult
+prepareForFusion(mlir::Region &region,
+                 llvm::function_ref<bool(mlir::Operation &)> needPrepare);
 } // namespace numba

@@ -3299,7 +3299,11 @@ void PostLinalgOptInnerPass::runOnOperation() {
                   OptimizeIdentityLayoutStrides>(&context);
 
   auto additionalOpt = [](mlir::func::FuncOp op) {
-    (void)numba::prepareForFusion(op.getRegion());
+    auto check = [](mlir::Operation &op) -> bool {
+      return mlir::isa<mlir::scf::ParallelOp, numba::util::EnvironmentRegionOp>(
+          op);
+    };
+    (void)numba::prepareForFusion(op.getRegion(), check);
     return numba::naivelyFuseParallelOps(op.getRegion());
   };
 
