@@ -5,10 +5,8 @@
 #include "numba/Transforms/LoopUtils.hpp"
 
 #include "numba/Analysis/AliasAnalysis.hpp"
-#include "numba/Dialect/numba_util/Dialect.hpp"
 #include "numba/Dialect/plier/Dialect.hpp"
 #include "numba/Transforms/CastUtils.hpp"
-#include "numba/Transforms/ConstUtils.hpp"
 
 #include <llvm/ADT/SmallVector.h>
 
@@ -436,9 +434,6 @@ fuseIfLegal(scf::ParallelOp firstPloop, scf::ParallelOp &secondPloop,
   auto newSecondPloop = b.create<mlir::scf::ParallelOp>(
       secondPloop.getLoc(), secondPloop.getLowerBound(),
       secondPloop.getUpperBound(), secondPloop.getStep(), newInitVars);
-  if (secondPloop->hasAttr(numba::util::attributes::getParallelName()))
-    newSecondPloop->setAttr(numba::util::attributes::getParallelName(),
-                            mlir::UnitAttr::get(b.getContext()));
 
   newSecondPloop.getRegion().getBlocks().splice(
       newSecondPloop.getRegion().begin(), secondPloop.getRegion().getBlocks());
@@ -542,16 +537,17 @@ mlir::LogicalResult numba::naivelyFuseParallelOps(Region &region) {
   return mlir::success(changed);
 }
 
-LogicalResult numba::prepareForFusion(Region &region) {
+LogicalResult numba::prepareForFusion(
+    Region &region, llvm::function_ref<bool(mlir::Operation &)> needPrepare) {
   DominanceInfo dom(region.getParentOp());
   bool changed = false;
   for (auto &block : region) {
     for (auto &parallelOp : llvm::make_early_inc_range(block)) {
       for (auto &innerReg : parallelOp.getRegions())
-        if (succeeded(prepareForFusion(innerReg)))
+        if (succeeded(prepareForFusion(innerReg, needPrepare)))
           changed = true;
 
-      if (!isa<scf::ParallelOp>(parallelOp))
+      if (!needPrepare(parallelOp))
         continue;
 
       auto it = Block::iterator(parallelOp);
@@ -563,7 +559,7 @@ LogicalResult numba::prepareForFusion(Region &region) {
       auto terminate = false;
       while (!terminate) {
         auto &currentOp = *it;
-        if (isa<scf::ParallelOp>(currentOp))
+        if (needPrepare(currentOp))
           break;
 
         if (it == block.begin()) {

@@ -48,10 +48,6 @@ llvm::StringRef numba::util::attributes::getJumpMarkersName() {
   return "numba.pipeline_jump_markers";
 }
 
-llvm::StringRef numba::util::attributes::getParallelName() {
-  return "numba.parallel";
-}
-
 llvm::StringRef numba::util::attributes::getMaxConcurrencyName() {
   return "numba.max_concurrency";
 }

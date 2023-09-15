@@ -641,11 +641,22 @@ private:
     assert(begins.size() == ends.size());
     assert(begins.size() == steps.size());
 
+    auto resultTypes = iterArgs.getTypes();
+    auto env = numba::util::ParallelAttr::get(builder.getContext());
+    auto loc = getCurrentLoc();
+    auto regionOp = builder.create<numba::util::EnvironmentRegionOp>(
+        loc, env, /*args*/ mlir::ValueRange{}, resultTypes);
+    mlir::Block &body = regionOp.getRegion().front();
+    body.getTerminator()->erase();
+    mlir::OpBuilder::InsertionGuard g(builder);
+    builder.setInsertionPointToStart(&body);
+
     llvm::SmallVector<mlir::Value> indices;
     indices.reserve(begins.size());
-    auto loc = getCurrentLoc();
-    return buildNestedParallelLoopImpl(builder, loc, begins, ends, steps,
-                                       iterArgs, bodyBuilder, indices);
+    auto results = buildNestedParallelLoopImpl(
+        builder, loc, begins, ends, steps, iterArgs, bodyBuilder, indices);
+    builder.create<numba::util::EnvironmentRegionYieldOp>(loc, results);
+    return regionOp.getResults();
   }
 
   mlir::ValueRange buildNestedParallelLoopImpl(
@@ -671,8 +682,6 @@ private:
     auto loop = loopBuilder.create<mlir::scf::ForOp>(
         loc, begins.front(), ends.front(), steps.front(), iterArgs,
         forBodyBuilder);
-    loop->setAttr(numba::util::attributes::getParallelName(),
-                  builder.getUnitAttr());
     return loop.getResults();
   }
 

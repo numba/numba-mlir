@@ -143,6 +143,20 @@ static LowerFunc getLowerer(mlir::Operation *op, mlir::Value iterVar) {
   return nullptr;
 }
 
+static bool isInsideParallelRegion(mlir::Operation *op) {
+  assert(op && "Invalid op");
+  while (true) {
+    auto region = op->getParentOfType<numba::util::EnvironmentRegionOp>();
+    if (!region)
+      return false;
+
+    if (mlir::isa<numba::util::ParallelAttr>(region.getEnvironment()))
+      return true;
+
+    op = region;
+  }
+}
+
 namespace {
 struct PromoteToParallel : public mlir::OpRewritePattern<mlir::scf::ForOp> {
   using OpRewritePattern::OpRewritePattern;
@@ -150,9 +164,7 @@ struct PromoteToParallel : public mlir::OpRewritePattern<mlir::scf::ForOp> {
   mlir::LogicalResult
   matchAndRewrite(mlir::scf::ForOp op,
                   mlir::PatternRewriter &rewriter) const override {
-    auto hasParallelAttr =
-        op->hasAttr(numba::util::attributes::getParallelName());
-    if (!canParallelizeLoop(op, hasParallelAttr))
+    if (!canParallelizeLoop(op, isInsideParallelRegion(op)))
       return mlir::failure();
 
     mlir::Block &loopBody = op.getLoopBody().front();
@@ -203,12 +215,9 @@ struct PromoteToParallel : public mlir::OpRewritePattern<mlir::scf::ForOp> {
       builder.create<mlir::scf::YieldOp>(loc);
     };
 
-    auto parallelOp = rewriter.replaceOpWithNewOp<mlir::scf::ParallelOp>(
+    rewriter.replaceOpWithNewOp<mlir::scf::ParallelOp>(
         op, op.getLowerBound(), op.getUpperBound(), op.getStep(),
         op.getInitArgs(), bodyBuilder);
-    if (hasParallelAttr)
-      parallelOp->setAttr(numba::util::attributes::getParallelName(),
-                          rewriter.getUnitAttr());
 
     return mlir::success();
   }
@@ -251,9 +260,7 @@ struct MergeNestedForIntoParallel
         checkVals(op.getStep()))
       return mlir::failure();
 
-    auto hasParallelAttr =
-        op->hasAttr(numba::util::attributes::getParallelName());
-    if (!canParallelizeLoop(op, hasParallelAttr))
+    if (!canParallelizeLoop(op, isInsideParallelRegion(op)))
       return mlir::failure();
 
     auto makeValueList = [](auto op, auto ops) {
@@ -287,9 +294,6 @@ struct MergeNestedForIntoParallel
     auto newOp = rewriter.replaceOpWithNewOp<mlir::scf::ParallelOp>(
         parent, lowerBounds, upperBounds, steps, parent.getInitArgs(),
         bodyBuilder);
-    if (hasParallelAttr)
-      newOp->setAttr(numba::util::attributes::getParallelName(),
-                     rewriter.getUnitAttr());
 
     return mlir::success();
   }

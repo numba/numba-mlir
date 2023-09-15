@@ -926,6 +926,61 @@ struct BuiltinCallsLoweringPass
           BuiltinCallsLoweringPass, void, void, BuiltinCallsLowering,
           numba::ExpandCallVarargs, ExternalCallsLowering> {};
 
+struct InsertParallelRegionPass
+    : public mlir::PassWrapper<InsertParallelRegionPass,
+                               mlir::OperationPass<void>> {
+  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(InsertParallelRegionPass)
+
+  virtual void
+  getDependentDialects(mlir::DialectRegistry &registry) const override {
+    registry.insert<numba::util::NumbaUtilDialect>();
+  }
+
+  void runOnOperation() override {
+    llvm::SmallSetVector<mlir::scf::WhileOp, 8> loops;
+    getOperation()->walk([&](plier::IternextOp op) {
+      auto loop = mlir::dyn_cast<mlir::scf::WhileOp>(op->getParentOp());
+      if (!loop)
+        return;
+
+      auto getiter = op.getValue().getDefiningOp<plier::GetiterOp>();
+      if (!getiter)
+        return;
+
+      auto call = getiter.getValue().getDefiningOp<plier::PyCallOp>();
+      if (!call)
+        return;
+
+      auto name = call.getFuncName();
+      // TODO: Unhardcode
+      if (name != "numba.prange" && name != "_gpu_range")
+        return;
+
+      loops.insert(loop);
+    });
+
+    if (loops.empty())
+      return markAllAnalysesPreserved();
+
+    auto *ctx = &getContext();
+    auto env = numba::util::ParallelAttr::get(ctx);
+    mlir::OpBuilder builder(ctx);
+    for (auto loop : loops) {
+      auto loc = loop.getLoc();
+      builder.setInsertionPoint(loop);
+      auto region = builder.create<numba::util::EnvironmentRegionOp>(
+          loc, env, /*args*/ mlir::ValueRange{}, loop->getResultTypes());
+      mlir::Block &body = region.getRegion().front();
+      body.getTerminator()->erase();
+      loop.getResults().replaceAllUsesWith(region.getResults());
+      builder.setInsertionPointToEnd(&body);
+      auto term = builder.create<numba::util::EnvironmentRegionYieldOp>(
+          loc, loop.getResults());
+      loop->moveBefore(term);
+    }
+  }
+};
+
 struct PlierToStdPass
     : public mlir::PassWrapper<PlierToStdPass,
                                mlir::OperationPass<mlir::ModuleOp>> {
@@ -1127,6 +1182,7 @@ static void populatePlierToStdPipeline(mlir::OpPassManager &pm) {
   pm.addPass(mlir::createCanonicalizerPass());
   pm.addPass(std::make_unique<PlierToStdPass>());
   pm.addPass(mlir::createCanonicalizerPass());
+  pm.addPass(std::make_unique<InsertParallelRegionPass>());
   pm.addPass(std::make_unique<BuiltinCallsLoweringPass>());
   pm.addPass(numba::createForceInlinePass());
   pm.addPass(mlir::createSymbolDCEPass());

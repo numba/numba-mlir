@@ -31,7 +31,6 @@ namespace util {
 namespace attributes {
 llvm::StringRef getFastmathName();
 llvm::StringRef getJumpMarkersName();
-llvm::StringRef getParallelName();
 llvm::StringRef getMaxConcurrencyName();
 llvm::StringRef getForceInlineName();
 llvm::StringRef getOptLevelName();

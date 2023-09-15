@@ -177,12 +177,7 @@ lowerPrange(plier::PyCallOp op, mlir::ValueRange operands,
             llvm::ArrayRef<std::pair<llvm::StringRef, mlir::Value>> kwargs,
             mlir::PatternRewriter &rewriter) {
   auto parent = op->getParentOp();
-  auto setAttr = [](mlir::scf::ForOp op) {
-    op->setAttr(numba::util::attributes::getParallelName(),
-                mlir::UnitAttr::get(op->getContext()));
-  };
-  if (mlir::succeeded(
-          numba::lowerRange(op, operands, kwargs, rewriter, setAttr))) {
+  if (mlir::succeeded(numba::lowerRange(op, operands, kwargs, rewriter))) {
     rerunScfPipeline(parent);
     return mlir::success();
   }
@@ -1968,6 +1963,20 @@ struct ResolveNtensorPass
   }
 };
 
+static bool isInsideParallelRegion(mlir::Operation *op) {
+  assert(op && "Invalid op");
+  while (true) {
+    auto region = op->getParentOfType<numba::util::EnvironmentRegionOp>();
+    if (!region)
+      return false;
+
+    if (mlir::isa<numba::util::ParallelAttr>(region.getEnvironment()))
+      return true;
+
+    op = region;
+  }
+}
+
 struct WrapParforRegionsPass
     : public mlir::PassWrapper<WrapParforRegionsPass,
                                mlir::OperationPass<void>> {
@@ -1994,13 +2003,11 @@ struct WrapParforRegionsPass
     };
 
     mlir::OpBuilder builder(&getContext());
-    auto attrName =
-        builder.getStringAttr(numba::util::attributes::getParallelName());
     llvm::SmallVector<std::pair<mlir::scf::ForOp, mlir::Attribute>>
         opsToProcess;
 
     auto visitor = [&](mlir::scf::ForOp forOp) -> mlir::WalkResult {
-      if (!forOp->hasAttr(attrName))
+      if (!isInsideParallelRegion(forOp))
         return mlir::WalkResult::advance();
 
       std::optional<mlir::Attribute> env;
@@ -3292,7 +3299,11 @@ void PostLinalgOptInnerPass::runOnOperation() {
                   OptimizeIdentityLayoutStrides>(&context);
 
   auto additionalOpt = [](mlir::func::FuncOp op) {
-    (void)numba::prepareForFusion(op.getRegion());
+    auto check = [](mlir::Operation &op) -> bool {
+      return mlir::isa<mlir::scf::ParallelOp, numba::util::EnvironmentRegionOp>(
+          op);
+    };
+    (void)numba::prepareForFusion(op.getRegion(), check);
     return numba::naivelyFuseParallelOps(op.getRegion());
   };
 

@@ -38,6 +38,14 @@ getReduceInitVal(mlir::Type type, mlir::Block &reduceBlock) {
   return mlir::arith::getNeutralElement(&(*reduceBlock.begin()));
 }
 
+static bool isInsideParalleRegion(mlir::Operation *op) {
+  // Must be direct parent
+  auto region =
+      mlir::dyn_cast<numba::util::EnvironmentRegionOp>(op->getParentOp());
+  return region &&
+         mlir::isa<numba::util::ParallelAttr>(region.getEnvironment());
+}
+
 struct ParallelToTbb : public mlir::OpRewritePattern<mlir::scf::ParallelOp> {
   using OpRewritePattern::OpRewritePattern;
 
@@ -47,9 +55,8 @@ struct ParallelToTbb : public mlir::OpRewritePattern<mlir::scf::ParallelOp> {
     if (mlir::isa<numba::util::ParallelOp>(op->getParentOp()))
       return mlir::failure();
 
-    bool needParallel =
-        op->hasAttr(numba::util::attributes::getParallelName()) ||
-        !op->getParentOfType<mlir::scf::ParallelOp>();
+    bool needParallel = isInsideParalleRegion(op) ||
+                        !op->getParentOfType<mlir::scf::ParallelOp>();
     if (!needParallel)
       return mlir::failure();
 
@@ -144,7 +151,6 @@ struct ParallelToTbb : public mlir::OpRewritePattern<mlir::scf::ParallelOp> {
       }
       auto newOp =
           mlir::cast<mlir::scf::ParallelOp>(builder.clone(*op, mapping));
-      newOp->removeAttr(numba::util::attributes::getParallelName());
       assert(newOp->getNumResults() == reduceVars.size());
       newOp.getLowerBoundMutable().assign(lowerBound);
       newOp.getUpperBoundMutable().assign(upperBound);
