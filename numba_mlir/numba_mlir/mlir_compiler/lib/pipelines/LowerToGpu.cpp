@@ -993,11 +993,7 @@ protected:
       return mlir::failure();
 
     llvm::SmallVector<mlir::scf::ForOp> newOps;
-    auto setAttr = [&](mlir::scf::ForOp op) {
-      auto unitAttr = mlir::UnitAttr::get(op->getContext());
-      op->setAttr(numba::util::attributes::getParallelName(), unitAttr);
-      newOps.emplace_back(op);
-    };
+    auto setAttr = [&](mlir::scf::ForOp op) { newOps.emplace_back(op); };
     if (mlir::failed(numba::lowerRange(op, args, kwargs, rewriter, setAttr)))
       return mlir::failure();
 

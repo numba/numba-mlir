@@ -1103,7 +1103,6 @@ public:
 static void copyAttrs(mlir::Operation *src, mlir::Operation *dst) {
   const mlir::StringRef attrs[] = {
       numba::util::attributes::getFastmathName(),
-      numba::util::attributes::getParallelName(),
       numba::util::attributes::getMaxConcurrencyName(),
   };
   for (auto name : attrs)

@@ -177,12 +177,7 @@ lowerPrange(plier::PyCallOp op, mlir::ValueRange operands,
             llvm::ArrayRef<std::pair<llvm::StringRef, mlir::Value>> kwargs,
             mlir::PatternRewriter &rewriter) {
   auto parent = op->getParentOp();
-  auto setAttr = [](mlir::scf::ForOp op) {
-    op->setAttr(numba::util::attributes::getParallelName(),
-                mlir::UnitAttr::get(op->getContext()));
-  };
-  if (mlir::succeeded(
-          numba::lowerRange(op, operands, kwargs, rewriter, setAttr))) {
+  if (mlir::succeeded(numba::lowerRange(op, operands, kwargs, rewriter))) {
     rerunScfPipeline(parent);
     return mlir::success();
   }
