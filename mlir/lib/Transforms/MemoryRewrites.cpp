@@ -76,6 +76,8 @@ static mlir::LogicalResult foldLoads(numba::MemorySSAAnalysis &memSSAAnalysis) {
   auto &memSSA = *memSSAAnalysis.memssa;
   using NodeType = numba::MemorySSA::NodeType;
   bool changed = false;
+
+  mlir::DominanceInfo dom;
   for (auto &node : llvm::make_early_inc_range(memSSA.getNodes())) {
     if (NodeType::Use == memSSA.getNodeType(&node)) {
       auto op1 = memSSA.getNodeOperation(&node);
@@ -90,16 +92,21 @@ static mlir::LogicalResult foldLoads(numba::MemorySSAAnalysis &memSSAAnalysis) {
 
       auto op2 = memSSA.getNodeOperation(def);
       assert(nullptr != op2);
-      if (MustAlias()(op1, op2)) {
-        auto val = getStoreValue(op2);
-        auto res = op1->getResult(0);
-        if (val.getType() == res.getType()) {
-          res.replaceAllUsesWith(val);
-          op1->erase();
-          memSSA.eraseNode(&node);
-          changed = true;
-        }
-      }
+      if (!MustAlias()(op1, op2))
+        continue;
+
+      auto val = getStoreValue(op2);
+      auto res = op1->getResult(0);
+      if (val.getType() != res.getType())
+        continue;
+
+      if (!dom.properlyDominates(val, op1))
+        continue;
+
+      res.replaceAllUsesWith(val);
+      op1->erase();
+      memSSA.eraseNode(&node);
+      changed = true;
     }
   }
   return mlir::success(changed);
