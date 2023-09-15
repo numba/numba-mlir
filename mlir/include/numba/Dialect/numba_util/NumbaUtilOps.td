@@ -67,6 +67,8 @@ def IndexRangeAttr
   let assemblyFormat = "`<` `[` $min `,` $max `]` `>`";
 }
 
+def ParallelAttr : NumbaUtil_Attr<"Parallel", "parallel">;
+
 def EnforceShapeOp : NumbaUtil_Op<"enforce_shape", [Pure]> {
 
   let arguments = (ins AnyShaped:$value, Variadic<Index>:$sizes);
