@@ -1047,6 +1047,48 @@ struct PairAccConversionPattern : public mlir::OpConversionPattern<Op> {
   }
 };
 
+struct GetitertConversionPattern
+    : public mlir::OpConversionPattern<plier::GetiterOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(plier::GetiterOp op, OpAdaptor adaptor,
+                  mlir::ConversionPatternRewriter &rewriter) const final {
+    auto converter = getTypeConverter();
+    assert(converter);
+
+    auto resType = converter->convertType<mlir::TupleType>(op.getType());
+    if (!resType || resType.size() != 4)
+      return mlir::failure();
+
+    auto src = adaptor.getValue();
+    auto srcType = mlir::dyn_cast<mlir::TupleType>(src.getType());
+    if (!srcType || srcType.size() != 3)
+      return mlir::failure();
+
+    auto loc = op.getLoc();
+    auto getItem = [&](unsigned i) -> mlir::Value {
+      auto idx = rewriter.create<mlir::arith::ConstantIndexOp>(loc, i);
+      return rewriter.create<numba::util::TupleExtractOp>(
+          loc, srcType.getType(i), src, idx);
+    };
+
+    auto begin = getItem(0);
+    auto end = getItem(1);
+    auto step = getItem(2);
+
+    auto iterType = mlir::MemRefType::get({}, rewriter.getIndexType());
+    mlir::Value iter = rewriter.create<mlir::memref::AllocOp>(loc, iterType);
+    rewriter.create<mlir::memref::StoreOp>(loc, begin, iter);
+
+    mlir::Value rets[] = {begin, end, step, iter};
+    mlir::Value ret =
+        rewriter.create<numba::util::BuildTupleOp>(loc, resType, rets);
+    rewriter.replaceOp(op, ret);
+    return mlir::success();
+  }
+};
+
 struct IternextConversionPattern
     : public mlir::OpConversionPattern<plier::IternextOp> {
   using OpConversionPattern::OpConversionPattern;
@@ -1251,6 +1293,10 @@ void PlierToStdPass::runOnOperation() {
 
         return std::nullopt;
       });
+  target.addDynamicallyLegalOp<plier::GetiterOp>(
+      [&](plier::GetiterOp op) -> std::optional<bool> {
+        return !mlir::isa<plier::RangeStateType>(op.getValue().getType());
+      });
   target.addDynamicallyLegalOp<plier::IternextOp>(
       [&](plier::IternextOp op) -> std::optional<bool> {
         return !mlir::isa<plier::RangeIterType>(op.getValue().getType());
@@ -1273,6 +1319,7 @@ void PlierToStdPass::runOnOperation() {
       LiteralLowering<plier::GlobalOp>,
       OmittedLowering,
       BuildTupleConversionPattern,
+      GetitertConversionPattern,
       IternextConversionPattern,
       PairAccConversionPattern<plier::PairfirstOp, 0>,
       PairAccConversionPattern<plier::PairsecondOp, 1>,
