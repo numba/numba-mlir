@@ -1209,9 +1209,10 @@ void PlierToStdPass::runOnOperation() {
 
 static void populatePlierToStdPipeline(mlir::OpPassManager &pm) {
   pm.addPass(mlir::createCanonicalizerPass());
+  pm.addPass(std::make_unique<InsertParallelRegionPass>());
+  pm.addPass(mlir::createCanonicalizerPass());
   pm.addPass(std::make_unique<PlierToStdPass>());
   pm.addPass(mlir::createCanonicalizerPass());
-  pm.addPass(std::make_unique<InsertParallelRegionPass>());
   pm.addPass(std::make_unique<BuiltinCallsLoweringPass>());
   pm.addPass(numba::createForceInlinePass());
   pm.addPass(mlir::createSymbolDCEPass());
