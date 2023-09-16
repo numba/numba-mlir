@@ -12,6 +12,7 @@
 #include <mlir/Dialect/Complex/IR/Complex.h>
 #include <mlir/Dialect/Func/IR/FuncOps.h>
 #include <mlir/Dialect/Math/IR/Math.h>
+#include <mlir/Dialect/MemRef/IR/MemRef.h>
 #include <mlir/Dialect/SCF/IR/SCF.h>
 #include <mlir/Dialect/UB/IR/UBOps.h>
 #include <mlir/IR/Dialect.h>
@@ -991,6 +992,7 @@ struct PlierToStdPass
     registry.insert<mlir::complex::ComplexDialect>();
     registry.insert<mlir::func::FuncDialect>();
     registry.insert<mlir::math::MathDialect>();
+    registry.insert<mlir::memref::MemRefDialect>();
     registry.insert<mlir::scf::SCFDialect>();
     registry.insert<mlir::ub::UBDialect>();
     registry.insert<numba::util::NumbaUtilDialect>();
@@ -1045,6 +1047,70 @@ struct PairAccConversionPattern : public mlir::OpConversionPattern<Op> {
   }
 };
 
+struct IternextConversionPattern
+    : public mlir::OpConversionPattern<plier::IternextOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(plier::IternextOp op, OpAdaptor adaptor,
+                  mlir::ConversionPatternRewriter &rewriter) const final {
+    auto converter = getTypeConverter();
+    assert(converter);
+
+    auto resType = converter->convertType<mlir::TupleType>(op.getType());
+    if (!resType || resType.size() != 2)
+      return mlir::failure();
+
+    auto src = adaptor.getValue();
+    auto srcType = mlir::dyn_cast<mlir::TupleType>(src.getType());
+    if (!srcType || srcType.size() != 4)
+      return mlir::failure();
+
+    auto loc = op.getLoc();
+    auto getItem = [&](unsigned i) -> mlir::Value {
+      auto idx = rewriter.create<mlir::arith::ConstantIndexOp>(loc, i);
+      return rewriter.create<numba::util::TupleExtractOp>(
+          loc, srcType.getType(i), src, idx);
+    };
+
+    //    auto begin = getItem(0);
+    auto end = getItem(1);
+    auto step = getItem(2);
+    auto iter = getItem(3);
+
+    mlir::Value current = rewriter.create<mlir::memref::LoadOp>(
+        loc, iter, /*indices*/ std::nullopt);
+    mlir::Value next = rewriter.create<mlir::arith::AddIOp>(loc, current, step);
+
+    mlir::Value zero = rewriter.create<mlir::arith::ConstantIndexOp>(loc, 0);
+    mlir::Value neg = rewriter.create<mlir::arith::CmpIOp>(
+        loc, mlir::arith::CmpIPredicate::slt, step, zero);
+    mlir::Value posCond = rewriter.create<mlir::arith::CmpIOp>(
+        loc, mlir::arith::CmpIPredicate::sge, current, end);
+    mlir::Value negCond = rewriter.create<mlir::arith::CmpIOp>(
+        loc, mlir::arith::CmpIPredicate::sle, current, end);
+    mlir::Value cond =
+        rewriter.create<mlir::arith::SelectOp>(loc, neg, negCond, posCond);
+
+    rewriter.create<mlir::memref::StoreOp>(loc, next, iter,
+                                           /*indices*/ std::nullopt);
+
+    current = numba::doConvert(rewriter, loc, current, resType.getType(0));
+    if (!current)
+      return mlir::failure();
+
+    cond = numba::doConvert(rewriter, loc, current, resType.getType(1));
+    if (!cond)
+      return mlir::failure();
+
+    mlir::Value rets[] = {current, cond};
+    mlir::Value ret =
+        rewriter.create<numba::util::BuildTupleOp>(loc, resType, rets);
+    rewriter.replaceOp(op, ret);
+    return mlir::success();
+  }
+};
+
 struct GetItemTupleConversionPattern
     : public mlir::OpConversionPattern<plier::GetItemOp> {
   using OpConversionPattern::OpConversionPattern;
@@ -1088,6 +1154,18 @@ void PlierToStdPass::runOnOperation() {
 
         return std::nullopt;
       });
+
+  auto indexType = mlir::IndexType::get(context);
+  auto indexMemref = mlir::MemRefType::get({}, indexType);
+  auto rangeStateType =
+      mlir::TupleType::get(context, {indexType, indexType, indexType});
+  auto rangeIterType = mlir::TupleType::get(
+      context, {indexType, indexType, indexType, indexMemref});
+  typeConverter.addConversion(
+      [rangeStateType](plier::RangeStateType type) { return rangeStateType; });
+  typeConverter.addConversion(
+      [rangeIterType](plier::RangeIterType type) { return rangeIterType; });
+
   numba::populateTupleTypeConverter(typeConverter);
 
   auto materializeCast = [](mlir::OpBuilder &builder, mlir::Type type,
@@ -1173,6 +1251,10 @@ void PlierToStdPass::runOnOperation() {
 
         return std::nullopt;
       });
+  target.addDynamicallyLegalOp<plier::IternextOp>(
+      [&](plier::IternextOp op) -> std::optional<bool> {
+        return !mlir::isa<plier::RangeIterType>(op.getValue().getType());
+      });
   target.addIllegalOp<plier::BuildTupleOp, plier::PairfirstOp,
                       plier::PairsecondOp>();
   target.addLegalOp<numba::util::BuildTupleOp, numba::util::TupleExtractOp>();
@@ -1191,6 +1273,7 @@ void PlierToStdPass::runOnOperation() {
       LiteralLowering<plier::GlobalOp>,
       OmittedLowering,
       BuildTupleConversionPattern,
+      IternextConversionPattern,
       PairAccConversionPattern<plier::PairfirstOp, 0>,
       PairAccConversionPattern<plier::PairsecondOp, 1>,
       GetItemTupleConversionPattern
