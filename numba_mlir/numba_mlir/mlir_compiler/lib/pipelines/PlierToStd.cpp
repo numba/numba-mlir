@@ -1019,6 +1019,32 @@ struct BuildTupleConversionPattern
   }
 };
 
+template <typename Op, int Idx>
+struct PairAccConversionPattern : public mlir::OpConversionPattern<Op> {
+  using mlir::OpConversionPattern<Op>::OpConversionPattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(Op op, typename Op::Adaptor adaptor,
+                  mlir::ConversionPatternRewriter &rewriter) const final {
+    auto src = adaptor.getValue();
+    if (!mlir::isa<mlir::TupleType>(src.getType()))
+      return mlir::failure();
+
+    auto converter = this->getTypeConverter();
+    assert(converter);
+
+    auto resType = converter->convertType(op.getType());
+    if (!resType)
+      return mlir::failure();
+
+    auto loc = op.getLoc();
+    auto idx = rewriter.create<mlir::arith::ConstantIndexOp>(loc, Idx);
+    rewriter.replaceOpWithNewOp<numba::util::TupleExtractOp>(op, resType, src,
+                                                             idx);
+    return mlir::success();
+  }
+};
+
 struct GetItemTupleConversionPattern
     : public mlir::OpConversionPattern<plier::GetItemOp> {
   using OpConversionPattern::OpConversionPattern;
@@ -1147,7 +1173,8 @@ void PlierToStdPass::runOnOperation() {
 
         return std::nullopt;
       });
-  target.addIllegalOp<plier::BuildTupleOp>();
+  target.addIllegalOp<plier::BuildTupleOp, plier::PairfirstOp,
+                      plier::PairsecondOp>();
   target.addLegalOp<numba::util::BuildTupleOp, numba::util::TupleExtractOp>();
   target.addLegalDialect<mlir::arith::ArithDialect>();
   target.addLegalDialect<mlir::complex::ComplexDialect>();
@@ -1164,6 +1191,8 @@ void PlierToStdPass::runOnOperation() {
       LiteralLowering<plier::GlobalOp>,
       OmittedLowering,
       BuildTupleConversionPattern,
+      PairAccConversionPattern<plier::PairfirstOp, 0>,
+      PairAccConversionPattern<plier::PairsecondOp, 1>,
       GetItemTupleConversionPattern
       // clang-format on
       >(typeConverter, context);
