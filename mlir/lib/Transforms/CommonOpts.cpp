@@ -643,6 +643,39 @@ struct MoveOpsFromBefore : public mlir::OpRewritePattern<mlir::scf::WhileOp> {
   }
 };
 
+struct WhileOpLICM : public mlir::OpRewritePattern<mlir::scf::WhileOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(mlir::scf::WhileOp loop,
+                  mlir::PatternRewriter &rewriter) const override {
+    bool changed = false;
+
+    mlir::DominanceInfo dom;
+    rewriter.startRootUpdate(loop);
+    for (mlir::Block *body : {loop.getBeforeBody(), loop.getAfterBody()}) {
+      for (mlir::Operation &op :
+           llvm::make_early_inc_range(body->without_terminator())) {
+        if (!mlir::isPure(&op))
+          continue;
+
+        if (llvm::any_of(op.getOperands(), [&](auto &&arg) {
+              return !dom.properlyDominates(arg, loop);
+            }))
+          continue;
+
+        rewriter.updateRootInPlace(&op, [&]() { op.moveBefore(loop); });
+      }
+    }
+    if (changed) {
+      rewriter.finalizeRootUpdate(loop);
+    } else {
+      rewriter.cancelRootUpdate(loop);
+    }
+    return mlir::success(changed);
+  }
+};
+
 struct GPUGenGlobalId : public mlir::OpRewritePattern<mlir::arith::AddIOp> {
   using OpRewritePattern::OpRewritePattern;
 
@@ -763,7 +796,7 @@ void numba::populatePoisonOptsPatterns(mlir::RewritePatternSet &patterns) {
 }
 
 void numba::populateLoopOptsPatterns(mlir::RewritePatternSet &patterns) {
-  patterns.insert<CanonicalizeLoopMemrefIndex, MoveOpsFromBefore>(
+  patterns.insert<CanonicalizeLoopMemrefIndex, MoveOpsFromBefore, WhileOpLICM>(
       patterns.getContext());
 }
 
