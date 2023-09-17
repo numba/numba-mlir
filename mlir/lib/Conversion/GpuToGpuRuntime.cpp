@@ -43,6 +43,19 @@
 #include <llvm/ADT/SmallBitVector.h>
 
 namespace {
+static gpu_runtime::GPURegionDescAttr getGpuRegionEnv(mlir::Operation *op) {
+  assert(op && "Invalid op");
+  while (auto region =
+             op->getParentOfType<numba::util::EnvironmentRegionOp>()) {
+    if (auto env = mlir::dyn_cast<gpu_runtime::GPURegionDescAttr>(
+            region.getEnvironment()))
+      return env;
+
+    op = region;
+  }
+  return {};
+}
+
 static mlir::gpu::Processor getProcessor(unsigned val) {
   const mlir::gpu::Processor mapping[] = {
       mlir::gpu::Processor::BlockX,  mlir::gpu::Processor::BlockY,
@@ -254,13 +267,11 @@ struct InsertGPUAllocs
     }
 
     auto getEnv = [](mlir::Operation *op) -> mlir::FailureOr<mlir::Attribute> {
-      assert(op && "Invalid op");
-      auto region = op->getParentOfType<numba::util::EnvironmentRegionOp>();
-      if (!region ||
-          !mlir::isa<gpu_runtime::GPURegionDescAttr>(region.getEnvironment()))
+      auto env = getGpuRegionEnv(op);
+      if (!env)
         return mlir::failure();
 
-      return region.getEnvironment();
+      return env;
     };
 
     mlir::StringAttr devFuncAttr;
@@ -532,16 +543,17 @@ static std::optional<mlir::Value> getGpuStream(mlir::OpBuilder &builder,
   assert(op);
   auto func = op->getParentOfType<mlir::FunctionOpInterface>();
   if (!func)
-    return {};
+    return std::nullopt;
 
   if (!llvm::hasSingleElement(func.getFunctionBody()))
-    return {};
+    return std::nullopt;
 
   mlir::Attribute device;
-  if (auto envRegion = op->getParentOfType<numba::util::EnvironmentRegionOp>())
-    if (auto desc = mlir::dyn_cast<gpu_runtime::GPURegionDescAttr>(
-            envRegion.getEnvironment()))
-      device = desc.getDevice();
+  if (auto env = getGpuRegionEnv(op))
+      device = env.getDevice();
+
+  if (!device)
+    return std::nullopt;
 
   auto &block = func.getFunctionBody().front();
   auto ops = block.getOps<gpu_runtime::CreateGpuStreamOp>();
@@ -1440,9 +1452,7 @@ struct ExpandDeviceFuncCallOp
   mlir::LogicalResult
   matchAndRewrite(mlir::func::CallOp op,
                   mlir::PatternRewriter &rewriter) const override {
-    auto region = op->getParentOfType<numba::util::EnvironmentRegionOp>();
-    if (!region || !mlir::isa_and_nonnull<gpu_runtime::GPURegionDescAttr>(
-                       region.getEnvironment()))
+    if (!getGpuRegionEnv(op))
       return mlir::failure();
 
     auto mod = op->getParentOfType<mlir::ModuleOp>();
@@ -1527,9 +1537,7 @@ static std::optional<mlir::TypedAttr> getNeutralValue(mlir::Block &block) {
 
 static bool isInsideGPURegion(mlir::Operation *op) {
   assert(op && "Invalid op");
-  auto envOp = op->getParentOfType<numba::util::EnvironmentRegionOp>();
-  return envOp &&
-         mlir::isa<gpu_runtime::GPURegionDescAttr>(envOp.getEnvironment());
+  return static_cast<bool>(getGpuRegionEnv(op));
 }
 
 struct TileParallelOp : public mlir::OpRewritePattern<mlir::scf::ParallelOp> {
