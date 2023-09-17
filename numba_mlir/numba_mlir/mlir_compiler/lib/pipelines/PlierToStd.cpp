@@ -1141,7 +1141,7 @@ struct IternextConversionPattern
     if (!current)
       return mlir::failure();
 
-    cond = numba::doConvert(rewriter, loc, current, resType.getType(1));
+    cond = numba::doConvert(rewriter, loc, cond, resType.getType(1));
     if (!cond)
       return mlir::failure();
 
