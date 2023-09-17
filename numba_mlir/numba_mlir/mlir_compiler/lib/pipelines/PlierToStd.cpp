@@ -1128,9 +1128,9 @@ struct IternextConversionPattern
     mlir::Value neg = rewriter.create<mlir::arith::CmpIOp>(
         loc, mlir::arith::CmpIPredicate::slt, step, zero);
     mlir::Value posCond = rewriter.create<mlir::arith::CmpIOp>(
-        loc, mlir::arith::CmpIPredicate::sge, current, end);
+        loc, mlir::arith::CmpIPredicate::slt, current, end);
     mlir::Value negCond = rewriter.create<mlir::arith::CmpIOp>(
-        loc, mlir::arith::CmpIPredicate::sle, current, end);
+        loc, mlir::arith::CmpIPredicate::sgt, current, end);
     mlir::Value cond =
         rewriter.create<mlir::arith::SelectOp>(loc, neg, negCond, posCond);
 
