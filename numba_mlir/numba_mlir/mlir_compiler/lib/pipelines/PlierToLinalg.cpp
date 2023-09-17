@@ -184,15 +184,6 @@ lowerPrange(plier::PyCallOp op, mlir::ValueRange operands,
   return mlir::failure();
 }
 
-using kwargs_t = llvm::ArrayRef<std::pair<llvm::StringRef, mlir::Value>>;
-using func_t = mlir::LogicalResult (*)(plier::PyCallOp, mlir::ValueRange,
-                                       kwargs_t, mlir::PatternRewriter &);
-static const std::pair<llvm::StringRef, func_t> builtinFuncsHandlers[] = {
-    // clang-format off
-    {"numba.prange", lowerPrange},
-    // clang-format on
-};
-
 static std::optional<mlir::Type> isUniTuple(mlir::TupleType type) {
   auto count = type.size();
   if (count == 0)
@@ -1025,40 +1016,6 @@ private:
   NumpyResolver &resolver;
 };
 
-struct BuiltinCallsToNtensor
-    : public mlir::OpConversionPattern<plier::PyCallOp> {
-  using OpConversionPattern::OpConversionPattern;
-
-  mlir::LogicalResult
-  matchAndRewrite(plier::PyCallOp op, plier::PyCallOp::Adaptor adaptor,
-                  mlir::ConversionPatternRewriter &rewriter) const override {
-    auto name = op.getFuncName();
-    for (auto &handler : builtinFuncsHandlers)
-      if (handler.first == name) {
-        auto func = adaptor.getFunc();
-        auto args = adaptor.getArgs();
-        auto varArgs = adaptor.getVarargs();
-        auto kwArgs = adaptor.getKwargs();
-        auto kwNames = adaptor.getKwNames();
-        assert(kwArgs.size() == kwNames.size() &&
-               "Args and names size mismatch");
-
-        auto converter = getTypeConverter();
-        assert(converter);
-
-        auto resType = converter->convertType(op.getType());
-        if (!resType)
-          return mlir::failure();
-
-        rewriter.replaceOpWithNewOp<plier::PyCallOp>(
-            op, resType, func, args, varArgs, kwArgs, name, kwNames);
-        return mlir::success();
-      }
-
-    return mlir::failure();
-  }
-};
-
 static std::optional<mlir::Value> addElementConversion(mlir::OpBuilder &builder,
                                                        mlir::Location loc,
                                                        mlir::Value srcArray,
@@ -1516,10 +1473,6 @@ struct PlierToNtensorPass
           if (resolver->hasFunc(funcName))
             return false;
 
-          for (auto &handler : builtinFuncsHandlers)
-            if (handler.first == funcName)
-              return typeConverter.isLegal(op);
-
           return std::nullopt;
         });
 
@@ -1572,7 +1525,6 @@ struct PlierToNtensorPass
         BinopToNtensor,
         InplaceBinopToNtensor,
         BuildSliceToNtensor,
-        BuiltinCallsToNtensor,
         CastsToNtensor,
         UnitupleExtractToNtensor,
         LowerConst
@@ -1855,34 +1807,6 @@ private:
   NumpyResolver &resolver;
 };
 
-struct BuiltinCallsLowering : public mlir::OpRewritePattern<plier::PyCallOp> {
-  using OpRewritePattern::OpRewritePattern;
-
-  mlir::LogicalResult
-  matchAndRewrite(plier::PyCallOp op,
-                  mlir::PatternRewriter &rewriter) const override {
-    auto name = op.getFuncName();
-    for (auto &handler : builtinFuncsHandlers)
-      if (handler.first == name) {
-        auto args = op.getArgs();
-        auto kwArgs = op.getKwargs();
-        auto kwNames = op.getKwNames();
-        assert(kwArgs.size() == kwNames.size() &&
-               "Args and names size mismatch");
-        llvm::SmallVector<std::pair<llvm::StringRef, mlir::Value>> kwArgsArray;
-        kwArgsArray.reserve(kwArgs.size());
-        for (auto &&[arg, nameAttr] : llvm::zip(kwArgs, kwNames)) {
-          auto argName = nameAttr.cast<mlir::StringAttr>().getValue();
-          kwArgsArray.emplace_back(argName, arg);
-        }
-
-        return handler.second(op, args, kwArgsArray, rewriter);
-      }
-
-    return mlir::failure();
-  }
-};
-
 struct UnaryOpsLowering
     : public mlir::OpRewritePattern<numba::ntensor::UnaryOp> {
   using OpRewritePattern::OpRewritePattern;
@@ -1954,8 +1878,7 @@ struct ResolveNtensorPass
     mlir::RewritePatternSet patterns(&ctx);
 
     patterns.insert<NtensorPrimitiveCallsLowering,
-                    NtensorViewPrimitiveCallsLowering, BuiltinCallsLowering>(
-        &ctx);
+                    NtensorViewPrimitiveCallsLowering>(&ctx);
 
     if (mlir::failed(mlir::applyPatternsAndFoldGreedily(getOperation(),
                                                         std::move(patterns))))
@@ -3471,6 +3394,8 @@ static void populatePlierToLinalgGenPipeline(mlir::OpPassManager &pm) {
   pm.addNestedPass<mlir::func::FuncOp>(mlir::createCanonicalizerPass());
   pm.addNestedPass<mlir::func::FuncOp>(numba::ntensor::createCopyRemovalPass());
   populateCommonOptPass(pm);
+  pm.addPass(numba::createPromoteWhilePass());
+  pm.addPass(mlir::createCanonicalizerPass());
   pm.addPass(numba::ntensor::createPropagateEnvironmentPass());
   pm.addPass(std::make_unique<ResolveNtensorPass>());
   pm.addPass(numba::createForceInlinePass());
