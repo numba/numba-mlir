@@ -1045,7 +1045,7 @@ struct GetitertConversionPattern
     assert(converter);
 
     auto resType = converter->convertType<mlir::TupleType>(op.getType());
-    if (!resType || resType.size() != 4)
+    if (!resType || resType.size() != 5)
       return mlir::failure();
 
     auto src = adaptor.getValue();
@@ -1064,11 +1064,23 @@ struct GetitertConversionPattern
     auto end = getItem(1);
     auto step = getItem(2);
 
+    auto zero = rewriter.create<mlir::arith::ConstantIndexOp>(loc, 0);
+    mlir::Value isNeg = rewriter.create<mlir::arith::CmpIOp>(
+        loc, mlir::arith::CmpIPredicate::slt, step, zero);
+    auto getNeg = [&](mlir::Value val) -> mlir::Value {
+      mlir::Value neg = rewriter.create<mlir::arith::SubIOp>(loc, zero, val);
+      return rewriter.create<mlir::arith::SelectOp>(loc, isNeg, neg, val);
+    };
+
+    begin = getNeg(begin);
+    end = getNeg(end);
+    step = getNeg(step);
+
     auto iterType = mlir::MemRefType::get({}, rewriter.getIndexType());
     mlir::Value iter = rewriter.create<mlir::memref::AllocOp>(loc, iterType);
     rewriter.create<mlir::memref::StoreOp>(loc, begin, iter);
 
-    mlir::Value rets[] = {begin, end, step, iter};
+    mlir::Value rets[] = {begin, end, step, iter, isNeg};
     mlir::Value ret =
         rewriter.create<numba::util::BuildTupleOp>(loc, resType, rets);
     rewriter.replaceOp(op, ret);
@@ -1092,7 +1104,7 @@ struct IternextConversionPattern
 
     auto src = adaptor.getValue();
     auto srcType = mlir::dyn_cast<mlir::TupleType>(src.getType());
-    if (!srcType || srcType.size() != 4)
+    if (!srcType || srcType.size() != 5)
       return mlir::failure();
 
     auto loc = op.getLoc();
@@ -1106,24 +1118,23 @@ struct IternextConversionPattern
     auto end = getItem(1);
     auto step = getItem(2);
     auto iter = getItem(3);
+    auto isNeg = getItem(4);
 
     mlir::Value current = rewriter.create<mlir::memref::LoadOp>(
         loc, iter, /*indices*/ std::nullopt);
     mlir::Value next = rewriter.create<mlir::arith::AddIOp>(loc, current, step);
 
     mlir::Value zero = rewriter.create<mlir::arith::ConstantIndexOp>(loc, 0);
-    mlir::Value neg = rewriter.create<mlir::arith::CmpIOp>(
-        loc, mlir::arith::CmpIPredicate::slt, step, zero);
-    mlir::Value posCond = rewriter.create<mlir::arith::CmpIOp>(
+    mlir::Value currentNeg =
+        rewriter.create<mlir::arith::SubIOp>(loc, zero, current);
+    mlir::Value cond = rewriter.create<mlir::arith::CmpIOp>(
         loc, mlir::arith::CmpIPredicate::slt, current, end);
-    mlir::Value negCond = rewriter.create<mlir::arith::CmpIOp>(
-        loc, mlir::arith::CmpIPredicate::sgt, current, end);
-    mlir::Value cond =
-        rewriter.create<mlir::arith::SelectOp>(loc, neg, negCond, posCond);
 
     rewriter.create<mlir::memref::StoreOp>(loc, next, iter,
                                            /*indices*/ std::nullopt);
 
+    current =
+        rewriter.create<mlir::arith::SelectOp>(loc, isNeg, currentNeg, current);
     current = numba::doConvert(rewriter, loc, current, resType.getType(0));
     if (!current)
       return mlir::failure();
@@ -1186,10 +1197,11 @@ void PlierToStdPass::runOnOperation() {
 
   auto indexType = mlir::IndexType::get(context);
   auto indexMemref = mlir::MemRefType::get({}, indexType);
+  auto i1 = mlir::IntegerType::get(context, 1);
   auto rangeStateType =
       mlir::TupleType::get(context, {indexType, indexType, indexType});
   auto rangeIterType = mlir::TupleType::get(
-      context, {indexType, indexType, indexType, indexMemref});
+      context, {indexType, indexType, indexType, indexMemref, i1});
   typeConverter.addConversion(
       [rangeStateType](plier::RangeStateType type) { return rangeStateType; });
   typeConverter.addConversion(
