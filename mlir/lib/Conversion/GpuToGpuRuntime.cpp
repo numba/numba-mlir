@@ -75,10 +75,9 @@ struct ParallelLoopGPUMappingPass
       mlir::OpBuilder builder(&getContext());
       auto identityMap = builder.getDimIdentityMap();
       llvm::SmallVector<mlir::gpu::ParallelLoopDimMappingAttr> mapping;
-      for (auto &op : llvm::make_early_inc_range(region.front())) {
-        auto parallel = mlir::dyn_cast<mlir::scf::ParallelOp>(op);
-        if (!parallel || parallel->hasAttr(mlir::gpu::getMappingAttrName()))
-          continue;
+      auto visitor = [&](mlir::scf::ParallelOp parallel) -> mlir::WalkResult {
+        if (parallel->hasAttr(mlir::gpu::getMappingAttrName()))
+          return mlir::WalkResult::skip();
 
         auto numLoops = parallel.getNumLoops();
         mapping.resize(numLoops);
@@ -87,10 +86,14 @@ struct ParallelLoopGPUMappingPass
               getProcessor(i), identityMap, identityMap);
 
         if (mlir::failed(mlir::gpu::setMappingAttr(parallel, mapping))) {
-          signalPassFailure();
-          return;
+          parallel->emitError("Failed to set mapping atter");
+          return mlir::WalkResult::interrupt();
         }
-      }
+
+        return mlir::WalkResult::skip();
+      };
+      if (region.walk(visitor).wasInterrupted())
+        return signalPassFailure();
     });
   }
 };
