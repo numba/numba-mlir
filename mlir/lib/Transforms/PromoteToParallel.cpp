@@ -284,6 +284,7 @@ struct PromoteWhileOp : public mlir::OpRewritePattern<mlir::scf::WhileOp> {
     step = toIndex(step);
 
     llvm::SmallVector<mlir::Value> mapping;
+    mapping.reserve(loop.getInits().size());
     for (auto &&[i, init] : llvm::enumerate(loop.getInits())) {
       if (i == argNumber)
         continue;
@@ -305,14 +306,15 @@ struct PromoteWhileOp : public mlir::OpRewritePattern<mlir::scf::WhileOp> {
       newIterVar = rewriter.create<mlir::arith::IndexCastOp>(
           loc, iterVar.getType(), newIterVar);
 
-    mapping.resize(newBody.getNumArguments());
-    for (auto &&[i, arg] : llvm::enumerate(newBody.getArguments())) {
+    mapping.clear();
+    auto newArgs = newBody.getArguments();
+    for (auto i : llvm::seq<size_t>(0, newArgs.size())) {
       if (i < argNumber) {
-        mapping[i + 1] = arg;
+        mapping.emplace_back(newArgs[i + 1]);
       } else if (i == argNumber) {
-        mapping[0] = arg;
+        mapping.emplace_back(newArgs.front());
       } else {
-        mapping[i] = arg;
+        mapping.emplace_back(newArgs[i]);
       }
     }
 
