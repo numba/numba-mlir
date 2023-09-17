@@ -1090,6 +1090,9 @@ struct InsertGpuRegionPass
         nestedRegion = region;
       }
 
+      if (getGpuRegionEnv(loop))
+        continue;
+
       auto parent = loop->getParentOfType<mlir::FunctionOpInterface>();
       if (!parent)
         continue;
