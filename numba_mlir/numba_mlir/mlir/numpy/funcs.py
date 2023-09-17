@@ -53,8 +53,6 @@ def _mkl_func(func):
     return func
 
 
-add_func(prange, "numba.prange")
-
 registry = FuncRegistry()
 
 _registered_funcs = {}
@@ -105,6 +103,20 @@ def promote_int(t, b):
     if is_int(t, b):
         return b.int64
     return t
+
+
+@register_func("numba.prange", prange)
+def range_impl(builder, begin, end=None, step=1):
+    end = literal(end)
+    if end is None:
+        end = begin
+        begin = 0
+
+    index = builder.index
+    begin = builder.cast(begin, index)
+    end = builder.cast(end, index)
+    step = builder.cast(step, index)
+    return (begin, end, step)
 
 
 def _linalg_index(dim):
