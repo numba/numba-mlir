@@ -432,6 +432,140 @@ struct ResTruncFBinary : public mlir::OpRewritePattern<Op> {
   }
 };
 
+struct CanonicalizeLoopMemrefIndex
+    : public mlir::OpRewritePattern<mlir::memref::LoadOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(mlir::memref::LoadOp loadOp,
+                  mlir::PatternRewriter &rewriter) const override {
+    auto loop = mlir::dyn_cast<mlir::scf::WhileOp>(loadOp->getParentOp());
+    if (!loop || loadOp->getBlock() != loop.getBeforeBody())
+      return rewriter.notifyMatchFailure(loadOp, "Not inside the loop");
+
+    auto memref = loadOp.getMemref();
+    if (!mlir::isa_and_present<mlir::memref::AllocOp, mlir::memref::AllocaOp>(
+            memref.getDefiningOp()))
+      return rewriter.notifyMatchFailure(loadOp, "Not result of alloc");
+
+    auto isAncestor = [&](mlir::Operation *op) -> bool {
+      auto reg = op->getParentRegion();
+      return loop.getBefore().isAncestor(reg) ||
+             loop.getAfter().isAncestor(reg);
+    };
+
+    mlir::memref::StoreOp storeOp;
+    for (auto user : memref.getUsers()) {
+      if (user == loadOp)
+        continue;
+
+      if (mlir::isa<mlir::memref::DeallocOp>(user))
+        continue;
+
+      if (mlir::isa<mlir::memref::LoadOp>(user)) {
+        if (isAncestor(user)) {
+          return rewriter.notifyMatchFailure(
+              loadOp, [&](mlir::Diagnostic &diag) {
+                diag << "Unsupported nested load: " << *user;
+              });
+        } else {
+          continue;
+        }
+      }
+
+      if (auto op = mlir::dyn_cast<mlir::memref::StoreOp>(user)) {
+        if (op->getBlock() == loop.getBeforeBody()) {
+          if (storeOp) {
+            return rewriter.notifyMatchFailure(
+                loadOp, [&](mlir::Diagnostic &diag) {
+                  diag << "Unsupported Multiple stores: " << *storeOp << " and "
+                       << *op;
+                });
+          } else {
+            storeOp = op;
+            continue;
+          }
+        } else {
+          if (isAncestor(user)) {
+            return rewriter.notifyMatchFailure(
+                loadOp, [&](mlir::Diagnostic &diag) {
+                  diag << "Unsupported nested store: " << *user;
+                });
+          } else {
+            continue;
+          }
+        }
+      }
+
+      return rewriter.notifyMatchFailure(loadOp, [&](mlir::Diagnostic &diag) {
+        diag << "Unsupported user: " << *user;
+      });
+    }
+
+    if (!storeOp || storeOp.getIndices() != loadOp.getIndices())
+      return rewriter.notifyMatchFailure(loadOp, "invalid store op");
+
+    mlir::DominanceInfo dom;
+    if (!dom.properlyDominates(loadOp.getOperation(), storeOp.getOperation()))
+      return rewriter.notifyMatchFailure(loadOp,
+                                         "Store op doesn't dominate load");
+
+    auto indices = storeOp.getIndices();
+    for (auto idx : indices) {
+      if (!dom.properlyDominates(idx, loop))
+        return rewriter.notifyMatchFailure(loadOp, [&](mlir::Diagnostic &diag) {
+          diag << "Index doesnt dominate the loop: " << idx;
+        });
+    }
+
+    mlir::OpBuilder::InsertionGuard g(rewriter);
+    rewriter.setInsertionPoint(loop);
+    auto loc = loop.getLoc();
+    mlir::Value init =
+        rewriter.create<mlir::memref::LoadOp>(loc, memref, indices);
+
+    auto newInits = llvm::to_vector(loop.getInits());
+    newInits.emplace_back(init);
+
+    auto newResults = llvm::to_vector(loop->getResultTypes());
+    newResults.emplace_back(init.getType());
+    auto newLoop = rewriter.create<mlir::scf::WhileOp>(
+        loc, newResults, newInits, nullptr, nullptr);
+
+    auto oldBefore = loop.getBeforeBody();
+    auto oldAfter = loop.getAfterBody();
+    auto newBefore = newLoop.getBeforeBody();
+    auto newAfter = newLoop.getAfterBody();
+
+    rewriter.inlineBlockBefore(oldBefore, newBefore, newBefore->begin(),
+                               newBefore->getArguments().drop_back());
+    rewriter.inlineBlockBefore(oldAfter, newAfter, newAfter->begin(),
+                               newAfter->getArguments().drop_back());
+
+    auto beforeTerm =
+        mlir::cast<mlir::scf::ConditionOp>(newBefore->getTerminator());
+    rewriter.setInsertionPoint(beforeTerm);
+    auto newCondArgs = llvm::to_vector(beforeTerm.getArgs());
+    newCondArgs.emplace_back(storeOp.getValueToStore());
+    rewriter.eraseOp(storeOp);
+    rewriter.replaceOp(loadOp, newBefore->getArguments().back());
+    rewriter.replaceOpWithNewOp<mlir::scf::ConditionOp>(
+        beforeTerm, beforeTerm.getCondition(), newCondArgs);
+
+    auto afterTerm = mlir::cast<mlir::scf::YieldOp>(newAfter->getTerminator());
+    rewriter.setInsertionPoint(afterTerm);
+    auto newYieldArgs = llvm::to_vector(afterTerm.getResults());
+    newYieldArgs.emplace_back(newAfter->getArguments().back());
+    rewriter.replaceOpWithNewOp<mlir::scf::YieldOp>(afterTerm, newYieldArgs);
+
+    rewriter.setInsertionPointAfter(newLoop);
+    rewriter.create<mlir::memref::StoreOp>(loc, newLoop.getResults().back(),
+                                           memref, indices);
+    rewriter.replaceOp(loop, newLoop.getResults().drop_back());
+    return mlir::success();
+  }
+};
+
 struct GPUGenGlobalId : public mlir::OpRewritePattern<mlir::arith::AddIOp> {
   using OpRewritePattern::OpRewritePattern;
 
@@ -572,6 +706,7 @@ void numba::populateCommonOptsPatterns(mlir::RewritePatternSet &patterns) {
       ResTruncFBinary<mlir::arith::SubFOp>,
       ResTruncFBinary<mlir::arith::MulFOp>,
       ResTruncFBinary<mlir::arith::DivFOp>,
+      CanonicalizeLoopMemrefIndex,
       GPUGenGlobalId
       // clang-format on
       >(patterns.getContext());
