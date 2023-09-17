@@ -17,6 +17,7 @@
 #include <mlir/Dialect/SCF/IR/SCF.h>
 #include <mlir/Dialect/UB/IR/UBOps.h>
 #include <mlir/IR/BuiltinOps.h>
+#include <mlir/IR/IRMapping.h>
 #include <mlir/IR/Matchers.h>
 #include <mlir/IR/PatternMatch.h>
 #include <mlir/Pass/Pass.h>
@@ -566,6 +567,81 @@ struct CanonicalizeLoopMemrefIndex
   }
 };
 
+struct MoveOpsFromBefore : public mlir::OpRewritePattern<mlir::scf::WhileOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(mlir::scf::WhileOp op,
+                  mlir::PatternRewriter &rewriter) const override {
+    auto oldBefore = op.getBeforeBody();
+    auto oldAfter = op.getAfterBody();
+    auto oldTerm =
+        mlir::cast<mlir::scf::ConditionOp>(oldBefore->getTerminator());
+
+    mlir::Operation *opToMove = nullptr;
+    size_t idx = 0;
+    for (auto &&[i, args] : llvm::enumerate(llvm::zip(
+             oldTerm.getArgs(), oldAfter->getArguments(), op.getResults()))) {
+      auto &&[arg, afterArg, res] = args;
+      if (afterArg.use_empty() && res.use_empty())
+        continue;
+
+      auto argOp = arg.getDefiningOp();
+      if (argOp && argOp->getNumResults() == 1 && mlir::isPure(argOp)) {
+        opToMove = argOp;
+        idx = i;
+        break;
+      }
+    }
+
+    if (!opToMove)
+      return rewriter.notifyMatchFailure(op, "No ops to move");
+
+    mlir::OpBuilder::InsertionGuard g(rewriter);
+
+    auto newResults = llvm::to_vector(op->getResultTypes());
+    llvm::append_range(newResults, opToMove->getOperandTypes());
+
+    auto newTermArgs = llvm::to_vector(oldTerm.getArgs());
+    llvm::append_range(newTermArgs, opToMove->getOperands());
+
+    rewriter.setInsertionPoint(oldTerm);
+    rewriter.replaceOpWithNewOp<mlir::scf::ConditionOp>(
+        oldTerm, oldTerm.getCondition(), newTermArgs);
+
+    rewriter.setInsertionPoint(op);
+    auto newLoop = rewriter.create<mlir::scf::WhileOp>(
+        op.getLoc(), newResults, op.getInits(), nullptr, nullptr);
+
+    auto newBefore = newLoop.getBeforeBody();
+    auto newAfter = newLoop.getAfterBody();
+
+    auto numArgs = opToMove->getNumOperands();
+    auto newAfterArgs = newAfter->getArguments();
+    rewriter.inlineBlockBefore(oldBefore, newBefore, newBefore->begin(),
+                               newBefore->getArguments());
+    rewriter.inlineBlockBefore(oldAfter, newAfter, newAfter->begin(),
+                               newAfterArgs.drop_back(numArgs));
+
+    mlir::IRMapping mapping;
+    mapping.map(opToMove->getOperands(), newAfterArgs.take_back(numArgs));
+
+    rewriter.setInsertionPointToStart(newAfter);
+    auto newOp = rewriter.clone(*opToMove, mapping);
+    rewriter.replaceAllUsesWith(newAfterArgs[idx], newOp->getResult(0));
+
+    mapping.map(opToMove->getOperands(),
+                newLoop.getResults().take_back(numArgs));
+
+    rewriter.setInsertionPointAfter(newLoop);
+    newOp = rewriter.clone(*opToMove, mapping);
+    rewriter.replaceAllUsesWith(op.getResult(idx), newOp->getResult(0));
+
+    rewriter.replaceOp(op, newLoop.getResults().drop_back(numArgs));
+    return mlir::success();
+  }
+};
+
 struct GPUGenGlobalId : public mlir::OpRewritePattern<mlir::arith::AddIOp> {
   using OpRewritePattern::OpRewritePattern;
 
@@ -686,7 +762,8 @@ void numba::populatePoisonOptsPatterns(mlir::RewritePatternSet &patterns) {
 }
 
 void numba::populateLoopOptsPatterns(mlir::RewritePatternSet &patterns) {
-  patterns.insert<CanonicalizeLoopMemrefIndex>(patterns.getContext());
+  patterns.insert<CanonicalizeLoopMemrefIndex, MoveOpsFromBefore>(
+      patterns.getContext());
 }
 
 void numba::populateCommonOptsPatterns(mlir::RewritePatternSet &patterns) {
