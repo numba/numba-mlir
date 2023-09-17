@@ -159,8 +159,8 @@ static bool isInsideParallelRegion(mlir::Operation *op) {
   }
 }
 
-static bool checkIndexType(mlir::Operation *op) {
-  auto type = op->getResult(0).getType();
+static bool checkIndexType(mlir::arith::CmpIOp op) {
+  auto type = op.getLhs().getType();
   if (mlir::isa<mlir::IndexType>(type))
     return true;
 
@@ -240,25 +240,16 @@ struct PromoteWhileOp : public mlir::OpRewritePattern<mlir::scf::WhileOp> {
         diag << "Unrecognized iter var: " << iterVar;
       });
 
-    auto &iterVarOperand = [&]() -> mlir::OpOperand & {
-      for (auto &use : iterVar.getUses()) {
-        if (use.getOwner() == beforeTerm)
-          return use;
-      }
-      llvm_unreachable("Invalid IR");
-    }();
-
     mlir::Block *afterBody = loop.getAfterBody();
     auto afterTerm = mlir::cast<mlir::scf::YieldOp>(afterBody->getTerminator());
     auto argNumber = iterVar.getArgNumber();
     auto afterTermIterArg = afterTerm.getResults()[argNumber];
 
-    auto iterVarAfter =
-        afterBody->getArgument(iterVarOperand.getOperandNumber());
+    auto iterVarAfter = afterBody->getArgument(argNumber);
 
     mlir::Value step;
-    for (auto user : iterVarAfter.getUsers()) {
-      auto owner = mlir::dyn_cast<mlir::arith::AddIOp>(user);
+    for (auto &use : iterVarAfter.getUses()) {
+      auto owner = mlir::dyn_cast<mlir::arith::AddIOp>(use.getOwner());
       if (!owner)
         continue;
 
@@ -271,12 +262,14 @@ struct PromoteWhileOp : public mlir::OpRewritePattern<mlir::scf::WhileOp> {
         continue;
 
       step = other;
+      break;
     }
 
     if (!step)
-      return rewriter.notifyMatchFailure(loop, "Didn't found suitable add op");
+      return rewriter.notifyMatchFailure(loop,
+                                         "Didn't found suitable 'add' op");
 
-    auto begin = loop.getInits()[iterVarOperand.getOperandNumber()];
+    auto begin = loop.getInits()[argNumber];
 
     auto loc = loop.getLoc();
     auto indexType = rewriter.getIndexType();
@@ -297,10 +290,12 @@ struct PromoteWhileOp : public mlir::OpRewritePattern<mlir::scf::WhileOp> {
 
       mapping.emplace_back(init);
     }
+
     auto emptyBuidler = [](mlir::OpBuilder &, mlir::Location, mlir::Value,
                            mlir::ValueRange) {};
     auto newLoop = rewriter.create<mlir::scf::ForOp>(loc, begin, end, step,
                                                      mapping, emptyBuidler);
+
     mlir::Block &newBody = newLoop.getLoopBody().front();
 
     mlir::OpBuilder::InsertionGuard g(rewriter);
@@ -321,7 +316,8 @@ struct PromoteWhileOp : public mlir::OpRewritePattern<mlir::scf::WhileOp> {
       }
     }
 
-    rewriter.inlineBlockBefore(beforeBody, &newBody, newBody.begin(), mapping);
+    rewriter.inlineBlockBefore(loop.getAfterBody(), &newBody, newBody.begin(),
+                               mapping);
 
     auto term = mlir::cast<mlir::scf::YieldOp>(newBody.getTerminator());
 
@@ -352,7 +348,7 @@ struct PromoteWhileOp : public mlir::OpRewritePattern<mlir::scf::WhileOp> {
     llvm::append_range(mapping, newLoop.getResults());
     mapping.insert(mapping.begin() + argNumber, res);
     rewriter.replaceOp(loop, mapping);
-    return mlir::failure();
+    return mlir::success();
   }
 };
 
