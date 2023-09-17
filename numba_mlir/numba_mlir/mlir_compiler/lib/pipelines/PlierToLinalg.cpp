@@ -68,7 +68,6 @@
 #include "numba/Transforms/UpliftMath.hpp"
 
 #include "BasePipeline.hpp"
-#include "LoopUtils.hpp"
 #include "NumpyResolver.hpp"
 #include "PyLinalgResolver.hpp"
 
@@ -170,18 +169,6 @@ static void rerunScfPipeline(mlir::Operation *op) {
   auto mod = op->getParentOfType<mlir::ModuleOp>();
   assert(nullptr != mod);
   numba::addPipelineJumpMarker(mod, marker);
-}
-
-static mlir::LogicalResult
-lowerPrange(plier::PyCallOp op, mlir::ValueRange operands,
-            llvm::ArrayRef<std::pair<llvm::StringRef, mlir::Value>> kwargs,
-            mlir::PatternRewriter &rewriter) {
-  auto parent = op->getParentOp();
-  if (mlir::succeeded(numba::lowerRange(op, operands, kwargs, rewriter))) {
-    rerunScfPipeline(parent);
-    return mlir::success();
-  }
-  return mlir::failure();
 }
 
 static std::optional<mlir::Type> isUniTuple(mlir::TupleType type) {
@@ -1468,7 +1455,7 @@ struct PlierToNtensorPass
         });
 
     target.addDynamicallyLegalOp<plier::PyCallOp>(
-        [this, &typeConverter](plier::PyCallOp op) -> std::optional<bool> {
+        [this](plier::PyCallOp op) -> std::optional<bool> {
           auto funcName = op.getFuncName();
           if (resolver->hasFunc(funcName))
             return false;
