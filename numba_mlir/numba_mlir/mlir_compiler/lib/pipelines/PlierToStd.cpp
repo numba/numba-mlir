@@ -763,24 +763,11 @@ lowerSlice(plier::PyCallOp op, mlir::ValueRange operands,
   return mlir::success();
 }
 
-static mlir::LogicalResult
-lowerRangeImpl(plier::PyCallOp op, mlir::ValueRange operands,
-               llvm::ArrayRef<std::pair<llvm::StringRef, mlir::Value>> kwargs,
-               mlir::PatternRewriter &rewriter) {
-  auto parent = op->getParentOp();
-  auto res = numba::lowerRange(op, operands, kwargs, rewriter);
-  if (mlir::succeeded(res))
-    rerunScfPipeline(parent);
-
-  return res;
-}
-
 using kwargs_t = llvm::ArrayRef<std::pair<llvm::StringRef, mlir::Value>>;
 using func_t = mlir::LogicalResult (*)(plier::PyCallOp, mlir::ValueRange,
                                        kwargs_t, mlir::PatternRewriter &);
 static const std::pair<llvm::StringRef, func_t> builtinFuncsHandlers[] = {
     // clang-format off
-    {"range", &lowerRangeImpl},
     {"slice", &lowerSlice},
     // clang-format on
 };
