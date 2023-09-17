@@ -1971,13 +1971,8 @@ public:
   void runOnOperation() override {
     auto mod = getOperation();
     mod->walk([&](mlir::gpu::LaunchFuncOp launch) {
-      auto env = launch->getParentOfType<numba::util::EnvironmentRegionOp>();
-      if (!env)
-        return;
-
-      auto gpuEnv =
-          env.getEnvironment().dyn_cast<gpu_runtime::GPURegionDescAttr>();
-      if (!gpuEnv)
+      auto env = getGpuRegionEnv(launch);
+      if (env)
         return;
 
       auto kernel = launch.getKernel();
@@ -1988,12 +1983,12 @@ public:
 
       auto gpuModAttr = gpuMod->getAttrOfType<gpu_runtime::GPURegionDescAttr>(
           kGpuModuleDeviceName);
-      if (gpuModAttr && gpuModAttr != gpuEnv) {
+      if (gpuModAttr && gpuModAttr != env) {
         gpuMod->emitError("Incompatible gpu module devices: ")
-            << gpuModAttr << " and " << gpuEnv;
+            << gpuModAttr << " and " << env;
         return signalPassFailure();
       }
-      gpuMod->setAttr(kGpuModuleDeviceName, gpuEnv);
+      gpuMod->setAttr(kGpuModuleDeviceName, env);
     });
   }
 };
