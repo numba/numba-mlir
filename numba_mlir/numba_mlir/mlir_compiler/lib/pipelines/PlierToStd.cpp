@@ -32,11 +32,11 @@
 #include "numba/Transforms/ConstUtils.hpp"
 #include "numba/Transforms/InlineUtils.hpp"
 #include "numba/Transforms/PipelineUtils.hpp"
+#include "numba/Transforms/PromoteToParallel.hpp"
 #include "numba/Transforms/RewriteWrapper.hpp"
 #include "numba/Transforms/TypeConversion.hpp"
 
 #include "BasePipeline.hpp"
-#include "LoopUtils.hpp"
 #include "PyFuncResolver.hpp"
 #include "PyLinalgResolver.hpp"
 
@@ -1333,6 +1333,8 @@ static void populatePlierToStdPipeline(mlir::OpPassManager &pm) {
   pm.addPass(std::make_unique<BuiltinCallsLoweringPass>());
   pm.addPass(numba::createForceInlinePass());
   pm.addPass(mlir::createSymbolDCEPass());
+  pm.addPass(mlir::createCanonicalizerPass());
+  pm.addPass(numba::createPromoteWhilePass());
   pm.addPass(mlir::createCanonicalizerPass());
 }
 } // namespace
