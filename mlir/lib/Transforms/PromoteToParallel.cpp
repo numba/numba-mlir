@@ -291,7 +291,7 @@ struct MergeNestedForIntoParallel
     };
 
     rewriter.setInsertionPoint(parent);
-    auto newOp = rewriter.replaceOpWithNewOp<mlir::scf::ParallelOp>(
+    rewriter.replaceOpWithNewOp<mlir::scf::ParallelOp>(
         parent, lowerBounds, upperBounds, steps, parent.getInitArgs(),
         bodyBuilder);
 
