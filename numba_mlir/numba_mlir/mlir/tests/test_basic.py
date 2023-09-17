@@ -594,7 +594,7 @@ def test_range1():
             res = res + i
         return res
 
-    with print_pass_ir([], ["BuiltinCallsLoweringPass"]):
+    with print_pass_ir([], ["PromoteWhilePass"]):
         jit_func = njit(py_func)
         assert_equal(py_func(10), jit_func(10))
         ir = get_print_buffer()
@@ -608,7 +608,7 @@ def test_range2():
             res = res + i
         return res
 
-    with print_pass_ir([], ["BuiltinCallsLoweringPass"]):
+    with print_pass_ir([], ["PromoteWhilePass"]):
         jit_func = njit(py_func)
         assert_equal(py_func(10, 20), jit_func(10, 20))
         ir = get_print_buffer()
@@ -622,7 +622,7 @@ def test_range3():
             res = res + i
         return res
 
-    with print_pass_ir([], ["BuiltinCallsLoweringPass"]):
+    with print_pass_ir([], ["PromoteWhilePass"]):
         jit_func = njit(py_func)
         assert_equal(py_func(10, 20, 2), jit_func(10, 20, 2))
         ir = get_print_buffer()
