@@ -941,7 +941,7 @@ struct InsertParallelRegionPass
 
       auto name = call.getFuncName();
       // TODO: Unhardcode
-      if (name != "numba.prange" && name != "_gpu_range")
+      if (name != "numba.prange")
         return;
 
       loops.insert(loop);

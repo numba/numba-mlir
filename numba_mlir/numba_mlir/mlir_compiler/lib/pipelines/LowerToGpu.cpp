@@ -1071,8 +1071,25 @@ struct InsertGpuRegionPass
       return markAllAnalysesPreserved();
 
     auto *ctx = &getContext();
+    auto env = numba::util::ParallelAttr::get(ctx);
     mlir::OpBuilder builder(ctx);
     for (auto loop : loops) {
+      auto loc = loop.getLoc();
+      builder.setInsertionPoint(loop);
+      mlir::Operation *nestedRegion;
+      {
+        auto region = builder.create<numba::util::EnvironmentRegionOp>(
+            loc, env, /*args*/ std::nullopt, loop->getResultTypes());
+        mlir::Block &body = region.getRegion().front();
+        body.getTerminator()->erase();
+        loop.getResults().replaceAllUsesWith(region.getResults());
+        builder.setInsertionPointToEnd(&body);
+        auto term = builder.create<numba::util::EnvironmentRegionYieldOp>(
+            loc, loop.getResults());
+        loop->moveBefore(term);
+        nestedRegion = region;
+      }
+
       auto parent = loop->getParentOfType<mlir::FunctionOpInterface>();
       if (!parent)
         continue;
@@ -1081,8 +1098,7 @@ struct InsertGpuRegionPass
       if (mlir::failed(env))
         continue;
 
-      auto loc = loop.getLoc();
-      builder.setInsertionPoint(loop);
+      builder.setInsertionPoint(nestedRegion);
       auto region = builder.create<numba::util::EnvironmentRegionOp>(
           loc, *env, /*args*/ std::nullopt, loop->getResultTypes());
       mlir::Block &body = region.getRegion().front();
@@ -1091,7 +1107,7 @@ struct InsertGpuRegionPass
       builder.setInsertionPointToEnd(&body);
       auto term = builder.create<numba::util::EnvironmentRegionYieldOp>(
           loc, loop.getResults());
-      loop->moveBefore(term);
+      nestedRegion->moveBefore(term);
     }
   }
 };
