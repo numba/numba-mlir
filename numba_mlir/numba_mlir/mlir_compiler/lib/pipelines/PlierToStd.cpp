@@ -957,7 +957,7 @@ struct InsertParallelRegionPass
       auto loc = loop.getLoc();
       builder.setInsertionPoint(loop);
       auto region = builder.create<numba::util::EnvironmentRegionOp>(
-          loc, env, /*args*/ mlir::ValueRange{}, loop->getResultTypes());
+          loc, env, /*args*/ std::nullopt, loop->getResultTypes());
       mlir::Block &body = region.getRegion().front();
       body.getTerminator()->erase();
       loop.getResults().replaceAllUsesWith(region.getResults());
