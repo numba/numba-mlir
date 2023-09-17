@@ -338,6 +338,7 @@ struct PromoteWhileOp : public mlir::OpRewritePattern<mlir::scf::WhileOp> {
     mlir::Value len = rewriter.create<mlir::arith::SubIOp>(loc, end, begin);
     len = rewriter.create<mlir::arith::AddIOp>(loc, len, stepDec);
     len = rewriter.create<mlir::arith::DivSIOp>(loc, len, step);
+    len = rewriter.create<mlir::arith::SubIOp>(loc, len, one);
     mlir::Value res = rewriter.create<mlir::arith::MulIOp>(loc, len, step);
     res = rewriter.create<mlir::arith::AddIOp>(loc, begin, res);
     if (res.getType() != iterVar.getType())
