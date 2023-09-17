@@ -15,7 +15,7 @@ from numba.core.typing.templates import (
 )
 
 from .target import infer_global
-from .linalg_builder import is_int, dtype_str, FuncRegistry
+from .linalg_builder import is_int, dtype_str, FuncRegistry, literal
 from .numpy.funcs import register_func
 from .func_registry import add_func
 
@@ -24,6 +24,8 @@ from .kernel_base import KernelBase
 from .dpctl_interop import check_usm_ndarray_args
 
 registry = FuncRegistry()
+
+register_func = registry.register_func
 
 
 def _stub_error():
@@ -57,6 +59,20 @@ class _RangeId(ConcreteTemplate):
 
 def _set_default_local_size():
     _stub_error()
+
+
+@registry.register_func("_gpu_range", _gpu_range)
+def range_impl(builder, begin, end=None, step=1):
+    end = literal(end)
+    if end is None:
+        end = begin
+        begin = 0
+
+    index = builder.index
+    begin = builder.cast(begin, index)
+    end = builder.cast(end, index)
+    step = builder.cast(step, index)
+    return (begin, end, step)
 
 
 @registry.register_func("_set_default_local_size", _set_default_local_size)
