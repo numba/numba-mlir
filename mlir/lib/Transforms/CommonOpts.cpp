@@ -548,10 +548,11 @@ struct CanonicalizeLoopMemrefIndex
     rewriter.setInsertionPoint(beforeTerm);
     auto newCondArgs = llvm::to_vector(beforeTerm.getArgs());
     newCondArgs.emplace_back(storeOp.getValueToStore());
-    rewriter.eraseOp(storeOp);
-    rewriter.replaceOp(loadOp, newBefore->getArguments().back());
     rewriter.replaceOpWithNewOp<mlir::scf::ConditionOp>(
         beforeTerm, beforeTerm.getCondition(), newCondArgs);
+
+    rewriter.eraseOp(storeOp);
+    rewriter.replaceOp(loadOp, newBefore->getArguments().back());
 
     auto afterTerm = mlir::cast<mlir::scf::YieldOp>(newAfter->getTerminator());
     rewriter.setInsertionPoint(afterTerm);
