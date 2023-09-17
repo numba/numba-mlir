@@ -5,6 +5,7 @@
 #include "numba/Transforms/PromoteToParallel.hpp"
 
 #include "numba/Dialect/numba_util/Dialect.hpp"
+#include "numba/Transforms/CommonOpts.hpp"
 #include "numba/Transforms/ConstUtils.hpp"
 
 #include <mlir/Dialect/Arith/IR/Arith.h>
@@ -315,6 +316,7 @@ struct PromoteToParallelPass
 
     mlir::RewritePatternSet patterns(context);
     numba::populatePromoteToParallelPatterns(patterns);
+    numba::populateLoopOptsPatterns(patterns);
 
     if (mlir::failed(mlir::applyPatternsAndFoldGreedily(getOperation(),
                                                         std::move(patterns))))

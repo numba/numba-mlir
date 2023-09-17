@@ -685,9 +685,14 @@ void numba::populatePoisonOptsPatterns(mlir::RewritePatternSet &patterns) {
   patterns.insert<SelectOfPoison, ReplacePoisonMath>(patterns.getContext());
 }
 
+void numba::populateLoopOptsPatterns(mlir::RewritePatternSet &patterns) {
+  patterns.insert<CanonicalizeLoopMemrefIndex>(patterns.getContext());
+}
+
 void numba::populateCommonOptsPatterns(mlir::RewritePatternSet &patterns) {
   populateCanonicalizationPatterns(patterns);
   populatePoisonOptsPatterns(patterns);
+  populateLoopOptsPatterns(patterns);
 
   patterns.insert<
       // clang-format off
@@ -706,7 +711,6 @@ void numba::populateCommonOptsPatterns(mlir::RewritePatternSet &patterns) {
       ResTruncFBinary<mlir::arith::SubFOp>,
       ResTruncFBinary<mlir::arith::MulFOp>,
       ResTruncFBinary<mlir::arith::DivFOp>,
-      CanonicalizeLoopMemrefIndex,
       GPUGenGlobalId
       // clang-format on
       >(patterns.getContext());
