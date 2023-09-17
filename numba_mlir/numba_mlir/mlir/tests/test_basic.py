@@ -636,7 +636,7 @@ def test_range_negative_step():
             res = res + i
         return res
 
-    with print_pass_ir([], ["BuiltinCallsLoweringPass"]):
+    with print_pass_ir([], ["PromoteWhilePass"]):
         jit_func = njit(py_func)
         assert_equal(py_func(5, -8, -2), jit_func(5, -8, -2))
         ir = get_print_buffer()
@@ -650,7 +650,7 @@ def test_range_const_step1():
             res = res + i
         return res
 
-    with print_pass_ir([], ["BuiltinCallsLoweringPass"]):
+    with print_pass_ir([], ["PromoteWhilePass"]):
         jit_func = njit(py_func)
         assert_equal(py_func(5, -8), jit_func(5, -8))
         ir = get_print_buffer()
@@ -664,7 +664,7 @@ def test_range_const_step2():
             res = res + i
         return res
 
-    with print_pass_ir([], ["BuiltinCallsLoweringPass"]):
+    with print_pass_ir([], ["PromoteWhilePass"]):
         jit_func = njit(py_func)
         assert_equal(py_func(-5, 8), jit_func(-5, 8))
         ir = get_print_buffer()
@@ -678,7 +678,7 @@ def test_range_use_index_after():
             res = res + i
         return res + i
 
-    with print_pass_ir([], ["BuiltinCallsLoweringPass"]):
+    with print_pass_ir([], ["PromoteWhilePass"]):
         jit_func = njit(py_func)
         assert_equal(py_func(9), jit_func(9))
         ir = get_print_buffer()
@@ -696,7 +696,7 @@ def test_range_if():
                 res1 = res1 + i * 2
         return res + res1
 
-    with print_pass_ir([], ["BuiltinCallsLoweringPass"]):
+    with print_pass_ir([], ["PromoteWhilePass"]):
         jit_func = njit(py_func)
         assert_equal(py_func(10), jit_func(10))
         ir = get_print_buffer()
@@ -717,7 +717,7 @@ def test_range_ifs():
                 res = res + i
         return res
 
-    with print_pass_ir([], ["BuiltinCallsLoweringPass"]):
+    with print_pass_ir([], ["PromoteWhilePass"]):
         jit_func = njit(py_func)
         assert_equal(py_func(10), jit_func(10))
         ir = get_print_buffer()
@@ -735,7 +735,7 @@ def test_range_continue():
             res1 = res1 + i * 2
         return res + res1
 
-    with print_pass_ir([], ["BuiltinCallsLoweringPass"]):
+    with print_pass_ir([], ["PromoteWhilePass"]):
         jit_func = njit(py_func)
         assert_equal(py_func(10), jit_func(10))
         ir = get_print_buffer()
@@ -751,7 +751,7 @@ def test_range_nested1():
                     res = res + i
         return res
 
-    with print_pass_ir([], ["BuiltinCallsLoweringPass"]):
+    with print_pass_ir([], ["PromoteWhilePass"]):
         jit_func = njit(py_func)
         assert_equal(py_func(10, 20, 2), jit_func(10, 20, 2))
         ir = get_print_buffer()
@@ -767,7 +767,7 @@ def test_range_nested2():
                     res = res + i + j * 10 + k * 100
         return res
 
-    with print_pass_ir([], ["BuiltinCallsLoweringPass"]):
+    with print_pass_ir([], ["PromoteWhilePass"]):
         jit_func = njit(py_func)
         assert_equal(py_func(10, 20, 2), jit_func(10, 20, 2))
         ir = get_print_buffer()
