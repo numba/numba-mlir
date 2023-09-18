@@ -174,7 +174,7 @@ def BuildTupleOp : Plier_Op<"build_tuple", [Pure]> {
   let builders = [OpBuilder<(ins "::mlir::ValueRange" : $args)>];
 }
 
-def GetItemOp : Plier_Op<"getitem", [Pure]> {
+def GetItemOp : Plier_Op<"getitem", []> {
   let arguments = (ins AnyType : $value, AnyType : $index);
 
   let results = (outs AnyType);
@@ -190,7 +190,7 @@ def SetItemOp : Plier_Op<"setitem", []> {
   let builders = [];
 }
 
-def GetiterOp : Plier_Op<"getiter", [Pure]> {
+def GetiterOp : Plier_Op<"getiter", []> {
   let arguments = (ins AnyType : $value);
 
   let results = (outs AnyType);
