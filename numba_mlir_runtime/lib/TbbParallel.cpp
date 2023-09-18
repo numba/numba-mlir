@@ -75,15 +75,17 @@ static TBBContext &getContext() {
   return *globalContext;
 }
 
+using index_t = std::make_signed_t<std::size_t>;
+
 struct InputRange {
-  size_t lower;
-  size_t upper;
-  size_t step;
+  index_t lower;
+  index_t upper;
+  index_t step;
 };
 
 struct Range {
-  size_t lower;
-  size_t upper;
+  index_t lower;
+  index_t upper;
 };
 
 struct Dim {
@@ -124,17 +126,17 @@ static void runParallelFor(const InputRange *inputRanges, size_t depth,
     auto lowerBound = input.lower;
     auto upperBound = input.upper;
     auto step = input.step;
-    size_t count = (upperBound - lowerBound + step - 1) / step;
-    size_t grain =
-        std::max(size_t(1), std::min(count / numThreads / 2, size_t(64)));
-    return tbb::blocked_range<size_t>(0, count, grain);
+    index_t count = (upperBound - lowerBound + step - 1) / step;
+    index_t grain = std::max(
+        index_t(1), std::min(count / index_t(numThreads) / 2, index_t(64)));
+    return tbb::blocked_range<index_t>(0, count, grain);
   };
 
-  tbb::blocked_rangeNd<size_t, N> range(getRange(Is)...);
+  tbb::blocked_rangeNd<index_t, N> range(getRange(Is)...);
 
   auto runFunc = [&](Dim *current) {
     auto threadIndex =
-        static_cast<size_t>(tbb::this_task_arena::current_thread_index());
+        static_cast<index_t>(tbb::this_task_arena::current_thread_index());
     assert(threadIndex >= 0);
     std::array<Range, 8> staticRanges;
     std::unique_ptr<Range[]> dynRanges;
@@ -168,7 +170,7 @@ static void runParallelFor(const InputRange *inputRanges, size_t depth,
     func(rangePtr, threadIndex, ctx);
   };
 
-  auto loopBody = [&](const tbb::blocked_rangeNd<size_t, N> &r) {
+  auto loopBody = [&](const tbb::blocked_rangeNd<index_t, N> &r) {
     std::array<Dim, N> dims;
     auto prev = prevDim;
     for (unsigned i = 0; i < N; ++i) {
@@ -231,6 +233,12 @@ NUMBA_MLIR_RUNTIME_EXPORT void nmrtParallelFor(const InputRange *inputRanges,
               static_cast<int>(r.upper), static_cast<int>(r.step));
     }
     fprintf(stderr, "\n");
+  }
+  for (size_t i = 0; i < numLoops; ++i) {
+    auto &range = inputRanges[i];
+    assert(range.step > 0);
+    if (range.lower >= range.upper)
+      return;
   }
 
   context.arena.execute([&] {
