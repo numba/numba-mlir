@@ -3574,6 +3574,36 @@ struct MakeGenericReduceInnermostPass
     : public numba::RewriteWrapperPass<MakeGenericReduceInnermostPass, void,
                                        void, MakeGenericReduceInnermost> {};
 
+/// Later passes (e.g. buffer deallocation) may not know how to handle poison
+/// memrefs. Replace them with dummy zero-size allocations.
+struct ReplaceMemrefPoison : public mlir::OpRewritePattern<mlir::ub::PoisonOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(mlir::ub::PoisonOp op,
+                  mlir::PatternRewriter &rewriter) const override {
+    auto resType = mlir::dyn_cast<mlir::MemRefType>(op.getType());
+    if (!resType)
+      return rewriter.notifyMatchFailure(op, "Not a memref");
+
+    auto loc = op.getLoc();
+    llvm::SmallVector<int64_t> shape(resType.getRank(), 0);
+    auto dummyType = mlir::MemRefType::get(shape, resType.getElementType(),
+                                           mlir::MemRefLayoutAttrInterface{},
+                                           resType.getMemorySpace());
+    mlir::Value memref = rewriter.create<mlir::memref::AllocOp>(loc, dummyType);
+    if (resType != dummyType)
+      memref = rewriter.create<mlir::memref::CastOp>(loc, resType, memref);
+
+    rewriter.replaceOp(op, memref);
+    return mlir::success();
+  }
+};
+
+struct ReplaceMemrefPoisonPass
+    : public numba::RewriteWrapperPass<ReplaceMemrefPoisonPass, void, void,
+                                       ReplaceMemrefPoison> {};
+
 struct InsertParallelRegionPass
     : public mlir::PassWrapper<InsertParallelRegionPass,
                                mlir::OperationPass<void>> {
@@ -3749,6 +3779,8 @@ static void populatePlierToLinalgOptPipeline(mlir::OpPassManager &pm) {
       std::make_unique<MakeGenericReduceInnermostPass>());
   pm.addNestedPass<mlir::func::FuncOp>(
       mlir::createConvertLinalgToParallelLoopsPass());
+  pm.addNestedPass<mlir::func::FuncOp>(
+      std::make_unique<ReplaceMemrefPoisonPass>());
   pm.addNestedPass<mlir::func::FuncOp>(mlir::createCanonicalizerPass());
 
   pm.addNestedPass<mlir::func::FuncOp>(std::make_unique<LowerCopyOpsPass>());
