@@ -552,9 +552,6 @@ static std::optional<mlir::Value> getGpuStream(mlir::OpBuilder &builder,
   if (auto env = getGpuRegionEnv(op))
     device = env.getDevice();
 
-  if (!device)
-    return std::nullopt;
-
   auto &block = func.getFunctionBody().front();
   auto ops = block.getOps<gpu_runtime::CreateGpuStreamOp>();
   for (auto streamOp : ops)
