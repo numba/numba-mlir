@@ -14,6 +14,7 @@
 #include <mlir/Dialect/Bufferization/IR/Bufferization.h>
 #include <mlir/Dialect/Linalg/IR/Linalg.h>
 #include <mlir/Dialect/MemRef/IR/MemRef.h>
+#include <mlir/Dialect/UB/IR/UBOps.h>
 #include <mlir/Pass/Pass.h>
 #include <mlir/Transforms/DialectConversion.h>
 
@@ -427,6 +428,35 @@ struct CopyOpLowering
     return mlir::success();
   }
 };
+
+struct PoisonLowering : public mlir::OpConversionPattern<mlir::ub::PoisonOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(mlir::ub::PoisonOp op, OpAdaptor /*adaptor*/,
+                  mlir::ConversionPatternRewriter &rewriter) const override {
+    auto *converter = getTypeConverter();
+    assert(converter && "Type converter is not set");
+
+    auto resType = mlir::dyn_cast<numba::ntensor::NTensorType>(op.getType());
+    if (!resType)
+      return rewriter.notifyMatchFailure(op, [&](mlir::Diagnostic &diag) {
+        diag << "Expected ntensor type but got " << op.getType();
+      });
+
+    auto newType = converter->convertType(resType);
+    if (!newType)
+      return rewriter.notifyMatchFailure(op, "Failed to convert res type");
+
+    auto res = numba::util::wrapEnvRegion(
+        rewriter, op.getLoc(), resType.getEnvironment(), newType,
+        [&](mlir::ConversionPatternRewriter &builder, mlir::Location loc) {
+          return builder.create<mlir::ub::PoisonOp>(loc, newType, nullptr);
+        });
+    rewriter.replaceOp(op, res);
+    return mlir::success();
+  }
+};
 } // namespace
 
 void numba::populateNtensorToMemrefRewritesAndTarget(
@@ -458,11 +488,12 @@ void numba::populateNtensorToMemrefRewritesAndTarget(
   converter.addConversion(
       [tuple3](numba::ntensor::SliceType) -> mlir::Type { return tuple3; });
 
-  patterns.insert<DimOpLowering, CreateOpLowering, SubviewOpLowering,
-                  LoadOpLowering, StoreOpLowering, ToTensorOpLowering,
-                  FromTensorOpLowering, ToMemrefOpLowering,
-                  FromMemrefOpLowering, CastOpLowering, CopyOpLowering>(
-      converter, context);
+  patterns
+      .insert<DimOpLowering, CreateOpLowering, SubviewOpLowering,
+              LoadOpLowering, StoreOpLowering, ToTensorOpLowering,
+              FromTensorOpLowering, ToMemrefOpLowering, FromMemrefOpLowering,
+              CastOpLowering, CopyOpLowering, PoisonLowering>(converter,
+                                                              context);
 
   target.addIllegalOp<numba::ntensor::DimOp, numba::ntensor::CreateArrayOp,
                       numba::ntensor::SubviewOp, numba::ntensor::LoadOp,
@@ -470,6 +501,9 @@ void numba::populateNtensorToMemrefRewritesAndTarget(
                       numba::ntensor::FromTensorOp, numba::ntensor::ToMemrefOp,
                       numba::ntensor::FromMemrefOp, numba::ntensor::CastOp,
                       numba::ntensor::CopyOp>();
+
+  target.addDynamicallyLegalOp<mlir::ub::PoisonOp>(
+      [&converter](mlir::Operation *op) { return converter.isLegal(op); });
 }
 
 namespace {
