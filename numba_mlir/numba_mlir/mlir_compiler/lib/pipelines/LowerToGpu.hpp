@@ -14,6 +14,7 @@ class StringRef;
 
 void registerLowerToGPUPipeline(numba::PipelineRegistry &registry);
 
+llvm::StringRef lowerToGPUPipelineNameRegion();
 llvm::StringRef lowerToGPUPipelineNameHigh();
 llvm::StringRef lowerToGPUPipelineNameMed();
 llvm::StringRef lowerToGPUPipelineNameLow();

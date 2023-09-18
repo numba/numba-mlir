@@ -12,7 +12,11 @@ class RewritePatternSet;
 } // namespace mlir
 
 namespace numba {
+void populatePromoteWhilePatterns(mlir::RewritePatternSet &patterns);
 void populatePromoteToParallelPatterns(mlir::RewritePatternSet &patterns);
+
+/// This pass tries to promote `scf.while` ops to `scf.for`.
+std::unique_ptr<mlir::Pass> createPromoteWhilePass();
 
 /// This pass tries to promote `scf.for` ops to `scf.parallel`.
 std::unique_ptr<mlir::Pass> createPromoteToParallelPass();

@@ -33,10 +33,10 @@
 
 #include "BasePipeline.hpp"
 #include "CheckGpuCaps.hpp"
-#include "LoopUtils.hpp"
 #include "PyLinalgResolver.hpp"
 #include "pipelines/LowerToLlvm.hpp"
 #include "pipelines/PlierToLinalg.hpp"
+#include "pipelines/PlierToScf.hpp"
 #include "pipelines/PlierToStd.hpp"
 #include "pipelines/PreLowSimplifications.hpp"
 
@@ -971,52 +971,6 @@ getDeviceDescFromFunc(mlir::MLIRContext *context, mlir::TypeRange argTypes) {
   }
 }
 
-struct LowerGpuRange final : public numba::CallOpLowering {
-  using CallOpLowering::CallOpLowering;
-
-protected:
-  virtual mlir::LogicalResult
-  resolveCall(plier::PyCallOp op, mlir::StringRef name, mlir::Location /*loc*/,
-              mlir::PatternRewriter &rewriter, mlir::ValueRange args,
-              KWargs kwargs) const override {
-    if (name != "_gpu_range")
-      return mlir::failure();
-
-    auto parent = op->getParentOfType<mlir::FunctionOpInterface>();
-    if (!parent)
-      return mlir::failure();
-
-    auto envAttr =
-        getDeviceDescFromFunc(op->getContext(), parent.getArgumentTypes());
-
-    if (mlir::failed(envAttr))
-      return mlir::failure();
-
-    llvm::SmallVector<mlir::scf::ForOp> newOps;
-    auto setAttr = [&](mlir::scf::ForOp op) { newOps.emplace_back(op); };
-    if (mlir::failed(numba::lowerRange(op, args, kwargs, rewriter, setAttr)))
-      return mlir::failure();
-
-    mlir::OpBuilder::InsertionGuard g(rewriter);
-    for (auto op : newOps) {
-      auto bodyBuilder = [&](mlir::OpBuilder &builder, mlir::Location loc) {
-        auto newOp = builder.clone(*op);
-        builder.create<numba::util::EnvironmentRegionYieldOp>(
-            loc, newOp->getResults());
-      };
-      auto opResults = op.getResults();
-      rewriter.setInsertionPoint(op);
-      auto newOp = rewriter.create<numba::util::EnvironmentRegionOp>(
-          op->getLoc(), *envAttr, /*args*/ std::nullopt, opResults.getTypes(),
-          bodyBuilder);
-      rewriter.replaceOp(op, newOp->getResults());
-    }
-
-    rerunStdPipeline(parent);
-    return mlir::success();
-  }
-};
-
 static bool isGpuArray(mlir::Type type) {
   auto tensor = type.dyn_cast<numba::ntensor::NTensorType>();
   if (!tensor)
@@ -1082,27 +1036,82 @@ void MarkGpuArraysInputs::runOnOperation() {
   markAllAnalysesPreserved();
 }
 
-struct LowerGpuRangePass
-    : public mlir::PassWrapper<LowerGpuRangePass, mlir::OperationPass<void>> {
-  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(LowerGpuRangePass)
+struct InsertGpuRegionPass
+    : public mlir::PassWrapper<InsertGpuRegionPass, mlir::OperationPass<void>> {
+  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(InsertGpuRegionPass)
 
   virtual void
   getDependentDialects(mlir::DialectRegistry &registry) const override {
-    registry.insert<gpu_runtime::GpuRuntimeDialect>();
+    registry.insert<numba::util::NumbaUtilDialect>();
   }
 
   void runOnOperation() override {
-    auto context = &getContext();
-    mlir::RewritePatternSet patterns(context);
+    llvm::SmallSetVector<mlir::scf::WhileOp, 8> loops;
+    getOperation()->walk([&](plier::IternextOp op) {
+      auto loop = mlir::dyn_cast<mlir::scf::WhileOp>(op->getParentOp());
+      if (!loop)
+        return;
 
-    patterns.insert<LowerGpuRange>(context);
+      auto getiter = op.getValue().getDefiningOp<plier::GetiterOp>();
+      if (!getiter)
+        return;
 
-    numba::util::EnvironmentRegionOp::getCanonicalizationPatterns(patterns,
-                                                                  context);
+      auto call = getiter.getValue().getDefiningOp<plier::PyCallOp>();
+      if (!call)
+        return;
 
-    if (mlir::failed(mlir::applyPatternsAndFoldGreedily(getOperation(),
-                                                        std::move(patterns))))
-      return signalPassFailure();
+      auto name = call.getFuncName();
+      if (name != "_gpu_range")
+        return;
+
+      loops.insert(loop);
+    });
+
+    if (loops.empty())
+      return markAllAnalysesPreserved();
+
+    auto *ctx = &getContext();
+    auto env = numba::util::ParallelAttr::get(ctx);
+    mlir::OpBuilder builder(ctx);
+    for (auto loop : loops) {
+      auto loc = loop.getLoc();
+      builder.setInsertionPoint(loop);
+      mlir::Operation *nestedRegion;
+      {
+        auto region = builder.create<numba::util::EnvironmentRegionOp>(
+            loc, env, /*args*/ std::nullopt, loop->getResultTypes());
+        mlir::Block &body = region.getRegion().front();
+        body.getTerminator()->erase();
+        loop.getResults().replaceAllUsesWith(region.getResults());
+        builder.setInsertionPointToEnd(&body);
+        auto term = builder.create<numba::util::EnvironmentRegionYieldOp>(
+            loc, loop.getResults());
+        loop->moveBefore(term);
+        nestedRegion = region;
+      }
+
+      if (getGpuRegionEnv(loop))
+        continue;
+
+      auto parent = loop->getParentOfType<mlir::FunctionOpInterface>();
+      if (!parent)
+        continue;
+
+      auto env = getDeviceDescFromFunc(ctx, parent.getArgumentTypes());
+      if (mlir::failed(env))
+        continue;
+
+      builder.setInsertionPoint(nestedRegion);
+      auto region = builder.create<numba::util::EnvironmentRegionOp>(
+          loc, *env, /*args*/ std::nullopt, loop->getResultTypes());
+      mlir::Block &body = region.getRegion().front();
+      body.getTerminator()->erase();
+      loop.getResults().replaceAllUsesWith(region.getResults());
+      builder.setInsertionPointToEnd(&body);
+      auto term = builder.create<numba::util::EnvironmentRegionYieldOp>(
+          loc, loop.getResults());
+      nestedRegion->moveBefore(term);
+    }
   }
 };
 
@@ -1962,13 +1971,8 @@ public:
   void runOnOperation() override {
     auto mod = getOperation();
     mod->walk([&](mlir::gpu::LaunchFuncOp launch) {
-      auto env = launch->getParentOfType<numba::util::EnvironmentRegionOp>();
+      auto env = getGpuRegionEnv(launch);
       if (!env)
-        return;
-
-      auto gpuEnv =
-          env.getEnvironment().dyn_cast<gpu_runtime::GPURegionDescAttr>();
-      if (!gpuEnv)
         return;
 
       auto kernel = launch.getKernel();
@@ -1979,12 +1983,12 @@ public:
 
       auto gpuModAttr = gpuMod->getAttrOfType<gpu_runtime::GPURegionDescAttr>(
           kGpuModuleDeviceName);
-      if (gpuModAttr && gpuModAttr != gpuEnv) {
+      if (gpuModAttr && gpuModAttr != env) {
         gpuMod->emitError("Incompatible gpu module devices: ")
-            << gpuModAttr << " and " << gpuEnv;
+            << gpuModAttr << " and " << env;
         return signalPassFailure();
       }
-      gpuMod->setAttr(kGpuModuleDeviceName, gpuEnv);
+      gpuMod->setAttr(kGpuModuleDeviceName, env);
     });
   }
 };
@@ -2174,9 +2178,12 @@ static void commonOptPasses(mlir::OpPassManager &pm) {
       }));
 }
 
+static void populateLowerToGPUPipelineRegion(mlir::OpPassManager &pm) {
+  pm.addPass(std::make_unique<InsertGpuRegionPass>());
+}
+
 static void populateLowerToGPUPipelineHigh(mlir::OpPassManager &pm) {
   pm.addNestedPass<mlir::func::FuncOp>(std::make_unique<MarkGpuArraysInputs>());
-  pm.addPass(std::make_unique<LowerGpuRangePass>());
   pm.addPass(std::make_unique<LowerGpuBuiltinsPass>());
   commonOptPasses(pm);
   pm.addPass(mlir::createSymbolDCEPass());
@@ -2258,11 +2265,16 @@ static void populateLowerToGPUPipelineLow(mlir::OpPassManager &pm) {
 void registerLowerToGPUPipeline(numba::PipelineRegistry &registry) {
   registry.registerPipeline([](auto sink) {
     auto highStage = getHighLoweringStage();
+    sink(lowerToGPUPipelineNameRegion(),
+         {highStage.begin, plierToScfPipelineName()},
+         {highStage.end, plierToLinalgGenPipelineName(),
+          plierToStdPipelineName(), untuplePipelineName()},
+         {}, &populateLowerToGPUPipelineRegion);
+
     sink(lowerToGPUPipelineNameHigh(),
-         {highStage.begin, plierToStdPipelineName(),
-          plierToLinalgGenPipelineName()},
-         {highStage.end, untuplePipelineName()}, {plierToStdPipelineName()},
-         &populateLowerToGPUPipelineHigh);
+         {highStage.begin, plierToStdPipelineName()},
+         {highStage.end, plierToLinalgGenPipelineName(), untuplePipelineName()},
+         {plierToStdPipelineName()}, &populateLowerToGPUPipelineHigh);
 
     auto lowStage = getLowerLoweringStage();
     sink(lowerToGPUPipelineNameMed(), {lowStage.begin, untuplePipelineName()},
@@ -2278,6 +2290,7 @@ void registerLowerToGPUPipeline(numba::PipelineRegistry &registry) {
   });
 }
 
+llvm::StringRef lowerToGPUPipelineNameRegion() { return "lower_to_gpu_region"; }
 llvm::StringRef lowerToGPUPipelineNameHigh() { return "lower_to_gpu_high"; }
 llvm::StringRef lowerToGPUPipelineNameMed() { return "lower_to_gpu_med"; }
 llvm::StringRef lowerToGPUPipelineNameLow() { return "lower_to_gpu_low"; }

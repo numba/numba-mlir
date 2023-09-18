@@ -60,6 +60,14 @@ static mlir::Type getSliceType(mlir::MLIRContext &ctx) {
   return plier::SliceType::get(&ctx);
 }
 
+static mlir::Type getRangeStateType(mlir::MLIRContext &ctx) {
+  return plier::RangeStateType::get(&ctx);
+}
+
+static mlir::Type getRangeIterType(mlir::MLIRContext &ctx) {
+  return plier::RangeIterType::get(&ctx);
+}
+
 using TypeFunc = mlir::Type (*)(mlir::MLIRContext &);
 static const constexpr std::pair<llvm::StringLiteral, TypeFunc>
     PrimitiveTypes[] = {
@@ -86,6 +94,14 @@ static const constexpr std::pair<llvm::StringLiteral, TypeFunc>
 
         {"slice2_type", &getSliceType},
         {"slice3_type", &getSliceType},
+
+        {"range_state32_type", &getRangeStateType},
+        {"range_state64_type", &getRangeStateType},
+        {"unsigned_range_state64_type", &getRangeStateType},
+
+        {"range_iter32_type", &getRangeIterType},
+        {"range_iter64_type", &getRangeIterType},
+        {"unsigned_range_iter64_type", &getRangeIterType},
         // clang-format on
 };
 

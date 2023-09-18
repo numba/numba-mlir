@@ -2,7 +2,14 @@
 #
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-from ..linalg_builder import FuncRegistry, is_int, is_float, is_complex, broadcast_type
+from ..linalg_builder import (
+    FuncRegistry,
+    is_int,
+    is_float,
+    is_complex,
+    broadcast_type,
+    literal,
+)
 from ..func_registry import add_func
 from . import helper_funcs
 
@@ -17,7 +24,7 @@ from numba.parfors.parfor import (
 )
 
 add_func(slice, "slice")
-add_func(range, "range")
+
 
 registry = FuncRegistry()
 
@@ -25,6 +32,20 @@ registry = FuncRegistry()
 def register_func(name, orig_func=None):
     global registry
     return registry.register_func(name, orig_func)
+
+
+@register_func("range", range)
+def range_impl(builder, begin, end=None, step=1):
+    end = literal(end)
+    if end is None:
+        end = begin
+        begin = 0
+
+    index = builder.index
+    begin = builder.cast(begin, index)
+    end = builder.cast(end, index)
+    step = builder.cast(step, index)
+    return (begin, end, step)
 
 
 @register_func("bool", bool)

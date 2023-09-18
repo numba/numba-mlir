@@ -381,6 +381,8 @@ struct WhileHoistFromBefore
   matchAndRewrite(mlir::scf::WhileOp op,
                   mlir::PatternRewriter &rewriter) const override {
     mlir::Block &beforeBlock = op.getBefore().front();
+    auto beforeTerm =
+        mlir::cast<mlir::scf::ConditionOp>(beforeBlock.getTerminator());
 
     mlir::DominanceInfo dom;
     auto checkArg = [&](mlir::Value arg) -> bool {
@@ -397,6 +399,11 @@ struct WhileHoistFromBefore
       if (!mlir::isa_and_present<mlir::arith::ArithDialect>(
               blockOp.getDialect()))
         return false;
+
+      for (auto res : blockOp.getResults()) {
+        if (res == beforeTerm.getCondition())
+          return false;
+      }
 
       if (beforeBlock.begin() != blockOp.getIterator() &&
           !mlir::isPure(&blockOp))

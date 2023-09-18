@@ -17,6 +17,7 @@
 #include <mlir/Dialect/SCF/IR/SCF.h>
 #include <mlir/Dialect/UB/IR/UBOps.h>
 #include <mlir/IR/BuiltinOps.h>
+#include <mlir/IR/IRMapping.h>
 #include <mlir/IR/Matchers.h>
 #include <mlir/IR/PatternMatch.h>
 #include <mlir/Pass/Pass.h>
@@ -432,6 +433,249 @@ struct ResTruncFBinary : public mlir::OpRewritePattern<Op> {
   }
 };
 
+struct CanonicalizeLoopMemrefIndex
+    : public mlir::OpRewritePattern<mlir::memref::LoadOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(mlir::memref::LoadOp loadOp,
+                  mlir::PatternRewriter &rewriter) const override {
+    auto loop = mlir::dyn_cast<mlir::scf::WhileOp>(loadOp->getParentOp());
+    if (!loop || loadOp->getBlock() != loop.getBeforeBody())
+      return rewriter.notifyMatchFailure(loadOp, "Not inside the loop");
+
+    auto memref = loadOp.getMemref();
+    if (!mlir::isa_and_present<mlir::memref::AllocOp, mlir::memref::AllocaOp>(
+            memref.getDefiningOp()))
+      return rewriter.notifyMatchFailure(loadOp, "Not result of alloc");
+
+    auto isAncestor = [&](mlir::Operation *op) -> bool {
+      auto reg = op->getParentRegion();
+      return loop.getBefore().isAncestor(reg) ||
+             loop.getAfter().isAncestor(reg);
+    };
+
+    mlir::memref::StoreOp storeOp;
+    for (auto user : memref.getUsers()) {
+      if (user == loadOp)
+        continue;
+
+      if (mlir::isa<mlir::memref::DeallocOp>(user))
+        continue;
+
+      if (mlir::isa<mlir::memref::LoadOp>(user)) {
+        if (isAncestor(user)) {
+          return rewriter.notifyMatchFailure(
+              loadOp, [&](mlir::Diagnostic &diag) {
+                diag << "Unsupported nested load: " << *user;
+              });
+        } else {
+          continue;
+        }
+      }
+
+      if (auto op = mlir::dyn_cast<mlir::memref::StoreOp>(user)) {
+        if (op->getBlock() == loop.getBeforeBody()) {
+          if (storeOp) {
+            return rewriter.notifyMatchFailure(
+                loadOp, [&](mlir::Diagnostic &diag) {
+                  diag << "Unsupported Multiple stores: " << *storeOp << " and "
+                       << *op;
+                });
+          } else {
+            storeOp = op;
+            continue;
+          }
+        } else {
+          if (isAncestor(user)) {
+            return rewriter.notifyMatchFailure(
+                loadOp, [&](mlir::Diagnostic &diag) {
+                  diag << "Unsupported nested store: " << *user;
+                });
+          } else {
+            continue;
+          }
+        }
+      }
+
+      return rewriter.notifyMatchFailure(loadOp, [&](mlir::Diagnostic &diag) {
+        diag << "Unsupported user: " << *user;
+      });
+    }
+
+    if (!storeOp || storeOp.getIndices() != loadOp.getIndices())
+      return rewriter.notifyMatchFailure(loadOp, "invalid store op");
+
+    mlir::DominanceInfo dom;
+    if (!dom.properlyDominates(loadOp.getOperation(), storeOp.getOperation()))
+      return rewriter.notifyMatchFailure(loadOp,
+                                         "Store op doesn't dominate load");
+
+    auto indices = storeOp.getIndices();
+    for (auto idx : indices) {
+      if (!dom.properlyDominates(idx, loop))
+        return rewriter.notifyMatchFailure(loadOp, [&](mlir::Diagnostic &diag) {
+          diag << "Index doesnt dominate the loop: " << idx;
+        });
+    }
+
+    mlir::OpBuilder::InsertionGuard g(rewriter);
+    rewriter.setInsertionPoint(loop);
+    auto loc = loop.getLoc();
+    mlir::Value init =
+        rewriter.create<mlir::memref::LoadOp>(loc, memref, indices);
+
+    auto newInits = llvm::to_vector(loop.getInits());
+    newInits.emplace_back(init);
+
+    auto newResults = llvm::to_vector(loop->getResultTypes());
+    newResults.emplace_back(init.getType());
+    auto newLoop = rewriter.create<mlir::scf::WhileOp>(
+        loc, newResults, newInits, nullptr, nullptr);
+
+    auto oldBefore = loop.getBeforeBody();
+    auto oldAfter = loop.getAfterBody();
+    auto newBefore = newLoop.getBeforeBody();
+    auto newAfter = newLoop.getAfterBody();
+
+    rewriter.inlineBlockBefore(oldBefore, newBefore, newBefore->begin(),
+                               newBefore->getArguments().drop_back());
+    rewriter.inlineBlockBefore(oldAfter, newAfter, newAfter->begin(),
+                               newAfter->getArguments().drop_back());
+
+    auto beforeTerm =
+        mlir::cast<mlir::scf::ConditionOp>(newBefore->getTerminator());
+    rewriter.setInsertionPoint(beforeTerm);
+    auto newCondArgs = llvm::to_vector(beforeTerm.getArgs());
+    newCondArgs.emplace_back(storeOp.getValueToStore());
+    rewriter.replaceOpWithNewOp<mlir::scf::ConditionOp>(
+        beforeTerm, beforeTerm.getCondition(), newCondArgs);
+
+    rewriter.eraseOp(storeOp);
+    rewriter.replaceOp(loadOp, newBefore->getArguments().back());
+
+    auto afterTerm = mlir::cast<mlir::scf::YieldOp>(newAfter->getTerminator());
+    rewriter.setInsertionPoint(afterTerm);
+    auto newYieldArgs = llvm::to_vector(afterTerm.getResults());
+    newYieldArgs.emplace_back(newAfter->getArguments().back());
+    rewriter.replaceOpWithNewOp<mlir::scf::YieldOp>(afterTerm, newYieldArgs);
+
+    rewriter.setInsertionPointAfter(newLoop);
+    rewriter.create<mlir::memref::StoreOp>(loc, newLoop.getResults().back(),
+                                           memref, indices);
+    rewriter.replaceOp(loop, newLoop.getResults().drop_back());
+    return mlir::success();
+  }
+};
+
+struct MoveOpsFromBefore : public mlir::OpRewritePattern<mlir::scf::WhileOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(mlir::scf::WhileOp op,
+                  mlir::PatternRewriter &rewriter) const override {
+    auto oldBefore = op.getBeforeBody();
+    auto oldAfter = op.getAfterBody();
+    auto oldTerm =
+        mlir::cast<mlir::scf::ConditionOp>(oldBefore->getTerminator());
+
+    mlir::Operation *opToMove = nullptr;
+    size_t idx = 0;
+    for (auto &&[i, args] : llvm::enumerate(llvm::zip(
+             oldTerm.getArgs(), oldAfter->getArguments(), op.getResults()))) {
+      auto &&[arg, afterArg, res] = args;
+      if (afterArg.use_empty() && res.use_empty())
+        continue;
+
+      auto argOp = arg.getDefiningOp();
+      if (argOp && argOp->getNumResults() == 1 && mlir::isPure(argOp)) {
+        opToMove = argOp;
+        idx = i;
+        break;
+      }
+    }
+
+    if (!opToMove)
+      return rewriter.notifyMatchFailure(op, "No ops to move");
+
+    mlir::OpBuilder::InsertionGuard g(rewriter);
+
+    auto newResults = llvm::to_vector(op->getResultTypes());
+    llvm::append_range(newResults, opToMove->getOperandTypes());
+
+    auto newTermArgs = llvm::to_vector(oldTerm.getArgs());
+    llvm::append_range(newTermArgs, opToMove->getOperands());
+
+    rewriter.setInsertionPoint(oldTerm);
+    rewriter.replaceOpWithNewOp<mlir::scf::ConditionOp>(
+        oldTerm, oldTerm.getCondition(), newTermArgs);
+
+    rewriter.setInsertionPoint(op);
+    auto newLoop = rewriter.create<mlir::scf::WhileOp>(
+        op.getLoc(), newResults, op.getInits(), nullptr, nullptr);
+
+    auto newBefore = newLoop.getBeforeBody();
+    auto newAfter = newLoop.getAfterBody();
+
+    auto numArgs = opToMove->getNumOperands();
+    auto newAfterArgs = newAfter->getArguments();
+    rewriter.inlineBlockBefore(oldBefore, newBefore, newBefore->begin(),
+                               newBefore->getArguments());
+    rewriter.inlineBlockBefore(oldAfter, newAfter, newAfter->begin(),
+                               newAfterArgs.drop_back(numArgs));
+
+    mlir::IRMapping mapping;
+    mapping.map(opToMove->getOperands(), newAfterArgs.take_back(numArgs));
+
+    rewriter.setInsertionPointToStart(newAfter);
+    auto newOp = rewriter.clone(*opToMove, mapping);
+    rewriter.replaceAllUsesWith(newAfterArgs[idx], newOp->getResult(0));
+
+    mapping.map(opToMove->getOperands(),
+                newLoop.getResults().take_back(numArgs));
+
+    rewriter.setInsertionPointAfter(newLoop);
+    newOp = rewriter.clone(*opToMove, mapping);
+    rewriter.replaceAllUsesWith(op.getResult(idx), newOp->getResult(0));
+
+    rewriter.replaceOp(op, newLoop.getResults().drop_back(numArgs));
+    return mlir::success();
+  }
+};
+
+struct WhileOpLICM : public mlir::OpRewritePattern<mlir::scf::WhileOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(mlir::scf::WhileOp loop,
+                  mlir::PatternRewriter &rewriter) const override {
+    bool changed = false;
+
+    mlir::DominanceInfo dom;
+    rewriter.startRootUpdate(loop);
+    for (mlir::Block *body : {loop.getBeforeBody(), loop.getAfterBody()}) {
+      for (mlir::Operation &op :
+           llvm::make_early_inc_range(body->without_terminator())) {
+        if (!mlir::isPure(&op))
+          continue;
+
+        if (llvm::any_of(op.getOperands(), [&](auto &&arg) {
+              return !dom.properlyDominates(arg, loop);
+            }))
+          continue;
+
+        rewriter.updateRootInPlace(&op, [&]() { op.moveBefore(loop); });
+      }
+    }
+    if (changed) {
+      rewriter.finalizeRootUpdate(loop);
+    } else {
+      rewriter.cancelRootUpdate(loop);
+    }
+    return mlir::success(changed);
+  }
+};
+
 struct GPUGenGlobalId : public mlir::OpRewritePattern<mlir::arith::AddIOp> {
   using OpRewritePattern::OpRewritePattern;
 
@@ -551,9 +795,15 @@ void numba::populatePoisonOptsPatterns(mlir::RewritePatternSet &patterns) {
   patterns.insert<SelectOfPoison, ReplacePoisonMath>(patterns.getContext());
 }
 
+void numba::populateLoopOptsPatterns(mlir::RewritePatternSet &patterns) {
+  patterns.insert<CanonicalizeLoopMemrefIndex, MoveOpsFromBefore, WhileOpLICM>(
+      patterns.getContext());
+}
+
 void numba::populateCommonOptsPatterns(mlir::RewritePatternSet &patterns) {
   populateCanonicalizationPatterns(patterns);
   populatePoisonOptsPatterns(patterns);
+  populateLoopOptsPatterns(patterns);
 
   patterns.insert<
       // clang-format off

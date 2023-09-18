@@ -15,6 +15,7 @@ namespace numba {
 void populateCanonicalizationPatterns(mlir::RewritePatternSet &patterns);
 
 void populatePoisonOptsPatterns(mlir::RewritePatternSet &patterns);
+void populateLoopOptsPatterns(mlir::RewritePatternSet &patterns);
 void populateCommonOptsPatterns(mlir::RewritePatternSet &patterns);
 
 std::unique_ptr<mlir::Pass> createCommonOptsPass();

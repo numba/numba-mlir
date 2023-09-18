@@ -1,14 +1,16 @@
-// SPDX-FileCopyrightText: 2021 - 2022 Intel Corporation
+// SPDX-FileCopyrightText: 2021 - 2023 Intel Corporation
 //
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "numba/Transforms/PromoteToParallel.hpp"
 
 #include "numba/Dialect/numba_util/Dialect.hpp"
+#include "numba/Transforms/CommonOpts.hpp"
 #include "numba/Transforms/ConstUtils.hpp"
 
 #include <mlir/Dialect/Arith/IR/Arith.h>
 #include <mlir/Dialect/SCF/IR/SCF.h>
+#include <mlir/IR/Dominance.h>
 #include <mlir/IR/IRMapping.h>
 #include <mlir/Interfaces/CallInterfaces.h>
 #include <mlir/Pass/Pass.h>
@@ -157,7 +159,202 @@ static bool isInsideParallelRegion(mlir::Operation *op) {
   }
 }
 
+static bool checkIndexType(mlir::arith::CmpIOp op) {
+  auto type = op.getLhs().getType();
+  if (mlir::isa<mlir::IndexType>(type))
+    return true;
+
+  // TODO: check datalayout
+  if (type.isSignlessInteger(64))
+    return true;
+
+  return false;
+}
+
 namespace {
+struct PromoteWhileOp : public mlir::OpRewritePattern<mlir::scf::WhileOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(mlir::scf::WhileOp loop,
+                  mlir::PatternRewriter &rewriter) const override {
+    mlir::Block *beforeBody = loop.getBeforeBody();
+    if (!llvm::hasSingleElement(beforeBody->without_terminator()))
+      return rewriter.notifyMatchFailure(loop, "Loop body must have single op");
+
+    auto cmp = mlir::dyn_cast<mlir::arith::CmpIOp>(beforeBody->front());
+    if (!cmp)
+      return rewriter.notifyMatchFailure(loop,
+                                         "Loop body must have single cmp op");
+
+    auto beforeTerm =
+        mlir::cast<mlir::scf::ConditionOp>(beforeBody->getTerminator());
+    if (!llvm::hasSingleElement(cmp->getUses()) &&
+        beforeTerm.getCondition() == cmp.getResult())
+      return rewriter.notifyMatchFailure(loop, [&](mlir::Diagnostic &diag) {
+        diag << "Expected single condiditon use: " << *cmp;
+      });
+
+    if (mlir::ValueRange(beforeBody->getArguments()) != beforeTerm.getArgs())
+      return rewriter.notifyMatchFailure(loop, "Invalid args order");
+
+    using Pred = mlir::arith::CmpIPredicate;
+    auto predicate = cmp.getPredicate();
+    if (predicate != Pred::slt && predicate != Pred::sgt)
+      return rewriter.notifyMatchFailure(loop, [&](mlir::Diagnostic &diag) {
+        diag << "Expected 'slt' or 'sgt' predicate: " << *cmp;
+      });
+
+    if (!checkIndexType(cmp))
+      return rewriter.notifyMatchFailure(loop, [&](mlir::Diagnostic &diag) {
+        diag << "Expected index like type: " << *cmp;
+      });
+
+    mlir::BlockArgument iterVar;
+    mlir::Value end;
+    mlir::DominanceInfo dom;
+    for (bool reverse : {false, true}) {
+      auto expectedPred = reverse ? Pred::sgt : Pred::slt;
+      if (cmp.getPredicate() != expectedPred)
+        continue;
+
+      auto arg1 = reverse ? cmp.getRhs() : cmp.getLhs();
+      auto arg2 = reverse ? cmp.getLhs() : cmp.getRhs();
+      if (!mlir::isa<mlir::BlockArgument>(arg1))
+        continue;
+
+      if (!dom.properlyDominates(arg2, loop))
+        continue;
+
+      iterVar = mlir::cast<mlir::BlockArgument>(arg1);
+      end = arg2;
+    }
+
+    if (!iterVar)
+      return rewriter.notifyMatchFailure(loop, [&](mlir::Diagnostic &diag) {
+        diag << "Unrecognized cmp form: " << *cmp;
+      });
+
+    if (!llvm::hasNItems(iterVar.getUses(), 2))
+      return rewriter.notifyMatchFailure(loop, [&](mlir::Diagnostic &diag) {
+        diag << "Unrecognized iter var: " << iterVar;
+      });
+
+    mlir::Block *afterBody = loop.getAfterBody();
+    auto afterTerm = mlir::cast<mlir::scf::YieldOp>(afterBody->getTerminator());
+    auto argNumber = iterVar.getArgNumber();
+    auto afterTermIterArg = afterTerm.getResults()[argNumber];
+
+    auto iterVarAfter = afterBody->getArgument(argNumber);
+
+    mlir::Value step;
+    for (auto &use : iterVarAfter.getUses()) {
+      auto owner = mlir::dyn_cast<mlir::arith::AddIOp>(use.getOwner());
+      if (!owner)
+        continue;
+
+      auto other =
+          (iterVarAfter == owner.getLhs() ? owner.getRhs() : owner.getLhs());
+      if (!dom.properlyDominates(other, loop))
+        continue;
+
+      if (afterTermIterArg != owner.getResult())
+        continue;
+
+      step = other;
+      break;
+    }
+
+    if (!step)
+      return rewriter.notifyMatchFailure(loop,
+                                         "Didn't found suitable 'add' op");
+
+    auto begin = loop.getInits()[argNumber];
+
+    auto loc = loop.getLoc();
+    auto indexType = rewriter.getIndexType();
+    auto toIndex = [&](mlir::Value val) -> mlir::Value {
+      if (val.getType() != indexType)
+        return rewriter.create<mlir::arith::IndexCastOp>(loc, indexType, val);
+
+      return val;
+    };
+    begin = toIndex(begin);
+    end = toIndex(end);
+    step = toIndex(step);
+
+    llvm::SmallVector<mlir::Value> mapping;
+    mapping.reserve(loop.getInits().size());
+    for (auto &&[i, init] : llvm::enumerate(loop.getInits())) {
+      if (i == argNumber)
+        continue;
+
+      mapping.emplace_back(init);
+    }
+
+    auto emptyBuidler = [](mlir::OpBuilder &, mlir::Location, mlir::Value,
+                           mlir::ValueRange) {};
+    auto newLoop = rewriter.create<mlir::scf::ForOp>(loc, begin, end, step,
+                                                     mapping, emptyBuidler);
+
+    mlir::Block &newBody = newLoop.getLoopBody().front();
+
+    mlir::OpBuilder::InsertionGuard g(rewriter);
+    rewriter.setInsertionPointToStart(&newBody);
+    mlir::Value newIterVar = newBody.getArgument(0);
+    if (newIterVar.getType() != iterVar.getType())
+      newIterVar = rewriter.create<mlir::arith::IndexCastOp>(
+          loc, iterVar.getType(), newIterVar);
+
+    mapping.clear();
+    auto newArgs = newBody.getArguments();
+    for (auto i : llvm::seq<size_t>(0, newArgs.size())) {
+      if (i < argNumber) {
+        mapping.emplace_back(newArgs[i + 1]);
+      } else if (i == argNumber) {
+        mapping.emplace_back(newArgs.front());
+      } else {
+        mapping.emplace_back(newArgs[i]);
+      }
+    }
+
+    rewriter.inlineBlockBefore(loop.getAfterBody(), &newBody, newBody.begin(),
+                               mapping);
+
+    auto term = mlir::cast<mlir::scf::YieldOp>(newBody.getTerminator());
+
+    mapping.clear();
+    for (auto &&[i, arg] : llvm::enumerate(term.getResults())) {
+      if (i == argNumber)
+        continue;
+
+      mapping.emplace_back(arg);
+    }
+
+    rewriter.setInsertionPoint(term);
+    rewriter.replaceOpWithNewOp<mlir::scf::YieldOp>(term, mapping);
+
+    rewriter.setInsertionPointAfter(newLoop);
+    mlir::Value one = rewriter.create<mlir::arith::ConstantIndexOp>(loc, 1);
+    mlir::Value stepDec = rewriter.create<mlir::arith::SubIOp>(loc, step, one);
+    mlir::Value len = rewriter.create<mlir::arith::SubIOp>(loc, end, begin);
+    len = rewriter.create<mlir::arith::AddIOp>(loc, len, stepDec);
+    len = rewriter.create<mlir::arith::DivSIOp>(loc, len, step);
+    len = rewriter.create<mlir::arith::SubIOp>(loc, len, one);
+    mlir::Value res = rewriter.create<mlir::arith::MulIOp>(loc, len, step);
+    res = rewriter.create<mlir::arith::AddIOp>(loc, begin, res);
+    if (res.getType() != iterVar.getType())
+      res = rewriter.create<mlir::arith::IndexCastOp>(loc, iterVar.getType(),
+                                                      res);
+
+    mapping.clear();
+    llvm::append_range(mapping, newLoop.getResults());
+    mapping.insert(mapping.begin() + argNumber, res);
+    rewriter.replaceOp(loop, mapping);
+    return mlir::success();
+  }
+};
+
 struct PromoteToParallel : public mlir::OpRewritePattern<mlir::scf::ForOp> {
   using OpRewritePattern::OpRewritePattern;
 
@@ -291,11 +488,34 @@ struct MergeNestedForIntoParallel
     };
 
     rewriter.setInsertionPoint(parent);
-    auto newOp = rewriter.replaceOpWithNewOp<mlir::scf::ParallelOp>(
+    rewriter.replaceOpWithNewOp<mlir::scf::ParallelOp>(
         parent, lowerBounds, upperBounds, steps, parent.getInitArgs(),
         bodyBuilder);
 
     return mlir::success();
+  }
+};
+
+struct PromoteWhilePass
+    : public mlir::PassWrapper<PromoteWhilePass, mlir::OperationPass<void>> {
+  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(PromoteWhilePass)
+
+  virtual void
+  getDependentDialects(mlir::DialectRegistry &registry) const override {
+    registry.insert<mlir::arith::ArithDialect>();
+    registry.insert<mlir::scf::SCFDialect>();
+  }
+
+  void runOnOperation() override {
+    auto context = &getContext();
+
+    mlir::RewritePatternSet patterns(context);
+    numba::populatePromoteWhilePatterns(patterns);
+    numba::populateLoopOptsPatterns(patterns);
+
+    if (mlir::failed(mlir::applyPatternsAndFoldGreedily(getOperation(),
+                                                        std::move(patterns))))
+      signalPassFailure();
   }
 };
 
@@ -315,6 +535,7 @@ struct PromoteToParallelPass
 
     mlir::RewritePatternSet patterns(context);
     numba::populatePromoteToParallelPatterns(patterns);
+    numba::populateLoopOptsPatterns(patterns);
 
     if (mlir::failed(mlir::applyPatternsAndFoldGreedily(getOperation(),
                                                         std::move(patterns))))
@@ -323,10 +544,18 @@ struct PromoteToParallelPass
 };
 } // namespace
 
+void numba::populatePromoteWhilePatterns(mlir::RewritePatternSet &patterns) {
+  patterns.insert<PromoteWhileOp>(patterns.getContext());
+}
+
 void numba::populatePromoteToParallelPatterns(
     mlir::RewritePatternSet &patterns) {
   patterns.insert<PromoteToParallel, MergeNestedForIntoParallel>(
       patterns.getContext());
+}
+
+std::unique_ptr<mlir::Pass> numba::createPromoteWhilePass() {
+  return std::make_unique<PromoteWhilePass>();
 }
 
 std::unique_ptr<mlir::Pass> numba::createPromoteToParallelPass() {
