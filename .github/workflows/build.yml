@@ -304,7 +304,7 @@ jobs:
       - name: Test wheels
         run: |
           cd numba_mlir_wheels
-          conda create -y -n wheels-test-env python=${{ matrix.python }} numba=0.57 numpy=1.22 "setuptools<65.6" scikit-learn pytest-xdist ninja scipy pybind11 pytest "tbb=$env:TBB_VER" cmake "mkl-devel-dpcpp>=2023.0.0" dpcpp_win-64 -c conda-forge -c intel -c numba
+          conda create -y -n wheels-test-env python=${{ matrix.python }} numba=0.57 numpy=1.23 scikit-learn pytest-xdist scipy pytest "tbb=$env:TBB_VER" cmake "mkl-devel-dpcpp>=2023.0.0" dpcpp_win-64 -c conda-forge -c intel -c numba
           conda info
           conda activate wheels-test-env
           conda list
@@ -702,7 +702,7 @@ jobs:
 
         run: |
           cd numba_mlir_wheels
-          conda create -y -n wheels-test-env python=${{ matrix.python }} numba=0.57 numpy=1.22 "setuptools<65.6" scikit-learn pytest-xdist ninja scipy pybind11 pytest tbb=${TBB_VER} cmake "mkl-devel-dpcpp>=2023.0.0" dpcpp_linux-64 -c conda-forge -c intel -c numba
+          conda create -y -n wheels-test-env python=${{ matrix.python }} numba=0.57 numpy=1.23 scikit-learn pytest-xdist scipy pytest tbb=${TBB_VER} cmake "mkl-devel-dpcpp>=2023.0.0" dpcpp_linux-64 -c conda-forge -c intel -c numba
           conda info
           source $CONDA/bin/activate wheels-test-env
           conda list
