@@ -550,7 +550,7 @@ static std::optional<mlir::Value> getGpuStream(mlir::OpBuilder &builder,
 
   mlir::Attribute device;
   if (auto env = getGpuRegionEnv(op))
-      device = env.getDevice();
+    device = env.getDevice();
 
   if (!device)
     return std::nullopt;

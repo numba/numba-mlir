@@ -1972,7 +1972,7 @@ public:
     auto mod = getOperation();
     mod->walk([&](mlir::gpu::LaunchFuncOp launch) {
       auto env = getGpuRegionEnv(launch);
-      if (env)
+      if (!env)
         return;
 
       auto kernel = launch.getKernel();
