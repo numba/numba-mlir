@@ -181,7 +181,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python: ["3.8", "3.9", "3.10"]
+        python: ["3.9", "3.10", "3.11"]
 
     steps:
       - uses: ilammy/msvc-dev-cmd@v1
@@ -322,7 +322,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python: ["3.8", "3.9", "3.10"]
+        python: ["3.9", "3.10", "3.11"]
         is_main:
           - ${{ github.ref == 'refs/heads/main' }}
 
@@ -575,7 +575,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python: ["3.8", "3.9", "3.10"]
+        python: ["3.9", "3.10", "3.11"]
         is_main:
           - ${{ github.ref == 'refs/heads/main' }}
 
@@ -719,7 +719,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python: ["3.8", "3.9", "3.10"]
+        python: ["3.9", "3.10", "3.11"]
         is_main:
           - ${{ github.ref == 'refs/heads/main' }}
 
@@ -836,7 +836,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-20.04, windows-latest]
-        python: ["3.8", "3.9", "3.10"]
+        python: ["3.9", "3.10", "3.11"]
     runs-on: ${{ matrix.os }}
     steps:
       - name: Download artifact
