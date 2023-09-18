@@ -14,5 +14,6 @@ class StringRef;
 
 void registerPlierToLinalgPipeline(numba::PipelineRegistry &registry);
 
+llvm::StringRef plierToLinalgRegionPipelineName();
 llvm::StringRef plierToLinalgGenPipelineName();
 llvm::StringRef plierToLinalgOptPipelineName();

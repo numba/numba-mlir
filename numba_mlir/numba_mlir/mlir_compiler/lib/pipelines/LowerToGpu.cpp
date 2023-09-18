@@ -899,10 +899,10 @@ struct GenerateOutlineContextPass
   }
 };
 
-static void rerunScfPipeline(mlir::Operation *op) {
+static void rerunStdPipeline(mlir::Operation *op) {
   assert(nullptr != op);
   auto marker =
-      mlir::StringAttr::get(op->getContext(), plierToScfPipelineName());
+      mlir::StringAttr::get(op->getContext(), plierToStdPipelineName());
   auto mod = op->getParentOfType<mlir::ModuleOp>();
   assert(nullptr != mod);
   numba::addPipelineJumpMarker(mod, marker);
@@ -1137,7 +1137,7 @@ protected:
         results[i] = rewriter.create<plier::CastOp>(loc, dstType, r);
     }
 
-    rerunScfPipeline(op);
+    rerunStdPipeline(op);
     rewriter.replaceOp(op, results);
     return mlir::success();
   }
@@ -2178,9 +2178,12 @@ static void commonOptPasses(mlir::OpPassManager &pm) {
       }));
 }
 
+static void populateLowerToGPUPipelineRegion(mlir::OpPassManager &pm) {
+  pm.addPass(std::make_unique<InsertGpuRegionPass>());
+}
+
 static void populateLowerToGPUPipelineHigh(mlir::OpPassManager &pm) {
   pm.addNestedPass<mlir::func::FuncOp>(std::make_unique<MarkGpuArraysInputs>());
-  pm.addPass(std::make_unique<InsertGpuRegionPass>());
   pm.addPass(std::make_unique<LowerGpuBuiltinsPass>());
   commonOptPasses(pm);
   pm.addPass(mlir::createSymbolDCEPass());
@@ -2262,11 +2265,16 @@ static void populateLowerToGPUPipelineLow(mlir::OpPassManager &pm) {
 void registerLowerToGPUPipeline(numba::PipelineRegistry &registry) {
   registry.registerPipeline([](auto sink) {
     auto highStage = getHighLoweringStage();
-    sink(lowerToGPUPipelineNameHigh(),
+    sink(lowerToGPUPipelineNameRegion(),
          {highStage.begin, plierToScfPipelineName()},
          {highStage.end, plierToLinalgGenPipelineName(),
           plierToStdPipelineName(), untuplePipelineName()},
-         {plierToScfPipelineName()}, &populateLowerToGPUPipelineHigh);
+         {}, &populateLowerToGPUPipelineRegion);
+
+    sink(lowerToGPUPipelineNameHigh(),
+         {highStage.begin, plierToStdPipelineName()},
+         {highStage.end, plierToLinalgGenPipelineName(), untuplePipelineName()},
+         {plierToStdPipelineName()}, &populateLowerToGPUPipelineHigh);
 
     auto lowStage = getLowerLoweringStage();
     sink(lowerToGPUPipelineNameMed(), {lowStage.begin, untuplePipelineName()},
@@ -2282,6 +2290,7 @@ void registerLowerToGPUPipeline(numba::PipelineRegistry &registry) {
   });
 }
 
+llvm::StringRef lowerToGPUPipelineNameRegion() { return "lower_to_gpu_region"; }
 llvm::StringRef lowerToGPUPipelineNameHigh() { return "lower_to_gpu_high"; }
 llvm::StringRef lowerToGPUPipelineNameMed() { return "lower_to_gpu_med"; }
 llvm::StringRef lowerToGPUPipelineNameLow() { return "lower_to_gpu_low"; }
