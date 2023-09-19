@@ -283,7 +283,8 @@ jobs:
           conda install asv=0.6 py-cpuinfo -c conda-forge
           conda list
           python runner.py machine
-          python runner.py test
+          python runner.py test .numba_mlir.
+          python runner.py test .numba_replace_parfor.
 
       - name: Build wheels
         run: |
@@ -678,8 +679,8 @@ jobs:
           conda install asv=0.6 py-cpuinfo -c conda-forge
           conda list
           python runner.py machine
-          python runner.py test
-
+          python runner.py test .numba_mlir.
+          python runner.py test .numba_replace_parfor.
 
       - name: Build wheels
         shell: bash -l {0}
