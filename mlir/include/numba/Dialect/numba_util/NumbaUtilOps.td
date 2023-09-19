@@ -212,6 +212,10 @@ def BuildTupleOp : NumbaUtil_Op<"build_tuple", [Pure]> {
   let results = (outs AnyTuple:$result);
 
   let assemblyFormat = "attr-dict ($args^ `:` type($args) `->`)? type($result)";
+
+  let builders = [
+    OpBuilder<(ins "::mlir::ValueRange":$args)>
+  ];
 }
 
 def TupleExtractOp : NumbaUtil_Op<"tuple_extract", [Pure]> {
@@ -235,6 +239,10 @@ def TupleExtractOp : NumbaUtil_Op<"tuple_extract", [Pure]> {
   }];
 
   let hasFolder = 1;
+
+  let builders = [
+    OpBuilder<(ins "::mlir::Value":$arg, "size_t":$index)>
+  ];
 }
 
 def EnvironmentRegionOp : NumbaUtil_Op<"env_region", [
