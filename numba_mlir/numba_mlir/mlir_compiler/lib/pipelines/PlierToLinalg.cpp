@@ -3159,8 +3159,15 @@ struct ReplaceClones
   mlir::LogicalResult
   matchAndRewrite(mlir::bufferization::CloneOp op,
                   mlir::PatternRewriter &rewriter) const override {
-    rewriter.replaceOpWithNewOp<numba::util::RetainOp>(op, op.getType(),
-                                                       op.getSource());
+    mlir::Value src = op.getSource();
+    mlir::Type srcType = src.getType();
+    mlir::Type dstType = op.getType();
+
+    auto loc = op.getLoc();
+    if (srcType != dstType)
+      src = rewriter.create<numba::util::ChangeLayoutOp>(loc, dstType, src);
+
+    rewriter.replaceOpWithNewOp<numba::util::RetainOp>(op, dstType, src);
     return mlir::success();
   }
 };
