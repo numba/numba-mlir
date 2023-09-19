@@ -818,6 +818,12 @@ struct WhileOpMoveIfCond : public mlir::OpRewritePattern<mlir::scf::IfOp> {
 
     mlir::OpBuilder::InsertionGuard g(rewriter);
 
+    auto newBeforeArgs = llvm::to_vector(beforeTerm.getArgs());
+    llvm::append_range(newBeforeArgs, capturedValues);
+    rewriter.setInsertionPoint(beforeTerm);
+    auto newTerm = rewriter.replaceOpWithNewOp<mlir::scf::ConditionOp>(
+        beforeTerm, beforeTerm.getCondition(), newBeforeArgs);
+
     rewriter.setInsertionPoint(loop);
     auto newLoop = rewriter.create<mlir::scf::WhileOp>(
         loop.getLoc(), newResTypes, loop.getInits(), nullptr, nullptr);
@@ -836,7 +842,7 @@ struct WhileOpMoveIfCond : public mlir::OpRewritePattern<mlir::scf::IfOp> {
     for (auto &&[res, yieldArg] :
          llvm::zip(op.getResults(), thenYield.getResults())) {
       for (auto &use : res.getUses()) {
-        assert(use.getOwner() == beforeTerm && "Invalid user");
+        assert(use.getOwner() == newTerm && "Invalid user");
         afterMapping[use.getOperandNumber() - 1] = yieldArg;
       }
     }
@@ -864,7 +870,7 @@ struct WhileOpMoveIfCond : public mlir::OpRewritePattern<mlir::scf::IfOp> {
       for (auto &&[res, yieldArg] :
            llvm::zip(op.getResults(), elseYield.getResults())) {
         for (auto &use : res.getUses()) {
-          assert(use.getOwner() == beforeTerm && "Invalid user");
+          assert(use.getOwner() == newTerm && "Invalid user");
           afterMapping[use.getOperandNumber() - 1] = yieldArg;
         }
       }
@@ -883,12 +889,7 @@ struct WhileOpMoveIfCond : public mlir::OpRewritePattern<mlir::scf::IfOp> {
     }
     rewriter.replaceOp(loop, afterMapping);
 
-    rewriter.setInsertionPoint(beforeTerm);
-    auto termLoc = beforeTerm.getLoc();
-    auto newBeforeArgs = llvm::to_vector(beforeTerm.getArgs());
-    llvm::append_range(newBeforeArgs, capturedValues);
-    auto newTerm = rewriter.replaceOpWithNewOp<mlir::scf::ConditionOp>(
-        beforeTerm, beforeTerm.getCondition(), newBeforeArgs);
+    auto termLoc = newTerm.getLoc();
     rewriter.setInsertionPoint(newTerm);
     for (auto res : op.getResults()) {
       mlir::Value newRes =
