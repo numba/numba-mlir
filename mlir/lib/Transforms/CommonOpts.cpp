@@ -570,7 +570,10 @@ struct CanonicalizeLoopMemrefIndex
 };
 
 static bool canMoveOpToBefore(mlir::Operation *op) {
-  return op->getNumResults() == 1 && mlir::isPure(op);
+  if (op->getNumResults() != 1)
+    return false;
+
+  return mlir::isPure(op);
 }
 
 struct MoveOpsFromBefore : public mlir::OpRewritePattern<mlir::scf::WhileOp> {
