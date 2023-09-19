@@ -392,11 +392,57 @@ struct DimOfRetain : public mlir::OpRewritePattern<mlir::memref::DimOp> {
     return mlir::success();
   }
 };
+
+struct RetainTrivialDealloc
+    : public mlir::OpRewritePattern<numba::util::RetainOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(numba::util::RetainOp op,
+                  mlir::PatternRewriter &rewriter) const override {
+    mlir::Value src = op.getSource();
+    mlir::Type srcType = src.getType();
+    mlir::Type dstType = op.getType();
+    if (srcType != dstType &&
+        !mlir::memref::CastOp::areCastCompatible(srcType, dstType))
+      return mlir::failure();
+
+    mlir::memref::DeallocOp dealloc;
+    mlir::DominanceInfo dom;
+
+    mlir::Block *block = op->getBlock();
+    auto checkUsers = [&](auto &&users) {
+      for (mlir::Operation *user : users) {
+        if (user->getBlock() != block ||
+            !mlir::isa<mlir::memref::DeallocOp>(user))
+          continue;
+
+        if (!dom.properlyDominates(op.getOperation(), user))
+          continue;
+
+        if (!dealloc || dom.properlyDominates(user, dealloc))
+          dealloc = mlir::cast<mlir::memref::DeallocOp>(user);
+      }
+    };
+    checkUsers(src.getUsers());
+    checkUsers(op->getUsers());
+
+    if (!dealloc)
+      return mlir::failure();
+
+    if (srcType != dstType)
+      src = rewriter.create<mlir::memref::CastOp>(op.getLoc(), dstType, src);
+
+    rewriter.replaceOp(op, src);
+    rewriter.eraseOp(dealloc);
+    return mlir::success();
+  }
+};
 } // namespace
 
 void RetainOp::getCanonicalizationPatterns(::mlir::RewritePatternSet &results,
                                            ::mlir::MLIRContext *context) {
-  results.insert<DimOfRetain>(context);
+  results.insert<DimOfRetain, RetainTrivialDealloc>(context);
 }
 
 static mlir::Value getChangeLayoutParent(mlir::Value val) {

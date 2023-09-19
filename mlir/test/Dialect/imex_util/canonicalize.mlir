@@ -152,3 +152,19 @@ func.func @test(%arg1: !ntensor.ntensor<?x?xf32>, %arg2: index, %arg3: index) ->
   %1 = ntensor.dim %0, %cst : !ntensor.ntensor<?x?xf32>
   return %1: index
 }
+
+
+// -----
+
+// CHECK-LABEL: func @test
+//  CHECK-SAME:   (%[[ARG1:.*]]: memref<?xf32>)
+//  CHECK-NEXT:   %[[RES:.*]] = numba_util.retain %[[ARG]] : memref<?xf32> to memref<?xf32>
+//  CHECK-NEXT:   return %[[RES]]
+func.func @test(%arg1: memref<?xf32>) -> memref<?xf32> {
+  %1 = numba_util.retain %arg1 : memref<?xf32> to memref<?xf32>
+  memref.dealloc %1 : memref<?xf32>
+  %2 = numba_util.retain %1 : memref<?xf32> to memref<?xf32>
+  %3 = numba_util.retain %2 : memref<?xf32> to memref<?xf32>
+  memref.dealloc %2 : memref<?xf32>
+  return %3: memref<?xf32>
+}
