@@ -1248,6 +1248,15 @@ struct IternextConversionPattern
     if (!resType || resType.size() != 2)
       return mlir::failure();
 
+    auto origType =
+        mlir::dyn_cast<numba::ntensor::IteratorType>(op.getValue().getType());
+    if (!origType)
+      return mlir::failure();
+
+    if (origType.getType().getRank() == 0)
+      return rewriter.notifyMatchFailure(
+          op, "Iteration over 0-rank arrays is not supported");
+
     auto src = adaptor.getValue();
     auto srcType = mlir::dyn_cast<mlir::TupleType>(src.getType());
     if (!srcType || srcType.size() != 2)
@@ -1263,6 +1272,7 @@ struct IternextConversionPattern
     using NTensor = numba::ntensor::NTensorType;
     auto iter = getItem(0);
     auto array = mlir::cast<mlir::TypedValue<NTensor>>(getItem(1));
+    auto arrayType = array.getType();
 
     mlir::Value end = rewriter.create<numba::ntensor::DimOp>(loc, array, 0);
     mlir::Value current = rewriter.create<mlir::memref::LoadOp>(
@@ -1276,16 +1286,58 @@ struct IternextConversionPattern
     rewriter.create<mlir::memref::StoreOp>(loc, next, iter,
                                            /*indices*/ std::nullopt);
 
+    bool slice = arrayType.getRank() > 1;
+    auto retType = [&]() -> mlir::Type {
+      auto type = mlir::cast<mlir::ShapedType>(array.getType());
+      if (!slice)
+        return type.getElementType();
+
+      return mlir::cast<NTensor>(resType.getType(0));
+    }();
+
     auto thenBuilder = [&](mlir::OpBuilder &builder, mlir::Location loc) {
-      mlir::Value res =
-          builder.create<numba::ntensor::LoadOp>(loc, array, current);
+      mlir::Value res = [&]() -> mlir::Value {
+        if (!slice)
+          return builder.create<numba::ntensor::LoadOp>(loc, array, current);
+
+        auto zero = builder.getIndexAttr(0);
+        auto one = builder.getIndexAttr(1);
+
+        auto rank = arrayType.getShape().size();
+        llvm::SmallVector<mlir::OpFoldResult> offsets(rank, zero);
+        offsets[0] = current;
+
+        llvm::SmallVector<mlir::OpFoldResult> sizes(rank);
+        for (auto i : llvm::seq<size_t>(0, rank)) {
+          mlir::OpFoldResult sz;
+          if (i == 0) {
+            sz = one;
+          } else {
+            sz = builder.create<numba::ntensor::DimOp>(loc, array, i)
+                     .getResult();
+          }
+          sizes[i] = sz;
+        }
+
+        llvm::SmallVector<mlir::OpFoldResult> strides(rank, one);
+
+        auto subviewType =
+            numba::ntensor::SubviewOp::inferRankReducedResultType(
+                mlir::cast<NTensor>(retType).getShape(),
+                mlir::cast<NTensor>(array.getType()), offsets, sizes, strides);
+        mlir::Value arr = builder.create<numba::ntensor::SubviewOp>(
+            loc, subviewType, array, offsets, sizes, strides);
+        if (arr.getType() != retType)
+          arr = builder.create<numba::ntensor::CastOp>(loc, retType, arr);
+
+        return arr;
+      }();
       builder.create<mlir::scf::YieldOp>(loc, res);
     };
 
     auto elseBuilder = [&](mlir::OpBuilder &builder, mlir::Location loc) {
-      auto elemType = array.getType().getElementType();
       mlir::Value res =
-          builder.create<mlir::ub::PoisonOp>(loc, elemType, nullptr);
+          builder.create<mlir::ub::PoisonOp>(loc, retType, nullptr);
       builder.create<mlir::scf::YieldOp>(loc, res);
     };
 
