@@ -23,6 +23,7 @@ struct Conversion {
     py::object mod = py::module::import("numba.core.types");
     dtype = mod.attr("DType");
     array = mod.attr("Array");
+    iterator = mod.attr("ArrayIterator");
 
     py::object arrayMod = py::module::import("numba_mlir.mlir.array_type");
     fixedArray = arrayMod.attr("FixedArray");
@@ -78,6 +79,15 @@ struct Conversion {
                                               llvm::StringRef(layout));
     }
 
+    if (py::isinstance(obj, iterator)) {
+      auto arrayType = (*this)(context, obj.attr("array_type"));
+      if (!arrayType || !mlir::isa<numba::ntensor::NTensorType>(*arrayType))
+        return std::nullopt;
+
+      return numba::ntensor::IteratorType::get(
+          mlir::cast<numba::ntensor::NTensorType>(*arrayType));
+    }
+
     return std::nullopt;
   }
 
@@ -86,6 +96,7 @@ private:
 
   py::object dtype;
   py::object array;
+  py::object iterator;
   py::object fixedArray;
 };
 } // namespace
