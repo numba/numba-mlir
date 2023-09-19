@@ -4,6 +4,7 @@
 
 #include "numba/Transforms/CommonOpts.hpp"
 
+#include "numba/Dialect/numba_util/Dialect.hpp"
 #include "numba/Transforms/IfRewrites.hpp"
 #include "numba/Transforms/IndexTypePropagation.hpp"
 #include "numba/Transforms/LoopRewrites.hpp"
@@ -681,6 +682,88 @@ struct WhileOpLICM : public mlir::OpRewritePattern<mlir::scf::WhileOp> {
   }
 };
 
+struct WhileOpExpandTuple : public mlir::OpRewritePattern<mlir::scf::WhileOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(mlir::scf::WhileOp loop,
+                  mlir::PatternRewriter &rewriter) const override {
+    mlir::Block *beforeBody = loop.getBeforeBody();
+    auto beforeTerm =
+        mlir::cast<mlir::scf::ConditionOp>(beforeBody->getTerminator());
+
+    mlir::Block *afterBody = loop.getAfterBody();
+
+    size_t argIndex = 0;
+    mlir::TypedValue<mlir::TupleType> arg;
+    for (auto &&[i, it] :
+         llvm::enumerate(llvm::zip(loop.getResults(), beforeTerm.getArgs(),
+                                   afterBody->getArguments()))) {
+      auto &&[loopRes, beforeArg, afterArg] = it;
+      if (loopRes.use_empty() && afterArg.use_empty())
+        continue;
+
+      if (!mlir::isa<mlir::TupleType>(beforeArg.getType()))
+        continue;
+
+      argIndex = i;
+      arg = mlir::cast<mlir::TypedValue<mlir::TupleType>>(beforeArg);
+      break;
+    }
+
+    if (!arg)
+      return mlir::failure();
+
+    auto type = arg.getType();
+    auto count = type.size();
+    auto loc = beforeTerm.getLoc();
+    mlir::OpBuilder::InsertionGuard g(rewriter);
+    rewriter.setInsertionPoint(beforeTerm);
+
+    auto newCondArgs = llvm::to_vector(beforeTerm.getArgs());
+    for (auto i : llvm::seq<size_t>(0, count)) {
+      auto val = rewriter.create<numba::util::TupleExtractOp>(loc, arg, i);
+      newCondArgs.emplace_back(val);
+    }
+    rewriter.setInsertionPoint(beforeTerm);
+    rewriter.replaceOpWithNewOp<mlir::scf::ConditionOp>(
+        beforeTerm, beforeTerm.getCondition(), newCondArgs);
+
+    mlir::ValueRange newArgsRange(newCondArgs);
+    auto newResTypes = newArgsRange.getTypes();
+
+    rewriter.setInsertionPoint(loop);
+    auto newLoop = rewriter.create<mlir::scf::WhileOp>(
+        loc, newResTypes, loop.getInits(), nullptr, nullptr);
+
+    auto newBefore = newLoop.getBeforeBody();
+    auto newAfter = newLoop.getAfterBody();
+
+    rewriter.inlineBlockBefore(beforeBody, newBefore, newBefore->begin(),
+                               newBefore->getArguments());
+
+    mlir::ValueRange newAfterArgs = newAfter->getArguments();
+    rewriter.setInsertionPointToStart(newAfter);
+
+    auto newTuple = rewriter.create<numba::util::BuildTupleOp>(
+        loc, newAfterArgs.take_back(count));
+    auto mappedAfterArgs = llvm::to_vector(newAfterArgs.drop_back(count));
+    mappedAfterArgs[argIndex] = newTuple;
+
+    rewriter.inlineBlockBefore(afterBody, newAfter, newAfter->end(),
+                               mappedAfterArgs);
+
+    mlir::ValueRange newLoopResults = newLoop.getResults();
+    rewriter.setInsertionPointAfter(newLoop);
+    newTuple = rewriter.create<numba::util::BuildTupleOp>(
+        loc, newLoopResults.take_back(count));
+    auto mappedLoopResults = llvm::to_vector(newLoopResults.drop_back(count));
+    mappedLoopResults[argIndex] = newTuple;
+    rewriter.replaceOp(loop, mappedLoopResults);
+    return mlir::success();
+  }
+};
+
 struct GPUGenGlobalId : public mlir::OpRewritePattern<mlir::arith::AddIOp> {
   using OpRewritePattern::OpRewritePattern;
 
@@ -801,7 +884,8 @@ void numba::populatePoisonOptsPatterns(mlir::RewritePatternSet &patterns) {
 }
 
 void numba::populateLoopOptsPatterns(mlir::RewritePatternSet &patterns) {
-  patterns.insert<CanonicalizeLoopMemrefIndex, MoveOpsFromBefore, WhileOpLICM>(
+  patterns.insert<CanonicalizeLoopMemrefIndex,
+                  /*MoveOpsFromBefore,*/ WhileOpLICM, WhileOpExpandTuple>(
       patterns.getContext());
 }
 
