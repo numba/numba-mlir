@@ -135,7 +135,7 @@ def YieldOp : NumbaUtil_Op<"yield", [
 def RetainOp : NumbaUtil_Op<"retain", [ViewLikeOpInterface]> {
   let arguments = (ins AnyMemRef : $source);
 
-  let results = (outs AnyMemRef);
+  let results = (outs AnyMemRef : $output);
 
   let builders = [OpBuilder<(ins "::mlir::Value" : $value)>];
 
@@ -144,6 +144,8 @@ def RetainOp : NumbaUtil_Op<"retain", [ViewLikeOpInterface]> {
   }];
 
   let hasCanonicalizer = 1;
+
+  let assemblyFormat = "$source attr-dict `:` type($source) `to` type($output)";
 }
 
 def ChangeLayoutOp : NumbaUtil_Op<"change_layout", [
