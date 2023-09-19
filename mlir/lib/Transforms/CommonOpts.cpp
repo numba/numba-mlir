@@ -568,6 +568,11 @@ struct CanonicalizeLoopMemrefIndex
   }
 };
 
+static bool canMoveOpToBefore(mlir::Operation *op) {
+  return op->getNumResults() == 1 &&
+         !mlir::isa<numba::util::BuildTupleOp>(op) && mlir::isPure(op);
+}
+
 struct MoveOpsFromBefore : public mlir::OpRewritePattern<mlir::scf::WhileOp> {
   using OpRewritePattern::OpRewritePattern;
 
@@ -588,7 +593,7 @@ struct MoveOpsFromBefore : public mlir::OpRewritePattern<mlir::scf::WhileOp> {
         continue;
 
       auto argOp = arg.getDefiningOp();
-      if (argOp && argOp->getNumResults() == 1 && mlir::isPure(argOp)) {
+      if (argOp && canMoveOpToBefore(argOp)) {
         opToMove = argOp;
         idx = i;
         break;
