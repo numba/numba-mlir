@@ -769,6 +769,133 @@ struct WhileOpExpandTuple : public mlir::OpRewritePattern<mlir::scf::WhileOp> {
   }
 };
 
+struct WhileOpMoveIfCond : public mlir::OpRewritePattern<mlir::scf::IfOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(mlir::scf::IfOp op,
+                  mlir::PatternRewriter &rewriter) const override {
+    auto loop = mlir::dyn_cast<mlir::scf::WhileOp>(op->getParentOp());
+    if (!loop || op->getBlock() != loop.getBeforeBody())
+      return mlir::failure();
+
+    mlir::Block *beforeBody = loop.getBeforeBody();
+    auto beforeTerm =
+        mlir::cast<mlir::scf::ConditionOp>(beforeBody->getTerminator());
+    if (op.getCondition() != beforeTerm.getCondition())
+      return mlir::failure();
+
+    for (auto result : op.getResults())
+      for (auto user : result.getUsers())
+        if (user != beforeTerm)
+          return mlir::failure();
+
+    for (auto &nextOp : llvm::make_range(std::next(op->getIterator()),
+                                         beforeTerm->getIterator()))
+      if (!mlir::isPure(&nextOp))
+        return mlir::failure();
+
+    mlir::DominanceInfo dom;
+    llvm::SmallSetVector<mlir::Value, 8> capturedValues;
+    for (auto body : {op.thenBlock(), op.elseBlock()}) {
+      if (!body)
+        continue;
+
+      body->walk([&](mlir::Operation *blockOp) {
+        for (auto arg : blockOp->getOperands()) {
+          if (dom.properlyDominates(arg, loop) ||
+              !dom.properlyDominates(arg, op))
+            continue;
+
+          capturedValues.insert(arg);
+        }
+      });
+    }
+
+    auto newBeforeArgs = llvm::to_vector(beforeTerm.getArgs());
+    llvm::append_range(newBeforeArgs, capturedValues);
+
+    mlir::OpBuilder::InsertionGuard g(rewriter);
+    mlir::ValueRange newArgsRange(newBeforeArgs);
+    auto newResTypes = newArgsRange.getTypes();
+
+    rewriter.setInsertionPoint(loop);
+    auto newLoop = rewriter.create<mlir::scf::WhileOp>(
+        loop.getLoc(), newResTypes, loop.getInits(), nullptr, nullptr);
+
+    auto newBefore = newLoop.getBeforeBody();
+    rewriter.inlineBlockBefore(beforeBody, newBefore, newBefore->begin(),
+                               newBefore->getArguments());
+
+    auto newAfter = newLoop.getAfterBody();
+
+    mlir::ValueRange newAfterArgs = newAfter->getArguments();
+    auto afterMapping =
+        llvm::to_vector(newAfterArgs.drop_back(capturedValues.size()));
+
+    auto thenYield = op.thenYield();
+    for (auto &&[res, yieldArg] :
+         llvm::zip(op.getResults(), thenYield.getResults())) {
+      for (auto &use : res.getUses()) {
+        assert(use.getOwner() == beforeTerm && "Invalid user");
+        afterMapping[use.getOperandNumber() - 1] = yieldArg;
+      }
+    }
+    rewriter.eraseOp(thenYield);
+
+    auto replaceChecker = [&](mlir::OpOperand &operand) -> bool {
+      auto onwer = operand.getOwner();
+      return op.getThenRegion().isAncestor(onwer->getParentRegion());
+    };
+    rewriter.replaceUsesWithIf(capturedValues.getArrayRef(),
+                               newAfterArgs.take_back(capturedValues.size()),
+                               replaceChecker);
+    rewriter.inlineBlockBefore(op.thenBlock(), newAfter, newAfter->end());
+
+    auto afterBody = loop.getAfterBody();
+    rewriter.inlineBlockBefore(afterBody, newAfter, newAfter->end(),
+                               afterMapping);
+
+    afterMapping.clear();
+    llvm::append_range(afterMapping,
+                       newLoop.getResults().drop_back(capturedValues.size()));
+
+    if (op.elseBlock()) {
+      auto elseYield = op.elseYield();
+      for (auto &&[res, yieldArg] :
+           llvm::zip(op.getResults(), elseYield.getResults())) {
+        for (auto &use : res.getUses()) {
+          assert(use.getOwner() == beforeTerm && "Invalid user");
+          afterMapping[use.getOperandNumber() - 1] = yieldArg;
+        }
+      }
+      rewriter.eraseOp(elseYield);
+
+      auto replaceChecker = [&](mlir::OpOperand &operand) -> bool {
+        auto onwer = operand.getOwner();
+        return op.getElseRegion().isAncestor(onwer->getParentRegion());
+      };
+      rewriter.replaceUsesWithIf(
+          capturedValues.getArrayRef(),
+          newLoop.getResults().take_back(capturedValues.size()),
+          replaceChecker);
+    }
+    rewriter.replaceOp(loop, afterMapping);
+
+    rewriter.setInsertionPoint(beforeTerm);
+    for (auto res : op.getResults()) {
+      mlir::Value newRes = rewriter.create<mlir::ub::PoisonOp>(
+          beforeTerm.getLoc(), res.getType(), nullptr);
+      rewriter.replaceAllUsesWith(res, newRes);
+    }
+    rewriter.replaceOpWithNewOp<mlir::scf::ConditionOp>(
+        beforeTerm, beforeTerm.getCondition(), newBeforeArgs);
+
+    rewriter.eraseOp(op);
+    return mlir::success();
+  }
+};
+
 struct GPUGenGlobalId : public mlir::OpRewritePattern<mlir::arith::AddIOp> {
   using OpRewritePattern::OpRewritePattern;
 
@@ -890,7 +1017,7 @@ void numba::populatePoisonOptsPatterns(mlir::RewritePatternSet &patterns) {
 
 void numba::populateLoopOptsPatterns(mlir::RewritePatternSet &patterns) {
   patterns.insert<CanonicalizeLoopMemrefIndex, MoveOpsFromBefore, WhileOpLICM,
-                  WhileOpExpandTuple>(patterns.getContext());
+                  WhileOpExpandTuple, WhileOpMoveIfCond>(patterns.getContext());
 }
 
 void numba::populateCommonOptsPatterns(mlir::RewritePatternSet &patterns) {
