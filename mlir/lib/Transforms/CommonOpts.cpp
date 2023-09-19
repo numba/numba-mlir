@@ -828,13 +828,34 @@ struct WhileOpMoveIfCond : public mlir::OpRewritePattern<mlir::scf::IfOp> {
     auto newLoop = rewriter.create<mlir::scf::WhileOp>(
         loop.getLoc(), newResTypes, loop.getInits(), nullptr, nullptr);
 
+    auto newAfter = newLoop.getAfterBody();
+    mlir::ValueRange newAfterArgs = newAfter->getArguments();
+
+    {
+      auto replaceChecker = [&](mlir::OpOperand &operand) -> bool {
+        auto owner = operand.getOwner();
+        return op.getThenRegion().isAncestor(owner->getParentRegion());
+      };
+      rewriter.replaceUsesWithIf(capturedValues.getArrayRef(),
+                                 newAfterArgs.take_back(capturedValues.size()),
+                                 replaceChecker);
+    }
+    if (op.elseBlock()) {
+      auto replaceChecker = [&](mlir::OpOperand &operand) -> bool {
+        auto owner = operand.getOwner();
+        return op.getElseRegion().isAncestor(owner->getParentRegion());
+      };
+      rewriter.replaceUsesWithIf(
+          capturedValues.getArrayRef(),
+          newLoop.getResults().take_back(capturedValues.size()),
+          replaceChecker);
+    }
+
     auto newBefore = newLoop.getBeforeBody();
+
     rewriter.inlineBlockBefore(beforeBody, newBefore, newBefore->begin(),
                                newBefore->getArguments());
 
-    auto newAfter = newLoop.getAfterBody();
-
-    mlir::ValueRange newAfterArgs = newAfter->getArguments();
     auto afterMapping =
         llvm::to_vector(newAfterArgs.drop_back(capturedValues.size()));
 
@@ -848,13 +869,6 @@ struct WhileOpMoveIfCond : public mlir::OpRewritePattern<mlir::scf::IfOp> {
     }
     rewriter.eraseOp(thenYield);
 
-    auto replaceChecker = [&](mlir::OpOperand &operand) -> bool {
-      auto onwer = operand.getOwner();
-      return op.getThenRegion().isAncestor(onwer->getParentRegion());
-    };
-    rewriter.replaceUsesWithIf(capturedValues.getArrayRef(),
-                               newAfterArgs.take_back(capturedValues.size()),
-                               replaceChecker);
     rewriter.inlineBlockBefore(op.thenBlock(), newAfter, newAfter->end());
 
     auto afterBody = loop.getAfterBody();
@@ -876,14 +890,6 @@ struct WhileOpMoveIfCond : public mlir::OpRewritePattern<mlir::scf::IfOp> {
       }
       rewriter.eraseOp(elseYield);
 
-      auto replaceChecker = [&](mlir::OpOperand &operand) -> bool {
-        auto onwer = operand.getOwner();
-        return op.getElseRegion().isAncestor(onwer->getParentRegion());
-      };
-      rewriter.replaceUsesWithIf(
-          capturedValues.getArrayRef(),
-          newLoop.getResults().take_back(capturedValues.size()),
-          replaceChecker);
       rewriter.inlineBlockBefore(op.elseBlock(), newLoop->getBlock(),
                                  std::next(newLoop->getIterator()));
     }
