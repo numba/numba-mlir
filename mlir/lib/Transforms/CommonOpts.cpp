@@ -812,12 +812,11 @@ struct WhileOpMoveIfCond : public mlir::OpRewritePattern<mlir::scf::IfOp> {
       });
     }
 
-    auto newBeforeArgs = llvm::to_vector(beforeTerm.getArgs());
-    llvm::append_range(newBeforeArgs, capturedValues);
+    auto newResTypes = llvm::to_vector(loop.getResultTypes());
+    llvm::append_range(
+        newResTypes, mlir::ValueRange(capturedValues.getArrayRef()).getTypes());
 
     mlir::OpBuilder::InsertionGuard g(rewriter);
-    mlir::ValueRange newArgsRange(newBeforeArgs);
-    auto newResTypes = newArgsRange.getTypes();
 
     rewriter.setInsertionPoint(loop);
     auto newLoop = rewriter.create<mlir::scf::WhileOp>(
@@ -879,17 +878,23 @@ struct WhileOpMoveIfCond : public mlir::OpRewritePattern<mlir::scf::IfOp> {
           capturedValues.getArrayRef(),
           newLoop.getResults().take_back(capturedValues.size()),
           replaceChecker);
+      rewriter.inlineBlockBefore(op.elseBlock(), newLoop->getBlock(),
+                                 std::next(newLoop->getIterator()));
     }
     rewriter.replaceOp(loop, afterMapping);
 
     rewriter.setInsertionPoint(beforeTerm);
+    auto termLoc = beforeTerm.getLoc();
+    auto newBeforeArgs = llvm::to_vector(beforeTerm.getArgs());
+    llvm::append_range(newBeforeArgs, capturedValues);
+    auto newTerm = rewriter.replaceOpWithNewOp<mlir::scf::ConditionOp>(
+        beforeTerm, beforeTerm.getCondition(), newBeforeArgs);
+    rewriter.setInsertionPoint(newTerm);
     for (auto res : op.getResults()) {
-      mlir::Value newRes = rewriter.create<mlir::ub::PoisonOp>(
-          beforeTerm.getLoc(), res.getType(), nullptr);
+      mlir::Value newRes =
+          rewriter.create<mlir::ub::PoisonOp>(termLoc, res.getType(), nullptr);
       rewriter.replaceAllUsesWith(res, newRes);
     }
-    rewriter.replaceOpWithNewOp<mlir::scf::ConditionOp>(
-        beforeTerm, beforeTerm.getCondition(), newBeforeArgs);
 
     rewriter.eraseOp(op);
     return mlir::success();
