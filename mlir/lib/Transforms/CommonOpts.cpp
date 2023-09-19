@@ -569,9 +569,14 @@ struct CanonicalizeLoopMemrefIndex
   }
 };
 
+static bool hasTupleOperands(mlir::Operation *op) {
+  auto check = [](mlir::Type type) { return mlir::isa<mlir::TupleType>(type); };
+  return llvm::any_of(op->getOperandTypes(), check) ||
+         llvm::any_of(op->getResultTypes(), check);
+}
+
 static bool canMoveOpToBefore(mlir::Operation *op) {
-  return op->getNumResults() == 1 &&
-         !mlir::isa<numba::util::BuildTupleOp>(op) && mlir::isPure(op);
+  return op->getNumResults() == 1 && !hasTupleOperands(op) && mlir::isPure(op);
 }
 
 struct MoveOpsFromBefore : public mlir::OpRewritePattern<mlir::scf::WhileOp> {
@@ -884,9 +889,8 @@ void numba::populatePoisonOptsPatterns(mlir::RewritePatternSet &patterns) {
 }
 
 void numba::populateLoopOptsPatterns(mlir::RewritePatternSet &patterns) {
-  patterns.insert<CanonicalizeLoopMemrefIndex,
-                  /*MoveOpsFromBefore,*/ WhileOpLICM, WhileOpExpandTuple>(
-      patterns.getContext());
+  patterns.insert<CanonicalizeLoopMemrefIndex, MoveOpsFromBefore, WhileOpLICM,
+                  WhileOpExpandTuple>(patterns.getContext());
 }
 
 void numba::populateCommonOptsPatterns(mlir::RewritePatternSet &patterns) {
