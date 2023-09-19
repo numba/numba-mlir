@@ -1954,7 +1954,8 @@ def test_inplace3():
     assert_equal(py_arg, jit_arg)
 
 
-def test_array_loop():
+@pytest.mark.parametrize("arr", [np.empty(0), np.arange(12)])
+def test_array_loop(arr):
     def py_func(arr):
         res = 0
         for a in arr:
@@ -1964,7 +1965,6 @@ def test_array_loop():
 
     jit_func = njit(py_func)
 
-    arr = np.arange(12)
     with print_pass_ir([], ["PromoteWhilePass"]):
         jit_func = njit(py_func)
         assert_equal(py_func(arr), jit_func(arr))
