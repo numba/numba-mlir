@@ -53,7 +53,6 @@ class KernelDispatcher:
     version = "base"
 
     params = [[1, 2, 6, 12], get_dpctl_devices()]
-    # params = [[1], get_dpctl_devices()]
     param_names = ["count", "device"]
 
     @skip_benchmark_if(not has_dpctl())
