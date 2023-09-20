@@ -31,20 +31,20 @@
 
 #define DEBUG_TYPE "numba-execution-engine"
 
-static llvm::OptimizationLevel mapToLevel(llvm::CodeGenOpt::Level level) {
+static llvm::OptimizationLevel mapToLevel(llvm::CodeGenOptLevel level) {
   unsigned optimizeSize = 0; // TODO: unhardcode
 
   switch (level) {
   default:
     llvm_unreachable("Invalid optimization level!");
 
-  case 0:
+  case llvm::CodeGenOptLevel::None:
     return llvm::OptimizationLevel::O0;
 
-  case 1:
+  case llvm::CodeGenOptLevel::Less:
     return llvm::OptimizationLevel::O1;
 
-  case 2:
+  case llvm::CodeGenOptLevel::Default:
     switch (optimizeSize) {
     default:
       llvm_unreachable("Invalid optimization level for size!");
@@ -59,23 +59,24 @@ static llvm::OptimizationLevel mapToLevel(llvm::CodeGenOpt::Level level) {
       return llvm::OptimizationLevel::Oz;
     }
 
-  case 3:
+  case llvm::CodeGenOptLevel::Aggressive:
     return llvm::OptimizationLevel::O3;
   }
 }
 
 static llvm::PipelineTuningOptions
-getPipelineTuningOptions(llvm::CodeGenOpt::Level optLevelVal) {
+getPipelineTuningOptions(llvm::CodeGenOptLevel optLevelVal) {
   llvm::PipelineTuningOptions pto;
+  auto level = static_cast<int>(optLevelVal);
 
-  pto.LoopUnrolling = optLevelVal > 0;
-  pto.LoopVectorization = optLevelVal > 1;
-  pto.SLPVectorization = optLevelVal > 1;
+  pto.LoopUnrolling = level > 0;
+  pto.LoopVectorization = level > 1;
+  pto.SLPVectorization = level > 1;
   return pto;
 }
 
 static void runOptimizationPasses(llvm::Module &M, llvm::TargetMachine &TM) {
-  llvm::CodeGenOpt::Level optLevelVal = TM.getOptLevel();
+  llvm::CodeGenOptLevel optLevelVal = TM.getOptLevel();
 
   llvm::LoopAnalysisManager lam;
   llvm::FunctionAnalysisManager fam;
@@ -111,7 +112,7 @@ static void runOptimizationPasses(llvm::Module &M, llvm::TargetMachine &TM) {
 
   llvm::OptimizationLevel level = mapToLevel(optLevelVal);
 
-  if (optLevelVal == 0) {
+  if (optLevelVal == llvm::CodeGenOptLevel::None) {
     mpm = pb.buildO0DefaultPipeline(level);
   } else {
     mpm = pb.buildPerModuleDefaultPipeline(level);
@@ -214,7 +215,7 @@ public:
 
       llvm::legacy::PassManager PM;
       if (TM->addPassesToEmitFile(PM, os, nullptr,
-                                  llvm::CodeGenFileType::CGFT_AssemblyFile))
+                                  llvm::CodeGenFileType::AssemblyFile))
         return makeStringError("Target does not support Asm emission");
 
       PM.run(M);

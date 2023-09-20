@@ -37,7 +37,7 @@ struct CanonicalizeReduction : public mlir::OpRewritePattern<mlir::scf::ForOp> {
 
     llvm::SmallVector<StoreDesc> stores;
 
-    auto &loopBlock = op.getLoopBody().front();
+    auto loopBlock = op.getBody();
 
     auto visitor = [&](mlir::Operation *bodyOp) -> mlir::WalkResult {
       if (auto load = mlir::dyn_cast<mlir::memref::LoadOp>(bodyOp)) {
@@ -64,7 +64,7 @@ struct CanonicalizeReduction : public mlir::OpRewritePattern<mlir::scf::ForOp> {
       return mlir::WalkResult::advance();
     };
 
-    if (loopBlock.walk(visitor).wasInterrupted())
+    if (loopBlock->walk(visitor).wasInterrupted())
       return mlir::failure();
 
     if (stores.empty())
@@ -125,7 +125,7 @@ struct CanonicalizeReduction : public mlir::OpRewritePattern<mlir::scf::ForOp> {
     if (!changed)
       return mlir::failure();
 
-    auto origBlockArgsCount = loopBlock.getNumArguments();
+    auto origBlockArgsCount = loopBlock->getNumArguments();
 
     auto oldInits = op.getInitArgs();
     auto oldInitsCount = static_cast<unsigned>(oldInits.size());
@@ -147,11 +147,11 @@ struct CanonicalizeReduction : public mlir::OpRewritePattern<mlir::scf::ForOp> {
     auto newOp = rewriter.create<mlir::scf::ForOp>(
         loc, op.getLowerBound(), op.getUpperBound(), op.getStep(), inits);
 
-    auto &newRegion = newOp.getLoopBody();
+    auto &newRegion = newOp.getRegion();
     assert(llvm::hasSingleElement(newRegion));
     auto &newBlock = newRegion.front();
     rewriter.mergeBlocks(
-        &loopBlock, &newBlock,
+        loopBlock, &newBlock,
         newBlock.getArguments().take_front(origBlockArgsCount));
 
     auto oldYield = mlir::cast<mlir::scf::YieldOp>(newBlock.getTerminator());

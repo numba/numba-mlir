@@ -77,7 +77,7 @@ struct ParallelToTbb : public mlir::OpRewritePattern<mlir::scf::ParallelOp> {
 
     llvm::SmallVector<mlir::TypedAttr> initVals;
     initVals.reserve(op.getNumResults());
-    for (auto &nestedOp : op.getLoopBody().front().without_terminator()) {
+    for (auto &nestedOp : op.getBody()->without_terminator()) {
       if (auto reduce = mlir::dyn_cast<mlir::scf::ReduceOp>(nestedOp)) {
         auto ind = static_cast<unsigned>(initVals.size());
         if (ind >= op.getNumResults())
@@ -135,7 +135,7 @@ struct ParallelToTbb : public mlir::OpRewritePattern<mlir::scf::ParallelOp> {
                                       reduceStep, std::nullopt,
                                       reduceInitBodyBuilder);
 
-    auto &oldBody = op.getLoopBody().front();
+    auto oldBody = op.getBody();
     auto origLowerBound = op.getLowerBound();
     auto origUpperBound = op.getUpperBound();
     auto origStep = op.getStep();
@@ -169,7 +169,7 @@ struct ParallelToTbb : public mlir::OpRewritePattern<mlir::scf::ParallelOp> {
       assert(args.size() == reduceVars.size());
       mapping.clear();
       auto reduceOps =
-          llvm::make_filter_range(oldBody.without_terminator(), [](auto &op) {
+          llvm::make_filter_range(oldBody->without_terminator(), [](auto &op) {
             return mlir::isa<mlir::scf::ReduceOp>(op);
           });
       llvm::SmallVector<mlir::Value> yieldArgs;

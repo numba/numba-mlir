@@ -432,7 +432,7 @@ numba::MemorySSA::Node *memSSAProcessRegion(mlir::Region &region,
         std::array<numba::MemorySSA::Node *, 2> phiArgs = {nullptr,
                                                            currentNode};
         auto phi = memSSA.createPhi(&op, phiArgs);
-        auto result = memSSAProcessRegion(loop.getLoopBody(), phi, memSSA);
+        auto result = memSSAProcessRegion(loop->getRegion(0), phi, memSSA);
         if (nullptr == result)
           return nullptr;
 
