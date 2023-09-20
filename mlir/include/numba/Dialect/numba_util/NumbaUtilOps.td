@@ -107,7 +107,7 @@ def ParallelOp : NumbaUtil_Op<"parallel", [
     let extraClassDeclaration = [{
         unsigned getNumLoops() { return getSteps().size(); }
 
-        ::mlir::Block *getBodyBlock() { return &getLoopBody().front(); }
+        ::mlir::Block *getBodyBlock() { return &getRegion().front(); }
 
         ::mlir::ValueRange getBodyLowerBounds() {
           return getBodyBlock()->getArguments().take_front(getNumLoops());

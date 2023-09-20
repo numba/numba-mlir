@@ -2131,7 +2131,7 @@ struct InsertGPUGlobalReduce
     if (op.getInitVals().empty())
       return mlir::failure();
 
-    auto reductionOps = op.getLoopBody().front().getOps<mlir::scf::ReduceOp>();
+    auto reductionOps = op.getBody()->getOps<mlir::scf::ReduceOp>();
     assert(static_cast<size_t>(
                std::distance(reductionOps.begin(), reductionOps.end())) ==
            op.getInitVals().size());
@@ -2146,11 +2146,11 @@ struct InsertGPUGlobalReduce
     mlir::IRMapping mapper;
     mlir::OpBuilder::InsertionGuard g(rewriter);
 
-    auto &loopBlock = op.getLoopBody().front();
-    rewriter.setInsertionPointToStart(&loopBlock);
+    auto loopBlock = op.getBody();
+    rewriter.setInsertionPointToStart(loopBlock);
     mlir::Value cond;
     for (auto &&[lb, arg] :
-         llvm::zip(op.getLowerBound(), loopBlock.getArguments())) {
+         llvm::zip(op.getLowerBound(), loopBlock->getArguments())) {
       mlir::Value eq = rewriter.create<mlir::arith::CmpIOp>(
           loc, mlir::arith::CmpIPredicate::eq, arg, lb);
       if (!cond) {
@@ -2205,9 +2205,9 @@ struct InsertGPUGlobalReduce
     rewriter.setInsertionPoint(op);
     auto newParallel = rewriter.create<mlir::scf::ParallelOp>(
         loc, op.getLowerBound(), op.getUpperBound(), op.getStep());
-    auto &newParallelRegion = newParallel.getLoopBody();
+    auto &newParallelRegion = newParallel.getRegion();
     rewriter.eraseBlock(&newParallelRegion.front());
-    rewriter.inlineRegionBefore(op.getLoopBody(), newParallelRegion,
+    rewriter.inlineRegionBefore(op.getRegion(), newParallelRegion,
                                 newParallelRegion.end());
 
     rewriter.replaceOp(op, results);
@@ -2558,8 +2558,8 @@ struct SortSCFParallel : public mlir::OpRewritePattern<mlir::scf::ParallelOp> {
     auto loc = op.getLoc();
     auto newOp = rewriter.create<mlir::scf::ParallelOp>(
         loc, newLowerBounds, newUpperBounds, newSteps, op.getInitVals());
-    auto &newBody = newOp.getLoopBody().front();
-    rewriter.eraseOp(newBody.getTerminator());
+    auto newBody = newOp.getBody();
+    rewriter.eraseOp(newBody->getTerminator());
 
     llvm::SmallVector<mlir::Value> indVarMapped(numVars);
     for (auto i : llvm::seq(0u, numVars)) {
@@ -2567,8 +2567,8 @@ struct SortSCFParallel : public mlir::OpRewritePattern<mlir::scf::ParallelOp> {
       indVarMapped[m] = newOp.getInductionVars()[i];
     }
 
-    auto &oldBody = op.getLoopBody().front();
-    rewriter.mergeBlocks(&oldBody, &newBody, indVarMapped);
+    auto oldBody = op.getBody();
+    rewriter.mergeBlocks(oldBody, newBody, indVarMapped);
     rewriter.replaceOp(op, newOp.getResults());
     return mlir::success();
   }

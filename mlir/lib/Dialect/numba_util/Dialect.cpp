@@ -328,7 +328,9 @@ ParallelOp::moveOutOfLoop(mlir::ArrayRef<mlir::Operation *> ops) {
 }
 */
 
-mlir::Region &ParallelOp::getLoopBody() { return getRegion(); }
+llvm::SmallVector<mlir::Region *> ParallelOp::getLoopRegions() {
+  return {&getRegion()};
+}
 
 /*
 bool ParallelOp::isDefinedOutsideOfLoop(mlir::Value value) {
@@ -1641,8 +1643,8 @@ struct SignCastForPropagate : public mlir::OpRewritePattern<mlir::scf::ForOp> {
   mlir::LogicalResult
   matchAndRewrite(mlir::scf::ForOp op,
                   mlir::PatternRewriter &rewriter) const override {
-    auto &body = op.getLoopBody().front();
-    auto term = mlir::cast<mlir::scf::YieldOp>(body.getTerminator());
+    auto body = op.getBody();
+    auto term = mlir::cast<mlir::scf::YieldOp>(body->getTerminator());
     auto termResults = term.getResults();
     auto initArgs = op.getInitArgs();
     auto count = static_cast<unsigned>(initArgs.size());
@@ -1673,8 +1675,8 @@ struct SignCastForPropagate : public mlir::OpRewritePattern<mlir::scf::ForOp> {
                            mlir::Value iter, mlir::ValueRange iterVals) {
       assert(iterVals.size() == count);
       mlir::IRMapping mapping;
-      mapping.map(body.getArguments()[0], iter);
-      auto oldIterVals = body.getArguments().drop_front(1);
+      mapping.map(body->getArguments()[0], iter);
+      auto oldIterVals = body->getArguments().drop_front(1);
       for (auto i : llvm::seq(0u, count)) {
         auto iterVal = iterVals[i];
         auto oldIterVal = oldIterVals[i];
@@ -1688,7 +1690,7 @@ struct SignCastForPropagate : public mlir::OpRewritePattern<mlir::scf::ForOp> {
         }
       }
 
-      for (auto &bodyOp : body.without_terminator())
+      for (auto &bodyOp : body->without_terminator())
         builder.clone(bodyOp, mapping);
 
       llvm::SmallVector<mlir::Value> newYieldArgs(count);

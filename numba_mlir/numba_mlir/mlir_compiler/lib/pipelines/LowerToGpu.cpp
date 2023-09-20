@@ -58,17 +58,18 @@
 
 namespace {
 static void moveOpsIntoParallel(mlir::scf::ParallelOp outer, int depth = 0) {
-  auto &outerBody = outer.getLoopBody().front();
-  auto parallelIt = llvm::find_if(
-      outerBody, [](auto &op) { return mlir::isa<mlir::scf::ParallelOp>(op); });
-  if (outerBody.end() == parallelIt)
+  auto outerBody = outer.getBody();
+  auto parallelIt = llvm::find_if(*outerBody, [](auto &op) {
+    return mlir::isa<mlir::scf::ParallelOp>(op);
+  });
+  if (outerBody->end() == parallelIt)
     return;
 
   auto parallelOp = mlir::cast<mlir::scf::ParallelOp>(*parallelIt);
-  auto &parallelOpBody = parallelOp.getLoopBody().front();
-  if (parallelIt != outerBody.begin()) {
+  auto parallelOpBody = parallelOp.getBody();
+  if (parallelIt != outerBody->begin()) {
     auto it = std::prev(parallelIt);
-    auto begin = outerBody.begin();
+    auto begin = outerBody->begin();
     while (true) {
       bool first = (it == begin);
       auto &op = *it;
@@ -82,7 +83,7 @@ static void moveOpsIntoParallel(mlir::scf::ParallelOp outer, int depth = 0) {
       };
 
       auto isUsedOutside = [&](mlir::Operation &op) -> bool {
-        auto &region = parallelOp.getLoopBody();
+        auto &region = parallelOp.getRegion();
         for (auto user : op.getUsers())
           if (!region.isAncestor(user->getParentRegion()))
             return true;
@@ -95,12 +96,12 @@ static void moveOpsIntoParallel(mlir::scf::ParallelOp outer, int depth = 0) {
         break;
 
       if (first) {
-        op.moveBefore(&parallelOpBody.front());
+        op.moveBefore(&parallelOpBody->front());
         break;
       }
 
       --it;
-      op.moveBefore(&parallelOpBody.front());
+      op.moveBefore(&parallelOpBody->front());
     }
   }
   depth += outer.getStep().size();
@@ -163,16 +164,16 @@ convertParallelToFor(mlir::scf::ParallelOp op,
   if (steps.size() > 1)
     return mlir::failure();
 
-  auto &srcBlock = op.getLoopBody().front();
-  assert(srcBlock.getNumArguments() == steps.size());
+  auto srcBlock = op.getBody();
+  assert(srcBlock->getNumArguments() == steps.size());
 
   auto buildFunc = [&](mlir::OpBuilder &builder, mlir::Location loc,
                        mlir::Value index, mlir::ValueRange args) {
     llvm::SmallVector<mlir::Value> yieldArgs(initVals.size());
     mlir::IRMapping mapping;
-    mapping.map(srcBlock.getArgument(0), index);
+    mapping.map(srcBlock->getArgument(0), index);
     unsigned reduceIndex = 0;
-    for (auto &bodyOp : srcBlock.without_terminator()) {
+    for (auto &bodyOp : srcBlock->without_terminator()) {
       if (auto reduce = mlir::dyn_cast<mlir::scf::ReduceOp>(bodyOp)) {
         auto &reduceBlock = reduce.getRegion().front();
         assert(reduceBlock.getNumArguments() == 2);

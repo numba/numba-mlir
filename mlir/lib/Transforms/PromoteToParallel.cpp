@@ -297,17 +297,17 @@ struct PromoteWhileOp : public mlir::OpRewritePattern<mlir::scf::WhileOp> {
     auto newLoop = rewriter.create<mlir::scf::ForOp>(loc, begin, end, step,
                                                      mapping, emptyBuidler);
 
-    mlir::Block &newBody = newLoop.getLoopBody().front();
+    mlir::Block *newBody = newLoop.getBody();
 
     mlir::OpBuilder::InsertionGuard g(rewriter);
-    rewriter.setInsertionPointToStart(&newBody);
-    mlir::Value newIterVar = newBody.getArgument(0);
+    rewriter.setInsertionPointToStart(newBody);
+    mlir::Value newIterVar = newBody->getArgument(0);
     if (newIterVar.getType() != iterVar.getType())
       newIterVar = rewriter.create<mlir::arith::IndexCastOp>(
           loc, iterVar.getType(), newIterVar);
 
     mapping.clear();
-    auto newArgs = newBody.getArguments();
+    auto newArgs = newBody->getArguments();
     for (auto i : llvm::seq<size_t>(0, newArgs.size())) {
       if (i < argNumber) {
         mapping.emplace_back(newArgs[i + 1]);
@@ -318,10 +318,10 @@ struct PromoteWhileOp : public mlir::OpRewritePattern<mlir::scf::WhileOp> {
       }
     }
 
-    rewriter.inlineBlockBefore(loop.getAfterBody(), &newBody, newBody.begin(),
+    rewriter.inlineBlockBefore(loop.getAfterBody(), newBody, newBody->begin(),
                                mapping);
 
-    auto term = mlir::cast<mlir::scf::YieldOp>(newBody.getTerminator());
+    auto term = mlir::cast<mlir::scf::YieldOp>(newBody->getTerminator());
 
     mapping.clear();
     for (auto &&[i, arg] : llvm::enumerate(term.getResults())) {
@@ -364,8 +364,8 @@ struct PromoteToParallel : public mlir::OpRewritePattern<mlir::scf::ForOp> {
     if (!canParallelizeLoop(op, isInsideParallelRegion(op)))
       return mlir::failure();
 
-    mlir::Block &loopBody = op.getLoopBody().front();
-    auto term = mlir::cast<mlir::scf::YieldOp>(loopBody.getTerminator());
+    mlir::Block *loopBody = op.getBody();
+    auto term = mlir::cast<mlir::scf::YieldOp>(loopBody->getTerminator());
     auto iterVars = op.getRegionIterArgs();
     assert(iterVars.size() == term.getResults().size());
 
@@ -401,7 +401,7 @@ struct PromoteToParallel : public mlir::OpRewritePattern<mlir::scf::ForOp> {
       assert(1 == iterVals.size());
       mlir::IRMapping mapping;
       mapping.map(op.getInductionVar(), iterVals.front());
-      for (auto &oldOp : loopBody.without_terminator())
+      for (auto &oldOp : loopBody->without_terminator())
         if (0 == reductionOpsSet.count(&oldOp))
           builder.clone(oldOp, mapping);
 
@@ -431,24 +431,24 @@ struct MergeNestedForIntoParallel
     if (!parent)
       return mlir::failure();
 
-    auto &block = parent.getLoopBody().front();
-    if (!llvm::hasSingleElement(block.without_terminator()))
+    auto block = parent.getBody();
+    if (!llvm::hasSingleElement(block->without_terminator()))
       return mlir::failure();
 
     if (parent.getInitArgs().size() != op.getInitVals().size())
       return mlir::failure();
 
-    auto yield = mlir::cast<mlir::scf::YieldOp>(block.getTerminator());
+    auto yield = mlir::cast<mlir::scf::YieldOp>(block->getTerminator());
     assert(yield.getNumOperands() == op.getNumResults());
     for (auto &&[arg, initVal, result, yieldOp] :
-         llvm::zip(block.getArguments().drop_front(), op.getInitVals(),
+         llvm::zip(block->getArguments().drop_front(), op.getInitVals(),
                    op.getResults(), yield.getOperands())) {
       if (!arg.hasOneUse() || arg != initVal || result != yieldOp)
         return mlir::failure();
     }
     auto checkVals = [&](auto vals) {
       for (auto val : vals)
-        if (val.getParentBlock() == &block)
+        if (val.getParentBlock() == block)
           return true;
 
       return false;
@@ -474,16 +474,16 @@ struct MergeNestedForIntoParallel
         makeValueList(parent.getUpperBound(), op.getUpperBound());
     auto steps = makeValueList(parent.getStep(), op.getStep());
 
-    auto &oldBody = op.getLoopBody().front();
+    auto oldBody = op.getBody();
     auto bodyBuilder = [&](mlir::OpBuilder &builder, mlir::Location /*loc*/,
                            mlir::ValueRange iter_vals, mlir::ValueRange temp) {
       assert(iter_vals.size() == lowerBounds.size());
       assert(temp.empty());
       mlir::IRMapping mapping;
-      assert((oldBody.getNumArguments() + 1) == iter_vals.size());
-      mapping.map(block.getArgument(0), iter_vals.front());
-      mapping.map(oldBody.getArguments(), iter_vals.drop_front());
-      for (auto &op : oldBody.without_terminator())
+      assert((oldBody->getNumArguments() + 1) == iter_vals.size());
+      mapping.map(block->getArgument(0), iter_vals.front());
+      mapping.map(oldBody->getArguments(), iter_vals.drop_front());
+      for (auto &op : oldBody->without_terminator())
         builder.clone(op, mapping);
     };
 

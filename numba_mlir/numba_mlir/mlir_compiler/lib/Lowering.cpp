@@ -1350,7 +1350,7 @@ private:
       }
       return ret;
     };
-    opts.jitCodeGenOptLevel = llvm::CodeGenOpt::Level::Aggressive;
+    opts.jitCodeGenOptLevel = llvm::CodeGenOptLevel::Aggressive;
 
     auto llvmPrinter = settings["llvm_printer"];
     if (!llvmPrinter.is_none())

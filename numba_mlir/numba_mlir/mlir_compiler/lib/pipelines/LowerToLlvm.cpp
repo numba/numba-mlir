@@ -1136,7 +1136,7 @@ struct LowerParallel : public mlir::OpRewritePattern<numba::util::ParallelOp> {
     };
 
     auto isDefinedInside = [&](mlir::Value value) {
-      auto &thisRegion = op.getLoopBody();
+      auto &thisRegion = op.getRegion();
       auto opRegion = value.getParentRegion();
       assert(nullptr != opRegion);
       do {
@@ -1272,7 +1272,7 @@ struct LowerParallel : public mlir::OpRewritePattern<numba::util::ParallelOp> {
         return func;
       }();
       mlir::IRMapping mapping;
-      auto &oldEntry = op.getLoopBody().front();
+      auto oldEntry = op.getBody();
       auto entry = func.addEntryBlock();
       auto loc = rewriter.getUnknownLoc();
       mlir::OpBuilder::InsertionGuard guard(rewriter);
@@ -1289,10 +1289,10 @@ struct LowerParallel : public mlir::OpRewritePattern<numba::util::ParallelOp> {
             loc, llvmIndexType, dims, 0);
         auto upper = rewriter.create<mlir::LLVM::ExtractValueOp>(
             loc, llvmIndexType, dims, 1);
-        mapping.map(oldEntry.getArgument(i), fromLLVMIndex(lower));
-        mapping.map(oldEntry.getArgument(i + numLoops), fromLLVMIndex(upper));
+        mapping.map(oldEntry->getArgument(i), fromLLVMIndex(lower));
+        mapping.map(oldEntry->getArgument(i + numLoops), fromLLVMIndex(upper));
       }
-      mapping.map(oldEntry.getArgument(2 * numLoops),
+      mapping.map(oldEntry->getArgument(2 * numLoops),
                   entry->getArgument(1)); // thread index
       for (auto arg : contextConstants)
         rewriter.clone(*arg, mapping);
@@ -1314,7 +1314,7 @@ struct LowerParallel : public mlir::OpRewritePattern<numba::util::ParallelOp> {
         auto val = doCast(rewriter, loc, llvmVal, oldVal.getType());
         mapping.map(oldVal, val);
       }
-      op.getLoopBody().cloneInto(&func.getBody(), mapping);
+      op.getRegion().cloneInto(&func.getBody(), mapping);
       auto &origEntry = *std::next(func.getBody().begin());
       rewriter.create<mlir::cf::BranchOp>(loc, &origEntry);
       for (auto &block : func.getBody()) {
