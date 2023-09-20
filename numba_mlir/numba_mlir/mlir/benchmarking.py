@@ -130,8 +130,22 @@ def filter_presets(presets):
 VALIDATE = readenv("NUMBA_MLIR_BENCH_VALIDATE", int, 1)
 
 
-# TODO: actually enumerate devices
-DEVICES = [""]
+def has_dpctl():
+    try:
+        import dpctl
+    except ImportError:
+        return False
+
+    return True
+
+
+def get_dpctl_devices():
+    try:
+        import dpctl
+    except ImportError:
+        return []
+
+    return list(map(lambda d: d.filter_string, dpctl.get_devices()))
 
 
 class BenchmarkBase:
