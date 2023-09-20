@@ -59,8 +59,9 @@
 namespace {
 static void moveOpsIntoParallel(mlir::scf::ParallelOp outer, int depth = 0) {
   auto outerBody = outer.getBody();
-  auto parallelIt = llvm::find_if(
-      *outerBody, [](auto &op) { return mlir::isa<mlir::scf::ParallelOp>(op); });
+  auto parallelIt = llvm::find_if(*outerBody, [](auto &op) {
+    return mlir::isa<mlir::scf::ParallelOp>(op);
+  });
   if (outerBody->end() == parallelIt)
     return;
 

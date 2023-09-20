@@ -328,7 +328,9 @@ ParallelOp::moveOutOfLoop(mlir::ArrayRef<mlir::Operation *> ops) {
 }
 */
 
-llvm::SmallVector<mlir::Region *> ParallelOp::getLoopRegions() { return {&getRegion()}; }
+llvm::SmallVector<mlir::Region *> ParallelOp::getLoopRegions() {
+  return {&getRegion()};
+}
 
 /*
 bool ParallelOp::isDefinedOutsideOfLoop(mlir::Value value) {
