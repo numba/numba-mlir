@@ -3706,8 +3706,11 @@ static void populatePlierToLinalgOptPipeline(mlir::OpPassManager &pm) {
   pm.addNestedPass<mlir::func::FuncOp>(mlir::createCanonicalizerPass());
   //  pm.addNestedPass<mlir::func::FuncOp>(
   //      mlir::bufferization::createBufferDeallocationPass());
+
   mlir::bufferization::BufferDeallocationPipelineOptions deallocOpts;
-  deallocOpts.privateFunctionDynamicOwnership = true;
+
+  // TODO: breaks private declarations
+  deallocOpts.privateFunctionDynamicOwnership = false;
   mlir::bufferization::buildBufferDeallocationPipeline(pm, deallocOpts);
   pm.addNestedPass<mlir::func::FuncOp>(std::make_unique<LowerCloneOpsPass>());
   pm.addNestedPass<mlir::func::FuncOp>(std::make_unique<LowerCopyOpsPass>());
