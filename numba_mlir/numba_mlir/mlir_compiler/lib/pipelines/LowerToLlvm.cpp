@@ -1593,6 +1593,9 @@ struct PreLLVMLowering
 
     mlir::RewritePatternSet patterns(&context);
     auto func = getOperation();
+    if (func.getName() == "dealloc_helper")
+      func.setPrivate();
+
     if (mlir::failed(fixFuncSig(type_helper, func)))
       return signalPassFailure();
 
