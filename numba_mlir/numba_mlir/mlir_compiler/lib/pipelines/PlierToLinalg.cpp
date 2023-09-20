@@ -9,6 +9,7 @@
 #include <mlir/Dialect/Arith/Transforms/Passes.h>
 #include <mlir/Dialect/Arith/Utils/Utils.h>
 #include <mlir/Dialect/Bufferization/IR/Bufferization.h>
+#include <mlir/Dialect/Bufferization/Pipelines/Passes.h>
 #include <mlir/Dialect/Bufferization/Transforms/BufferViewFlowAnalysis.h>
 #include <mlir/Dialect/Bufferization/Transforms/Bufferize.h>
 #include <mlir/Dialect/Bufferization/Transforms/Passes.h>
@@ -3687,7 +3688,7 @@ static void populatePlierToLinalgOptPipeline(mlir::OpPassManager &pm) {
   //  pm.addNestedPass<mlir::func::FuncOp>(
   //      mlir::bufferization::createBufferLoopHoistingPass());
 
-  pm.addNestedPass<mlir::func::FuncOp>(std::make_unique<CloneArgsPass>());
+  //  pm.addNestedPass<mlir::func::FuncOp>(std::make_unique<CloneArgsPass>());
   pm.addPass(std::make_unique<MakeStridedLayoutPass>());
   pm.addPass(std::make_unique<OptimizeStridedLayoutPass>());
   pm.addNestedPass<mlir::func::FuncOp>(
@@ -3703,8 +3704,11 @@ static void populatePlierToLinalgOptPipeline(mlir::OpPassManager &pm) {
   pm.addNestedPass<mlir::func::FuncOp>(
       mlir::createConvertLinalgToParallelLoopsPass());
   pm.addNestedPass<mlir::func::FuncOp>(mlir::createCanonicalizerPass());
-  pm.addNestedPass<mlir::func::FuncOp>(
-      mlir::bufferization::createBufferDeallocationPass());
+  //  pm.addNestedPass<mlir::func::FuncOp>(
+  //      mlir::bufferization::createBufferDeallocationPass());
+  mlir::bufferization::BufferDeallocationPipelineOptions deallocOpts;
+  deallocOpts.privateFunctionDynamicOwnership = true;
+  mlir::bufferization::buildBufferDeallocationPipeline(pm, deallocOpts);
   pm.addNestedPass<mlir::func::FuncOp>(std::make_unique<LowerCloneOpsPass>());
   pm.addNestedPass<mlir::func::FuncOp>(std::make_unique<LowerCopyOpsPass>());
   pm.addNestedPass<mlir::func::FuncOp>(

@@ -81,6 +81,7 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
     LLVM${LLVM_NATIVE_ARCH}Desc
     LLVMOrcJIT
     LLVMTarget
+    MLIRBufferizationPipelines
     MLIRComplexToLLVM
     MLIRComplexToStandard
     MLIRFuncInlinerExtension # TODO: Remove
