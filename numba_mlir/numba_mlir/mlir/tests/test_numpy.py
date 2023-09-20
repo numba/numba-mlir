@@ -1954,6 +1954,51 @@ def test_inplace3():
     assert_equal(py_arg, jit_arg)
 
 
+@pytest.mark.parametrize(
+    "arr",
+    [
+        # np.empty(0), TODO: Need dispatchef fixes for FixedArray
+        # np.ones(1),
+        np.arange(12),
+    ],
+)
+def test_array_loop1(arr):
+    def py_func(arr):
+        res = 0
+        for a in arr:
+            res += a
+
+        return res
+
+    jit_func = njit(py_func)
+
+    with print_pass_ir([], ["PromoteWhilePass"]):
+        jit_func = njit(py_func)
+        assert_equal(py_func(arr), jit_func(arr))
+        ir = get_print_buffer()
+        assert ir.count("scf.for") > 0, ir
+
+
+@pytest.mark.parametrize(
+    "arr", [np.arange(12).reshape(3, 4), np.arange(60).reshape(3, 4, 5)]
+)
+def test_array_loop2(arr):
+    def py_func(arr):
+        res = 0
+        for a in arr:
+            res += np.sum(a)
+
+        return res
+
+    jit_func = njit(py_func)
+
+    with print_pass_ir([], ["PromoteWhilePass"]):
+        jit_func = njit(py_func)
+        assert_equal(py_func(arr), jit_func(arr))
+        ir = get_print_buffer()
+        assert ir.count("scf.for") > 0, ir
+
+
 @pytest.mark.parametrize("a", [np.array([[1, 2], [4, 5]])])
 @pytest.mark.parametrize("b", [True, False])
 def test_tensor_if(a, b):

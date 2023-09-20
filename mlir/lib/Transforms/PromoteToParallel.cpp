@@ -512,6 +512,7 @@ struct PromoteWhilePass
     mlir::RewritePatternSet patterns(context);
     numba::populatePromoteWhilePatterns(patterns);
     numba::populateLoopOptsPatterns(patterns);
+    mlir::scf::WhileOp::getCanonicalizationPatterns(patterns, context);
 
     if (mlir::failed(mlir::applyPatternsAndFoldGreedily(getOperation(),
                                                         std::move(patterns))))

@@ -1788,6 +1788,13 @@ void TakeContextOp::build(mlir::OpBuilder &b, mlir::OperationState &result,
   build(b, result, allTypes, initFunc, releaseFunc);
 }
 
+void BuildTupleOp::build(::mlir::OpBuilder &odsBuilder,
+                         ::mlir::OperationState &odsState,
+                         ::mlir::ValueRange args) {
+  auto tupleType = odsBuilder.getTupleType(args.getTypes());
+  build(odsBuilder, odsState, tupleType, args);
+}
+
 std::optional<int64_t> TupleExtractOp::getConstantIndex() {
   if (auto constantOp = getIndex().getDefiningOp<mlir::arith::ConstantOp>())
     return constantOp.getValue().cast<mlir::IntegerAttr>().getInt();
@@ -1810,6 +1817,18 @@ mlir::OpFoldResult TupleExtractOp::fold(FoldAdaptor adaptor) {
     return {};
 
   return args[indexVal];
+}
+
+void TupleExtractOp::build(::mlir::OpBuilder &odsBuilder,
+                           ::mlir::OperationState &odsState, ::mlir::Value arg,
+                           size_t index) {
+  auto type = mlir::cast<mlir::TupleType>(arg.getType());
+  assert(index < type.size());
+  auto elemType = type.getType(index);
+  auto loc = odsState.location;
+  mlir::Value indexValue =
+      odsBuilder.create<mlir::arith::ConstantIndexOp>(loc, index);
+  build(odsBuilder, odsState, elemType, arg, indexValue);
 }
 
 /// Given the region at `index`, or the parent operation if `index` is None,

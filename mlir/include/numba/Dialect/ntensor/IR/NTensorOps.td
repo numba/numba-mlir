@@ -126,6 +126,26 @@ def NTensor_Slice : NTensor_Type<"Slice", "slice", [], "::mlir::Type"> {
   }];
 }
 
+def NTensor_Iterator : NTensor_Type<"Iterator", "iterator", [], "::mlir::Type"> {
+  let summary = "Array iterator";
+  let description = [{
+    TBD
+  }];
+
+  let parameters = (ins "::numba::ntensor::NTensorType":$type);
+
+  let builders = [
+    TypeBuilderWithInferredContext<
+    (ins "::numba::ntensor::NTensorType":$type),
+    [{
+      auto ctx = type.getContext();
+      return $_get(ctx, type);
+    }]>
+  ];
+
+  let assemblyFormat = "`<` qualified($type) `>`";
+}
+
 def UnaryOp : NTensor_OpBase<"unary", []> {
   let summary = "Unary operation.";
   let description = [{

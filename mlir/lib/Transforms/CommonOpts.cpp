@@ -4,6 +4,7 @@
 
 #include "numba/Transforms/CommonOpts.hpp"
 
+#include "numba/Dialect/numba_util/Dialect.hpp"
 #include "numba/Transforms/IfRewrites.hpp"
 #include "numba/Transforms/IndexTypePropagation.hpp"
 #include "numba/Transforms/LoopRewrites.hpp"
@@ -568,6 +569,13 @@ struct CanonicalizeLoopMemrefIndex
   }
 };
 
+static bool canMoveOpToBefore(mlir::Operation *op) {
+  if (op->getNumResults() != 1)
+    return false;
+
+  return mlir::isPure(op);
+}
+
 struct MoveOpsFromBefore : public mlir::OpRewritePattern<mlir::scf::WhileOp> {
   using OpRewritePattern::OpRewritePattern;
 
@@ -588,7 +596,7 @@ struct MoveOpsFromBefore : public mlir::OpRewritePattern<mlir::scf::WhileOp> {
         continue;
 
       auto argOp = arg.getDefiningOp();
-      if (argOp && argOp->getNumResults() == 1 && mlir::isPure(argOp)) {
+      if (argOp && canMoveOpToBefore(argOp)) {
         opToMove = argOp;
         idx = i;
         break;
@@ -673,6 +681,228 @@ struct WhileOpLICM : public mlir::OpRewritePattern<mlir::scf::WhileOp> {
       rewriter.cancelRootUpdate(loop);
     }
     return mlir::success(changed);
+  }
+};
+
+// struct WhileOpExpandTuple : public mlir::OpRewritePattern<mlir::scf::WhileOp>
+// {
+//   using OpRewritePattern::OpRewritePattern;
+
+//  mlir::LogicalResult
+//  matchAndRewrite(mlir::scf::WhileOp loop,
+//                  mlir::PatternRewriter &rewriter) const override {
+//    mlir::Block *beforeBody = loop.getBeforeBody();
+//    auto beforeTerm =
+//        mlir::cast<mlir::scf::ConditionOp>(beforeBody->getTerminator());
+
+//    mlir::Block *afterBody = loop.getAfterBody();
+
+//    size_t argIndex = 0;
+//    mlir::TypedValue<mlir::TupleType> arg;
+//    for (auto &&[i, it] :
+//         llvm::enumerate(llvm::zip(loop.getResults(), beforeTerm.getArgs(),
+//                                   afterBody->getArguments()))) {
+//      auto &&[loopRes, beforeArg, afterArg] = it;
+//      if (loopRes.use_empty() && afterArg.use_empty())
+//        continue;
+
+//      if (!mlir::isa<mlir::TupleType>(beforeArg.getType()))
+//        continue;
+
+//      argIndex = i;
+//      arg = mlir::cast<mlir::TypedValue<mlir::TupleType>>(beforeArg);
+//      break;
+//    }
+
+//    if (!arg)
+//      return mlir::failure();
+
+//    auto type = arg.getType();
+//    auto count = type.size();
+//    auto loc = beforeTerm.getLoc();
+//    mlir::OpBuilder::InsertionGuard g(rewriter);
+//    rewriter.setInsertionPoint(beforeTerm);
+
+//    auto newCondArgs = llvm::to_vector(beforeTerm.getArgs());
+//    for (auto i : llvm::seq<size_t>(0, count)) {
+//      auto val = rewriter.create<numba::util::TupleExtractOp>(loc, arg, i);
+//      newCondArgs.emplace_back(val);
+//    }
+//    rewriter.setInsertionPoint(beforeTerm);
+//    rewriter.replaceOpWithNewOp<mlir::scf::ConditionOp>(
+//        beforeTerm, beforeTerm.getCondition(), newCondArgs);
+
+//    mlir::ValueRange newArgsRange(newCondArgs);
+//    auto newResTypes = newArgsRange.getTypes();
+
+//    rewriter.setInsertionPoint(loop);
+//    auto newLoop = rewriter.create<mlir::scf::WhileOp>(
+//        loc, newResTypes, loop.getInits(), nullptr, nullptr);
+
+//    auto newBefore = newLoop.getBeforeBody();
+//    auto newAfter = newLoop.getAfterBody();
+
+//    rewriter.inlineBlockBefore(beforeBody, newBefore, newBefore->begin(),
+//                               newBefore->getArguments());
+
+//    mlir::ValueRange newAfterArgs = newAfter->getArguments();
+//    rewriter.setInsertionPointToStart(newAfter);
+
+//    auto newTuple = rewriter.create<numba::util::BuildTupleOp>(
+//        loc, newAfterArgs.take_back(count));
+//    auto mappedAfterArgs = llvm::to_vector(newAfterArgs.drop_back(count));
+//    mappedAfterArgs[argIndex] = newTuple;
+
+//    rewriter.inlineBlockBefore(afterBody, newAfter, newAfter->end(),
+//                               mappedAfterArgs);
+
+//    mlir::ValueRange newLoopResults = newLoop.getResults();
+//    rewriter.setInsertionPointAfter(newLoop);
+//    newTuple = rewriter.create<numba::util::BuildTupleOp>(
+//        loc, newLoopResults.take_back(count));
+//    auto mappedLoopResults = llvm::to_vector(newLoopResults.drop_back(count));
+//    mappedLoopResults[argIndex] = newTuple;
+//    rewriter.replaceOp(loop, mappedLoopResults);
+//    return mlir::success();
+//  }
+//};
+
+struct WhileOpMoveIfCond : public mlir::OpRewritePattern<mlir::scf::IfOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(mlir::scf::IfOp op,
+                  mlir::PatternRewriter &rewriter) const override {
+    auto loop = mlir::dyn_cast<mlir::scf::WhileOp>(op->getParentOp());
+    if (!loop || op->getBlock() != loop.getBeforeBody())
+      return mlir::failure();
+
+    mlir::Block *beforeBody = loop.getBeforeBody();
+    auto beforeTerm =
+        mlir::cast<mlir::scf::ConditionOp>(beforeBody->getTerminator());
+    if (op.getCondition() != beforeTerm.getCondition())
+      return mlir::failure();
+
+    for (auto result : op.getResults())
+      for (auto user : result.getUsers())
+        if (user != beforeTerm)
+          return mlir::failure();
+
+    for (auto &nextOp : llvm::make_range(std::next(op->getIterator()),
+                                         beforeTerm->getIterator()))
+      if (!mlir::isPure(&nextOp))
+        return mlir::failure();
+
+    mlir::DominanceInfo dom;
+    llvm::SmallSetVector<mlir::Value, 8> capturedValues;
+    for (auto body : {op.thenBlock(), op.elseBlock()}) {
+      if (!body)
+        continue;
+
+      body->walk([&](mlir::Operation *blockOp) {
+        for (auto arg : blockOp->getOperands()) {
+          if (dom.properlyDominates(arg, loop) ||
+              !dom.properlyDominates(arg, op))
+            continue;
+
+          capturedValues.insert(arg);
+        }
+      });
+    }
+
+    auto newResTypes = llvm::to_vector(loop.getResultTypes());
+    llvm::append_range(
+        newResTypes, mlir::ValueRange(capturedValues.getArrayRef()).getTypes());
+
+    mlir::OpBuilder::InsertionGuard g(rewriter);
+
+    auto newBeforeArgs = llvm::to_vector(beforeTerm.getArgs());
+    llvm::append_range(newBeforeArgs, capturedValues);
+    rewriter.setInsertionPoint(beforeTerm);
+    auto newTerm = rewriter.replaceOpWithNewOp<mlir::scf::ConditionOp>(
+        beforeTerm, beforeTerm.getCondition(), newBeforeArgs);
+
+    rewriter.setInsertionPoint(loop);
+    auto newLoop = rewriter.create<mlir::scf::WhileOp>(
+        loop.getLoc(), newResTypes, loop.getInits(), nullptr, nullptr);
+
+    auto newAfter = newLoop.getAfterBody();
+    mlir::ValueRange newAfterArgs = newAfter->getArguments();
+
+    {
+      auto replaceChecker = [&](mlir::OpOperand &operand) -> bool {
+        auto owner = operand.getOwner();
+        return op.getThenRegion().isAncestor(owner->getParentRegion());
+      };
+      rewriter.replaceUsesWithIf(capturedValues.getArrayRef(),
+                                 newAfterArgs.take_back(capturedValues.size()),
+                                 replaceChecker);
+    }
+    if (op.elseBlock()) {
+      auto replaceChecker = [&](mlir::OpOperand &operand) -> bool {
+        auto owner = operand.getOwner();
+        return op.getElseRegion().isAncestor(owner->getParentRegion());
+      };
+      rewriter.replaceUsesWithIf(
+          capturedValues.getArrayRef(),
+          newLoop.getResults().take_back(capturedValues.size()),
+          replaceChecker);
+    }
+
+    auto newBefore = newLoop.getBeforeBody();
+
+    rewriter.inlineBlockBefore(beforeBody, newBefore, newBefore->begin(),
+                               newBefore->getArguments());
+
+    auto afterMapping =
+        llvm::to_vector(newAfterArgs.drop_back(capturedValues.size()));
+
+    auto thenYield = op.thenYield();
+    for (auto &&[res, yieldArg] :
+         llvm::zip(op.getResults(), thenYield.getResults())) {
+      for (auto &use : res.getUses()) {
+        assert(use.getOwner() == newTerm && "Invalid user");
+        afterMapping[use.getOperandNumber() - 1] = yieldArg;
+      }
+    }
+    rewriter.eraseOp(thenYield);
+
+    rewriter.inlineBlockBefore(op.thenBlock(), newAfter, newAfter->end());
+
+    auto afterBody = loop.getAfterBody();
+    rewriter.inlineBlockBefore(afterBody, newAfter, newAfter->end(),
+                               afterMapping);
+
+    afterMapping.clear();
+    llvm::append_range(afterMapping,
+                       newLoop.getResults().drop_back(capturedValues.size()));
+
+    if (op.elseBlock()) {
+      auto elseYield = op.elseYield();
+      for (auto &&[res, yieldArg] :
+           llvm::zip(op.getResults(), elseYield.getResults())) {
+        for (auto &use : res.getUses()) {
+          assert(use.getOwner() == newTerm && "Invalid user");
+          afterMapping[use.getOperandNumber() - 1] = yieldArg;
+        }
+      }
+      rewriter.eraseOp(elseYield);
+
+      rewriter.inlineBlockBefore(op.elseBlock(), newLoop->getBlock(),
+                                 std::next(newLoop->getIterator()));
+    }
+    rewriter.replaceOp(loop, afterMapping);
+
+    auto termLoc = newTerm.getLoc();
+    rewriter.setInsertionPoint(newTerm);
+    for (auto res : op.getResults()) {
+      mlir::Value newRes =
+          rewriter.create<mlir::ub::PoisonOp>(termLoc, res.getType(), nullptr);
+      rewriter.replaceAllUsesWith(res, newRes);
+    }
+
+    rewriter.eraseOp(op);
+    return mlir::success();
   }
 };
 
@@ -796,7 +1026,8 @@ void numba::populatePoisonOptsPatterns(mlir::RewritePatternSet &patterns) {
 }
 
 void numba::populateLoopOptsPatterns(mlir::RewritePatternSet &patterns) {
-  patterns.insert<CanonicalizeLoopMemrefIndex, MoveOpsFromBefore, WhileOpLICM>(
+  patterns.insert<CanonicalizeLoopMemrefIndex, MoveOpsFromBefore, WhileOpLICM,
+                  /*WhileOpExpandTuple,*/ WhileOpMoveIfCond>(
       patterns.getContext());
 }
 

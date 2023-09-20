@@ -1200,6 +1200,158 @@ struct UnitupleExtractToNtensor
   }
 };
 
+struct GetitertConversionPattern
+    : public mlir::OpConversionPattern<plier::GetiterOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(plier::GetiterOp op, OpAdaptor adaptor,
+                  mlir::ConversionPatternRewriter &rewriter) const final {
+    auto converter = getTypeConverter();
+    assert(converter && "Invalid type converter");
+    if (!mlir::isa<numba::ntensor::NTensorType>(op.getValue().getType()) ||
+        !mlir::isa<numba::ntensor::IteratorType>(op.getType()))
+      return mlir::failure();
+
+    auto resType = converter->convertType<mlir::TupleType>(op.getType());
+    if (!resType || resType.size() != 2)
+      return mlir::failure();
+
+    auto loc = op.getLoc();
+    mlir::Value begin = rewriter.create<mlir::arith::ConstantIndexOp>(loc, 0);
+
+    auto iterType = mlir::MemRefType::get({}, rewriter.getIndexType());
+    mlir::Value iter = rewriter.create<mlir::memref::AllocOp>(loc, iterType);
+    rewriter.create<mlir::memref::StoreOp>(loc, begin, iter);
+
+    mlir::Value rets[] = {iter, adaptor.getValue()};
+    mlir::Value ret =
+        rewriter.create<numba::util::BuildTupleOp>(loc, resType, rets);
+    rewriter.replaceOp(op, ret);
+    return mlir::success();
+  }
+};
+
+struct IternextConversionPattern
+    : public mlir::OpConversionPattern<plier::IternextOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(plier::IternextOp op, OpAdaptor adaptor,
+                  mlir::ConversionPatternRewriter &rewriter) const final {
+    auto converter = getTypeConverter();
+    assert(converter && "Invalid type converter");
+    if (!mlir::isa<numba::ntensor::IteratorType>(op.getValue().getType()))
+      return mlir::failure();
+
+    auto resType = converter->convertType<mlir::TupleType>(op.getType());
+    if (!resType || resType.size() != 2)
+      return mlir::failure();
+
+    auto origType =
+        mlir::dyn_cast<numba::ntensor::IteratorType>(op.getValue().getType());
+    if (!origType)
+      return mlir::failure();
+
+    if (origType.getType().getRank() == 0)
+      return rewriter.notifyMatchFailure(
+          op, "Iteration over 0-rank arrays is not supported");
+
+    auto src = adaptor.getValue();
+    auto srcType = mlir::dyn_cast<mlir::TupleType>(src.getType());
+    if (!srcType || srcType.size() != 2)
+      return mlir::failure();
+
+    auto loc = op.getLoc();
+    auto getItem = [&](unsigned i) -> mlir::Value {
+      auto idx = rewriter.create<mlir::arith::ConstantIndexOp>(loc, i);
+      return rewriter.create<numba::util::TupleExtractOp>(
+          loc, srcType.getType(i), src, idx);
+    };
+
+    using NTensor = numba::ntensor::NTensorType;
+    auto iter = getItem(0);
+    auto array = mlir::cast<mlir::TypedValue<NTensor>>(getItem(1));
+    auto arrayType = array.getType();
+
+    mlir::Value end = rewriter.create<numba::ntensor::DimOp>(loc, array, 0);
+    mlir::Value current = rewriter.create<mlir::memref::LoadOp>(
+        loc, iter, /*indices*/ std::nullopt);
+    mlir::Value one = rewriter.create<mlir::arith::ConstantIndexOp>(loc, 1);
+    mlir::Value next = rewriter.create<mlir::arith::AddIOp>(loc, current, one);
+
+    mlir::Value cond = rewriter.create<mlir::arith::CmpIOp>(
+        loc, mlir::arith::CmpIPredicate::slt, current, end);
+
+    rewriter.create<mlir::memref::StoreOp>(loc, next, iter,
+                                           /*indices*/ std::nullopt);
+
+    bool slice = arrayType.getRank() > 1;
+    auto retType = [&]() -> mlir::Type {
+      auto type = mlir::cast<mlir::ShapedType>(array.getType());
+      if (!slice)
+        return type.getElementType();
+
+      return mlir::cast<NTensor>(resType.getType(0));
+    }();
+
+    auto thenBuilder = [&](mlir::OpBuilder &builder, mlir::Location loc) {
+      mlir::Value res = [&]() -> mlir::Value {
+        if (!slice)
+          return builder.create<numba::ntensor::LoadOp>(loc, array, current);
+
+        auto zero = builder.getIndexAttr(0);
+        auto one = builder.getIndexAttr(1);
+
+        auto rank = arrayType.getShape().size();
+        llvm::SmallVector<mlir::OpFoldResult> offsets(rank, zero);
+        offsets[0] = current;
+
+        llvm::SmallVector<mlir::OpFoldResult> sizes(rank);
+        for (auto i : llvm::seq<size_t>(0, rank)) {
+          mlir::OpFoldResult sz;
+          if (i == 0) {
+            sz = one;
+          } else {
+            sz = builder.create<numba::ntensor::DimOp>(loc, array, i)
+                     .getResult();
+          }
+          sizes[i] = sz;
+        }
+
+        llvm::SmallVector<mlir::OpFoldResult> strides(rank, one);
+
+        auto subviewType =
+            numba::ntensor::SubviewOp::inferRankReducedResultType(
+                mlir::cast<NTensor>(retType).getShape(),
+                mlir::cast<NTensor>(array.getType()), offsets, sizes, strides);
+        mlir::Value arr = builder.create<numba::ntensor::SubviewOp>(
+            loc, subviewType, array, offsets, sizes, strides);
+        if (arr.getType() != retType)
+          arr = builder.create<numba::ntensor::CastOp>(loc, retType, arr);
+
+        return arr;
+      }();
+      builder.create<mlir::scf::YieldOp>(loc, res);
+    };
+
+    auto elseBuilder = [&](mlir::OpBuilder &builder, mlir::Location loc) {
+      mlir::Value res =
+          builder.create<mlir::ub::PoisonOp>(loc, retType, nullptr);
+      builder.create<mlir::scf::YieldOp>(loc, res);
+    };
+
+    auto ifOp =
+        rewriter.create<mlir::scf::IfOp>(loc, cond, thenBuilder, elseBuilder);
+
+    mlir::Value rets[] = {ifOp.getResult(0), cond};
+    mlir::Value ret =
+        rewriter.create<numba::util::BuildTupleOp>(loc, resType, rets);
+    rewriter.replaceOp(op, ret);
+    return mlir::success();
+  }
+};
+
 template <typename T>
 static std::optional<llvm::SmallVector<mlir::Value>>
 getElementsValuesIntImpl(mlir::DenseElementsAttr attr, mlir::Location loc,
@@ -1385,6 +1537,14 @@ struct PlierToNtensorPass
           return numba::ntensor::SliceType::get(type.getContext());
         });
 
+    auto indexType = mlir::IndexType::get(&context);
+    auto indexMemref = mlir::MemRefType::get({}, indexType);
+    typeConverter.addConversion(
+        [indexMemref](numba::ntensor::IteratorType type) {
+          return mlir::TupleType::get(type.getContext(),
+                                      {indexMemref, type.getType()});
+        });
+
     auto addUnrealizedCast = [](mlir::OpBuilder &builder, mlir::Type type,
                                 mlir::ValueRange inputs, mlir::Location loc) {
       auto cast =
@@ -1498,6 +1658,17 @@ struct PlierToNtensorPass
           return !isNtensor(typeConverter, op.getType());
         });
 
+    target.addDynamicallyLegalOp<plier::GetiterOp>(
+        [&](plier::GetiterOp op) -> std::optional<bool> {
+          return !mlir::isa<numba::ntensor::NTensorType>(
+              op.getValue().getType());
+        });
+    target.addDynamicallyLegalOp<plier::IternextOp>(
+        [&](plier::IternextOp op) -> std::optional<bool> {
+          return !mlir::isa<numba::ntensor::IteratorType>(
+              op.getValue().getType());
+        });
+
     target.addIllegalOp<plier::BuildSliceOp>();
 
     target.addLegalDialect<numba::ntensor::NTensorDialect>();
@@ -1514,6 +1685,8 @@ struct PlierToNtensorPass
         BuildSliceToNtensor,
         CastsToNtensor,
         UnitupleExtractToNtensor,
+        GetitertConversionPattern,
+        IternextConversionPattern,
         LowerConst
         // clang-format on
         >(typeConverter, &context);
