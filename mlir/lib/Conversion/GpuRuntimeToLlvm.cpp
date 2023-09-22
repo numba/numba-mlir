@@ -711,9 +711,8 @@ private:
     mlir::Value event = rewriter.create<mlir::LLVM::ExtractValueOp>(
         loc, llvmPointerType, res, 1);
 
-    deallocCallBuilder.createFunc(loc, rewriter);
-    auto dtor = mlir::SymbolRefAttr::get(
-        rewriter.getStringAttr(deallocCallBuilder.getName()));
+    auto deallocFunc = deallocCallBuilder.createFunc(loc, rewriter);
+    auto dtor = mlir::SymbolRefAttr::get(deallocFunc);
     mlir::Value meminfo = rewriter.create<numba::util::WrapAllocatedPointer>(
         loc, llvmPointerType, dataPtr, dtor, stream);
 
