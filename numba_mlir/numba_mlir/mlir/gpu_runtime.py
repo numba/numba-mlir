@@ -6,6 +6,7 @@ import ctypes
 import atexit
 import logging
 from .utils import load_lib, mlir_func_name, register_cfunc, readenv
+from . import python_rt
 
 from numba.core.runtime import _nrt_python as _nrt
 
