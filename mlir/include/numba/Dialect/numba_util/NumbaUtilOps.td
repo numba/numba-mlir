@@ -372,4 +372,9 @@ def StringConstOp : NumbaUtil_Op<"str_constant",
   let hasFolder = 1;
 }
 
+def WrapAllocatedPointer : NumbaUtil_Op<"wrap_allocated_pointer", [Pure]> {
+  let arguments = (ins AnyType:$ptr, SymbolRefAttr:$dtor, AnyType:$dtor_data);
+  let results = (outs AnyType:$result);
+}
+
 #endif // PLIER_UTIL_OPS
