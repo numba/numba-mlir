@@ -34,7 +34,6 @@ except Exception:
 
 
 if IS_GPU_RUNTIME_AVAILABLE:
-    from .python_rt import get_alloc_func
 
     def _register_funcs():
         _funcs = [
@@ -80,10 +79,6 @@ if IS_GPU_RUNTIME_AVAILABLE:
             else:
                 func = 1
             register_cfunc(name, func)
-
-        _alloc_func = runtime_lib.gpuxSetMemInfoAllocFunc
-        _alloc_func.argtypes = [ctypes.c_void_p]
-        _alloc_func(get_alloc_func())
 
     _register_funcs()
     del _register_funcs

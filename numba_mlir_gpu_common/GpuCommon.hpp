@@ -59,7 +59,6 @@ using MemInfoAllocFuncT = void *(*)(void *, size_t, MemInfoDtorFunction,
                                     void *);
 
 struct GPUAllocResult {
-  void *info;
   void *ptr;
   void *event;
 };

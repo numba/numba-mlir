@@ -2,6 +2,10 @@
 //
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#ifdef _MSC_VER
+#define _CRT_SECURE_NO_WARNINGS 1
+#endif
+
 #include <algorithm>
 #include <atomic>
 #include <cassert>
@@ -52,8 +56,6 @@ private:
 #define LOG_FUNC() FuncScope _scope(__func__)
 
 namespace {
-static numba::MemInfoAllocFuncT AllocFunc = nullptr;
-
 static auto getDeviceSelector(std::string deviceName) {
   using Sel = sycl::ext::oneapi::filter_selector;
   return [selector = Sel(std::move(deviceName))](
@@ -74,6 +76,16 @@ static auto countEvents(sycl::event **events) {
   return static_cast<uint32_t>(
       countUntil(events, static_cast<sycl::event *>(nullptr)));
 }
+
+static void *checkAlloc(void *mem, const char *err) {
+  if (!mem)
+    throw std::runtime_error(err);
+
+  return mem;
+}
+
+#define CHECK_ALLOC(mem, type)                                                 \
+  checkAlloc(mem, "Failed to allocate " #type " memory")
 
 struct EventStorage {
   sycl::event event;
@@ -176,9 +188,9 @@ public:
     returnEvent(storage);
   }
 
-  std::tuple<void *, void *, sycl::event *>
-  allocBuffer(size_t size, size_t alignment, numba::GpuAllocType type,
-              sycl::event **srcEvents, numba::MemInfoAllocFuncT allocFunc) {
+  std::tuple<void *, sycl::event *> allocBuffer(size_t size, size_t alignment,
+                                                numba::GpuAllocType type,
+                                                sycl::event **srcEvents) {
     // Alloc is always sync for now, synchronize
     auto eventsCount = countEvents(srcEvents);
     for (decltype(eventsCount) i = 0; i < eventsCount; ++i) {
@@ -187,22 +199,16 @@ public:
       event->wait();
     }
 
-    auto dtor = [](void *ptr, size_t /*size*/, void *info) {
-      assert(info);
-      auto *stream = static_cast<Stream *>(info);
-      Releaser r(stream);
-      if (ptr)
-        sycl::free(ptr, stream->queue);
-    };
-
     auto evStorage = getEvent();
 
     auto mem = [&]() -> void * {
       void *ret = nullptr;
       if (type == numba::GpuAllocType::Device) {
-        ret = sycl::aligned_alloc_device(alignment, size, queue);
+        ret = CHECK_ALLOC(sycl::aligned_alloc_device(alignment, size, queue),
+                          device);
       } else if (type == numba::GpuAllocType::Shared) {
-        ret = sycl::aligned_alloc_shared(alignment, size, queue);
+        ret = CHECK_ALLOC(sycl::aligned_alloc_shared(alignment, size, queue),
+                          shared);
       } else if (type == numba::GpuAllocType::Local) {
         // Local allocs are handled specially, do not allocate any pointer on
         // host side.
@@ -212,23 +218,10 @@ public:
       return ret;
     }();
 
-    auto info = [&]() -> void * {
-      if (allocFunc)
-        return allocFunc(mem, size, dtor, this);
-
-      return mem;
-    }();
-
-    if (!info) {
-      if (mem)
-        sycl::free(mem, queue);
-      throw std::runtime_error("Failed to allocate MemInfo");
-    }
-
     // Prolong gpu_runtime lifetime until all buffers are released (in case we
     // need to return allocated buffer from function).
     retain();
-    return {info, mem, &(evStorage->event)};
+    return {mem, &(evStorage->event)};
   }
 
   void deallocBuffer(void *ptr) {
@@ -338,12 +331,6 @@ static Stream *toStream(void *stream) {
 
 } // namespace
 
-extern "C" NUMBA_MLIR_GPU_RUNTIME_SYCL_EXPORT void
-gpuxSetMemInfoAllocFunc(void *func) {
-  LOG_FUNC();
-  AllocFunc = reinterpret_cast<numba::MemInfoAllocFuncT>(func);
-}
-
 extern "C" NUMBA_MLIR_GPU_RUNTIME_SYCL_EXPORT void *
 gpuxStreamCreate(const char *deviceName) {
   LOG_FUNC();
@@ -419,8 +406,8 @@ gpuxAlloc(void *stream, size_t size, size_t alignment, int type, void *events,
   catchAll([&]() {
     auto res = toStream(stream)->allocBuffer(
         size, alignment, static_cast<numba::GpuAllocType>(type),
-        static_cast<sycl::event **>(events), AllocFunc);
-    *ret = {std::get<0>(res), std::get<1>(res), std::get<2>(res)};
+        static_cast<sycl::event **>(events));
+    *ret = {std::get<0>(res), std::get<1>(res)};
   });
 }
 
