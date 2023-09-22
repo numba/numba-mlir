@@ -53,6 +53,8 @@
 #include "numba/Transforms/RewriteWrapper.hpp"
 #include "numba/Utils.hpp"
 
+static const bool defineMeminfoFuncs = true;
+
 namespace {
 static mlir::LowerToLLVMOptions getLLVMOptions(mlir::MLIRContext &context) {
   static llvm::DataLayout dl = []() {
@@ -736,8 +738,6 @@ static mlir::Type getMeminfoType(const mlir::LLVMTypeConverter &converter) {
   };
   return mlir::LLVM::LLVMStructType::getLiteral(context, members);
 }
-
-static const bool defineMeminfoFuncs = true;
 
 struct LowerRetainOp
     : public mlir::ConvertOpToLLVMPattern<numba::util::RetainOp> {
