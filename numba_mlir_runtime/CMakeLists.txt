@@ -13,6 +13,7 @@ endif()
 find_package(MLIR REQUIRED CONFIG)
 
 set(SOURCES_LIST
+    lib/AllocToken.cpp
     lib/Context.cpp
     lib/Memory.cpp
     lib/TbbParallel.cpp
