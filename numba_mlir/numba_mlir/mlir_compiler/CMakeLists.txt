@@ -131,12 +131,6 @@ install(TARGETS numba-mlir-runtime numba-mlir-math-runtime numba-mlir-python-run
         DESTINATION "${CMAKE_INSTALL_PREFIX}/numba_mlir/numba_mlir"
         )
 
-if(NUMBA_MLIR_ENABLE_IGPU_DIALECT)
-    install(TARGETS numba-mlir-gpu-runtime-l0
-            DESTINATION "${CMAKE_INSTALL_PREFIX}/numba_mlir/numba_mlir"
-            )
-endif()
-
 get_filename_component(_tmp_path1 "${CMAKE_SOURCE_DIR}" REALPATH)
 get_filename_component(_tmp_path2 "${CMAKE_INSTALL_PREFIX}" REALPATH)
 cmake_path(IS_PREFIX _tmp_path1 ${_tmp_path2} NORMALIZE _result)

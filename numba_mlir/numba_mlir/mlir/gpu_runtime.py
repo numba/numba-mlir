@@ -18,12 +18,7 @@ def _get_gpu_runtime_name():
     if GPU_RUNTIME == "sycl":
         return "numba-mlir-gpu-runtime-sycl"
 
-    if GPU_RUNTIME == "level-zero":
-        return "numba-mlir-gpu-runtime-l0"
-
-    raise ValueError(
-        f'Invalid GPU runtime type: "{GPU_RUNTIME}", expected "sycl" or "level-zero"'
-    )
+    raise ValueError(f'Invalid GPU runtime type: "{GPU_RUNTIME}", expected "sycl"')
 
 
 try:
