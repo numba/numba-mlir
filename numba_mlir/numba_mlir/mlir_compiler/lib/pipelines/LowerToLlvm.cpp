@@ -229,7 +229,7 @@ static mlir::LLVM::LLVMStructType getArrayType(mlir::TypeConverter &converter,
 static mlir::Value wrapAllocPtr(mlir::OpBuilder &builder, mlir::Location loc,
                                 mlir::ModuleOp mod, mlir::Value allocPtr) {
   if (!ensureUniqueAllocPtr)
-    allocPtr;
+    return allocPtr;
 
   auto ptrType = mlir::LLVM::LLVMPointerType::get(builder.getContext());
   mlir::StringRef funcName = "nmrtCreateAllocToken";
