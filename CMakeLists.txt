@@ -107,15 +107,6 @@ macro(apply_llvm_compile_flags target)
     target_compile_definitions(${target} PRIVATE ${LLVM_DEFINITIONS})
 endmacro()
 
-if(NUMBA_MLIR_ENABLE_IGPU_DIALECT)
-    if(DEFINED ENV{LEVEL_ZERO_VERSION_CHECK_OFF})
-        find_package(LevelZero REQUIRED)
-    else()
-        find_package(LevelZero 1.6 REQUIRED)
-    endif()
-    add_subdirectory(numba_mlir_gpu_runtime_l0)
-endif()
-
 add_subdirectory(mlir)
 add_subdirectory(numba_mlir_runtime)
 
