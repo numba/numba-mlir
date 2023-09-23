@@ -543,6 +543,89 @@ struct LowerApplyOffsetOp
   }
 };
 
+static mlir::LLVM::LLVMFuncOp
+getAllocMemInfoFunc(mlir::OpBuilder &builder,
+                    const mlir::LLVMTypeConverter &converter,
+                    mlir::ModuleOp mod) {
+  mlir::StringRef funcName = "nmrtAllocMemInfo";
+  auto func = mod.lookupSymbol<mlir::LLVM::LLVMFuncOp>(funcName);
+  if (func)
+    return func;
+
+  auto loc = builder.getUnknownLoc();
+  auto ptr = mlir::LLVM::LLVMPointerType::get(builder.getContext());
+  auto index = converter.getIndexType();
+  auto funcType =
+      mlir::LLVM::LLVMFunctionType::get(ptr, {ptr, index, ptr, ptr});
+
+  mlir::OpBuilder::InsertionGuard g(builder);
+  builder.setInsertionPointToStart(mod.getBody());
+  return builder.create<mlir::LLVM::LLVMFuncOp>(loc, funcName, funcType);
+}
+
+struct LowerWrapAllocPointerOp
+    : public mlir::ConvertOpToLLVMPattern<numba::util::WrapAllocatedPointer> {
+  using ConvertOpToLLVMPattern::ConvertOpToLLVMPattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(numba::util::WrapAllocatedPointer op, OpAdaptor adaptor,
+                  mlir::ConversionPatternRewriter &rewriter) const override {
+    auto mod = op->getParentOfType<mlir::ModuleOp>();
+    if (!mod)
+      return rewriter.notifyMatchFailure(op, "Top level op is not ModuleOp");
+
+    auto dtorRef = adaptor.getDtor();
+    auto deallocFunc = mod.lookupSymbol<mlir::LLVM::LLVMFuncOp>(dtorRef);
+    if (!deallocFunc)
+      return rewriter.notifyMatchFailure(op, [&](mlir::Diagnostic &diag) {
+        diag << "Dealloc function not found " << dtorRef;
+      });
+
+    auto &converter = *getTypeConverter();
+    auto allocMeminfoFunc = getAllocMemInfoFunc(rewriter, converter, mod);
+    auto ptrType = mlir::LLVM::LLVMPointerType::get(rewriter.getContext());
+    auto indexType = converter.getIndexType();
+
+    auto wrapper = [&]() {
+      auto voidType = mlir::LLVM::LLVMVoidType::get(rewriter.getContext());
+      // Keep in sync with PythonRt.cpp MemInfoDtorFunction decl.
+      auto wrapperFuncType = mlir::LLVM::LLVMFunctionType::get(
+          voidType, {ptrType, indexType, ptrType});
+      auto wrapperName =
+          numba::getUniqueLLVMGlobalName(mod, dtorRef + "_wrapper");
+      mlir::OpBuilder::InsertionGuard g(rewriter);
+      rewriter.setInsertionPointToStart(mod.getBody());
+      auto loc = deallocFunc.getLoc();
+      auto func = rewriter.create<mlir::LLVM::LLVMFuncOp>(loc, wrapperName,
+                                                          wrapperFuncType);
+      func.setPrivate();
+      auto block = func.addEntryBlock();
+      rewriter.setInsertionPointToStart(block);
+      auto ptr = block->getArgument(0);
+      auto dtorData = block->getArgument(2);
+      rewriter.create<mlir::LLVM::CallOp>(loc, deallocFunc,
+                                          mlir::ValueRange({dtorData, ptr}));
+      rewriter.create<mlir::LLVM::ReturnOp>(loc, std::nullopt);
+      return func;
+    }();
+
+    auto loc = op.getLoc();
+    mlir::Value wrapperPtr =
+        rewriter.create<mlir::LLVM::AddressOfOp>(loc, wrapper);
+    wrapperPtr =
+        rewriter.create<mlir::LLVM::BitcastOp>(loc, ptrType, wrapperPtr);
+    auto size = rewriter.create<mlir::LLVM::ConstantOp>(loc, indexType, 0);
+    mlir::Value args[] = {
+        adaptor.getPtr(),
+        size,
+        wrapperPtr,
+        adaptor.getDtorData(),
+    };
+    rewriter.replaceOpWithNewOp<mlir::LLVM::CallOp>(op, allocMeminfoFunc, args);
+    return mlir::success();
+  }
+};
+
 /// Convert operations from the numba_util dialect to the LLVM dialect.
 struct NumbaUtilToLLVMPass
     : public mlir::PassWrapper<NumbaUtilToLLVMPass,
@@ -568,7 +651,8 @@ struct NumbaUtilToLLVMPass
         LowerMemrefBitcastOp,
         LowerTakeContextOp,
         LowerReleaseContextOp,
-        LowerApplyOffsetOp
+        LowerApplyOffsetOp,
+        LowerWrapAllocPointerOp
         // clang-format on
         >(typeConverter);
 

@@ -24,9 +24,3 @@ def _register_funcs():
 
 _register_funcs()
 del _register_funcs
-
-_alloc_func = runtime_lib.nmrtAllocMemInfo
-
-
-def get_alloc_func():
-    return ctypes.cast(_alloc_func, ctypes.c_void_p).value

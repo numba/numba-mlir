@@ -744,8 +744,7 @@ struct LowerRetainOp
   using ConvertOpToLLVMPattern::ConvertOpToLLVMPattern;
 
   mlir::LogicalResult
-  matchAndRewrite(numba::util::RetainOp op,
-                  numba::util::RetainOp::Adaptor adaptor,
+  matchAndRewrite(numba::util::RetainOp op, OpAdaptor adaptor,
                   mlir::ConversionPatternRewriter &rewriter) const override {
     auto arg = adaptor.getSource();
     if (!arg.getType().isa<mlir::LLVM::LLVMStructType>())
@@ -1606,6 +1605,7 @@ struct LLVMLoweringPass
         });
 
     populateToLLVMAdditionalTypeConversion(typeConverter);
+
     RewritePatternSet patterns(&context);
     populateFuncToLLVMFuncOpConversionPattern(typeConverter, patterns);
     populateFuncToLLVMConversionPatterns(typeConverter, patterns);

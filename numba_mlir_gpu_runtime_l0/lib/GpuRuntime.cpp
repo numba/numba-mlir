@@ -516,7 +516,7 @@ gpuxAlloc(void *stream, size_t size, size_t alignment, int type, void *events,
     auto res = static_cast<Stream *>(stream)->allocBuffer(
         size, alignment, static_cast<numba::GpuAllocType>(type),
         static_cast<ze_event_handle_t *>(events), eventIndex, AllocFunc);
-    *ret = {std::get<0>(res), std::get<1>(res), std::get<2>(res)};
+    *ret = {std::get<1>(res), std::get<2>(res)};
   });
 }
 

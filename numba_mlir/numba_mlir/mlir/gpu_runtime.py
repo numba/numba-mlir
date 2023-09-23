@@ -6,6 +6,7 @@ import ctypes
 import atexit
 import logging
 from .utils import load_lib, mlir_func_name, register_cfunc, readenv
+from . import python_rt
 
 from numba.core.runtime import _nrt_python as _nrt
 
@@ -34,11 +35,11 @@ except Exception:
 
 
 if IS_GPU_RUNTIME_AVAILABLE:
-    from .python_rt import get_alloc_func
 
     def _register_funcs():
         _funcs = [
             "gpuxAlloc",
+            "gpuxDeAlloc",
             "gpuxKernelDestroy",
             "gpuxKernelGet",
             "gpuxLaunchKernel",
@@ -80,10 +81,6 @@ if IS_GPU_RUNTIME_AVAILABLE:
             else:
                 func = 1
             register_cfunc(name, func)
-
-        _alloc_func = runtime_lib.gpuxSetMemInfoAllocFunc
-        _alloc_func.argtypes = [ctypes.c_void_p]
-        _alloc_func(get_alloc_func())
 
     _register_funcs()
     del _register_funcs

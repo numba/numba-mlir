@@ -2167,6 +2167,18 @@ mlir::OpFoldResult MemrefBitcastOp::fold(FoldAdaptor) {
 mlir::OpFoldResult StringConstOp::fold(FoldAdaptor adaptor) {
   return getValueAttr();
 }
+
+mlir::LogicalResult WrapAllocatedPointer::verifySymbolUses(
+    mlir::SymbolTableCollection &symbolTable) {
+  auto fnAttr = getDtorAttr();
+  auto fn = symbolTable.lookupNearestSymbolFrom<mlir::FunctionOpInterface>(
+      *this, fnAttr);
+  if (!fn)
+    return emitOpError() << "'" << fnAttr.getValue()
+                         << "' does not reference a valid function";
+
+  return mlir::success();
+}
 } // namespace util
 } // namespace numba
 

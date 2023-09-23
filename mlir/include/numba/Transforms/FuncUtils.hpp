@@ -20,7 +20,8 @@ class FuncOp;
 
 namespace llvm {
 class StringRef;
-}
+class Twine;
+} // namespace llvm
 
 namespace numba {
 mlir::func::FuncOp addFunction(mlir::OpBuilder &builder, mlir::ModuleOp module,
@@ -44,6 +45,5 @@ private:
 };
 
 /// Generate unique name for llvm global based on provided srcName.
-std::string getUniqueLLVMGlobalName(mlir::ModuleOp mod,
-                                    mlir::StringRef srcName);
+std::string getUniqueLLVMGlobalName(mlir::ModuleOp mod, llvm::Twine srcName);
 } // namespace numba

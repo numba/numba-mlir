@@ -13,6 +13,7 @@ include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/Interfaces/ViewLikeInterface.td"
 include "mlir/IR/EnumAttr.td"
 include "mlir/IR/OpBase.td"
+include "mlir/IR/SymbolInterfaces.td"
 
 def NumbaUtil_Dialect : Dialect {
   let name = "numba_util";
@@ -370,6 +371,12 @@ def StringConstOp : NumbaUtil_Op<"str_constant",
 
   let assemblyFormat = "attr-dict $value";
   let hasFolder = 1;
+}
+
+def WrapAllocatedPointer : NumbaUtil_Op<"wrap_allocated_pointer",
+    [Pure, DeclareOpInterfaceMethods<SymbolUserOpInterface>]> {
+  let arguments = (ins AnyType:$ptr, FlatSymbolRefAttr:$dtor, AnyType:$dtor_data);
+  let results = (outs AnyType:$result);
 }
 
 #endif // PLIER_UTIL_OPS

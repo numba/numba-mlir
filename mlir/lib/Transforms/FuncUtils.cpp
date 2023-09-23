@@ -35,15 +35,11 @@ numba::AllocaInsertionPoint::AllocaInsertionPoint(mlir::Operation *inst) {
 }
 
 std::string numba::getUniqueLLVMGlobalName(mlir::ModuleOp mod,
-                                           mlir::StringRef srcName) {
-  auto globals = mod.getOps<mlir::LLVM::GlobalOp>();
+                                           llvm::Twine srcName) {
   for (int i = 0;; ++i) {
     auto name =
-        (i == 0 ? std::string(srcName) : (srcName + llvm::Twine(i)).str());
-    auto isSameName = [&](mlir::LLVM::GlobalOp global) {
-      return global.getName() == name;
-    };
-    if (llvm::find_if(globals, isSameName) == globals.end())
+        (i == 0 ? srcName.str() : (srcName + "_" + llvm::Twine(i)).str());
+    if (!mod.lookupSymbol(name))
       return name;
   }
 }

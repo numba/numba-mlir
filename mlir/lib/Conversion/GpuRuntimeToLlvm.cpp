@@ -5,6 +5,7 @@
 #include "numba/Conversion/GpuRuntimeToLlvm.hpp"
 
 #include "numba/Dialect/gpu_runtime/IR/GpuRuntimeOps.hpp"
+#include "numba/Dialect/numba_util/Dialect.hpp"
 #include "numba/Transforms/FuncUtils.hpp"
 #include "numba/Transforms/TypeConversion.hpp"
 
@@ -28,17 +29,27 @@ struct FunctionCallBuilder {
             mlir::LLVM::LLVMFunctionType::get(returnType, argumentTypes)) {}
   mlir::LLVM::CallOp create(mlir::Location loc, mlir::OpBuilder &builder,
                             mlir::ArrayRef<mlir::Value> arguments) const {
-    auto module =
-        builder.getBlock()->getParent()->getParentOfType<mlir::ModuleOp>();
-    auto function = [&] {
-      if (auto function =
-              module.lookupSymbol<mlir::LLVM::LLVMFuncOp>(functionName))
-        return function;
-      return mlir::OpBuilder::atBlockEnd(module.getBody())
-          .create<mlir::LLVM::LLVMFuncOp>(loc, functionName, functionType);
-    }();
+    auto function = createFunc(loc, builder);
     return builder.create<mlir::LLVM::CallOp>(loc, function, arguments);
   }
+  mlir::LLVM::LLVMFuncOp createFunc(mlir::Location loc,
+                                    mlir::OpBuilder &builder) const {
+    auto module =
+        builder.getBlock()->getParent()->getParentOfType<mlir::ModuleOp>();
+    assert(module);
+
+    if (auto function =
+            module.lookupSymbol<mlir::LLVM::LLVMFuncOp>(functionName))
+      return function;
+
+    auto body = module.getBody();
+    mlir::OpBuilder::InsertionGuard g(builder);
+    builder.setInsertionPoint(body, body->end());
+    return builder.create<mlir::LLVM::LLVMFuncOp>(loc, functionName,
+                                                  functionType);
+  }
+
+  mlir::StringRef getName() const { return functionName; }
 
 private:
   mlir::StringRef functionName;
@@ -77,7 +88,7 @@ protected:
       context, {llvmPointerType, llvmInt32Type, llvmInt32Type});
   mlir::Type llvmGpuParamPointerType = getLLVMPointerType(llvmGpuParamType);
   mlir::Type llvmAllocResType = mlir::LLVM::LLVMStructType::getLiteral(
-      context, {llvmPointerType, llvmPointerType, llvmPointerType});
+      context, {llvmPointerType, llvmPointerType});
   mlir::Type llvmAllocResPtrType = getLLVMPointerType(llvmAllocResType);
 
   FunctionCallBuilder streamCreateCallBuilder = {
@@ -695,10 +706,15 @@ private:
     allocCallBuilder.create(loc, rewriter, params);
     auto res =
         rewriter.create<mlir::LLVM::LoadOp>(loc, llvmAllocResType, resultPtr);
-    auto meminfo = rewriter.create<mlir::LLVM::ExtractValueOp>(
-        loc, llvmPointerType, res, 0);
     auto dataPtr = rewriter.create<mlir::LLVM::ExtractValueOp>(
+        loc, llvmPointerType, res, 0);
+    mlir::Value event = rewriter.create<mlir::LLVM::ExtractValueOp>(
         loc, llvmPointerType, res, 1);
+
+    auto deallocFunc = deallocCallBuilder.createFunc(loc, rewriter);
+    auto dtor = mlir::SymbolRefAttr::get(deallocFunc);
+    mlir::Value meminfo = rewriter.create<numba::util::WrapAllocatedPointer>(
+        loc, llvmPointerType, dataPtr, dtor, stream);
 
     auto memrefDesc = mlir::MemRefDescriptor::undef(rewriter, loc, dstType);
     auto elemPtrTye = memrefDesc.getElementPtrType();
@@ -719,8 +735,6 @@ private:
     }
 
     mlir::Value resMemref = memrefDesc;
-    mlir::Value event = rewriter.create<mlir::LLVM::ExtractValueOp>(
-        loc, llvmPointerType, res, 2);
     if (op.getNumResults() == 1) {
       waitEventCallBuilder.create(loc, rewriter, {stream, event});
       destroyEventCallBuilder.create(loc, rewriter, {stream, event});
