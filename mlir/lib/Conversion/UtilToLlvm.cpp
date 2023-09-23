@@ -591,8 +591,8 @@ struct LowerWrapAllocPointerOp
       // Keep in sync with PythonRt.cpp MemInfoDtorFunction decl.
       auto wrapperFuncType = mlir::LLVM::LLVMFunctionType::get(
           voidType, {ptrType, indexType, ptrType});
-      auto wrapperName = numba::getUniqueLLVMGlobalName(
-          mod, dtorRef.getLeafReference().getValue() + "_wrapper");
+      auto wrapperName =
+          numba::getUniqueLLVMGlobalName(mod, dtorRef + "_wrapper");
       mlir::OpBuilder::InsertionGuard g(rewriter);
       rewriter.setInsertionPointToStart(mod.getBody());
       auto loc = deallocFunc.getLoc();
