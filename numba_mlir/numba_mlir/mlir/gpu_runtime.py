@@ -39,6 +39,7 @@ if IS_GPU_RUNTIME_AVAILABLE:
     def _register_funcs():
         _funcs = [
             "gpuxAlloc",
+            "gpuxDeAlloc",
             "gpuxKernelDestroy",
             "gpuxKernelGet",
             "gpuxLaunchKernel",
