@@ -43,10 +43,8 @@ struct FunctionCallBuilder {
       return function;
 
     auto body = module.getBody();
-    mlir::OpBuilder::InsertionGuard g(builder);
-    builder.setInsertionPoint(body, body->end());
-    return builder.create<mlir::LLVM::LLVMFuncOp>(loc, functionName,
-                                                  functionType);
+    return mlir::OpBuilder::atBlockBegin(body).create<mlir::LLVM::LLVMFuncOp>(
+        loc, functionName, functionType);
   }
 
   mlir::StringRef getName() const { return functionName; }
