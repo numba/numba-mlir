@@ -953,6 +953,27 @@ struct LowerWrapAllocPointerOp
   }
 };
 
+struct LowerGetAllocToken
+    : public mlir::ConvertOpToLLVMPattern<numba::util::GetAllocTokenOp> {
+  using ConvertOpToLLVMPattern::ConvertOpToLLVMPattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(numba::util::GetAllocTokenOp op, OpAdaptor adaptor,
+                  mlir::ConversionPatternRewriter &rewriter) const override {
+    mlir::MemRefDescriptor source(adaptor.getSource());
+
+    auto loc = op.getLoc();
+    auto allocPtr = source.allocatedPtr(rewriter, loc);
+
+    auto &converter = *getTypeConverter();
+    auto indexType = converter.getIndexType();
+    mlir::Value res =
+        rewriter.create<mlir::LLVM::PtrToIntOp>(loc, indexType, allocPtr);
+    rewriter.replaceOp(op, res);
+    return mlir::success();
+  }
+};
+
 /// Try to match the kind of a memref.atomic_rmw to determine whether to use a
 /// lowering to llvm.atomicrmw or fallback to llvm.cmpxchg.
 static std::optional<mlir::LLVM::AtomicBinOp>
@@ -1748,8 +1769,8 @@ struct LLVMLoweringPass
     ub::populateUBToLLVMConversionPatterns(typeConverter, patterns);
 
     patterns.insert<AllocOpLowering, DeallocOpLowering, LowerRetainOp,
-                    LowerWrapAllocPointerOp, AtomicRMWOpLowering, LowerPoison>(
-        typeConverter);
+                    LowerWrapAllocPointerOp, LowerGetAllocToken,
+                    AtomicRMWOpLowering, LowerPoison>(typeConverter);
 
     LLVMConversionTarget target(context);
     target.addIllegalDialect<mlir::func::FuncDialect>();
