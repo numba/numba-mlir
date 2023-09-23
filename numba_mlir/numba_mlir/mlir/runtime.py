@@ -21,6 +21,8 @@ _funcs = [
     "nmrtPurgeContext",
     "nmrtReleaseContext",
     "nmrtTakeContext",
+    "nmrtCreateAllocToken",
+    "nmrtDestroyAllocToken",
 ]
 
 for name in _funcs:
