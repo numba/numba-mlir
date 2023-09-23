@@ -125,3 +125,14 @@ func.func @test(%arg1: tensor<?xf32>, %arg2: index) -> tensor<?xf32> {
   %0 = numba_util.enforce_shape %arg1 : tensor<?xf32>(%arg2) -> tensor<?xf32>
   return %0: tensor<?xf32>
 }
+
+// -----
+
+func.func @test(%arg: memref<?xf32>) -> index {
+  %0 = numba_util.get_alloc_token %arg : memref<?xf32> -> index
+  return %0: index
+}
+// CHECK-LABEL: func @test
+//  CHECK-SAME:   (%[[ARG:.*]]: memref<?xf32>)
+//  CHECK-NEXT:   %[[RES:.*]] = numba_util.get_alloc_token %[[ARG]] : memref<?xf32> -> index
+//  CHECK-NEXT:   return %[[RES]] : index
