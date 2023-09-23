@@ -30,7 +30,7 @@ extern "C" NUMBA_MLIR_PYTHON_RUNTIME_EXPORT void *
 nmrtAllocMemInfo(void *data, size_t size, MemInfoDtorFunction dtor,
                  void *dtorInfo) {
   if (!AllocFunc)
-    return nullptr;
+    std::abort();
 
   auto meminfo = static_cast<MemInfo *>(AllocFunc(sizeof(MemInfo)));
   if (!meminfo)
