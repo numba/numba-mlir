@@ -379,4 +379,19 @@ def WrapAllocatedPointer : NumbaUtil_Op<"wrap_allocated_pointer",
   let results = (outs AnyType:$result);
 }
 
+def GetAllocTokenOp : NumbaUtil_Op<"get_alloc_token", [
+    Pure, SameVariadicResultSize]> {
+
+  let arguments = (ins
+    AnyStridedMemRef:$source
+  );
+  let results = (outs Index:$token);
+
+  let hasCanonicalizer = 1;
+
+  let assemblyFormat = [{
+    $source `:` type($source) `->` type(results) attr-dict
+  }];
+}
+
 #endif // PLIER_UTIL_OPS

@@ -2179,6 +2179,54 @@ mlir::LogicalResult WrapAllocatedPointer::verifySymbolUses(
 
   return mlir::success();
 }
+
+static mlir::Value getCastSource(mlir::Value val) {
+  auto op = val.getDefiningOp();
+  if (!op)
+    return {};
+
+  if (auto cast = mlir::dyn_cast<mlir::memref::CastOp>(op))
+    return cast.getSource();
+
+  if (auto cast = mlir::dyn_cast<mlir::memref::ReinterpretCastOp>(op))
+    return cast.getSource();
+
+  if (auto cast = mlir::dyn_cast<mlir::memref::ExtractStridedMetadataOp>(op))
+    return cast.getSource();
+
+  return {};
+}
+
+static mlir::Value propagateCasts(mlir::Value val) {
+  while (auto source = getCastSource(val))
+    val = source;
+
+  return val;
+}
+
+namespace {
+struct PropagateAllocTokenCasts
+    : public mlir::OpRewritePattern<numba::util::GetAllocTokenOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(numba::util::GetAllocTokenOp op,
+                  mlir::PatternRewriter &rewriter) const override {
+    auto src = op.getSource();
+    auto newSrc = propagateCasts(src);
+    if (!newSrc || newSrc == src)
+      return mlir::failure();
+
+    rewriter.replaceOpWithNewOp<numba::util::GetAllocTokenOp>(op, newSrc);
+    return mlir::success();
+  }
+};
+} // namespace
+
+void GetAllocTokenOp::getCanonicalizationPatterns(
+    mlir::RewritePatternSet &results, mlir::MLIRContext *context) {
+  results.insert<PropagateAllocTokenCasts>(context);
+}
 } // namespace util
 } // namespace numba
 

@@ -168,3 +168,40 @@ func.func @test(%arg1: memref<?xf32>) -> memref<?xf32> {
   memref.dealloc %2 : memref<?xf32>
   return %3: memref<?xf32>
 }
+
+
+// -----
+
+// CHECK-LABEL: func @test
+//  CHECK-SAME:   (%[[ARG:.*]]: memref<?xf32>)
+//       CHECK:   %[[RES:.*]] = numba_util.get_alloc_token %[[ARG]] : memref<?xf32> -> index
+//       CHECK:   return %[[RES]]
+func.func @test(%arg: memref<?xf32>) -> index {
+  %0 = memref.cast %arg : memref<?xf32> to memref<2xf32>
+  %res = numba_util.get_alloc_token %0 : memref<2xf32> -> index
+  return %res: index
+}
+
+// -----
+
+// CHECK-LABEL: func @test
+//  CHECK-SAME:   (%[[ARG:.*]]: memref<?xf32>)
+//       CHECK:   %[[RES:.*]] = numba_util.get_alloc_token %[[ARG]] : memref<?xf32> -> index
+//       CHECK:   return %[[RES]]
+func.func @test(%arg: memref<?xf32>) -> index {
+  %0 = memref.reinterpret_cast %arg to offset: [0], sizes: [3], strides: [1] : memref<?xf32> to memref<3xf32>
+  %res = numba_util.get_alloc_token %0 : memref<3xf32> -> index
+  return %res: index
+}
+
+// -----
+
+// CHECK-LABEL: func @test
+//  CHECK-SAME:   (%[[ARG:.*]]: memref<?xf32>)
+//       CHECK:   %[[RES:.*]] = numba_util.get_alloc_token %[[ARG]] : memref<?xf32> -> index
+//       CHECK:   return %[[RES]]
+func.func @test(%arg: memref<?xf32>) -> index {
+  %0, %offset, %sizes, %strides = memref.extract_strided_metadata %arg : memref<?xf32> -> memref<f32>, index, index, index
+  %res = numba_util.get_alloc_token %0 : memref<f32> -> index
+  return %res: index
+}

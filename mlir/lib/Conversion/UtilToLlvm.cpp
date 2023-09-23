@@ -577,6 +577,7 @@ struct NumbaUtilToLLVMPass
     target.addLegalOp<mlir::func::CallOp>();
     target.addLegalOp<numba::util::RetainOp>();
     target.addLegalOp<numba::util::WrapAllocatedPointer>();
+    target.addLegalOp<numba::util::GetAllocTokenOp>();
     target.addIllegalDialect<numba::util::NumbaUtilDialect>();
     if (failed(applyPartialConversion(op, target, std::move(patterns))))
       signalPassFailure();
