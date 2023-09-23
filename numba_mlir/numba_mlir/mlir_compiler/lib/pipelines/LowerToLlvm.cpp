@@ -242,7 +242,7 @@ static mlir::Value wrapAllocPtr(mlir::OpBuilder &builder, mlir::Location loc,
   }
   mlir::Value token =
       builder.create<mlir::LLVM::CallOp>(loc, func, std::nullopt).getResult();
-  builder.create<mlir::LLVM::StoreOp>(loc, token, allocPtr);
+  builder.create<mlir::LLVM::StoreOp>(loc, allocPtr, token);
   return token;
 }
 
