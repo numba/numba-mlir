@@ -2194,6 +2194,9 @@ static mlir::Value getCastSource(mlir::Value val) {
   if (auto cast = mlir::dyn_cast<mlir::memref::ExtractStridedMetadataOp>(op))
     return cast.getSource();
 
+  if (auto cast = mlir::dyn_cast<mlir::memref::SubViewOp>(op))
+    return cast.getSource();
+
   return {};
 }
 
