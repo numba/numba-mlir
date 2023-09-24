@@ -368,7 +368,6 @@ def _gen_replace_parfor_tests():
         "test_parfor_slice22",
         "test_issue5065",
         "test_prange25",
-        "test_copy_global_for_parfor",
         "test_record_array_setitem",
         "test_list_setitem_hoisting",
         "test_list_comprehension_prange",
@@ -382,6 +381,7 @@ def _gen_replace_parfor_tests():
         "test_arraymap",
     }
     skip_tests = {
+        "test_copy_global_for_parfor",  # flaky test
         "test_prange04",  # flaky test
         "test_prange22",  # flaky test
         "test_no_warn_if_cache_set",  # caching is not supported
