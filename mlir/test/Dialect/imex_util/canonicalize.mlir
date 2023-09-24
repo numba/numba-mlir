@@ -182,6 +182,7 @@ func.func @test(%arg: memref<?xf32>) -> index {
   return %res: index
 }
 
+
 // -----
 
 // CHECK-LABEL: func @test
@@ -194,6 +195,7 @@ func.func @test(%arg: memref<?xf32>) -> index {
   return %res: index
 }
 
+
 // -----
 
 // CHECK-LABEL: func @test
@@ -203,5 +205,18 @@ func.func @test(%arg: memref<?xf32>) -> index {
 func.func @test(%arg: memref<?xf32>) -> index {
   %0, %offset, %sizes, %strides = memref.extract_strided_metadata %arg : memref<?xf32> -> memref<f32>, index, index, index
   %res = numba_util.get_alloc_token %0 : memref<f32> -> index
+  return %res: index
+}
+
+
+// -----
+
+// CHECK-LABEL: func @test
+//  CHECK-SAME:   (%[[ARG:.*]]: memref<?xf32>)
+//       CHECK:   %[[RES:.*]] = numba_util.get_alloc_token %[[ARG]] : memref<?xf32> -> index
+//       CHECK:   return %[[RES]]
+func.func @test(%arg: memref<?xf32>) -> index {
+  %0 = memref.subview %arg[1][3][1] : memref<?xf32> to memref<3xf32, strided<[1], offset: 1>>
+  %res = numba_util.get_alloc_token %0 : memref<3xf32, strided<[1], offset: 1>> -> index
   return %res: index
 }
