@@ -3419,6 +3419,34 @@ struct EnforceUniqueResultsOwnershipPass
   }
 };
 
+struct GenerateAllocTokens
+    : public mlir::PassWrapper<GenerateAllocTokens, mlir::OperationPass<void>> {
+  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(GenerateAllocTokens)
+
+  virtual void
+  getDependentDialects(mlir::DialectRegistry &registry) const override {
+    registry.insert<numba::util::NumbaUtilDialect>();
+  }
+
+  void runOnOperation() override {
+    mlir::OpBuilder builder(&getContext());
+
+    bool changed = false;
+    auto visitor = [&](mlir::memref::ExtractAlignedPointerAsIndexOp op) {
+      changed = true;
+      builder.setInsertionPoint(op);
+      mlir::Value res = builder.create<numba::util::GetAllocTokenOp>(
+          op.getLoc(), op.getSource());
+      op->replaceAllUsesWith(mlir::ValueRange(res));
+      op->erase();
+    };
+    getOperation()->walk(visitor);
+
+    if (!changed)
+      return markAllAnalysesPreserved();
+  }
+};
+
 struct ReplaceClones
     : public mlir::OpRewritePattern<mlir::bufferization::CloneOp> {
   using OpRewritePattern::OpRewritePattern;
@@ -3715,6 +3743,12 @@ static void populateDeallocationPipeline(mlir::OpPassManager &pm) {
   pm.addNestedPass<mlir::func::FuncOp>(
       std::make_unique<EnforceUniqueResultsOwnershipPass>());
   pm.addNestedPass<mlir::func::FuncOp>(std::make_unique<LowerCloneOpsPass>());
+  pm.addNestedPass<mlir::func::FuncOp>(std::make_unique<GenerateAllocTokens>());
+  pm.addPass(numba::createCompositePass(
+      "PostDeallocCleanups", [](mlir::OpPassManager &p) {
+        p.addNestedPass<mlir::func::FuncOp>(mlir::createCSEPass());
+        p.addNestedPass<mlir::func::FuncOp>(numba::createCommonOptsPass());
+      }));
 }
 
 static void populatePlierToLinalgGenPipeline(mlir::OpPassManager &pm) {
