@@ -1593,6 +1593,12 @@ struct PreLLVMLowering
 
     mlir::RewritePatternSet patterns(&context);
     auto func = getOperation();
+
+    // TODO: workaround for deallocation pipeline not declaring "dealloc_helper"
+    // private.
+    if (func.getName() == "dealloc_helper")
+      func.setPrivate();
+
     if (mlir::failed(fixFuncSig(type_helper, func)))
       return signalPassFailure();
 

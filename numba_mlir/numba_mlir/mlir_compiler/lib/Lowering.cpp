@@ -14,11 +14,15 @@
 #include <pybind11/pybind11.h>
 
 #include <mlir/Dialect/Arith/IR/Arith.h>
+#include <mlir/Dialect/Arith/Transforms/BufferDeallocationOpInterfaceImpl.h>
 #include <mlir/Dialect/Complex/IR/Complex.h>
 #include <mlir/Dialect/ControlFlow/IR/ControlFlowOps.h>
+#include <mlir/Dialect/ControlFlow/Transforms/BufferDeallocationOpInterfaceImpl.h>
 #include <mlir/Dialect/Func/Extensions/InlinerExtension.h>
 #include <mlir/Dialect/Func/IR/FuncOps.h>
+#include <mlir/Dialect/GPU/Transforms/BufferDeallocationOpInterfaceImpl.h>
 #include <mlir/Dialect/SCF/IR/SCF.h>
+#include <mlir/Dialect/SCF/Transforms/BufferDeallocationOpInterfaceImpl.h>
 #include <mlir/IR/Builders.h>
 #include <mlir/IR/BuiltinOps.h>
 #include <mlir/IR/BuiltinTypes.h>
@@ -1279,6 +1283,10 @@ struct DialectReg {
   DialectReg() {
     // TODO: remove this.
     mlir::func::registerInlinerExtension(registry);
+    mlir::arith::registerBufferDeallocationOpInterfaceExternalModels(registry);
+    mlir::cf::registerBufferDeallocationOpInterfaceExternalModels(registry);
+    mlir::gpu::registerBufferDeallocationOpInterfaceExternalModels(registry);
+    mlir::scf::registerBufferDeallocationOpInterfaceExternalModels(registry);
   }
 };
 

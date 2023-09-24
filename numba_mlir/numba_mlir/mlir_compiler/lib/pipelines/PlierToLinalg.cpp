@@ -9,6 +9,7 @@
 #include <mlir/Dialect/Arith/Transforms/Passes.h>
 #include <mlir/Dialect/Arith/Utils/Utils.h>
 #include <mlir/Dialect/Bufferization/IR/Bufferization.h>
+#include <mlir/Dialect/Bufferization/Pipelines/Passes.h>
 #include <mlir/Dialect/Bufferization/Transforms/BufferViewFlowAnalysis.h>
 #include <mlir/Dialect/Bufferization/Transforms/Bufferize.h>
 #include <mlir/Dialect/Bufferization/Transforms/Passes.h>
@@ -2952,9 +2953,9 @@ static bool mayAliasImpl(mlir::Value src, F &&mayAliasCheck) {
 }
 
 static bool mayAlias(mlir::AliasAnalysis &analysis, mlir::Value input,
-                     const mlir::OpOperandVector &outputs) {
-  for (auto outOperand : outputs) {
-    auto out = outOperand->get();
+                     mlir::MutableOperandRange outputs) {
+  for (auto &&outOperand : outputs) {
+    auto out = outOperand.get();
     auto check = [&](mlir::Value val) {
       return !analysis.alias(val, out).isNo();
     };
@@ -2982,7 +2983,7 @@ struct MixedGenericsAliasAnalysis
       flagsArray.resize(op.getNumDpsInputs());
       for (auto &&[i, arg] : llvm::enumerate(op.getDpsInputOperands()))
         flagsArray[i] =
-            !mayAlias(aliasAnalysis, arg->get(), op.getDpsInitOperands());
+            !mayAlias(aliasAnalysis, arg->get(), op.getDpsInitsMutable());
 
       auto flags = builder.getDenseBoolArrayAttr(flagsArray);
       op->setAttr(attrName, flags);
@@ -3160,46 +3161,6 @@ struct BufferizeSignCast
   }
 };
 
-struct FixDeallocPlacement
-    : public mlir::OpRewritePattern<mlir::memref::DeallocOp> {
-  using mlir::OpRewritePattern<mlir::memref::DeallocOp>::OpRewritePattern;
-
-  mlir::LogicalResult
-  matchAndRewrite(mlir::memref::DeallocOp op,
-                  mlir::PatternRewriter &rewriter) const override {
-    auto block = op->getBlock();
-    auto blockIt = mlir::Block::iterator(op);
-    mlir::Operation *newPos = op;
-    ++blockIt;
-    auto memref = op.getMemref();
-    mlir::BufferViewFlowAnalysis analysis(
-        op->getParentOfType<mlir::func::FuncOp>());
-    auto aliases = analysis.resolve(memref);
-    auto blockEnd = block->without_terminator().end();
-    for (auto &it : llvm::make_range(blockIt, blockEnd)) {
-      auto visitor = [&](mlir::Operation *inner) {
-        for (auto arg : inner->getOperands()) {
-          if (aliases.count(arg)) {
-            return mlir::WalkResult::interrupt();
-          }
-        }
-        return mlir::WalkResult::advance();
-      };
-      if (it.walk(visitor).wasInterrupted()) {
-        newPos = &it;
-      }
-    }
-
-    if (newPos != op) {
-      rewriter.setInsertionPointAfter(newPos);
-      rewriter.create<mlir::memref::DeallocOp>(op.getLoc(), memref);
-      rewriter.eraseOp(op);
-      return mlir::success();
-    }
-    return mlir::failure();
-  }
-};
-
 struct AdditionalBufferize
     : public mlir::PassWrapper<AdditionalBufferize, mlir::OperationPass<void>> {
   MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(AdditionalBufferize)
@@ -3279,51 +3240,126 @@ struct MarkArgsRestrictPass
   }
 };
 
-struct CloneArgsPass
-    : public mlir::PassWrapper<CloneArgsPass,
+struct EnforceUniqueResultsOwnershipPass
+    : public mlir::PassWrapper<EnforceUniqueResultsOwnershipPass,
                                mlir::OperationPass<mlir::func::FuncOp>> {
-  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(CloneArgsPass)
+  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(
+      EnforceUniqueResultsOwnershipPass)
+
+  virtual void
+  getDependentDialects(mlir::DialectRegistry &registry) const override {
+    registry.insert<mlir::arith::ArithDialect>();
+    registry.insert<mlir::bufferization::BufferizationDialect>();
+    registry.insert<mlir::memref::MemRefDialect>();
+    registry.insert<mlir::scf::SCFDialect>();
+  }
+
+  void runOnOperation() override {
+    auto op = getOperation();
+    if (op.isPrivate() || op.isDeclaration() || op.isExternal() ||
+        op.getNumResults() <= 1)
+      return markAllAnalysesPreserved();
+
+    bool changed = false;
+    mlir::OpBuilder builder(&getContext());
+    for (mlir::Block &block : op.getFunctionBody()) {
+      auto ret = mlir::dyn_cast<mlir::func::ReturnOp>(block.getTerminator());
+      if (!ret)
+        continue;
+
+      mlir::Location loc = ret.getLoc();
+      builder.setInsertionPoint(ret);
+      mlir::ValueRange args = ret.getOperands();
+      auto newArgs = llvm::to_vector(args);
+      bool updated = false;
+      for (auto &&[i, arg] : llvm::enumerate(args)) {
+        auto type = mlir::dyn_cast<mlir::MemRefType>(arg.getType());
+        if (!type)
+          continue;
+
+        mlir::Value token;
+        mlir::Value needClone;
+        for (auto &&other : args.drop_front(i + 1)) {
+          if (!mlir::isa<mlir::MemRefType>(other.getType()))
+            continue;
+
+          if (!token)
+            token =
+                builder.create<mlir::memref::ExtractAlignedPointerAsIndexOp>(
+                    loc, arg);
+
+          mlir::Value otherToken =
+              builder.create<mlir::memref::ExtractAlignedPointerAsIndexOp>(
+                  loc, other);
+          mlir::Value cmp = builder.create<mlir::arith::CmpIOp>(
+              loc, mlir::arith::CmpIPredicate::eq, token, otherToken);
+          if (!needClone) {
+            needClone = cmp;
+          } else {
+            needClone = builder.create<mlir::arith::OrIOp>(loc, needClone, cmp);
+          }
+        }
+
+        if (!needClone)
+          continue;
+
+        changed = true;
+        updated = true;
+
+        // TODO: to workaround stupid C++ spec limitation on capturing
+        // structured bindings into lambda.
+        mlir::Value argCopy = arg;
+        auto trueBuilder = [&](mlir::OpBuilder &builder, mlir::Location loc) {
+          mlir::Value cloned =
+              builder.create<mlir::bufferization::CloneOp>(loc, argCopy);
+          builder.create<mlir::scf::YieldOp>(loc, cloned);
+        };
+        auto falseBuilder = [&](mlir::OpBuilder &builder, mlir::Location loc) {
+          builder.create<mlir::scf::YieldOp>(loc, argCopy);
+        };
+        auto ifOp = builder.create<mlir::scf::IfOp>(loc, needClone, trueBuilder,
+                                                    falseBuilder);
+        newArgs[i] = ifOp.getResult(0);
+      }
+
+      if (!updated)
+        continue;
+
+      ret.getOperandsMutable().assign(newArgs);
+    }
+
+    if (!changed)
+      return markAllAnalysesPreserved();
+  }
+};
+
+struct GenerateAllocTokens
+    : public mlir::PassWrapper<GenerateAllocTokens, mlir::OperationPass<void>> {
+  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(GenerateAllocTokens)
 
   virtual void
   getDependentDialects(mlir::DialectRegistry &registry) const override {
     registry.insert<numba::util::NumbaUtilDialect>();
   }
 
-  void runOnOperation() override;
-};
+  void runOnOperation() override {
+    mlir::OpBuilder builder(&getContext());
 
-void CloneArgsPass::runOnOperation() {
-  auto func = getOperation();
-  if (func.isPrivate() || func.isDeclaration() || func.getBody().empty())
-    return;
+    bool changed = false;
+    auto visitor = [&](mlir::memref::ExtractAlignedPointerAsIndexOp op) {
+      changed = true;
+      builder.setInsertionPoint(op);
+      mlir::Value res = builder.create<numba::util::GetAllocTokenOp>(
+          op.getLoc(), op.getSource());
+      op->replaceAllUsesWith(mlir::ValueRange(res));
+      op->erase();
+    };
+    getOperation()->walk(visitor);
 
-  mlir::OpBuilder builder(&getContext());
-
-  for (auto &block : func.getBody()) {
-    auto ret =
-        mlir::dyn_cast_or_null<mlir::func::ReturnOp>(block.getTerminator());
-    if (!ret)
-      continue;
-
-    auto loc = ret.getLoc();
-    bool needReplace = false;
-    llvm::SmallVector<mlir::Value> newArgs(ret.getOperands().size());
-    builder.setInsertionPoint(ret);
-    for (auto &&[i, arg] : llvm::enumerate(ret.getOperands())) {
-      if (arg.getType().isa<mlir::MemRefType>()) {
-        newArgs[i] = builder.create<mlir::bufferization::CloneOp>(loc, arg);
-        needReplace = true;
-      } else {
-        newArgs[i] = arg;
-      }
-    }
-
-    if (needReplace) {
-      builder.create<mlir::func::ReturnOp>(loc, newArgs);
-      ret.erase();
-    }
+    if (!changed)
+      return markAllAnalysesPreserved();
   }
-}
+};
 
 struct ReplaceClones
     : public mlir::OpRewritePattern<mlir::bufferization::CloneOp> {
@@ -3468,11 +3504,6 @@ struct MoveTrivialIntoRegionPass
   }
 };
 
-struct FixDeallocPlacementPass
-    : public numba::RewriteWrapperPass<FixDeallocPlacementPass,
-                                       mlir::func::FuncOp, void,
-                                       FixDeallocPlacement> {};
-
 /// Move reduction iterators to the right to help later reduction simplification
 /// passes.
 struct MakeGenericReduceInnermost
@@ -3612,6 +3643,23 @@ static void populateCommonOptPass(mlir::OpPassManager &pm) {
       }));
 }
 
+static void populateDeallocationPipeline(mlir::OpPassManager &pm) {
+  mlir::bufferization::BufferDeallocationPipelineOptions deallocOpts;
+
+  // TODO: breaks private declarations
+  deallocOpts.privateFunctionDynamicOwnership = false;
+  mlir::bufferization::buildBufferDeallocationPipeline(pm, deallocOpts);
+  pm.addNestedPass<mlir::func::FuncOp>(
+      std::make_unique<EnforceUniqueResultsOwnershipPass>());
+  pm.addNestedPass<mlir::func::FuncOp>(std::make_unique<LowerCloneOpsPass>());
+  pm.addNestedPass<mlir::func::FuncOp>(std::make_unique<GenerateAllocTokens>());
+  pm.addPass(numba::createCompositePass(
+      "PostDeallocCleanups", [](mlir::OpPassManager &p) {
+        p.addNestedPass<mlir::func::FuncOp>(mlir::createCSEPass());
+        p.addNestedPass<mlir::func::FuncOp>(numba::createCommonOptsPass());
+      }));
+}
+
 static void populatePlierToLinalgGenPipeline(mlir::OpPassManager &pm) {
   pm.addPass(std::make_unique<MarkArgsRestrictPass>());
   pm.addPass(std::make_unique<PlierToNtensorPass>());
@@ -3687,7 +3735,6 @@ static void populatePlierToLinalgOptPipeline(mlir::OpPassManager &pm) {
   //  pm.addNestedPass<mlir::func::FuncOp>(
   //      mlir::bufferization::createBufferLoopHoistingPass());
 
-  pm.addNestedPass<mlir::func::FuncOp>(std::make_unique<CloneArgsPass>());
   pm.addPass(std::make_unique<MakeStridedLayoutPass>());
   pm.addPass(std::make_unique<OptimizeStridedLayoutPass>());
   pm.addNestedPass<mlir::func::FuncOp>(
@@ -3703,9 +3750,7 @@ static void populatePlierToLinalgOptPipeline(mlir::OpPassManager &pm) {
   pm.addNestedPass<mlir::func::FuncOp>(
       mlir::createConvertLinalgToParallelLoopsPass());
   pm.addNestedPass<mlir::func::FuncOp>(mlir::createCanonicalizerPass());
-  pm.addNestedPass<mlir::func::FuncOp>(
-      mlir::bufferization::createBufferDeallocationPass());
-  pm.addNestedPass<mlir::func::FuncOp>(std::make_unique<LowerCloneOpsPass>());
+
   pm.addNestedPass<mlir::func::FuncOp>(std::make_unique<LowerCopyOpsPass>());
   pm.addNestedPass<mlir::func::FuncOp>(
       mlir::createConvertLinalgToParallelLoopsPass());
@@ -3742,12 +3787,11 @@ static void populatePlierToLinalgOptPipeline(mlir::OpPassManager &pm) {
 
   pm.addNestedPass<mlir::func::FuncOp>(
       std::make_unique<PropagateFastmathFlags>());
-  // Uplifting FMAs con interfere with other optimizations, like loop reduction
+  // Uplifting FMAs can interfere with other optimizations, like loop reduction
   // uplifting. Move it after main optimization pass.
   pm.addNestedPass<mlir::func::FuncOp>(mlir::math::createMathUpliftToFMA());
   pm.addNestedPass<mlir::func::FuncOp>(mlir::createCanonicalizerPass());
-  pm.addNestedPass<mlir::func::FuncOp>(
-      std::make_unique<FixDeallocPlacementPass>());
+  populateDeallocationPipeline(pm);
 
   pm.addPass(mlir::createSymbolDCEPass());
 }
