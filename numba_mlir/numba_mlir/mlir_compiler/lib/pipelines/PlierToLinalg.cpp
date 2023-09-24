@@ -2952,9 +2952,9 @@ static bool mayAliasImpl(mlir::Value src, F &&mayAliasCheck) {
 }
 
 static bool mayAlias(mlir::AliasAnalysis &analysis, mlir::Value input,
-                     const mlir::OpOperandVector &outputs) {
-  for (auto outOperand : outputs) {
-    auto out = outOperand->get();
+                     mlir::MutableOperandRange outputs) {
+  for (auto &&outOperand : outputs) {
+    auto out = outOperand.get();
     auto check = [&](mlir::Value val) {
       return !analysis.alias(val, out).isNo();
     };
@@ -2982,7 +2982,7 @@ struct MixedGenericsAliasAnalysis
       flagsArray.resize(op.getNumDpsInputs());
       for (auto &&[i, arg] : llvm::enumerate(op.getDpsInputOperands()))
         flagsArray[i] =
-            !mayAlias(aliasAnalysis, arg->get(), op.getDpsInitOperands());
+            !mayAlias(aliasAnalysis, arg->get(), op.getDpsInitsMutable());
 
       auto flags = builder.getDenseBoolArrayAttr(flagsArray);
       op->setAttr(attrName, flags);
