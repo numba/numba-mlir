@@ -3326,6 +3326,99 @@ void CloneArgsPass::runOnOperation() {
   }
 }
 
+struct EnforceUniqueResultsOwnershipPass
+    : public mlir::PassWrapper<EnforceUniqueResultsOwnershipPass,
+                               mlir::OperationPass<mlir::func::FuncOp>> {
+  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(
+      EnforceUniqueResultsOwnershipPass)
+
+  virtual void
+  getDependentDialects(mlir::DialectRegistry &registry) const override {
+    registry.insert<mlir::arith::ArithDialect>();
+    registry.insert<mlir::bufferization::BufferizationDialect>();
+    registry.insert<mlir::memref::MemRefDialect>();
+    registry.insert<mlir::scf::SCFDialect>();
+  }
+
+  void runOnOperation() override {
+    auto op = getOperation();
+    if (op.isPrivate() || op.isDeclaration() || op.isExternal() ||
+        op.getNumResults() <= 1)
+      return markAllAnalysesPreserved();
+
+    bool changed = false;
+    mlir::OpBuilder builder(&getContext());
+    for (mlir::Block &block : op.getFunctionBody()) {
+      auto ret = mlir::dyn_cast<mlir::func::ReturnOp>(block.getTerminator());
+      if (!ret)
+        continue;
+
+      mlir::Location loc = ret.getLoc();
+      builder.setInsertionPoint(ret);
+      mlir::ValueRange args = ret.getOperands();
+      auto newArgs = llvm::to_vector(args);
+      bool updated = false;
+      for (auto &&[i, arg] : llvm::enumerate(args)) {
+        auto type = mlir::dyn_cast<mlir::MemRefType>(arg.getType());
+        if (!type)
+          continue;
+
+        mlir::Value token;
+        mlir::Value needClone;
+        for (auto &&other : args.drop_front(i + 1)) {
+          if (!mlir::isa<mlir::MemRefType>(other.getType()))
+            continue;
+
+          if (!token)
+            token =
+                builder.create<mlir::memref::ExtractAlignedPointerAsIndexOp>(
+                    loc, arg);
+
+          mlir::Value otherToken =
+              builder.create<mlir::memref::ExtractAlignedPointerAsIndexOp>(
+                  loc, other);
+          mlir::Value cmp = builder.create<mlir::arith::CmpIOp>(
+              loc, mlir::arith::CmpIPredicate::eq, token, otherToken);
+          if (!needClone) {
+            needClone = cmp;
+          } else {
+            needClone = builder.create<mlir::arith::OrIOp>(loc, needClone, cmp);
+          }
+        }
+
+        if (!needClone)
+          continue;
+
+        changed = true;
+        updated = true;
+
+        // TODO: to workaround stupid C++ spec limitation on capturing
+        // structured bindings into lambda.
+        mlir::Value argCopy = arg;
+        auto trueBuilder = [&](mlir::OpBuilder &builder, mlir::Location loc) {
+          mlir::Value cloned =
+              builder.create<mlir::bufferization::CloneOp>(loc, argCopy);
+          builder.create<mlir::scf::YieldOp>(loc, cloned);
+        };
+        auto falseBuilder = [&](mlir::OpBuilder &builder, mlir::Location loc) {
+          builder.create<mlir::scf::YieldOp>(loc, argCopy);
+        };
+        auto ifOp = builder.create<mlir::scf::IfOp>(loc, needClone, trueBuilder,
+                                                    falseBuilder);
+        newArgs[i] = ifOp.getResult(0);
+      }
+
+      if (!updated)
+        continue;
+
+      ret.getOperandsMutable().assign(newArgs);
+    }
+
+    if (!changed)
+      return markAllAnalysesPreserved();
+  }
+};
+
 struct ReplaceClones
     : public mlir::OpRewritePattern<mlir::bufferization::CloneOp> {
   using OpRewritePattern::OpRewritePattern;
@@ -3613,6 +3706,17 @@ static void populateCommonOptPass(mlir::OpPassManager &pm) {
       }));
 }
 
+static void populateDeallocationPipeline(mlir::OpPassManager &pm) {
+  mlir::bufferization::BufferDeallocationPipelineOptions deallocOpts;
+
+  // TODO: breaks private declarations
+  deallocOpts.privateFunctionDynamicOwnership = false;
+  mlir::bufferization::buildBufferDeallocationPipeline(pm, deallocOpts);
+  pm.addNestedPass<mlir::func::FuncOp>(
+      std::make_unique<EnforceUniqueResultsOwnershipPass>());
+  pm.addNestedPass<mlir::func::FuncOp>(std::make_unique<LowerCloneOpsPass>());
+}
+
 static void populatePlierToLinalgGenPipeline(mlir::OpPassManager &pm) {
   pm.addPass(std::make_unique<MarkArgsRestrictPass>());
   pm.addPass(std::make_unique<PlierToNtensorPass>());
@@ -3707,12 +3811,6 @@ static void populatePlierToLinalgOptPipeline(mlir::OpPassManager &pm) {
   //  pm.addNestedPass<mlir::func::FuncOp>(
   //      mlir::bufferization::createBufferDeallocationPass());
 
-  mlir::bufferization::BufferDeallocationPipelineOptions deallocOpts;
-
-  // TODO: breaks private declarations
-  deallocOpts.privateFunctionDynamicOwnership = false;
-  mlir::bufferization::buildBufferDeallocationPipeline(pm, deallocOpts);
-  pm.addNestedPass<mlir::func::FuncOp>(std::make_unique<LowerCloneOpsPass>());
   pm.addNestedPass<mlir::func::FuncOp>(std::make_unique<LowerCopyOpsPass>());
   pm.addNestedPass<mlir::func::FuncOp>(
       mlir::createConvertLinalgToParallelLoopsPass());
@@ -3753,8 +3851,9 @@ static void populatePlierToLinalgOptPipeline(mlir::OpPassManager &pm) {
   // uplifting. Move it after main optimization pass.
   pm.addNestedPass<mlir::func::FuncOp>(mlir::math::createMathUpliftToFMA());
   pm.addNestedPass<mlir::func::FuncOp>(mlir::createCanonicalizerPass());
-  pm.addNestedPass<mlir::func::FuncOp>(
-      std::make_unique<FixDeallocPlacementPass>());
+  //  pm.addNestedPass<mlir::func::FuncOp>(
+  //      std::make_unique<FixDeallocPlacementPass>());
+  populateDeallocationPipeline(pm);
 
   pm.addPass(mlir::createSymbolDCEPass());
 }
