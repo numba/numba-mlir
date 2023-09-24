@@ -3161,46 +3161,6 @@ struct BufferizeSignCast
   }
 };
 
-struct FixDeallocPlacement
-    : public mlir::OpRewritePattern<mlir::memref::DeallocOp> {
-  using mlir::OpRewritePattern<mlir::memref::DeallocOp>::OpRewritePattern;
-
-  mlir::LogicalResult
-  matchAndRewrite(mlir::memref::DeallocOp op,
-                  mlir::PatternRewriter &rewriter) const override {
-    auto block = op->getBlock();
-    auto blockIt = mlir::Block::iterator(op);
-    mlir::Operation *newPos = op;
-    ++blockIt;
-    auto memref = op.getMemref();
-    mlir::BufferViewFlowAnalysis analysis(
-        op->getParentOfType<mlir::func::FuncOp>());
-    auto aliases = analysis.resolve(memref);
-    auto blockEnd = block->without_terminator().end();
-    for (auto &it : llvm::make_range(blockIt, blockEnd)) {
-      auto visitor = [&](mlir::Operation *inner) {
-        for (auto arg : inner->getOperands()) {
-          if (aliases.count(arg)) {
-            return mlir::WalkResult::interrupt();
-          }
-        }
-        return mlir::WalkResult::advance();
-      };
-      if (it.walk(visitor).wasInterrupted()) {
-        newPos = &it;
-      }
-    }
-
-    if (newPos != op) {
-      rewriter.setInsertionPointAfter(newPos);
-      rewriter.create<mlir::memref::DeallocOp>(op.getLoc(), memref);
-      rewriter.eraseOp(op);
-      return mlir::success();
-    }
-    return mlir::failure();
-  }
-};
-
 struct AdditionalBufferize
     : public mlir::PassWrapper<AdditionalBufferize, mlir::OperationPass<void>> {
   MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(AdditionalBufferize)
@@ -3279,52 +3239,6 @@ struct MarkArgsRestrictPass
     });
   }
 };
-
-struct CloneArgsPass
-    : public mlir::PassWrapper<CloneArgsPass,
-                               mlir::OperationPass<mlir::func::FuncOp>> {
-  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(CloneArgsPass)
-
-  virtual void
-  getDependentDialects(mlir::DialectRegistry &registry) const override {
-    registry.insert<numba::util::NumbaUtilDialect>();
-  }
-
-  void runOnOperation() override;
-};
-
-void CloneArgsPass::runOnOperation() {
-  auto func = getOperation();
-  if (func.isPrivate() || func.isDeclaration() || func.getBody().empty())
-    return;
-
-  mlir::OpBuilder builder(&getContext());
-
-  for (auto &block : func.getBody()) {
-    auto ret =
-        mlir::dyn_cast_or_null<mlir::func::ReturnOp>(block.getTerminator());
-    if (!ret)
-      continue;
-
-    auto loc = ret.getLoc();
-    bool needReplace = false;
-    llvm::SmallVector<mlir::Value> newArgs(ret.getOperands().size());
-    builder.setInsertionPoint(ret);
-    for (auto &&[i, arg] : llvm::enumerate(ret.getOperands())) {
-      if (arg.getType().isa<mlir::MemRefType>()) {
-        newArgs[i] = builder.create<mlir::bufferization::CloneOp>(loc, arg);
-        needReplace = true;
-      } else {
-        newArgs[i] = arg;
-      }
-    }
-
-    if (needReplace) {
-      builder.create<mlir::func::ReturnOp>(loc, newArgs);
-      ret.erase();
-    }
-  }
-}
 
 struct EnforceUniqueResultsOwnershipPass
     : public mlir::PassWrapper<EnforceUniqueResultsOwnershipPass,
@@ -3590,11 +3504,6 @@ struct MoveTrivialIntoRegionPass
   }
 };
 
-struct FixDeallocPlacementPass
-    : public numba::RewriteWrapperPass<FixDeallocPlacementPass,
-                                       mlir::func::FuncOp, void,
-                                       FixDeallocPlacement> {};
-
 /// Move reduction iterators to the right to help later reduction simplification
 /// passes.
 struct MakeGenericReduceInnermost
@@ -3826,7 +3735,6 @@ static void populatePlierToLinalgOptPipeline(mlir::OpPassManager &pm) {
   //  pm.addNestedPass<mlir::func::FuncOp>(
   //      mlir::bufferization::createBufferLoopHoistingPass());
 
-  //  pm.addNestedPass<mlir::func::FuncOp>(std::make_unique<CloneArgsPass>());
   pm.addPass(std::make_unique<MakeStridedLayoutPass>());
   pm.addPass(std::make_unique<OptimizeStridedLayoutPass>());
   pm.addNestedPass<mlir::func::FuncOp>(
@@ -3842,8 +3750,6 @@ static void populatePlierToLinalgOptPipeline(mlir::OpPassManager &pm) {
   pm.addNestedPass<mlir::func::FuncOp>(
       mlir::createConvertLinalgToParallelLoopsPass());
   pm.addNestedPass<mlir::func::FuncOp>(mlir::createCanonicalizerPass());
-  //  pm.addNestedPass<mlir::func::FuncOp>(
-  //      mlir::bufferization::createBufferDeallocationPass());
 
   pm.addNestedPass<mlir::func::FuncOp>(std::make_unique<LowerCopyOpsPass>());
   pm.addNestedPass<mlir::func::FuncOp>(
@@ -3881,12 +3787,10 @@ static void populatePlierToLinalgOptPipeline(mlir::OpPassManager &pm) {
 
   pm.addNestedPass<mlir::func::FuncOp>(
       std::make_unique<PropagateFastmathFlags>());
-  // Uplifting FMAs con interfere with other optimizations, like loop reduction
+  // Uplifting FMAs can interfere with other optimizations, like loop reduction
   // uplifting. Move it after main optimization pass.
   pm.addNestedPass<mlir::func::FuncOp>(mlir::math::createMathUpliftToFMA());
   pm.addNestedPass<mlir::func::FuncOp>(mlir::createCanonicalizerPass());
-  //  pm.addNestedPass<mlir::func::FuncOp>(
-  //      std::make_unique<FixDeallocPlacementPass>());
   populateDeallocationPipeline(pm);
 
   pm.addPass(mlir::createSymbolDCEPass());
