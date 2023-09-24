@@ -84,6 +84,7 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
     MLIRBufferizationPipelines
     MLIRComplexToLLVM
     MLIRComplexToStandard
+    MLIRControlFlowTransforms
     MLIRFuncInlinerExtension # TODO: Remove
     MLIRFuncTransforms
     MLIRGPUToGPURuntimeTransforms
