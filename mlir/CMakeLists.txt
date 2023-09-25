@@ -130,11 +130,11 @@ set(HEADERS_LIST
     include/numba/Utils.hpp
     )
 
-set(MLIR_EXTENSIONS_LIB "mlir-extensions")
+set(NUMBA_MLIR_LIB "numba-mlir")
 
-add_library(${MLIR_EXTENSIONS_LIB} STATIC ${SOURCES_LIST} ${HEADERS_LIST})
+add_library(${NUMBA_MLIR_LIB} STATIC ${SOURCES_LIST} ${HEADERS_LIST})
 
-apply_llvm_compile_flags(${MLIR_EXTENSIONS_LIB})
+apply_llvm_compile_flags(${NUMBA_MLIR_LIB})
 
 include(CheckCXXCompilerFlag)
 CHECK_CXX_COMPILER_FLAG(-Winvalid-offsetof __offsetof_flag)
@@ -147,7 +147,7 @@ if (__offsetof_flag)
 endif()
 unset(__offsetof_flag)
 
-target_link_libraries(${MLIR_EXTENSIONS_LIB} PRIVATE
+target_link_libraries(${NUMBA_MLIR_LIB} PRIVATE
     MLIRControlFlowToSCF
     MLIRControlFlowToSPIRV
     MLIRFuncTransforms
@@ -161,20 +161,20 @@ target_link_libraries(${MLIR_EXTENSIONS_LIB} PRIVATE
     MLIRUBToSPIRV
     )
 
-target_include_directories(${MLIR_EXTENSIONS_LIB} SYSTEM PRIVATE
+target_include_directories(${NUMBA_MLIR_LIB} SYSTEM PRIVATE
     ${MLIR_INCLUDE_DIRS}
     PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/../numba_mlir_gpu_common
     ./lib
     )
 
-target_include_directories(${MLIR_EXTENSIONS_LIB} PUBLIC
+target_include_directories(${NUMBA_MLIR_LIB} PUBLIC
     ./include
     ${PROJECT_BINARY_DIR}/mlir/include
     ${PROJECT_BINARY_DIR}/numba/include
     )
 
-add_dependencies(${MLIR_EXTENSIONS_LIB} MLIRPlierOpsIncGen MLIRNumbaUtilOpsIncGen MLIRGpuRuntimeOpsIncGen MLIRNTensorOpsIncGen)
+add_dependencies(${NUMBA_MLIR_LIB} MLIRPlierOpsIncGen MLIRNumbaUtilOpsIncGen MLIRGpuRuntimeOpsIncGen MLIRNTensorOpsIncGen)
 
 add_subdirectory(tools)
 if(NUMBA_MLIR_ENABLE_TESTS)

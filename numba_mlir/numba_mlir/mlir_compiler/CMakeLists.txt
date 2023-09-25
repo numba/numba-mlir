@@ -74,7 +74,7 @@ endif()
 apply_llvm_compile_flags(${PROJECT_NAME})
 
 target_link_libraries(${PROJECT_NAME} PRIVATE
-    mlir-extensions
+    numba-mlir
 
     LLVM${LLVM_NATIVE_ARCH}AsmParser
     LLVM${LLVM_NATIVE_ARCH}CodeGen
