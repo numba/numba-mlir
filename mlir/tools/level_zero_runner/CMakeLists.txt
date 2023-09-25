@@ -17,7 +17,7 @@ add_llvm_executable(level_zero_runner LevelZeroRunner.cpp)
 llvm_update_compile_flags(level_zero_runner)
 
 target_link_libraries(level_zero_runner PRIVATE
-    ${MLIR_EXTENSIONS_LIB}
+    ${NUMBA_MLIR_LIB}
     ${dialect_libs}
     ${conversion_libs}
     MLIROptLib
