@@ -16,12 +16,26 @@ from timeit import default_timer as timer
 BASE_PATH = os.path.join(os.getcwd(), ".asv")
 
 
+def get_machine_name():
+    from asv.machine import Machine
+
+    return os.environ.get(
+        "NUMBA_MLIR_BENCH_RUNNER_MACHINE", Machine.get_unique_machine_name()
+    )
+
+
 def asv_run(args):
-    subprocess.check_call(["python", "-m", "asv", "run"] + args)
+    machine = get_machine_name()
+    subprocess.check_call(
+        ["python", "-m", "asv", "run", "--machine", str(machine)] + args
+    )
 
 
 def asv_show(args):
-    subprocess.check_call(["python", "-m", "asv", "show"] + args)
+    machine = get_machine_name()
+    subprocess.check_call(
+        ["python", "-m", "asv", "show", "--machine", str(machine)] + args
+    )
 
 
 def asv_machine(args):
@@ -41,12 +55,6 @@ def get_head_hash():
         .decode("utf-8")
         .strip()
     )
-
-
-def get_machine_name():
-    from asv.machine import Machine
-
-    return Machine.get_unique_machine_name()
 
 
 def load_results(commit, machine):
