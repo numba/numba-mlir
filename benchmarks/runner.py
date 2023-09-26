@@ -36,6 +36,7 @@ def get_config_file():
     config["results_dir"] = os.path.join(new_results_dir, "results")
     config["repo"] = os.path.join("..", "..")
     config["benchmark_dir"] = os.path.join("..", "benchmarks")
+    config["html_dir"] = os.path.join(new_results_dir, "html")
 
     new_filename = os.path.join(BASE_PATH, "temp.asv.conf.json")
     try:
@@ -57,15 +58,20 @@ def get_machine_name():
     )
 
 
-def wrap_args(args):
-    machine = get_machine_name()
+def wrap_config(args):
     config = get_config_file()
-
-    args = args + ["--machine", str(machine)]
     if config:
         args = args + ["--config", str(config)]
 
     return args
+
+
+def wrap_args(args):
+    machine = get_machine_name()
+
+    args = args + ["--machine", str(machine)]
+
+    return wrap_config(args)
 
 
 def asv_run(args):
@@ -78,6 +84,10 @@ def asv_show(args):
 
 def asv_machine(args):
     subprocess.check_call(["python", "-m", "asv", "machine"] + args)
+
+
+def asv_publish(args):
+    subprocess.check_call(wrap_config(["python", "-m", "asv", "publish"]) + args)
 
 
 def add_bench_arg(args, bench):
@@ -258,11 +268,21 @@ def setup_machine(params):
     asv_machine(args)
 
 
+def publish(params):
+    if len(params) > 0:
+        args = ["--html-dir", params[0]]
+    else:
+        args = []
+
+    asv_publish(args)
+
+
 def run_cmd(cmd, params):
     cmds = [
         ("test", run_test),
         ("bench", run_bench),
         ("machine", setup_machine),
+        ("publish", publish),
     ]
 
     for n, c in cmds:
