@@ -16,16 +16,78 @@ from timeit import default_timer as timer
 BASE_PATH = os.path.join(os.getcwd(), ".asv")
 
 
+def get_results_dir():
+    return os.environ.get("NUMBA_MLIR_BENCH_RUNNER_RESULTS_DIR", BASE_PATH)
+
+
+def get_config_file():
+    new_results_dir = get_results_dir()
+    if BASE_PATH == new_results_dir:
+        return None
+
+    orig_file = os.path.join(os.getcwd(), "asv.conf.json")
+    with open(orig_file) as file:
+        file_contents = file.read()
+
+    import json5
+
+    config = json5.loads(file_contents)
+
+    config["results_dir"] = os.path.join(new_results_dir, "results")
+    config["repo"] = os.path.join("..", "..")
+    config["benchmark_dir"] = os.path.join("..", "benchmarks")
+    config["html_dir"] = os.path.join(new_results_dir, "html")
+
+    new_filename = os.path.join(BASE_PATH, "temp.asv.conf.json")
+    try:
+        os.remove(new_filename)
+    except OSError:
+        pass
+
+    with open(new_filename, "w") as outfile:
+        outfile.write(str(config))
+
+    return new_filename
+
+
+def get_machine_name():
+    from asv.machine import Machine
+
+    return os.environ.get(
+        "NUMBA_MLIR_BENCH_RUNNER_MACHINE", Machine.get_unique_machine_name()
+    )
+
+
+def wrap_config(args):
+    config = get_config_file()
+    if config:
+        args = args + ["--config", str(config)]
+
+    return args
+
+
+def wrap_args(args):
+    machine = get_machine_name()
+
+    args = args + ["--machine", str(machine)]
+
+    return wrap_config(args)
+
+
 def asv_run(args):
-    subprocess.check_call(["python", "-m", "asv", "run"] + args)
+    subprocess.check_call(wrap_args(["python", "-m", "asv", "run"]) + args)
 
 
 def asv_show(args):
-    subprocess.check_call(["python", "-m", "asv", "show"] + args)
+    subprocess.check_call(wrap_args(["python", "-m", "asv", "show"]) + args)
 
 
 def asv_machine(args):
     subprocess.check_call(["python", "-m", "asv", "machine"] + args)
+
+
+def asv_publish(args):
+    subprocess.check_call(wrap_config(["python", "-m", "asv", "publish"]) + args)
 
 
 def add_bench_arg(args, bench):
@@ -43,14 +105,8 @@ def get_head_hash():
     )
 
 
-def get_machine_name():
-    from asv.machine import Machine
-
-    return Machine.get_unique_machine_name()
-
-
 def load_results(commit, machine):
-    res_path = os.path.join(BASE_PATH, "results")
+    res_path = os.path.join(get_results_dir(), "results")
 
     pattern = os.path.join(res_path, machine, f"{commit}-existing*.json")
     files = glob.glob(pattern)
@@ -186,7 +242,7 @@ def run_bench(params):
     print("csv report:")
     print(results)
 
-    reports_dir = os.path.join(BASE_PATH, "csv_reports")
+    reports_dir = os.path.join(get_results_dir(), "csv_reports")
     save_report(results, commit, machine, reports_dir)
 
 
@@ -212,11 +268,21 @@ def setup_machine(params):
     asv_machine(args)
 
 
+def publish(params):
+    if len(params) > 0:
+        args = ["--html-dir", params[0]]
+    else:
+        args = []
+
+    asv_publish(args)
+
+
 def run_cmd(cmd, params):
     cmds = [
         ("test", run_test),
         ("bench", run_bench),
         ("machine", setup_machine),
+        ("publish", publish),
     ]
 
     for n, c in cmds:
