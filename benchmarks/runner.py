@@ -108,7 +108,7 @@ def get_head_hash():
 def load_results(commit, machine):
     res_path = os.path.join(get_results_dir(), "results")
 
-    pattern = os.path.join(res_path, machine, f"{commit}-existing*.json")
+    pattern = os.path.join(res_path, machine, f"{commit}*-existing*.json")
     files = glob.glob(pattern)
     assert len(files) == 1, files
 
