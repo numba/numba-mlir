@@ -16,6 +16,39 @@ from timeit import default_timer as timer
 BASE_PATH = os.path.join(os.getcwd(), ".asv")
 
 
+def get_results_dir():
+    return os.environ.get("NUMBA_MLIR_BENCH_RUNNER_RESULTS_DIR", BASE_PATH)
+
+
+def get_config_file():
+    new_results_dir = get_results_dir()
+    if BASE_PATH == new_results_dir:
+        return None
+
+    orig_file = os.path.join(os.getcwd(), "asv.conf.json")
+    with open(orig_file) as file:
+        file_contents = file.read()
+
+    import json5
+
+    config = json5.loads(file_contents)
+
+    config["results_dir"] = os.path.join(new_results_dir, "results")
+    config["repo"] = os.path.join("..", "..")
+    config["benchmark_dir"] = os.path.join("..", "benchmarks")
+
+    new_filename = os.path.join(BASE_PATH, "temp.asv.conf.json")
+    try:
+        os.remove(new_filename)
+    except OSError:
+        pass
+
+    with open(new_filename, "w") as outfile:
+        outfile.write(str(config))
+
+    return new_filename
+
+
 def get_machine_name():
     from asv.machine import Machine
 
@@ -24,18 +57,23 @@ def get_machine_name():
     )
 
 
-def asv_run(args):
+def wrap_args(args):
     machine = get_machine_name()
-    subprocess.check_call(
-        ["python", "-m", "asv", "run", "--machine", str(machine)] + args
-    )
+    config = get_config_file()
+
+    args = args + ["--machine", str(machine)]
+    if config:
+        args = args + ["--config", str(config)]
+
+    return args
+
+
+def asv_run(args):
+    subprocess.check_call(wrap_args(["python", "-m", "asv", "run"]) + args)
 
 
 def asv_show(args):
-    machine = get_machine_name()
-    subprocess.check_call(
-        ["python", "-m", "asv", "show", "--machine", str(machine)] + args
-    )
+    subprocess.check_call(wrap_args(["python", "-m", "asv", "show"]) + args)
 
 
 def asv_machine(args):
@@ -58,7 +96,7 @@ def get_head_hash():
 
 
 def load_results(commit, machine):
-    res_path = os.path.join(BASE_PATH, "results")
+    res_path = os.path.join(get_results_dir(), "results")
 
     pattern = os.path.join(res_path, machine, f"{commit}-existing*.json")
     files = glob.glob(pattern)
@@ -194,7 +232,7 @@ def run_bench(params):
     print("csv report:")
     print(results)
 
-    reports_dir = os.path.join(BASE_PATH, "csv_reports")
+    reports_dir = os.path.join(get_results_dir(), "csv_reports")
     save_report(results, commit, machine, reports_dir)
 
 
