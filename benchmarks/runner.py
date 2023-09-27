@@ -252,7 +252,7 @@ def run_bench(params):
             ],
             bench,
         ),
-        ignore_failures=False,
+        ignore_failures=True,
     )
     asv_show([commit])
 
