@@ -16,8 +16,30 @@ from timeit import default_timer as timer
 BASE_PATH = os.path.join(os.getcwd(), ".asv")
 
 
+def get_machine_name():
+    from asv.machine import Machine
+
+    return os.environ.get(
+        "NUMBA_MLIR_BENCH_RUNNER_MACHINE", Machine.get_unique_machine_name()
+    )
+
+
 def get_results_dir():
     return os.environ.get("NUMBA_MLIR_BENCH_RUNNER_RESULTS_DIR", BASE_PATH)
+
+
+def remove_if_present(path):
+    try:
+        os.remove(path)
+    except OSError:
+        pass
+
+
+def ensure_dir(path):
+    try:
+        os.makedirs(path)
+    except OSError as e:
+        pass
 
 
 def get_config_file():
@@ -39,28 +61,14 @@ def get_config_file():
     config["html_dir"] = os.path.join(new_results_dir, "html")
 
     new_filename = os.path.join(BASE_PATH, "temp.asv.conf.json")
-    try:
-        os.remove(new_filename)
-    except OSError:
-        pass
+    remove_if_present(new_filename)
 
-    try:
-        os.makedirs(BASE_PATH)
-    except OSError as e:
-        pass
+    ensure_dir(BASE_PATH)
 
     with open(new_filename, "w") as outfile:
         outfile.write(str(config))
 
     return new_filename
-
-
-def get_machine_name():
-    from asv.machine import Machine
-
-    return os.environ.get(
-        "NUMBA_MLIR_BENCH_RUNNER_MACHINE", Machine.get_unique_machine_name()
-    )
 
 
 def wrap_config(args):
@@ -79,8 +87,14 @@ def wrap_args(args):
     return wrap_config(args)
 
 
-def asv_run(args):
-    subprocess.check_call(wrap_args(["python", "-m", "asv", "run"]) + args)
+def asv_run(args, ignore_failures):
+    try:
+        subprocess.check_call(wrap_args(["python", "-m", "asv", "run"]) + args)
+    except subprocess.CalledProcessError as e:
+        if ignore_failures and e.returncode == 2:
+            return
+
+        raise
 
 
 def asv_show(args):
@@ -216,7 +230,10 @@ def run_test(params):
     os.environ["NUMBA_MLIR_BENCH_PRESETS"] = "S"
     os.environ["NUMBA_MLIR_BENCH_VALIDATE"] = "1"
     asv_run(
-        add_bench_arg(["--python=same", "--quick", "--show-stderr", "--dry-run"], bench)
+        add_bench_arg(
+            ["--python=same", "--quick", "--show-stderr", "--dry-run"], bench
+        ),
+        ignore_failures=False,
     )
 
 
@@ -225,20 +242,19 @@ def run_bench(params):
     os.environ["NUMBA_MLIR_BENCH_PRESETS"] = "S,M,paper"
     os.environ["NUMBA_MLIR_BENCH_VALIDATE"] = "0"
     commit = get_head_hash()
-    try:
-        asv_run(
-            add_bench_arg(
-                [
-                    "--environment=existing:python",
-                    "--show-stderr",
-                    f"--set-commit-hash={commit}",
-                ],
-                bench,
-            )
-        )
-        asv_show([commit])
-    except:
-        pass
+
+    asv_run(
+        add_bench_arg(
+            [
+                "--environment=existing:python",
+                "--show-stderr",
+                f"--set-commit-hash={commit}",
+            ],
+            bench,
+        ),
+        ignore_failures=True,
+    )
+    asv_show([commit])
 
     machine = get_machine_name()
     results = load_results(commit, machine)
