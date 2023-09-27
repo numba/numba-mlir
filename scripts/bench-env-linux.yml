@@ -1,0 +1,16 @@
+name: bench
+channels:
+  - dppy/label/dev
+  - conda-forge
+  - intel
+  - nodefaults
+dependencies:
+  - python=3.10
+  - asv=0.6
+  - numba-mlir
+  - dpctl
+  - gxx_linux-64
+  - icc_rt
+  - intel::numpy
+  - py-cpuinfo
+  - tomli
