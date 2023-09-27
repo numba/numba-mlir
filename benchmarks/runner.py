@@ -254,7 +254,10 @@ def run_bench(params):
         ),
         ignore_failures=True,
     )
-    asv_show([commit])
+    try:
+        asv_show([commit])
+    except:
+        pass
 
     machine = get_machine_name()
     results = load_results(commit, machine)
