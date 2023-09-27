@@ -44,6 +44,11 @@ def get_config_file():
     except OSError:
         pass
 
+    try:
+        os.makedirs(BASE_PATH)
+    except OSError as e:
+        pass
+
     with open(new_filename, "w") as outfile:
         outfile.write(str(config))
 
