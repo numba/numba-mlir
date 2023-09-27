@@ -9,7 +9,7 @@ dependencies:
   - asv=0.6
   - numba-mlir
   - dpctl
-  - gxx_linux-64
+  - dpcpp_linux-64
   - icc_rt
   - intel::numpy
   - py-cpuinfo
