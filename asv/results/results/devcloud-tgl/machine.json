@@ -1,0 +1,9 @@
+{
+    "arch": "X86_64",
+    "cpu": "11th Gen Intel(R) Core(TM) i9-11900KB @ 3.30GHz",
+    "machine": "devcloud-tgl",
+    "num_cpu": "16",
+    "os": "Linux 5.15.0-52-generic",
+    "ram": "32417004",
+    "version": 1
+}
