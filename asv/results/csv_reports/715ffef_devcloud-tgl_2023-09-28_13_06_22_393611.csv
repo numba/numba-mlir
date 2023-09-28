@@ -1,0 +1,86 @@
+bench\framework,numba_mlir,numba,numba_replace_parfor,numpy
+npbench.azimint_naive["S"],101±2ms,30.6±0.1ms,32.7±0.8ms,502±1ms
+npbench.azimint_naive["M"],1.04±0.02s,944±30ms,910±10ms,6.60±0.01s
+npbench.azimint_naive["paper"],255±7ms,96.3±1ms,105±3ms,1.27±0s
+microbenchmarks.dispatcher["1"],188±3ns,,,
+microbenchmarks.dispatcher["2-same"],196±1ns,,,
+microbenchmarks.dispatcher["2-different"],202±3ns,,,
+microbenchmarks.dispatcher["6-same"],215±0.8ns,,,
+microbenchmarks.dispatcher["6-different"],239±4ns,,,
+microbenchmarks.dispatcher["12-same"],248±3ns,,,
+microbenchmarks.dispatcher["12-different"],1.79±0.5μs,,,
+microbenchmarks.kernel_dispatcher[1; "opencl:gpu:0"],failed,,,
+microbenchmarks.kernel_dispatcher[1; "opencl:cpu:0"],failed,,,
+microbenchmarks.kernel_dispatcher[1; "level_zero:gpu:0"],failed,,,
+microbenchmarks.kernel_dispatcher[2; "opencl:gpu:0"],failed,,,
+microbenchmarks.kernel_dispatcher[2; "opencl:cpu:0"],failed,,,
+microbenchmarks.kernel_dispatcher[2; "level_zero:gpu:0"],failed,,,
+microbenchmarks.kernel_dispatcher[6; "opencl:gpu:0"],failed,,,
+microbenchmarks.kernel_dispatcher[6; "opencl:cpu:0"],failed,,,
+microbenchmarks.kernel_dispatcher[6; "level_zero:gpu:0"],failed,,,
+microbenchmarks.kernel_dispatcher[12; "opencl:gpu:0"],failed,,,
+microbenchmarks.kernel_dispatcher[12; "opencl:cpu:0"],failed,,,
+microbenchmarks.kernel_dispatcher[12; "level_zero:gpu:0"],failed,,,
+npbench.azimint_hist["S"],skipped,2.33±0.01ms,2.10±0.01ms,5.59±0.02ms
+npbench.azimint_hist["M"],skipped,21.4±0.02ms,20.7±0.03ms,63.6±2ms
+npbench.azimint_hist["paper"],skipped,5.49±0.01ms,5.09±0.05ms,13.9±0.04ms
+npbench.cavity_flow["S"],37.0±0.07ms,61.9±0.8ms,9.58±0.1ms,6.86±0.1ms
+npbench.cavity_flow["M"],148±2ms,61.7±0.1ms,41.0±0.3ms,50.9±0.2ms
+npbench.cavity_flow["paper"],5.99±0.01s,3.35±2s,1.99±0s,1.68±0.02s
+npbench.channel_flow["S"],2.15±0.01ms,3.82±0.06ms,failed,421±3μs
+npbench.channel_flow["M"],3.82±0ms,1.65±0ms,failed,1.26±0ms
+npbench.channel_flow["paper"],10.5±0.01ms,failed,failed,3.02±0.01ms
+npbench.compute["S"],skipped,15.6±0.6ms,25.4±0.07ms,17.4±0.1ms
+npbench.compute["M"],skipped,97.1±0.2ms,166±0.1ms,146±0.6ms
+npbench.compute["paper"],skipped,600±0.6ms,1.02±0s,923±3ms
+npbench.contour_integral["S"],skipped,failed,skipped,3.60±0.01ms
+npbench.contour_integral["M"],skipped,failed,skipped,44.3±0.09ms
+npbench.contour_integral["paper"],skipped,failed,skipped,575±1ms
+npbench.crc16["S"],9.76±0μs,8.92±0.01μs,8.92±0.01μs,3.63±0.02ms
+npbench.crc16["M"],94.8±0.07μs,89.4±2μs,86.7±0.1μs,36.4±0.1ms
+npbench.crc16["paper"],5.91±0ms,5.43±0.01ms,5.49±0.05ms,2.28±0.02s
+npbench.deep_learning.conv2d_bias["S"],1.07±0ms,873±10μs,3.59±0.1ms,6.70±0.02ms
+npbench.deep_learning.conv2d_bias["M"],5.25±0.02ms,7.68±0.02ms,11.3±1ms,52.8±0.05ms
+npbench.deep_learning.conv2d_bias["paper"],1.76±0.02s,2.95±0.01s,1.48±0.01s,12.8±0.01s
+npbench.deep_learning.lenet["S"],1.10±0ms,failed,skipped,5.51±0ms
+npbench.deep_learning.lenet["M"],7.06±0.1ms,failed,skipped,44.7±0.08ms
+npbench.deep_learning.lenet["paper"],289±3ms,failed,skipped,1.74±0.01s
+npbench.deep_learning.mlp["S"],13.2±0.02ms,failed,skipped,14.9±0.03ms
+npbench.deep_learning.mlp["M"],84.5±0.8ms,failed,skipped,92.4±0.05ms
+npbench.deep_learning.mlp["paper"],65.7±0.07ms,failed,skipped,65.5±0.03ms
+npbench.deep_learning.resnet["S"],3.76±0.03ms,skipped,failed,6.91±0.09ms
+npbench.deep_learning.resnet["M"],22.6±0.2ms,skipped,failed,55.3±0.09ms
+npbench.deep_learning.resnet["paper"],4.56±0s,skipped,failed,2.07±0.01s
+npbench.deep_learning.softmax["S"],5.05±0.03ms,20.5±0.3ms,skipped,16.2±0.08ms
+npbench.deep_learning.softmax["M"],36.7±0.1ms,187±2ms,skipped,75.0±0.2ms
+npbench.deep_learning.softmax["paper"],685±2ms,3.10±0.01s,skipped,1.13±0s
+npbench.go_fast["S"],7.46±0.04ms,3.74±0.02ms,7.44±0.03ms,4.73±0.02ms
+npbench.go_fast["M"],131±0.2ms,38.2±0.08ms,131±0.3ms,61.0±0.06ms
+npbench.go_fast["paper"],561±0.9ms,164±0.09ms,560±0.9ms,256±0.1ms
+npbench.mandelbrot1["S"],2.74±0ms,4.57±0.02ms,3.62±0.02ms,8.97±0.2ms
+npbench.mandelbrot1["M"],17.4±0.08ms,23.8±0.06ms,20.5±0.03ms,85.0±1ms
+npbench.mandelbrot1["paper"],200±0.2ms,188±0.8ms,225±1ms,1.58±0.01s
+npbench.mandelbrot2["S"],10.1±0.05ms,skipped,skipped,7.41±0ms
+npbench.mandelbrot2["M"],81.3±0.5ms,skipped,skipped,71.6±0.1ms
+npbench.mandelbrot2["paper"],550±4ms,skipped,skipped,510±0.4ms
+npbench.nbody["S"],13.0±0.05ms,skipped,skipped,2.97±0ms
+npbench.nbody["M"],108±0.4ms,skipped,skipped,30.6±0.06ms
+npbench.nbody["paper"],537±1ms,skipped,skipped,306±0.05ms
+npbench.pythran.arc_distance["S"],561±4μs,584±2μs,568±4μs,3.09±0.03ms
+npbench.pythran.arc_distance["M"],5.63±0.02ms,5.51±0.04ms,5.67±0.02ms,37.1±0.1ms
+npbench.pythran.arc_distance["paper"],72.2±0.05ms,56.3±0.2ms,72.7±0.1ms,445±0.2ms
+npbench.scattering_self_energies["S"],37.2±0.08μs,failed,failed,6.10±0.01ms
+npbench.scattering_self_energies["M"],307±6μs,failed,failed,46.5±0.2ms
+npbench.scattering_self_energies["paper"],8.81±0.4ms,failed,failed,1.47±0s
+npbench.spmv["S"],failed,failed,failed,failed
+npbench.spmv["M"],failed,failed,failed,failed
+npbench.spmv["paper"],failed,failed,failed,failed
+npbench.stockham_fft["S"],skipped,failed,failed,4.79±0.2ms
+npbench.stockham_fft["M"],skipped,failed,failed,51.9±1ms
+npbench.stockham_fft["paper"],skipped,failed,failed,216±0.5ms
+npbench.weather_stencils.hdiff["S"],12.2±0.08ms,2.47±0.02ms,3.85±0.01ms,8.22±0.01ms
+npbench.weather_stencils.hdiff["M"],160±0.3ms,42.0±0.2ms,55.3±0.3ms,111±0.1ms
+npbench.weather_stencils.hdiff["paper"],731±0.8ms,154±0.3ms,301±0.6ms,447±0.6ms
+npbench.weather_stencils.vadv["S"],9.90±0.03ms,7.26±0.05ms,6.02±0.01ms,5.87±0.1ms
+npbench.weather_stencils.vadv["M"],39.0±0.1ms,28.8±0.09ms,25.1±0.01ms,61.3±1ms
+npbench.weather_stencils.vadv["paper"],1.15±0s,704±2ms,791±10ms,1.52±0s
