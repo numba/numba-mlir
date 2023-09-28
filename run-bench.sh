@@ -11,7 +11,7 @@ export GH_PAGE=gh-pages
 rm -rf ${BENCH_DIR}
 mkdir ${BENCH_DIR}
 pushd ${BENCH_DIR}
-git clone -b ${GH_BRANCH} https://${GH_PAGES_USER}:${GH_PAGES_TOKEN}@github.com/numba/numba-mlir.git ${GH_PAGE}
+git clone -b ${GH_BRANCH} https://${GH_PAGES_USER}:${GH_PAGES_TOKEN}@github.com/${GH_PAGES_USER}/numba-mlir.git ${GH_PAGE}
 git clone https://github.com/numba/numba-mlir.git
 
 export ENV_NAME="test-asv"
