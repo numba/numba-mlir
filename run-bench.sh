@@ -20,8 +20,8 @@ conda env create -n ${ENV_NAME} -f ./numba-mlir/scripts/bench-env-linux.yml
 conda activate ${ENV_NAME}
 conda list
 
-mkdir ./${GH_PAGE}/asv/html || true
-mkdir ./${GH_PAGE}/asv/results || true
+mkdir -p ./${GH_PAGE}/asv/html
+mkdir -p ./${GH_PAGE}/asv/results
 
 export NUMBA_MLIR_COMMIT=`python -c "import numba_mlir; print(numba_mlir._version.get_versions()['full-revisionid'])"`
 export PAGE_DIR=`cd ./${GH_PAGE}/asv/html; pwd`
