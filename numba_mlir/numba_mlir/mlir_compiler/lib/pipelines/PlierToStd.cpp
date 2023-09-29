@@ -41,20 +41,6 @@
 #include "PyLinalgResolver.hpp"
 
 namespace {
-static bool isInsideParallelRegion(mlir::Operation *op) {
-  assert(op && "Invalid op");
-  while (true) {
-    auto region = op->getParentOfType<numba::util::EnvironmentRegionOp>();
-    if (!region)
-      return false;
-
-    if (mlir::isa<numba::util::ParallelAttr>(region.getEnvironment()))
-      return true;
-
-    op = region;
-  }
-}
-
 static bool isSupportedType(mlir::Type type) {
   assert(type);
   return type.isa<mlir::IntegerType, mlir::FloatType, mlir::ComplexType>();
@@ -406,7 +392,7 @@ struct InplaceBinOpLowering
   using OpConversionPattern::OpConversionPattern;
 
   mlir::LogicalResult
-  matchAndRewrite(plier::InplaceBinOp op, OpAdaptor adaptor,
+  matchAndRewrite(plier::InplaceBinOp op, plier::InplaceBinOp::Adaptor adaptor,
                   mlir::ConversionPatternRewriter &rewriter) const override {
     auto converter = getTypeConverter();
     assert(converter && "Invalid type converter");
@@ -415,28 +401,8 @@ struct InplaceBinOpLowering
     if (!resType)
       return mlir::failure();
 
-    auto loc = op.getLoc();
-    auto res = [&]() -> mlir::Value {
-      mlir::OpBuilder::InsertionGuard g(rewriter);
-      if (isInsideParallelRegion(op)) {
-        auto env = numba::util::AtomicAttr::get(getContext());
-        auto reg = rewriter.create<numba::util::EnvironmentRegionOp>(
-            loc, env, std::nullopt, resType);
-        auto body = reg.getBody();
-        rewriter.eraseOp(body->getTerminator());
-        rewriter.setInsertionPointToStart(body);
-        mlir::Value res = rewriter.create<plier::BinOp>(
-            loc, resType, adaptor.getLhs(), adaptor.getRhs(),
-            adaptor.getOpAttr());
-        rewriter.create<numba::util::EnvironmentRegionYieldOp>(loc, res);
-        return reg.getResult(0);
-      }
-      return rewriter.create<plier::BinOp>(loc, resType, adaptor.getLhs(),
-                                           adaptor.getRhs(),
-                                           adaptor.getOpAttr());
-    }();
-
-    rewriter.replaceOp(op, res);
+    rewriter.replaceOpWithNewOp<plier::BinOp>(
+        op, resType, adaptor.getLhs(), adaptor.getRhs(), adaptor.getOpAttr());
     return mlir::success();
   }
 };
