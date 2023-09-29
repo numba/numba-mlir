@@ -7,6 +7,7 @@ import numpy as np
 from numba.core import types
 from numba.core.typing import npydecl
 from numba.core.extending import overload
+from numba.core.types.scalars import Integer, Float
 from numba.core.types.npytypes import Array
 from numba.np.numpy_support import is_nonelike
 from numba.core.typing.templates import signature, AbstractTemplate
@@ -198,3 +199,91 @@ class DotId(get_abstract_template(_dot_pattern)):
             return signature(return_type, a, b)
         else:
             return signature(return_type, a, b, out)
+
+
+def is_array_or_scalar(t):
+    return isinstance(t, (Array, Integer, Float))
+
+
+def is_array_or_scalar_or_none(t):
+    return is_none(t) or is_array_or_scalar(t)
+
+
+def get_ndim(val):
+    if isinstance(val, Array):
+        return val.ndim
+
+    return -1
+
+
+def get_dtype(val):
+    if isinstance(val, Array):
+        return val.dtype
+
+    return val
+
+
+def coerce_dtype(a, b):
+    if isinstance(a, Array):
+        a = a.dtype
+
+    if isinstance(b, Array):
+        b = b.dtype
+
+    if isinstance(a, Float) and not isinstance(b, Float):
+        return a
+
+    if isinstance(b, Float) and not isinstance(a, Float):
+        return b
+
+    return a if a.bitwidth > b.bitwidth else b
+
+
+def coerce_dtypes(*args):
+    assert len(args) > 0
+    ret = args[0]
+    for t in args[1:]:
+        ret = coerce_dtype(ret, t)
+
+    return ret
+
+
+def get_arr_type(dtype, ndim):
+    if ndim < 0:
+        return dtype
+
+    return Array(dtype, ndim, "C")
+
+
+def _ternary_pattern(a, a_min, a_max, out=None):
+    return a, a_min, a_max, out
+
+
+@infer_global(np.clip)
+class ClipId(get_abstract_template(_ternary_pattern)):
+    def generic_impl(self, a, a_min, a_max, out):
+        if not (
+            is_array_or_scalar(a)
+            and is_array_or_scalar(a_min)
+            and is_array_or_scalar(a_max)
+        ):
+            return
+
+        if not is_array_or_scalar_or_none(out):
+            return
+
+        ndim = max(get_ndim(a), get_ndim(a_min), get_ndim(a_max))
+
+        if not is_none(out):
+            ndim = max(ndim, get_ndim(out))
+            dtype = get_dtype(out)
+        else:
+            # TODO: coerce type
+            dtype = coerce_dtypes(get_dtype(a), get_dtype(a_min), get_dtype(a_max))
+
+        return_type = get_arr_type(dtype, ndim)
+
+        if out is None:
+            return signature(return_type, a, a_min, a_max)
+        else:
+            return signature(return_type, a, a_min, a_max, out)

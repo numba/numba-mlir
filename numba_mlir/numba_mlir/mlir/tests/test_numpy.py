@@ -239,6 +239,54 @@ def test_binary_scalar_const(py_func, a):
     assert_allclose(py_func(a), jit_func(a), rtol=1e-7, atol=1e-7)
 
 
+@parametrize_function_variants(
+    "py_func",
+    [
+        "lambda a, b, c: np.clip(a, b, c)",
+    ],
+)
+@pytest.mark.parametrize(
+    "a", _test_binary_test_arrays, ids=_test_binary_test_arrays_ids
+)
+@pytest.mark.parametrize(
+    "b", _test_binary_test_arrays, ids=_test_binary_test_arrays_ids
+)
+@pytest.mark.parametrize(
+    "c", _test_binary_test_arrays, ids=_test_binary_test_arrays_ids
+)
+def test_ternary(py_func, a, b, c):
+    jit_func = njit(py_func)
+    assert_allclose(py_func(a, b, c), jit_func(a, b, c), rtol=1e-7, atol=1e-7)
+
+
+@parametrize_function_variants(
+    "py_func",
+    [
+        "lambda a, b, c, out: np.clip(a, b, c, out)",
+        "lambda a, b, c, out: np.clip(a, b, c, out=out)",
+    ],
+)
+@pytest.mark.parametrize(
+    "a", _test_binary_test_arrays, ids=_test_binary_test_arrays_ids
+)
+@pytest.mark.parametrize(
+    "b", _test_binary_test_arrays, ids=_test_binary_test_arrays_ids
+)
+@pytest.mark.parametrize(
+    "c", _test_binary_test_arrays, ids=_test_binary_test_arrays_ids
+)
+def test_ternary_inplace(py_func, a, b, c):
+    jit_func = njit(py_func)
+
+    res_temp = np.broadcast(np.array(a), np.array(b), np.array(c))
+    py_res = np.zeros(res_temp.shape)
+    jit_res = np.zeros(res_temp.shape)
+
+    py_func(a, b, c, py_res)
+    jit_func(a, b, c, jit_res)
+    assert_allclose(py_res, jit_res, rtol=1e-7, atol=1e-7)
+
+
 _test_logical_arrays = [
     True,
     False,
