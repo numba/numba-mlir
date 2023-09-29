@@ -3763,11 +3763,6 @@ struct InsertParallelRegionPass
   }
 };
 
-static void populatePlierToLinalgRegionPipeline(mlir::OpPassManager &pm) {
-  pm.addPass(mlir::createCanonicalizerPass());
-  pm.addPass(std::make_unique<InsertParallelRegionPass>());
-}
-
 static void populateCommonOptPass(mlir::OpPassManager &pm) {
   pm.addPass(numba::createCompositePass(
       "PlierToLinalgCommonOptPass", [](mlir::OpPassManager &p) {
@@ -3793,6 +3788,11 @@ static void populateDeallocationPipeline(mlir::OpPassManager &pm) {
         p.addNestedPass<mlir::func::FuncOp>(mlir::createCSEPass());
         p.addNestedPass<mlir::func::FuncOp>(numba::createCommonOptsPass());
       }));
+}
+
+static void populatePlierToLinalgRegionPipeline(mlir::OpPassManager &pm) {
+  pm.addPass(mlir::createCanonicalizerPass());
+  pm.addPass(std::make_unique<InsertParallelRegionPass>());
 }
 
 static void populatePlierToLinalgGenPipeline(mlir::OpPassManager &pm) {
