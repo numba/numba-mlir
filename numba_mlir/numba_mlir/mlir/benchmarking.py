@@ -164,12 +164,12 @@ class BenchmarkBase:
                 if self.is_validate:
                     self.validate(self.args, res)
             except:
-                if self.is_expected_failure:
+                if self.is_validate and self.is_expected_failure:
                     raise SkipNotImplemented("Expected failure")
                 else:
                     raise
             else:
-                if self.is_expected_failure:
+                if self.is_validate and self.is_expected_failure:
                     raise ValueError("Unexpected success")
 
         setup.pretty_source = inspect.getsource(self.initialize)
