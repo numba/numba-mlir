@@ -90,6 +90,21 @@ isInsideParallelRegion(mlir::Operation *op) {
   }
 }
 
+static numba::util::EnvironmentRegionOp
+isInsideAtomicRegion(mlir::Operation *op) {
+  assert(op && "Invalid op");
+  while (true) {
+    auto region = op->getParentOfType<numba::util::EnvironmentRegionOp>();
+    if (!region)
+      return nullptr;
+
+    if (mlir::isa<numba::util::AtomicAttr>(region.getEnvironment()))
+      return region;
+
+    op = region;
+  }
+}
+
 static int64_t getOptLevel(mlir::Operation *op) {
   assert(op);
   auto attr = op->getAttr(numba::util::attributes::getOptLevelName())
@@ -3233,7 +3248,7 @@ struct GenAtomicAdd : public mlir::OpRewritePattern<mlir::memref::StoreOp> {
     if (!atomicOp)
       return mlir::failure();
 
-    auto reg = isInsideParallelRegion(op);
+    auto reg = isInsideAtomicRegion(op);
     if (!reg)
       return mlir::failure();
 
@@ -3323,9 +3338,30 @@ struct GenAtomicAdd : public mlir::OpRewritePattern<mlir::memref::StoreOp> {
   }
 };
 
+struct RemoveAtomicReg
+    : public mlir::OpRewritePattern<numba::util::EnvironmentRegionOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(numba::util::EnvironmentRegionOp op,
+                  mlir::PatternRewriter &rewriter) const override {
+    if (!mlir::isa<numba::util::AtomicAttr>(op.getEnvironment()))
+      return mlir::failure();
+
+    auto visitor = [](mlir::memref::StoreOp) -> mlir::WalkResult {
+      return mlir::WalkResult::interrupt();
+    };
+    if (op.getRegion().walk(visitor).wasInterrupted())
+      return mlir::failure();
+
+    numba::util::EnvironmentRegionOp::inlineIntoParent(rewriter, op);
+    return mlir::success();
+  }
+};
+
 struct GenAtomicOpsPass
     : public numba::RewriteWrapperPass<GenAtomicOpsPass, void, void,
-                                       GenAtomicAdd> {};
+                                       GenAtomicAdd, RemoveAtomicReg> {};
 
 struct MarkArgsRestrictPass
     : public mlir::PassWrapper<MarkArgsRestrictPass,
@@ -3763,6 +3799,48 @@ struct InsertParallelRegionPass
   }
 };
 
+struct GenAtomicRegion : public mlir::OpRewritePattern<plier::InplaceBinOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(plier::InplaceBinOp op,
+                  mlir::PatternRewriter &rewriter) const override {
+    if (!isInsideParallelRegion(op) || isInsideAtomicRegion(op))
+      return mlir::failure();
+
+    auto loc = op.getLoc();
+    auto env = numba::util::AtomicAttr::get(getContext());
+    auto reg = rewriter.create<numba::util::EnvironmentRegionOp>(
+        loc, env, std::nullopt, op.getType());
+    auto body = reg.getBody();
+    rewriter.eraseOp(body->getTerminator());
+
+    mlir::OpBuilder::InsertionGuard g(rewriter);
+    rewriter.setInsertionPointToStart(body);
+
+    auto res = op.getResult();
+    auto newTerm =
+        rewriter.create<numba::util::EnvironmentRegionYieldOp>(loc, res);
+    rewriter.updateRootInPlace(op, [&]() { op->moveBefore(newTerm); });
+    for (auto user : op->getUsers()) {
+      if (!mlir::isa<plier::SetItemOp>(user))
+        continue;
+
+      rewriter.updateRootInPlace(user, [&]() { user->moveBefore(newTerm); });
+    }
+
+    auto checker = [&](mlir::OpOperand &arg) {
+      return arg.getOwner()->getParentOp() != reg;
+    };
+    rewriter.replaceUsesWithIf(res, reg.getResult(0), checker);
+    return mlir::success();
+  }
+};
+
+struct GenAtomicRegionPass
+    : public numba::RewriteWrapperPass<GenAtomicRegionPass, void, void,
+                                       GenAtomicRegion> {};
+
 static void populateCommonOptPass(mlir::OpPassManager &pm) {
   pm.addPass(numba::createCompositePass(
       "PlierToLinalgCommonOptPass", [](mlir::OpPassManager &p) {
@@ -3793,6 +3871,7 @@ static void populateDeallocationPipeline(mlir::OpPassManager &pm) {
 static void populatePlierToLinalgRegionPipeline(mlir::OpPassManager &pm) {
   pm.addPass(mlir::createCanonicalizerPass());
   pm.addPass(std::make_unique<InsertParallelRegionPass>());
+  pm.addPass(std::make_unique<GenAtomicRegionPass>());
 }
 
 static void populatePlierToLinalgGenPipeline(mlir::OpPassManager &pm) {
@@ -3903,12 +3982,13 @@ static void populatePlierToLinalgOptPipeline(mlir::OpPassManager &pm) {
 
   pm.addPass(numba::createShapeIntegerRangePropagationPass());
   pm.addPass(std::make_unique<MarkArgsRestrictPass>());
-  pm.addPass(std::make_unique<GenAtomicOpsPass>());
   pm.addNestedPass<mlir::func::FuncOp>(
       std::make_unique<PropagateFastmathFlags>());
   pm.addPass(numba::createCompositePass(
       "PostLinalgOptPass", [](mlir::OpPassManager &p) {
         p.addPass(numba::createNormalizeMemrefArgsPass());
+        p.addNestedPass<mlir::func::FuncOp>(
+            std::make_unique<GenAtomicOpsPass>());
         p.addNestedPass<mlir::func::FuncOp>(
             std::make_unique<MoveTrivialIntoRegionPass>());
         p.addNestedPass<mlir::func::FuncOp>(mlir::createCSEPass());
