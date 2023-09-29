@@ -10,3 +10,4 @@ dependencies:
   - zlib
   - vs2019_win-64
   - tbb-devel >=2021.10.0
+  - level-zero-devel
