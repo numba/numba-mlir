@@ -22,7 +22,7 @@ class Benchmark(numba_mlir.mlir.benchmarking.BenchmarkBase):
         return get_impl(get_numba_mlir_context())
 
     def initialize(self, preset):
-        self.is_expected_failure = self.is_validate # atomic in prange
+        self.is_expected_failure = self.is_validate
         preset = parameters[preset]
         return initialize(**preset)
 
