@@ -3246,7 +3246,7 @@ struct GenAtomicAdd : public mlir::OpRewritePattern<mlir::memref::StoreOp> {
     auto checkAddOp = [&](auto addOp) -> mlir::Value {
       for (bool reverse : {false, true}) {
         auto load = (reverse ? addOp.getLhs() : addOp.getRhs())
-                        .getDefiningOp<mlir::memref::LoadOp>();
+            .template getDefiningOp<mlir::memref::LoadOp>();
         if (!load)
           continue;
 
