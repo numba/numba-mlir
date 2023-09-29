@@ -3246,7 +3246,7 @@ struct GenAtomicAdd : public mlir::OpRewritePattern<mlir::memref::StoreOp> {
     auto checkAddOp = [&](auto addOp) -> mlir::Value {
       for (bool reverse : {false, true}) {
         auto load = (reverse ? addOp.getLhs() : addOp.getRhs())
-            .template getDefiningOp<mlir::memref::LoadOp>();
+                        .template getDefiningOp<mlir::memref::LoadOp>();
         if (!load)
           continue;
 
@@ -3277,6 +3277,44 @@ struct GenAtomicAdd : public mlir::OpRewritePattern<mlir::memref::StoreOp> {
       rewriter.create<mlir::memref::AtomicRMWOp>(
           op.getLoc(), mlir::arith::AtomicRMWKind::addf, other, memref,
           indices);
+      rewriter.eraseOp(op);
+      return mlir::success();
+    }
+    if (auto addOp = mlir::dyn_cast<mlir::complex::AddOp>(atomicOp)) {
+      auto other = checkAddOp(addOp);
+      if (!other)
+        return mlir::failure();
+
+      auto loc = op.getLoc();
+
+      auto srcType = mlir::cast<mlir::MemRefType>(memref.getType());
+      auto elemType = mlir::cast<mlir::ComplexType>(srcType.getElementType())
+                          .getElementType();
+      auto rank = srcType.getShape().size();
+      llvm::SmallVector<mlir::OpFoldResult> offsets(rank);
+      llvm::copy(indices, offsets.begin());
+
+      llvm::SmallVector<mlir::OpFoldResult> sizes(rank,
+                                                  rewriter.getIndexAttr(1));
+
+      mlir::Value view = rewriter.create<mlir::memref::SubViewOp>(
+          loc, memref, offsets, sizes, sizes);
+      auto resType =
+          mlir::MemRefType::get(2, elemType, mlir::MemRefLayoutAttrInterface{},
+                                srcType.getMemorySpace());
+      view =
+          rewriter.create<numba::util::MemrefApplyOffsetOp>(loc, resType, view);
+
+      auto re = rewriter.create<mlir::complex::ReOp>(loc, other);
+      auto im = rewriter.create<mlir::complex::ImOp>(loc, other);
+
+      mlir::Value zero = rewriter.create<mlir::arith::ConstantIndexOp>(loc, 0);
+      mlir::Value one = rewriter.create<mlir::arith::ConstantIndexOp>(loc, 1);
+      rewriter.create<mlir::memref::AtomicRMWOp>(
+          loc, mlir::arith::AtomicRMWKind::addf, re, view, zero);
+      rewriter.create<mlir::memref::AtomicRMWOp>(
+          loc, mlir::arith::AtomicRMWKind::addf, im, view, one);
+
       rewriter.eraseOp(op);
       return mlir::success();
     }
