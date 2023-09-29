@@ -843,7 +843,7 @@ struct InplaceBinopToNtensor
   using OpConversionPattern::OpConversionPattern;
 
   mlir::LogicalResult
-  matchAndRewrite(plier::InplaceBinOp op, plier::InplaceBinOp::Adaptor adaptor,
+  matchAndRewrite(plier::InplaceBinOp op, OpAdaptor adaptor,
                   mlir::ConversionPatternRewriter &rewriter) const override {
     auto lhs = adaptor.getLhs();
     auto rhs = adaptor.getRhs();
@@ -859,9 +859,18 @@ struct InplaceBinopToNtensor
 
     auto loc = op.getLoc();
     auto opName = op.getOp();
-    mlir::Value res = rewriter.create<numba::ntensor::BinaryOp>(
-        loc, resultType, lhs, rhs, opName);
-    rewriter.create<numba::ntensor::CopyOp>(loc, res, lhs);
+    {
+      mlir::OpBuilder::InsertionGuard g(rewriter);
+      if (isInsideParallelRegion(op)) {
+        auto env = numba::util::AtomicAttr::get(getContext());
+        auto reg = rewriter.create<numba::util::EnvironmentRegionOp>(loc, env);
+        rewriter.setInsertionPointToStart(reg.getBody());
+      }
+      mlir::Value res = rewriter.create<numba::ntensor::BinaryOp>(
+          loc, resultType, lhs, rhs, opName);
+      rewriter.create<numba::ntensor::CopyOp>(loc, res, lhs);
+    }
+
     rewriter.replaceOp(op, lhs);
     return mlir::success();
   }
