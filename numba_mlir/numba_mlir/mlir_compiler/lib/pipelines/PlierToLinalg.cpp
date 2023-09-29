@@ -75,6 +75,20 @@
 #include <cctype>
 
 namespace {
+static bool isInsideParallelRegion(mlir::Operation *op) {
+  assert(op && "Invalid op");
+  while (true) {
+    auto region = op->getParentOfType<numba::util::EnvironmentRegionOp>();
+    if (!region)
+      return false;
+
+    if (mlir::isa<numba::util::ParallelAttr>(region.getEnvironment()))
+      return true;
+
+    op = region;
+  }
+}
+
 static int64_t getOptLevel(mlir::Operation *op) {
   assert(op);
   auto attr = op->getAttr(numba::util::attributes::getOptLevelName())
@@ -828,7 +842,7 @@ struct InplaceBinopToNtensor
   using OpConversionPattern::OpConversionPattern;
 
   mlir::LogicalResult
-  matchAndRewrite(plier::InplaceBinOp op, plier::InplaceBinOp::Adaptor adaptor,
+  matchAndRewrite(plier::InplaceBinOp op, OpAdaptor adaptor,
                   mlir::ConversionPatternRewriter &rewriter) const override {
     auto lhs = adaptor.getLhs();
     auto rhs = adaptor.getRhs();
@@ -844,9 +858,18 @@ struct InplaceBinopToNtensor
 
     auto loc = op.getLoc();
     auto opName = op.getOp();
-    mlir::Value res = rewriter.create<numba::ntensor::BinaryOp>(
-        loc, resultType, lhs, rhs, opName);
-    rewriter.create<numba::ntensor::CopyOp>(loc, res, lhs);
+    {
+      mlir::OpBuilder::InsertionGuard g(rewriter);
+      if (isInsideParallelRegion(op)) {
+        auto env = numba::util::AtomicAttr::get(getContext());
+        auto reg = rewriter.create<numba::util::EnvironmentRegionOp>(loc, env);
+        rewriter.setInsertionPointToStart(reg.getBody());
+      }
+      mlir::Value res = rewriter.create<numba::ntensor::BinaryOp>(
+          loc, resultType, lhs, rhs, opName);
+      rewriter.create<numba::ntensor::CopyOp>(loc, res, lhs);
+    }
+
     rewriter.replaceOp(op, lhs);
     return mlir::success();
   }
@@ -2046,20 +2069,6 @@ struct ResolveNtensorPass
       return signalPassFailure();
   }
 };
-
-static bool isInsideParallelRegion(mlir::Operation *op) {
-  assert(op && "Invalid op");
-  while (true) {
-    auto region = op->getParentOfType<numba::util::EnvironmentRegionOp>();
-    if (!region)
-      return false;
-
-    if (mlir::isa<numba::util::ParallelAttr>(region.getEnvironment()))
-      return true;
-
-    op = region;
-  }
-}
 
 struct WrapParforRegionsPass
     : public mlir::PassWrapper<WrapParforRegionsPass,
