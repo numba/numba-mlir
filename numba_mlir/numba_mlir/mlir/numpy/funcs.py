@@ -366,21 +366,24 @@ _gen_unary_ops()
 del _gen_unary_ops
 
 
-def _select_float_type(builder, a, b):
+def _select_float_type(builder, *args):
     # TODO: hack for numba
-    da = get_array_type(builder, a)
-    db = get_array_type(builder, b)
-    if da == db:
-        return da
+    arrs = tuple(map(lambda t: get_array_type(builder, t), args))
+    count = len(arrs)
+    if ((arrs[0],) * count) == arrs:
+        return arrs[0]
 
-    if is_complex(da, builder) or is_complex(db, builder):
-        return broadcast_type_arrays(builder, (a, b))
+    if any(map(lambda t: is_complex(t, builder), arrs)):
+        return broadcast_type_arrays(builder, args)
 
-    if is_float(da, builder) and not is_float(db, builder):
-        return da
-    if is_float(db, builder) and not is_float(da, builder):
-        return db
-    return broadcast_type_arrays(builder, (a, b))
+    if all(map(lambda t: is_float(t, builder), arrs)):
+        return broadcast_type_arrays(builder, args)
+
+    for t in arrs:
+        if is_float(t, builder):
+            return t
+
+    return broadcast_type_arrays(builder, args)
 
 
 def _gen_binary_ops():
@@ -497,6 +500,16 @@ def _gen_binary_ops():
 
 _gen_binary_ops()
 del _gen_binary_ops
+
+
+@register_func("numpy.clip", numpy.clip, out="out")
+def empty_impl(builder, a, a_min, a_max):
+    init_type = _select_float_type(builder, a, a_min, a_max)
+
+    def body(a, a_min, a_max, _):
+        return min(a_max, max(a, a_min))
+
+    return eltwise(builder, (a, a_min, a_max), body, init_type)
 
 
 def _init_impl(builder, shape, dtype, init=None):
