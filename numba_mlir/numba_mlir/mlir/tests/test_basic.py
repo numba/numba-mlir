@@ -288,6 +288,16 @@ def test_math_const(py_func):
     assert_equal(py_func(), jit_func())
 
 
+def test_captured_const():
+    m = math
+
+    def py_func():
+        return m.pi
+
+    jit_func = njit(py_func)
+    assert_equal(py_func(), jit_func())
+
+
 def _while_py_func_simple(a, b):
     while a < b:
         a = a * 2
