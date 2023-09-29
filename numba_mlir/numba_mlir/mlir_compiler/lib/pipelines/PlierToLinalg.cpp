@@ -75,6 +75,21 @@
 #include <cctype>
 
 namespace {
+static numba::util::EnvironmentRegionOp
+isInsideParallelRegion(mlir::Operation *op) {
+  assert(op && "Invalid op");
+  while (true) {
+    auto region = op->getParentOfType<numba::util::EnvironmentRegionOp>();
+    if (!region)
+      return nullptr;
+
+    if (mlir::isa<numba::util::ParallelAttr>(region.getEnvironment()))
+      return region;
+
+    op = region;
+  }
+}
+
 static int64_t getOptLevel(mlir::Operation *op) {
   assert(op);
   auto attr = op->getAttr(numba::util::attributes::getOptLevelName())
@@ -2047,21 +2062,6 @@ struct ResolveNtensorPass
   }
 };
 
-static numba::util::EnvironmentRegionOp
-isInsideParallelRegion(mlir::Operation *op) {
-  assert(op && "Invalid op");
-  while (true) {
-    auto region = op->getParentOfType<numba::util::EnvironmentRegionOp>();
-    if (!region)
-      return nullptr;
-
-    if (mlir::isa<numba::util::ParallelAttr>(region.getEnvironment()))
-      return region;
-
-    op = region;
-  }
-}
-
 struct WrapParforRegionsPass
     : public mlir::PassWrapper<WrapParforRegionsPass,
                                mlir::OperationPass<void>> {
@@ -3229,26 +3229,24 @@ struct GenAtomicAdd : public mlir::OpRewritePattern<mlir::memref::StoreOp> {
   mlir::LogicalResult
   matchAndRewrite(mlir::memref::StoreOp op,
                   mlir::PatternRewriter &rewriter) const override {
-    auto value = op.getValueToStore();
-    auto reg = value.getDefiningOp<numba::util::EnvironmentRegionOp>();
-    if (!reg)
-      return mlir::failure();
-
-    auto idx = mlir::cast<mlir::OpResult>(value).getResultNumber();
-
-    auto body = reg.getBody();
-    auto term = mlir::cast<numba::util::EnvironmentRegionYieldOp>(body->getTerminator());
-    auto atomicOp = term.getResults()[idx].getDefiningOp();
+    auto atomicOp = op.getValueToStore().getDefiningOp();
     if (!atomicOp)
       return mlir::failure();
 
+    auto reg = isInsideParallelRegion(op);
+    if (!reg)
+      return mlir::failure();
+
     auto memref = op.getMemRef();
+    if (!mlir::DominanceInfo().properlyDominates(memref, reg))
+      return mlir::failure();
+
     auto indices = op.getIndices();
 
     if (auto addOp = mlir::dyn_cast<mlir::arith::AddIOp>(atomicOp)) {
       for (bool reverse : {false, true}) {
         auto load = (reverse ? addOp.getLhs() : addOp.getRhs())
-            .getDefiningOp<mlir::memref::LoadOp>();
+                        .getDefiningOp<mlir::memref::LoadOp>();
         if (!load)
           continue;
 
@@ -3256,8 +3254,10 @@ struct GenAtomicAdd : public mlir::OpRewritePattern<mlir::memref::StoreOp> {
           continue;
 
         auto other = (reverse ? addOp.getRhs() : addOp.getLhs());
-        rewriter.replaceOpWithNewOp<mlir::memref::AtomicRMWOp>(
-              op, mlir::arith::AtomicRMWKind::addi, other, memref, indices);
+        rewriter.create<mlir::memref::AtomicRMWOp>(
+            op.getLoc(), mlir::arith::AtomicRMWKind::addi, other, memref,
+            indices);
+        rewriter.eraseOp(op);
         return mlir::success();
       }
     }
