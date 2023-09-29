@@ -83,6 +83,22 @@ def _get_flag(flags, name, default):
     return default
 
 
+def _get_cellvars(func):
+    ret = {}
+    closure = func.__closure__
+    if not closure:
+        return ret
+
+    code = func.__code__
+    for i, var in enumerate(code.co_cellvars):
+        ret[var] = closure[i].cell_contents
+
+    for i, var in enumerate(code.co_freevars):
+        ret[var] = closure[i].cell_contents
+
+    return ret
+
+
 class MlirBackendBase(FunctionPass):
     def __init__(self, push_func_stack):
         self._push_func_stack = push_func_stack
@@ -150,7 +166,9 @@ class MlirBackendBase(FunctionPass):
         mangler = state.targetctx.mangler
         mangler = default_mangler if mangler is None else mangler
         unique_name = state.func_ir.func_id.unique_name
-        modname = state.func_ir.func_id.func.__module__
+
+        orig_func = state.func_ir.func_id.func
+        modname = orig_func.__module__
         qualprefix = qualifying_prefix(modname, unique_name)
         abi_tags = [state.flags.get_mangle_string()]
         fn_name = mangler(qualprefix, state.args, abi_tags=abi_tags)
@@ -171,7 +189,8 @@ class MlirBackendBase(FunctionPass):
         ctx["restype"] = lambda: state.return_type
         ctx["fnname"] = lambda: fn_name
         ctx["resolve_func"] = lambda obj: self._resolve_func_name(state, obj)
-        ctx["globals"] = lambda: state.func_id.func.__globals__
+        ctx["globals"] = lambda: orig_func.__globals__
+        ctx["cellvars"] = lambda: _get_cellvars(orig_func)
 
         func_attrs = {}
         if state.targetctx.fastmath:

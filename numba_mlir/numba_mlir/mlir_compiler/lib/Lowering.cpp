@@ -433,9 +433,10 @@ private:
     llvm::SmallVector<PhiDesc, 2> outgoingPhiNodes;
   };
   py::handle currentInstr;
-  py::handle typemap;
-  py::handle funcNameResolver;
-  py::handle globals;
+  py::object typemap;
+  py::object funcNameResolver;
+  py::object globals;
+  py::object cellvars;
 
   std::unordered_map<mlir::Block *, BlockInfo> blockInfos;
 
@@ -473,6 +474,7 @@ private:
     parseAttributes(func, compilationContext["func_attrs"]);
 
     globals = compilationContext["globals"]();
+    cellvars = compilationContext["cellvars"]();
 
     mod.push_back(func);
     return func;
@@ -1012,10 +1014,15 @@ private:
                         llvm::SmallVectorImpl<llvm::StringRef> &names) {
     if (auto global = val.getDefiningOp<plier::GlobalOp>()) {
       std::string name = global.getName().str();
-      if (!globals.contains(name.c_str()))
+      py::object attr;
+      if (cellvars.contains(name.c_str())) {
+        attr = cellvars[name.c_str()];
+      } else if (globals.contains(name.c_str())) {
+        attr = globals[name.c_str()];
+      } else {
         return std::nullopt;
+      }
 
-      py::object attr = globals[name.c_str()];
       while (!names.empty()) {
         name = names.pop_back_val().str();
         if (!py::hasattr(attr, name.c_str()))

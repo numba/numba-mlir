@@ -20,7 +20,6 @@ class Benchmark(numba_mlir.mlir.benchmarking.BenchmarkBase):
         return get_impl_numba(get_numba_mlir_context())
 
     def initialize(self, preset):
-        self.is_expected_failure = True  # global pi
         preset = parameters[preset]
         return initialize(**preset)
 
