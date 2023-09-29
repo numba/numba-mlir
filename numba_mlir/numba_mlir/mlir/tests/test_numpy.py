@@ -855,6 +855,25 @@ def test_prange_lowering_indirect():
         assert ir.count("numba_util.parallel") == 1, ir
 
 
+@pytest.mark.parametrize("dtype", [np.int32, np.int64, np.float32, np.float64])
+def test_prange_atomic(dtype):
+    def py_func(n, s):
+        res = np.zeros(s, dtype=dtype)
+        for i in numba.prange(n):
+            res[i % s] += i
+
+        return res
+
+    jit_func = njit(py_func, parallel=True)
+
+    N = 100000
+    S = 10
+    with print_pass_ir([], ["GenAtomicOpsPass"]):
+        assert_allclose(py_func(N, S), jit_func(N, S), rtol=1e-5)
+        ir = get_print_buffer()
+        assert ir.count("memref.atomic_rmw") == 1, ir
+
+
 def test_loop_fusion1():
     def py_func(arr):
         l = len(arr)
