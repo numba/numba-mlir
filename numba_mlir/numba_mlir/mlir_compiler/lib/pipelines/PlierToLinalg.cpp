@@ -3243,7 +3243,7 @@ struct GenAtomicAdd : public mlir::OpRewritePattern<mlir::memref::StoreOp> {
 
     auto indices = op.getIndices();
 
-    if (auto addOp = mlir::dyn_cast<mlir::arith::AddIOp>(atomicOp)) {
+    auto checkAddOp = [&](auto addOp) -> mlir::Value {
       for (bool reverse : {false, true}) {
         auto load = (reverse ? addOp.getLhs() : addOp.getRhs())
                         .getDefiningOp<mlir::memref::LoadOp>();
@@ -3253,13 +3253,32 @@ struct GenAtomicAdd : public mlir::OpRewritePattern<mlir::memref::StoreOp> {
         if (load.getMemRef() != memref || load.getIndices() != indices)
           continue;
 
-        auto other = (reverse ? addOp.getRhs() : addOp.getLhs());
-        rewriter.create<mlir::memref::AtomicRMWOp>(
-            op.getLoc(), mlir::arith::AtomicRMWKind::addi, other, memref,
-            indices);
-        rewriter.eraseOp(op);
-        return mlir::success();
+        return (reverse ? addOp.getRhs() : addOp.getLhs());
       }
+      return nullptr;
+    };
+
+    if (auto addOp = mlir::dyn_cast<mlir::arith::AddIOp>(atomicOp)) {
+      auto other = checkAddOp(addOp);
+      if (!other)
+        return mlir::failure();
+
+      rewriter.create<mlir::memref::AtomicRMWOp>(
+          op.getLoc(), mlir::arith::AtomicRMWKind::addi, other, memref,
+          indices);
+      rewriter.eraseOp(op);
+      return mlir::success();
+    }
+    if (auto addOp = mlir::dyn_cast<mlir::arith::AddFOp>(atomicOp)) {
+      auto other = checkAddOp(addOp);
+      if (!other)
+        return mlir::failure();
+
+      rewriter.create<mlir::memref::AtomicRMWOp>(
+          op.getLoc(), mlir::arith::AtomicRMWKind::addf, other, memref,
+          indices);
+      rewriter.eraseOp(op);
+      return mlir::success();
     }
 
     return mlir::failure();
