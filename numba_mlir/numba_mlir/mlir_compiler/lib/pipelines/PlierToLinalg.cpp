@@ -75,16 +75,15 @@
 #include <cctype>
 
 namespace {
-static numba::util::EnvironmentRegionOp
-isInsideParallelRegion(mlir::Operation *op) {
+static bool isInsideParallelRegion(mlir::Operation *op) {
   assert(op && "Invalid op");
   while (true) {
     auto region = op->getParentOfType<numba::util::EnvironmentRegionOp>();
     if (!region)
-      return nullptr;
+      return false;
 
     if (mlir::isa<numba::util::ParallelAttr>(region.getEnvironment()))
-      return region;
+      return true;
 
     op = region;
   }
@@ -3232,49 +3231,43 @@ struct AdditionalBufferize
   }
 };
 
-struct GenAtomicAdd : public mlir::OpRewritePattern<mlir::arith::AddIOp> {
+struct GenAtomicAdd : public mlir::OpRewritePattern<mlir::memref::StoreOp> {
   using OpRewritePattern::OpRewritePattern;
 
   mlir::LogicalResult
-  matchAndRewrite(mlir::arith::AddIOp op,
+  matchAndRewrite(mlir::memref::StoreOp op,
                   mlir::PatternRewriter &rewriter) const override {
-    auto reg = isInsideParallelRegion(op);
+    auto value = op.getValueToStore();
+    auto reg = value.getDefiningOp<numba::util::EnvironmentRegionOp>();
     if (!reg)
       return mlir::failure();
 
-    if (!llvm::hasSingleElement(op->getUsers()))
+    auto idx = mlir::cast<mlir::OpResult>(value).getResultNumber();
+
+    auto body = reg.getBody();
+    auto term = mlir::cast<numba::util::EnvironmentRegionYieldOp>(body->getTerminator());
+    auto atomicOp = term.getResults()[idx].getDefiningOp();
+    if (!atomicOp)
       return mlir::failure();
 
-    auto store = mlir::dyn_cast<mlir::memref::StoreOp>(*op->getUsers().begin());
-    if (!store)
-      return mlir::failure();
+    auto memref = op.getMemRef();
+    auto indices = op.getIndices();
 
-    auto memref = store.getMemRef();
-    auto indices = store.getIndices();
+    if (auto addOp = mlir::dyn_cast<mlir::arith::AddIOp>(atomicOp)) {
+      for (bool reverse : {false, true}) {
+        auto load = (reverse ? addOp.getLhs() : addOp.getRhs())
+            .getDefiningOp<mlir::memref::LoadOp>();
+        if (!load)
+          continue;
 
-    mlir::DominanceInfo dom;
-    for (bool reverse : {false, true}) {
-      auto load = (reverse ? op.getLhs() : op.getRhs())
-                      .getDefiningOp<mlir::memref::LoadOp>();
-      if (!load)
-        continue;
+        if (load.getMemRef() != memref || load.getIndices() != indices)
+          continue;
 
-      if (load.getMemRef() != memref || load.getIndices() != indices)
-        continue;
-
-      if (!dom.properlyDominates(memref, reg))
-        continue;
-
-      auto other = (reverse ? op.getRhs() : op.getLhs());
-
-      auto loc = store.getLoc();
-      mlir::OpBuilder::InsertionGuard g(rewriter);
-      rewriter.setInsertionPoint(store);
-      rewriter.create<mlir::memref::AtomicRMWOp>(
-          loc, mlir::arith::AtomicRMWKind::addi, other, memref, indices);
-      rewriter.eraseOp(store);
-      rewriter.eraseOp(op);
-      return mlir::success();
+        auto other = (reverse ? addOp.getRhs() : addOp.getLhs());
+        rewriter.replaceOpWithNewOp<mlir::memref::AtomicRMWOp>(
+              op, mlir::arith::AtomicRMWKind::addi, other, memref, indices);
+        return mlir::success();
+      }
     }
 
     return mlir::failure();
