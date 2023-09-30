@@ -34,6 +34,7 @@ def get_impl(ctx):
     np = ctx.numpy
     prange = ctx.prange
 
+    @jit
     def kernel(alpha, beta, C, A, B):
         temp2 = np.empty((C.shape[1],), dtype=C.dtype)
         C *= beta
