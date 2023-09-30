@@ -3338,7 +3338,7 @@ struct GenAtomicAdd : public mlir::OpRewritePattern<mlir::memref::StoreOp> {
   }
 };
 
-struct RemoveAtomicReg
+struct RemoveAtomicRegions
     : public mlir::OpRewritePattern<numba::util::EnvironmentRegionOp> {
   using OpRewritePattern::OpRewritePattern;
 
@@ -3361,7 +3361,26 @@ struct RemoveAtomicReg
 
 struct GenAtomicOpsPass
     : public numba::RewriteWrapperPass<GenAtomicOpsPass, void, void,
-                                       GenAtomicAdd, RemoveAtomicReg> {};
+                                       GenAtomicAdd, RemoveAtomicRegions> {};
+
+struct RemoveAllAtomicRegions
+    : public mlir::OpRewritePattern<numba::util::EnvironmentRegionOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(numba::util::EnvironmentRegionOp op,
+                  mlir::PatternRewriter &rewriter) const override {
+    if (!mlir::isa<numba::util::AtomicAttr>(op.getEnvironment()))
+      return mlir::failure();
+
+    numba::util::EnvironmentRegionOp::inlineIntoParent(rewriter, op);
+    return mlir::success();
+  }
+};
+
+struct RemoveAtomicRegionsPass
+    : public numba::RewriteWrapperPass<GenAtomicOpsPass, void, void,
+                                       RemoveAllAtomicRegions> {};
 
 struct MarkArgsRestrictPass
     : public mlir::PassWrapper<MarkArgsRestrictPass,
@@ -4003,6 +4022,8 @@ static void populatePlierToLinalgOptPipeline(mlir::OpPassManager &pm) {
         p.addPass(numba::createRemoveUnusedArgsPass());
       }));
 
+  pm.addNestedPass<mlir::func::FuncOp>(
+      std::make_unique<RemoveAtomicRegionsPass>());
   pm.addNestedPass<mlir::func::FuncOp>(
       std::make_unique<PropagateFastmathFlags>());
   // Uplifting FMAs can interfere with other optimizations, like loop reduction
