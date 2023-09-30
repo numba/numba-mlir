@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2010-2016 Ohio State University
+# SPDX-FileCopyrightText: 2021 ETH Zurich and the NPBench authors
+# SPDX-FileCopyrightText: 2022 - 2023 Intel Corporation
+#
+# SPDX-License-Identifier: BSD-3-Clause
+
+[benchmark]
+name = "Covariance"
+
+[benchmark.parameters.S]
+M = 500
+N = 600
+
+[benchmark.parameters.M]
+M = 1400
+N = 1800
+
+[benchmark.parameters.L]
+M = 3200
+N = 4000
+
+[benchmark.parameters.paper]
+M = 1200
+N = 1400
