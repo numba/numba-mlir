@@ -907,6 +907,12 @@ def shape_impl(builder, arg):
     return builder.force_copy(arg)
 
 
+@register_func("numpy.asfortranarray", numpy.asfortranarray)
+def shape_impl(builder, arg):
+    # Layout will be inferred by the compiler so we just do a copy
+    return builder.force_copy(arg)
+
+
 def _get_transpose_axes(axes, dims):
     axes = literal(axes)
     if axes is None:
