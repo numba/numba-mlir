@@ -1,0 +1,28 @@
+# SPDX-FileCopyrightText: 2010-2016 Ohio State University
+# SPDX-FileCopyrightText: 2021 ETH Zurich and the NPBench authors
+# SPDX-FileCopyrightText: 2022 - 2023 Intel Corporation
+#
+# SPDX-License-Identifier: BSD-3-Clause
+
+[benchmark]
+name = "General matrix-matrix multiplication"
+
+[benchmark.parameters.S]
+NI = 1000
+NJ = 1100
+NK = 1200
+
+[benchmark.parameters.M]
+NI = 2500
+NJ = 2750
+NK = 3000
+
+[benchmark.parameters.L]
+NI = 7000
+NJ = 7500
+NK = 8000
+
+[benchmark.parameters.paper]
+NI = 2000
+NJ = 2300
+NK = 2600
