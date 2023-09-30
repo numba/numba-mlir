@@ -3618,6 +3618,9 @@ struct MoveTrivialIntoRegionPass
           !op->getRegions().empty())
         return false;
 
+      if (op->hasTrait<mlir::OpTrait::ConstantLike>())
+        return false;
+
       if (mlir::isa<mlir::ViewLikeOpInterface>(op))
         return true;
 

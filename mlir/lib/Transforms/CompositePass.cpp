@@ -31,8 +31,9 @@ struct CompositePass
         return signalPassFailure();
 
       if (currentIter++ >= maxIters) {
-        //        op->emitWarning("Composite pass didn't converge in " +
-        //                        llvm::Twine(maxIters) + " iterations");
+        op->emitWarning("Composite pass \"" + llvm::Twine(name) +
+                        "\"+ didn't converge in " + llvm::Twine(maxIters) +
+                        " iterations");
         break;
       }
 

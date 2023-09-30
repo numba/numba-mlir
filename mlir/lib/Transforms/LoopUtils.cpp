@@ -302,6 +302,9 @@ LogicalResult numba::prepareForFusion(
         }
 
         bool canMove = [&]() {
+          if (currentOp.hasTrait<mlir::OpTrait::ConstantLike>())
+            return false;
+
           if (!hasNoEffect(&currentOp))
             return false;
 
