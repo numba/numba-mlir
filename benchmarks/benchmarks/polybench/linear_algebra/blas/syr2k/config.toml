@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2010-2016 Ohio State University
+# SPDX-FileCopyrightText: 2021 ETH Zurich and the NPBench authors
+# SPDX-FileCopyrightText: 2022 - 2023 Intel Corporation
+#
+# SPDX-License-Identifier: BSD-3-Clause
+
+[benchmark]
+name = "Symmetric rank-2k operations"
+
+[benchmark.parameters.S]
+M = 35
+N = 50
+
+[benchmark.parameters.M]
+M = 110
+N = 140
+
+[benchmark.parameters.L]
+M = 350
+N = 400
+
+[benchmark.parameters.paper]
+M = 1000
+N = 1200
