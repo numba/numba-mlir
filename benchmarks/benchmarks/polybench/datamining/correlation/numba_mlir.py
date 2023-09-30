@@ -1,8 +1,9 @@
-# SPDX-FileCopyrightText: 2020 Philip Mocz
+# SPDX-FileCopyrightText: 2010-2016 Ohio State University
 # SPDX-FileCopyrightText: 2021 ETH Zurich and the NPBench authors
 # SPDX-FileCopyrightText: 2022 - 2023 Intel Corporation
 #
-# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-License-Identifier: BSD-3-Clause
+
 
 from .common import initialize, get_impl, get_impl_numba, parameters, presets
 import numba_mlir.mlir.benchmarking

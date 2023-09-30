@@ -127,6 +127,19 @@ def filter_presets(presets):
     return [x for x in presets if x in TEST_PRESETS]
 
 
+def copy_args(arg):
+    if isinstance(arg, tuple):
+        return tuple(map(copy_args, arg))
+
+    if isinstance(arg, list):
+        return lsit(map(copy_args, arg))
+
+    if hasattr(arg, "__array__"):
+        return arg.copy()
+
+    return arg
+
+
 VALIDATE = readenv("NUMBA_MLIR_BENCH_VALIDATE", int, 1)
 
 
@@ -160,9 +173,9 @@ class BenchmarkBase:
         def setup(*args, **kwargs):
             self.args = self.initialize(*args, **kwargs)
             try:
-                res = func(*self.args)
+                res = func(*copy_args(self.args))
                 if self.is_validate:
-                    self.validate(self.args, res)
+                    self.validate(copy_args(self.args), res)
             except:
                 if self.is_validate and self.is_expected_failure:
                     raise SkipNotImplemented("Expected failure")

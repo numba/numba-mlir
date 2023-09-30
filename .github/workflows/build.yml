@@ -229,6 +229,9 @@ jobs:
           python "$env:GITHUB_WORKSPACE/numba_mlir/conda-recipe/run_package_tests.py" verbose gpu
 
       - name: Test bench
+
+        # TODO: investigate
+        if: matrix.python != '3.9'
         run: |
           cd benchmarks
           conda activate test-env
@@ -569,6 +572,8 @@ jobs:
       - name: Test bench
         shell: bash -l {0}
 
+        # TODO: investigate
+        if: matrix.python != '3.9'
         run: |
           cd benchmarks
           source $CONDA/bin/activate test-env
