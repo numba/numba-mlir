@@ -492,26 +492,31 @@ struct LowerApplyOffsetOp
   using ConvertOpToLLVMPattern::ConvertOpToLLVMPattern;
 
   mlir::LogicalResult
-  matchAndRewrite(numba::util::MemrefApplyOffsetOp op,
-                  numba::util::MemrefApplyOffsetOp::Adaptor adaptor,
+  matchAndRewrite(numba::util::MemrefApplyOffsetOp op, OpAdaptor adaptor,
                   mlir::ConversionPatternRewriter &rewriter) const override {
     auto arg = adaptor.getSource();
     if (!arg.getType().isa<mlir::LLVM::LLVMStructType>())
       return mlir::failure();
 
-    auto memrefType = op.getType().dyn_cast<mlir::MemRefType>();
+    auto memrefType =
+        mlir::dyn_cast<mlir::MemRefType>(op.getSource().getType());
     if (!memrefType)
+      return mlir::failure();
+
+    auto dstMemrefType = mlir::dyn_cast<mlir::MemRefType>(op.getType());
+    if (!dstMemrefType)
       return mlir::failure();
 
     auto converter = getTypeConverter();
     assert(converter && "Invalid type converter");
 
-    auto resType = converter->convertType(memrefType);
+    auto resType = converter->convertType(op.getType());
     if (!resType)
       return mlir::failure();
 
     auto elemType = converter->convertType(memrefType.getElementType());
-    assert(elemType);
+    if (!elemType)
+      return mlir::failure();
 
     auto loc = op.getLoc();
     mlir::MemRefDescriptor src(arg);
@@ -534,7 +539,8 @@ struct LowerApplyOffsetOp
     auto zeroAttr = rewriter.getIntegerAttr(dst.getIndexType(), 0);
     auto dstOffset = rewriter.create<mlir::LLVM::ConstantOp>(loc, zeroAttr);
     dst.setOffset(rewriter, loc, dstOffset);
-    for (auto i : llvm::seq(0u, static_cast<unsigned>(memrefType.getRank()))) {
+    for (auto i :
+         llvm::seq(0u, static_cast<unsigned>(dstMemrefType.getRank()))) {
       dst.setSize(rewriter, loc, i, src.size(rewriter, loc, i));
       dst.setStride(rewriter, loc, i, src.stride(rewriter, loc, i));
     }

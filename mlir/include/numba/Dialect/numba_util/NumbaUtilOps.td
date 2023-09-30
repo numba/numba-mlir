@@ -70,6 +70,8 @@ def IndexRangeAttr
 
 def ParallelAttr : NumbaUtil_Attr<"Parallel", "parallel">;
 
+def AtomicAttr : NumbaUtil_Attr<"Atomic", "atomic">;
+
 def EnforceShapeOp : NumbaUtil_Op<"enforce_shape", [Pure]> {
 
   let arguments = (ins AnyShaped:$value, Variadic<Index>:$sizes);

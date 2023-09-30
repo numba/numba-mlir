@@ -27,7 +27,6 @@ class Benchmark(numba_mlir.mlir.benchmarking.BenchmarkBase):
         return get_impl_prange(get_numba_replace_parfor_context())
 
     def initialize(self, preset):
-        self.is_expected_failure = self.is_validate
         preset = parameters[preset]
         return initialize(**preset)
 

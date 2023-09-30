@@ -75,6 +75,36 @@
 #include <cctype>
 
 namespace {
+static numba::util::EnvironmentRegionOp
+isInsideParallelRegion(mlir::Operation *op) {
+  assert(op && "Invalid op");
+  while (true) {
+    auto region = op->getParentOfType<numba::util::EnvironmentRegionOp>();
+    if (!region)
+      return nullptr;
+
+    if (mlir::isa<numba::util::ParallelAttr>(region.getEnvironment()))
+      return region;
+
+    op = region;
+  }
+}
+
+static numba::util::EnvironmentRegionOp
+isInsideAtomicRegion(mlir::Operation *op) {
+  assert(op && "Invalid op");
+  while (true) {
+    auto region = op->getParentOfType<numba::util::EnvironmentRegionOp>();
+    if (!region)
+      return nullptr;
+
+    if (mlir::isa<numba::util::AtomicAttr>(region.getEnvironment()))
+      return region;
+
+    op = region;
+  }
+}
+
 static int64_t getOptLevel(mlir::Operation *op) {
   assert(op);
   auto attr = op->getAttr(numba::util::attributes::getOptLevelName())
@@ -2047,20 +2077,6 @@ struct ResolveNtensorPass
   }
 };
 
-static bool isInsideParallelRegion(mlir::Operation *op) {
-  assert(op && "Invalid op");
-  while (true) {
-    auto region = op->getParentOfType<numba::util::EnvironmentRegionOp>();
-    if (!region)
-      return false;
-
-    if (mlir::isa<numba::util::ParallelAttr>(region.getEnvironment()))
-      return true;
-
-    op = region;
-  }
-}
-
 struct WrapParforRegionsPass
     : public mlir::PassWrapper<WrapParforRegionsPass,
                                mlir::OperationPass<void>> {
@@ -3222,6 +3238,150 @@ struct AdditionalBufferize
   }
 };
 
+struct GenAtomicAdd : public mlir::OpRewritePattern<mlir::memref::StoreOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(mlir::memref::StoreOp op,
+                  mlir::PatternRewriter &rewriter) const override {
+    auto atomicOp = op.getValueToStore().getDefiningOp();
+    if (!atomicOp)
+      return mlir::failure();
+
+    auto reg = isInsideAtomicRegion(op);
+    if (!reg)
+      return mlir::failure();
+
+    auto memref = op.getMemRef();
+    if (!mlir::DominanceInfo().properlyDominates(memref, reg))
+      return mlir::failure();
+
+    auto indices = op.getIndices();
+
+    auto checkAddOp = [&](auto addOp) -> mlir::Value {
+      for (bool reverse : {false, true}) {
+        auto load = (reverse ? addOp.getLhs() : addOp.getRhs())
+                        .template getDefiningOp<mlir::memref::LoadOp>();
+        if (!load)
+          continue;
+
+        if (load.getMemRef() != memref || load.getIndices() != indices)
+          continue;
+
+        return (reverse ? addOp.getRhs() : addOp.getLhs());
+      }
+      return nullptr;
+    };
+
+    if (auto addOp = mlir::dyn_cast<mlir::arith::AddIOp>(atomicOp)) {
+      auto other = checkAddOp(addOp);
+      if (!other)
+        return mlir::failure();
+
+      rewriter.create<mlir::memref::AtomicRMWOp>(
+          op.getLoc(), mlir::arith::AtomicRMWKind::addi, other, memref,
+          indices);
+      rewriter.eraseOp(op);
+      return mlir::success();
+    }
+    if (auto addOp = mlir::dyn_cast<mlir::arith::AddFOp>(atomicOp)) {
+      auto other = checkAddOp(addOp);
+      if (!other)
+        return mlir::failure();
+
+      rewriter.create<mlir::memref::AtomicRMWOp>(
+          op.getLoc(), mlir::arith::AtomicRMWKind::addf, other, memref,
+          indices);
+      rewriter.eraseOp(op);
+      return mlir::success();
+    }
+    if (auto addOp = mlir::dyn_cast<mlir::complex::AddOp>(atomicOp)) {
+      auto other = checkAddOp(addOp);
+      if (!other)
+        return mlir::failure();
+
+      auto loc = op.getLoc();
+
+      auto srcType = mlir::cast<mlir::MemRefType>(memref.getType());
+      auto elemType = mlir::cast<mlir::ComplexType>(srcType.getElementType())
+                          .getElementType();
+      auto rank = srcType.getShape().size();
+      llvm::SmallVector<mlir::OpFoldResult> offsets(rank);
+      llvm::copy(indices, offsets.begin());
+
+      llvm::SmallVector<mlir::OpFoldResult> sizes(rank,
+                                                  rewriter.getIndexAttr(1));
+
+      mlir::Value view = rewriter.create<mlir::memref::SubViewOp>(
+          loc, memref, offsets, sizes, sizes);
+      auto resType =
+          mlir::MemRefType::get(2, elemType, mlir::MemRefLayoutAttrInterface{},
+                                srcType.getMemorySpace());
+      view =
+          rewriter.create<numba::util::MemrefApplyOffsetOp>(loc, resType, view);
+
+      auto re = rewriter.create<mlir::complex::ReOp>(loc, other);
+      auto im = rewriter.create<mlir::complex::ImOp>(loc, other);
+
+      mlir::Value zero = rewriter.create<mlir::arith::ConstantIndexOp>(loc, 0);
+      mlir::Value one = rewriter.create<mlir::arith::ConstantIndexOp>(loc, 1);
+      rewriter.create<mlir::memref::AtomicRMWOp>(
+          loc, mlir::arith::AtomicRMWKind::addf, re, view, zero);
+      rewriter.create<mlir::memref::AtomicRMWOp>(
+          loc, mlir::arith::AtomicRMWKind::addf, im, view, one);
+
+      rewriter.eraseOp(op);
+      return mlir::success();
+    }
+
+    return mlir::failure();
+  }
+};
+
+struct RemoveAtomicRegions
+    : public mlir::OpRewritePattern<numba::util::EnvironmentRegionOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(numba::util::EnvironmentRegionOp op,
+                  mlir::PatternRewriter &rewriter) const override {
+    if (!mlir::isa<numba::util::AtomicAttr>(op.getEnvironment()))
+      return mlir::failure();
+
+    auto visitor = [](mlir::memref::StoreOp) -> mlir::WalkResult {
+      return mlir::WalkResult::interrupt();
+    };
+    if (op.getRegion().walk(visitor).wasInterrupted())
+      return mlir::failure();
+
+    numba::util::EnvironmentRegionOp::inlineIntoParent(rewriter, op);
+    return mlir::success();
+  }
+};
+
+struct GenAtomicOpsPass
+    : public numba::RewriteWrapperPass<GenAtomicOpsPass, void, void,
+                                       GenAtomicAdd, RemoveAtomicRegions> {};
+
+struct RemoveAllAtomicRegions
+    : public mlir::OpRewritePattern<numba::util::EnvironmentRegionOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(numba::util::EnvironmentRegionOp op,
+                  mlir::PatternRewriter &rewriter) const override {
+    if (!mlir::isa<numba::util::AtomicAttr>(op.getEnvironment()))
+      return mlir::failure();
+
+    numba::util::EnvironmentRegionOp::inlineIntoParent(rewriter, op);
+    return mlir::success();
+  }
+};
+
+struct RemoveAtomicRegionsPass
+    : public numba::RewriteWrapperPass<GenAtomicOpsPass, void, void,
+                                       RemoveAllAtomicRegions> {};
+
 struct MarkArgsRestrictPass
     : public mlir::PassWrapper<MarkArgsRestrictPass,
                                mlir::OperationPass<void>> {
@@ -3658,10 +3818,47 @@ struct InsertParallelRegionPass
   }
 };
 
-static void populatePlierToLinalgRegionPipeline(mlir::OpPassManager &pm) {
-  pm.addPass(mlir::createCanonicalizerPass());
-  pm.addPass(std::make_unique<InsertParallelRegionPass>());
-}
+struct GenAtomicRegion : public mlir::OpRewritePattern<plier::InplaceBinOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(plier::InplaceBinOp op,
+                  mlir::PatternRewriter &rewriter) const override {
+    if (!isInsideParallelRegion(op) || isInsideAtomicRegion(op))
+      return mlir::failure();
+
+    auto loc = op.getLoc();
+    auto env = numba::util::AtomicAttr::get(getContext());
+    auto reg = rewriter.create<numba::util::EnvironmentRegionOp>(
+        loc, env, std::nullopt, op.getType());
+    auto body = reg.getBody();
+    rewriter.eraseOp(body->getTerminator());
+
+    mlir::OpBuilder::InsertionGuard g(rewriter);
+    rewriter.setInsertionPointToStart(body);
+
+    auto res = op.getResult();
+    auto newTerm =
+        rewriter.create<numba::util::EnvironmentRegionYieldOp>(loc, res);
+    rewriter.updateRootInPlace(op, [&]() { op->moveBefore(newTerm); });
+    for (auto user : op->getUsers()) {
+      if (!mlir::isa<plier::SetItemOp>(user))
+        continue;
+
+      rewriter.updateRootInPlace(user, [&]() { user->moveBefore(newTerm); });
+    }
+
+    auto checker = [&](mlir::OpOperand &arg) {
+      return arg.getOwner()->getParentOp() != reg;
+    };
+    rewriter.replaceUsesWithIf(res, reg.getResult(0), checker);
+    return mlir::success();
+  }
+};
+
+struct GenAtomicRegionPass
+    : public numba::RewriteWrapperPass<GenAtomicRegionPass, void, void,
+                                       GenAtomicRegion> {};
 
 static void populateCommonOptPass(mlir::OpPassManager &pm) {
   pm.addPass(numba::createCompositePass(
@@ -3688,6 +3885,12 @@ static void populateDeallocationPipeline(mlir::OpPassManager &pm) {
         p.addNestedPass<mlir::func::FuncOp>(mlir::createCSEPass());
         p.addNestedPass<mlir::func::FuncOp>(numba::createCommonOptsPass());
       }));
+}
+
+static void populatePlierToLinalgRegionPipeline(mlir::OpPassManager &pm) {
+  pm.addPass(mlir::createCanonicalizerPass());
+  pm.addPass(std::make_unique<InsertParallelRegionPass>());
+  pm.addPass(std::make_unique<GenAtomicRegionPass>());
 }
 
 static void populatePlierToLinalgGenPipeline(mlir::OpPassManager &pm) {
@@ -3804,6 +4007,8 @@ static void populatePlierToLinalgOptPipeline(mlir::OpPassManager &pm) {
       "PostLinalgOptPass", [](mlir::OpPassManager &p) {
         p.addPass(numba::createNormalizeMemrefArgsPass());
         p.addNestedPass<mlir::func::FuncOp>(
+            std::make_unique<GenAtomicOpsPass>());
+        p.addNestedPass<mlir::func::FuncOp>(
             std::make_unique<MoveTrivialIntoRegionPass>());
         p.addNestedPass<mlir::func::FuncOp>(mlir::createCSEPass());
         p.addNestedPass<mlir::func::FuncOp>(
@@ -3817,6 +4022,8 @@ static void populatePlierToLinalgOptPipeline(mlir::OpPassManager &pm) {
         p.addPass(numba::createRemoveUnusedArgsPass());
       }));
 
+  pm.addNestedPass<mlir::func::FuncOp>(
+      std::make_unique<RemoveAtomicRegionsPass>());
   pm.addNestedPass<mlir::func::FuncOp>(
       std::make_unique<PropagateFastmathFlags>());
   // Uplifting FMAs can interfere with other optimizations, like loop reduction

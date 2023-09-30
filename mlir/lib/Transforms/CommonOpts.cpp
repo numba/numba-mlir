@@ -406,6 +406,36 @@ struct ResTruncFUnary : public mlir::OpRewritePattern<Op> {
 
 // TODO: Upstream
 template <typename Op>
+struct ResTruncIBinary : public mlir::OpRewritePattern<Op> {
+  using mlir::OpRewritePattern<Op>::OpRewritePattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(Op op, mlir::PatternRewriter &rewriter) const override {
+    auto res = op.getResult();
+    if (!llvm::hasSingleElement(res.getUsers()))
+      return mlir::failure();
+
+    auto trunc = mlir::dyn_cast<mlir::arith::TruncIOp>(*res.getUsers().begin());
+    if (!trunc)
+      return mlir::failure();
+
+    auto resType = trunc.getType();
+
+    auto loc = op.getLoc();
+    mlir::Value lhs =
+        rewriter.create<mlir::arith::TruncIOp>(loc, resType, op.getLhs());
+    mlir::Value rhs =
+        rewriter.create<mlir::arith::TruncIOp>(loc, resType, op.getRhs());
+
+    mlir::Value newRes = rewriter.create<Op>(loc, lhs, rhs);
+    rewriter.replaceOp(trunc, newRes);
+    rewriter.eraseOp(op);
+    return mlir::success();
+  }
+};
+
+// TODO: Upstream
+template <typename Op>
 struct ResTruncFBinary : public mlir::OpRewritePattern<Op> {
   using mlir::OpRewritePattern<Op>::OpRewritePattern;
 
@@ -1053,6 +1083,9 @@ void numba::populateCommonOptsPatterns(mlir::RewritePatternSet &patterns) {
       ResTruncFBinary<mlir::arith::SubFOp>,
       ResTruncFBinary<mlir::arith::MulFOp>,
       ResTruncFBinary<mlir::arith::DivFOp>,
+      ResTruncIBinary<mlir::arith::AddIOp>,
+      ResTruncIBinary<mlir::arith::SubIOp>,
+      ResTruncIBinary<mlir::arith::MulIOp>,
       GPUGenGlobalId
       // clang-format on
       >(patterns.getContext());
