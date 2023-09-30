@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2010-2016 Ohio State University
+# SPDX-FileCopyrightText: 2021 ETH Zurich and the NPBench authors
+# SPDX-FileCopyrightText: 2022 - 2023 Intel Corporation
+#
+# SPDX-License-Identifier: BSD-3-Clause
+
+[benchmark]
+name = "Triangular matrix-multiply"
+
+[benchmark.parameters.S]
+M = 65
+N = 80
+
+[benchmark.parameters.M]
+M = 200
+N = 250
+
+[benchmark.parameters.L]
+M = 600
+N = 700
+
+[benchmark.parameters.paper]
+M = 1000
+N = 1200
