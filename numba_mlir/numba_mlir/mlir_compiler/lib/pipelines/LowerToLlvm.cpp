@@ -1531,7 +1531,7 @@ struct LowerParallel : public mlir::OpRewritePattern<numba::util::ParallelOp> {
   }
 
 private:
-  mutable mlir::LLVMTypeConverter converter; // TODO
+  mlir::LLVMTypeConverter converter;
 };
 
 struct RemoveParallelRegion
