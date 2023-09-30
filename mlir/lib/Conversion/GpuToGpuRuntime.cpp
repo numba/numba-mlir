@@ -172,10 +172,6 @@ struct InsertGPUAllocs
     };
 
     auto hasMemAccess = [](mlir::Operation *op) -> bool {
-      // TODO: Add MemoryEffectOpInterface to AtomicRMWOp.
-      if (mlir::isa<mlir::memref::AtomicRMWOp>(op))
-        return true;
-
       if (auto memInterface =
               mlir::dyn_cast<mlir::MemoryEffectOpInterface>(op)) {
         if (memInterface.hasEffect<mlir::MemoryEffects::Read>() ||
@@ -230,12 +226,8 @@ struct InsertGPUAllocs
                   if (op) {
                     if (mlir::isa<mlir::scf::SCFDialect>(op->getDialect()) ||
                         mlir::isa<mlir::ViewLikeOpInterface,
-                                  mlir::memref::ExtractStridedMetadataOp,
                                   mlir::arith::SelectOp, mlir::func::CallOp,
                                   numba::util::EnvironmentRegionOp>(op))
-                      // TODO: Add ViewLikeOpInterface to
-                      // ExtractStridedMetadataOp
-
                       // Ignore Op
                       continue;
                     if (mlir::isa<mlir::memref::AllocOp, mlir::memref::AllocaOp,
@@ -337,27 +329,6 @@ struct InsertGPUAllocs
               }
             }
 
-            continue;
-          }
-
-          if (auto atomic = mlir::dyn_cast<mlir::memref::AtomicRMWOp>(user)) {
-            // TODO: Add MemoryEffectOpInterface to AtomicRMWOp.
-            bool onDevice = user->getParentOfType<mlir::gpu::LaunchOp>();
-            (onDevice ? ret.deviceRead : ret.hostRead) = true;
-            (onDevice ? ret.deviceWrite : ret.hostWrite) = true;
-
-            if (onDevice) {
-              auto env = getEnv(user);
-              if (mlir::succeeded(env)) {
-                assert(*env && "Invalid device");
-                if (!ret.env) {
-                  ret.env = *env;
-                } else if (ret.env != *env) {
-                  return user->emitError("Device conflict: ")
-                         << ret.env << " and " << *env;
-                }
-              }
-            }
             continue;
           }
 
