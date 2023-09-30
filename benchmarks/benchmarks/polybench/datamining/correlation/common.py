@@ -14,14 +14,6 @@ parameters = dict(config["benchmark"]["parameters"])
 presets = filter_presets(parameters.keys())
 
 
-def initialize(N, npt):
-    from numpy.random import default_rng
-
-    rng = default_rng(42)
-    data, radius = rng.random((N,)), rng.random((N,))
-    return data, radius, npt
-
-
 def initialize(M, N, datatype=np.float64):
     float_n = datatype(N)
     data = np.fromfunction(lambda i, j: (i * j) / M + i, (N, M), dtype=datatype)
