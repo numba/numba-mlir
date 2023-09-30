@@ -16,7 +16,7 @@ presets = filter_presets(parameters.keys())
 
 def initialize(M, N, datatype=np.float64):
     float_n = datatype(N)
-    data = np.fromfunction(lambda i, j: (i * j) / M + i, (N, M), dtype=datatype)
+    data = np.fromfunction(lambda i, j: (i * j) / M, (N, M), dtype=datatype)
 
     return M, float_n, data
 
@@ -28,15 +28,12 @@ def get_impl(ctx):
 
     def kernel(M, float_n, data):
         mean = np.mean(data, axis=0)
-        stddev = np.std(data, axis=0)
-        stddev[stddev <= 0.1] = 1.0
         data -= mean
-        data /= np.sqrt(float_n) * stddev
-        corr = np.eye(M, dtype=data.dtype)
-        for i in prange(M - 1):
-            corr[i + 1 : M, i] = corr[i, i + 1 : M] = data[:, i] @ data[:, i + 1 : M]
+        cov = np.zeros((M, M), dtype=data.dtype)
+        for i in prange(M):
+            cov[i:M, i] = cov[i, i:M] = data[:, i] @ data[:, i:M] / (float_n - 1.0)
 
-        return corr
+        return cov
 
     return jit(kernel)
 
@@ -49,15 +46,16 @@ def get_impl_numba(ctx):
     def kernel(M, float_n, data):
         # mean = np.mean(data, axis=0)
         mean = np.sum(data, axis=0) / float_n
-        # stddev = np.std(data, axis=0)
-        stddev = np.sqrt(np.sum((data - mean) ** 2, axis=0) / float_n)
-        stddev[stddev <= 0.1] = 1.0
         data -= mean
-        data /= np.sqrt(float_n) * stddev
-        corr = np.eye(M, dtype=data.dtype)
-        for i in prange(M - 1):
-            corr[i + 1 : M, i] = corr[i, i + 1 : M] = data[:, i] @ data[:, i + 1 : M]
+        cov = np.zeros((M, M), dtype=data.dtype)
+        # for i in nb.prange(M):
+        #     for j in nb.prange(i, M):
+        #         cov[i, j] = np.sum(data[:, i] * data[:, j])
+        #         cov[i, j] /= float_n - 1.0
+        #         cov[j, i] = cov[i, j]
+        for i in prange(M):
+            cov[i:M, i] = cov[i, i:M] = data[:, i] @ data[:, i:M] / (float_n - 1.0)
 
-        return corr
+        return cov
 
     return jit(kernel)
