@@ -43,3 +43,18 @@ std::string numba::getUniqueLLVMGlobalName(mlir::ModuleOp mod,
       return name;
   }
 }
+
+mlir::LLVM::LLVMFuncOp numba::getOrInserLLVMFunc(mlir::OpBuilder &builder,
+                                                 mlir::ModuleOp mod,
+                                                 llvm::StringRef name,
+                                                 mlir::Type type) {
+  auto func = mod.lookupSymbol<mlir::LLVM::LLVMFuncOp>(name);
+  if (!func) {
+    mlir::OpBuilder::InsertionGuard g(builder);
+    auto body = mod.getBody();
+    builder.setInsertionPoint(body, body->end());
+    auto loc = builder.getUnknownLoc();
+    return builder.create<mlir::LLVM::LLVMFuncOp>(loc, name, type);
+  }
+  return func;
+}
