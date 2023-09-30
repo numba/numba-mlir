@@ -1,0 +1,32 @@
+# SPDX-FileCopyrightText: 2010-2016 Ohio State University
+# SPDX-FileCopyrightText: 2021 ETH Zurich and the NPBench authors
+# SPDX-FileCopyrightText: 2022 - 2023 Intel Corporation
+#
+# SPDX-License-Identifier: BSD-3-Clause
+
+[benchmark]
+name = "2 Matrix Multiplications"
+
+[benchmark.parameters.S]
+NI = 800
+NJ = 850
+NK = 900
+NL = 950
+
+[benchmark.parameters.M]
+NI = 2000
+NJ = 2250
+NK = 2500
+NL = 2750
+
+[benchmark.parameters.L]
+NI = 6000
+NJ = 6500
+NK = 7000
+NL = 7500
+
+[benchmark.parameters.paper]
+NI = 3200
+NJ = 3600
+NK = 4400
+NL = 4800
