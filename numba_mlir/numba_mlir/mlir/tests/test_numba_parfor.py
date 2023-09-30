@@ -378,7 +378,6 @@ def _gen_replace_parfor_tests():
         "test_ssa_false_reduction",
         "test_min",
         "test_nd_parfor",
-        "test_arraymap",
     }
     skip_tests = {
         "test_copy_global_for_parfor",  # flaky test
