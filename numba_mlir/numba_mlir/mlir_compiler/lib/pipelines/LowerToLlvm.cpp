@@ -233,13 +233,8 @@ static mlir::Value wrapAllocPtr(mlir::OpBuilder &builder, mlir::Location loc,
 
   auto ptrType = mlir::LLVM::LLVMPointerType::get(builder.getContext());
   mlir::StringRef funcName = "nmrtCreateAllocToken";
-  auto func = mod.lookupSymbol<mlir::LLVM::LLVMFuncOp>(funcName);
-  if (!func) {
-    mlir::OpBuilder::InsertionGuard g(builder);
-    builder.setInsertionPointToStart(mod.getBody());
-    auto funcType = mlir::LLVM::LLVMFunctionType::get(ptrType, {});
-    func = builder.create<mlir::LLVM::LLVMFuncOp>(loc, funcName, funcType);
-  }
+  auto funcType = mlir::LLVM::LLVMFunctionType::get(ptrType, {});
+  auto func = numba::getOrInserLLVMFunc(builder, mod, funcName, funcType);
   mlir::Value token =
       builder.create<mlir::LLVM::CallOp>(loc, func, std::nullopt).getResult();
   builder.create<mlir::LLVM::StoreOp>(loc, allocPtr, token);
@@ -262,15 +257,9 @@ static void freeAllocPtrWrapper(mlir::OpBuilder &builder, mlir::Location loc,
 
   auto ptrType = mlir::LLVM::LLVMPointerType::get(builder.getContext());
   mlir::StringRef funcName = "nmrtDestroyAllocToken";
-  auto func = mod.lookupSymbol<mlir::LLVM::LLVMFuncOp>(funcName);
-  if (!func) {
-    auto voidType = mlir::LLVM::LLVMVoidType::get(builder.getContext());
-    mlir::OpBuilder::InsertionGuard g(builder);
-    builder.setInsertionPointToStart(mod.getBody());
-    auto funcType = mlir::LLVM::LLVMFunctionType::get(voidType, ptrType);
-    func = builder.create<mlir::LLVM::LLVMFuncOp>(loc, funcName, funcType);
-  }
-
+  auto voidType = mlir::LLVM::LLVMVoidType::get(builder.getContext());
+  auto funcType = mlir::LLVM::LLVMFunctionType::get(voidType, ptrType);
+  auto func = numba::getOrInserLLVMFunc(builder, mod, funcName, funcType);
   builder.create<mlir::LLVM::CallOp>(loc, func, allocPtr);
 }
 
@@ -826,7 +815,8 @@ private:
     if (!func) {
       auto loc = builder.getUnknownLoc();
       mlir::OpBuilder::InsertionGuard g(builder);
-      builder.setInsertionPointToStart(mod.getBody());
+      auto body = mod.getBody();
+      builder.setInsertionPoint(body, body->end());
       auto llvmVoidType = getVoidType();
       auto llvmVoidPointerType = getVoidPtrType();
       func = builder.create<mlir::LLVM::LLVMFuncOp>(
@@ -882,7 +872,8 @@ getAllocMemInfoFunc(mlir::OpBuilder &builder,
       mlir::LLVM::LLVMFunctionType::get(ptr, {ptr, index, ptr, ptr});
 
   mlir::OpBuilder::InsertionGuard g(builder);
-  builder.setInsertionPointToStart(mod.getBody());
+  auto body = mod.getBody();
+  builder.setInsertionPoint(body, body->end());
   return builder.create<mlir::LLVM::LLVMFuncOp>(loc, funcName, funcType);
 }
 
@@ -917,8 +908,9 @@ struct LowerWrapAllocPointerOp
       auto wrapperName =
           numba::getUniqueLLVMGlobalName(mod, dtorRef + "_wrapper");
       mlir::OpBuilder::InsertionGuard g(rewriter);
-      rewriter.setInsertionPointToStart(mod.getBody());
       auto loc = deallocFunc.getLoc();
+      auto body = mod.getBody();
+      rewriter.setInsertionPoint(body, body->end());
       auto func = rewriter.create<mlir::LLVM::LLVMFuncOp>(loc, wrapperName,
                                                           wrapperFuncType);
       func.setPrivate();
@@ -1105,7 +1097,8 @@ private:
       auto allocFuncType =
           LLVM::LLVMFunctionType::get(getVoidPtrType(), paramTypes);
       OpBuilder::InsertionGuard guard(rewriter);
-      rewriter.setInsertionPointToStart(module.getBody());
+      auto body = module.getBody();
+      rewriter.setInsertionPoint(body, body->end());
       allocFuncOp = rewriter.create<LLVM::LLVMFuncOp>(rewriter.getUnknownLoc(),
                                                       name, allocFuncType);
     }
@@ -1170,7 +1163,8 @@ private:
     if (!func) {
       auto loc = builder.getUnknownLoc();
       mlir::OpBuilder::InsertionGuard g(builder);
-      builder.setInsertionPointToStart(mod.getBody());
+      auto body = mod.getBody();
+      builder.setInsertionPoint(body, body->end());
       auto llvmVoidType = getVoidType();
       auto llvmVoidPointerType = getVoidPtrType();
       func = builder.create<mlir::LLVM::LLVMFuncOp>(
@@ -1217,7 +1211,8 @@ private:
         auto dtorFunc = mod.lookupSymbol<mlir::LLVM::LLVMFuncOp>(dtorFuncName);
         if (!dtorFunc) {
           mlir::OpBuilder::InsertionGuard g1(builder);
-          builder.setInsertionPointToStart(mod.getBody());
+          auto body = mod.getBody();
+          builder.setInsertionPoint(body, body->end());
           dtorFunc = builder.create<mlir::LLVM::LLVMFuncOp>(
               loc, dtorFuncName,
               mlir::LLVM::LLVMFunctionType::get(llvmVoidType, meminfoPtrType));
@@ -1531,7 +1526,7 @@ struct LowerParallel : public mlir::OpRewritePattern<numba::util::ParallelOp> {
   }
 
 private:
-  mutable mlir::LLVMTypeConverter converter; // TODO
+  mlir::LLVMTypeConverter converter;
 };
 
 struct RemoveParallelRegion

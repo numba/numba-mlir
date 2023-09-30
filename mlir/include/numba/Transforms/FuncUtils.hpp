@@ -15,6 +15,9 @@ class Operation;
 namespace func {
 class FuncOp;
 }
+namespace LLVM {
+class LLVMFuncOp;
+}
 
 } // namespace mlir
 
@@ -46,4 +49,9 @@ private:
 
 /// Generate unique name for llvm global based on provided srcName.
 std::string getUniqueLLVMGlobalName(mlir::ModuleOp mod, llvm::Twine srcName);
+
+mlir::LLVM::LLVMFuncOp getOrInserLLVMFunc(mlir::OpBuilder &builder,
+                                          mlir::ModuleOp mod,
+                                          llvm::StringRef name,
+                                          mlir::Type type);
 } // namespace numba
