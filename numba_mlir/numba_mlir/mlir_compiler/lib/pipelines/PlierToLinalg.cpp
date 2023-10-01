@@ -566,11 +566,12 @@ struct ChangeLayoutReturn
       return mlir::failure();
 
     auto func = op->getParentOfType<mlir::func::FuncOp>();
-    if (!func || !func.isPrivate() || !llvm::hasSingleElement(func.getBody()))
+    if (!func || func.isPrivate() || !llvm::hasSingleElement(func.getBody()))
       return mlir::failure();
 
     auto mod = func->getParentOfType<mlir::ModuleOp>();
-    assert(mod);
+    if (!mod)
+      return mlir::failure();
 
     auto funcUses = mlir::SymbolTable::getSymbolUses(func, mod);
     if (!funcUses)
@@ -580,7 +581,7 @@ struct ChangeLayoutReturn
       if (!mlir::isa<mlir::func::CallOp>(use.getUser()))
         return mlir::failure();
 
-    auto loc = op->getLoc();
+    auto loc = op.getLoc();
     auto args = op.getOperands();
     auto count = static_cast<unsigned>(args.size());
     llvm::SmallVector<mlir::Value> newArgs(args.begin(), args.end());
@@ -589,7 +590,7 @@ struct ChangeLayoutReturn
     bool changed = false;
     for (auto i : llvm::seq(0u, count)) {
       auto arg = args[i];
-      auto retType = arg.getType().dyn_cast<mlir::MemRefType>();
+      auto retType = mlir::dyn_cast<mlir::MemRefType>(arg.getType());
       if (!retType)
         continue;
 
@@ -598,7 +599,7 @@ struct ChangeLayoutReturn
         continue;
 
       auto src = cast.getSource();
-      auto srcType = src.getType().cast<mlir::MemRefType>();
+      auto srcType = mlir::cast<mlir::MemRefType>(src.getType());
       assert(srcType.getElementType() == retType.getElementType());
 
       auto srcLayout = srcType.getLayout();
@@ -725,7 +726,7 @@ struct ChangeLayoutCall : public mlir::OpRewritePattern<mlir::func::CallOp> {
 
     mlir::func::FuncOp func =
         mod.lookupSymbol<mlir::func::FuncOp>(op.getCalleeAttr());
-    if (!func || func.isDeclaration() || func.isPublic())
+    if (!func || func.isDeclaration() || !func.isPrivate())
       return mlir::failure();
 
     bool checked = false;
