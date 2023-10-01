@@ -566,7 +566,7 @@ struct ChangeLayoutReturn
       return mlir::failure();
 
     auto func = op->getParentOfType<mlir::func::FuncOp>();
-    if (!func || func.isPrivate() || !llvm::hasSingleElement(func.getBody()))
+    if (!func || !func.isPrivate() || !llvm::hasSingleElement(func.getBody()))
       return mlir::failure();
 
     auto mod = func->getParentOfType<mlir::ModuleOp>();
