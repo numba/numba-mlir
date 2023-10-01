@@ -570,7 +570,8 @@ struct ChangeLayoutReturn
       return mlir::failure();
 
     auto mod = func->getParentOfType<mlir::ModuleOp>();
-    assert(mod);
+    if (!mod)
+      return mlir::failure();
 
     auto funcUses = mlir::SymbolTable::getSymbolUses(func, mod);
     if (!funcUses)
@@ -580,7 +581,7 @@ struct ChangeLayoutReturn
       if (!mlir::isa<mlir::func::CallOp>(use.getUser()))
         return mlir::failure();
 
-    auto loc = op->getLoc();
+    auto loc = op.getLoc();
     auto args = op.getOperands();
     auto count = static_cast<unsigned>(args.size());
     llvm::SmallVector<mlir::Value> newArgs(args.begin(), args.end());
@@ -589,16 +590,24 @@ struct ChangeLayoutReturn
     bool changed = false;
     for (auto i : llvm::seq(0u, count)) {
       auto arg = args[i];
-      auto retType = arg.getType().dyn_cast<mlir::MemRefType>();
+      auto retType = mlir::dyn_cast<mlir::MemRefType>(arg.getType());
       if (!retType)
         continue;
 
-      auto cast = arg.getDefiningOp<mlir::memref::CastOp>();
-      if (!cast)
+      auto src = [&]() -> mlir::Value {
+        if (auto cast = arg.getDefiningOp<mlir::memref::CastOp>())
+          return cast.getSource();
+
+        if (auto cast = arg.getDefiningOp<numba::util::ChangeLayoutOp>())
+          return cast.getSource();
+
+        return nullptr;
+      }();
+
+      if (!src)
         continue;
 
-      auto src = cast.getSource();
-      auto srcType = src.getType().cast<mlir::MemRefType>();
+      auto srcType = mlir::cast<mlir::MemRefType>(src.getType());
       assert(srcType.getElementType() == retType.getElementType());
 
       auto srcLayout = srcType.getLayout();
@@ -661,12 +670,175 @@ struct ChangeLayoutReturn
         auto oldType = oldResults[i].getType();
         auto newType = newArgs[i].getType();
         if (oldType != newType)
-          newArgs[i] = rewriter.create<mlir::memref::CastOp>(callLoc, oldType,
-                                                             newArgs[i]);
+          newArgs[i] = rewriter.create<numba::util::ChangeLayoutOp>(
+              callLoc, oldType, newArgs[i]);
       }
       rewriter.replaceOp(call, newArgs);
     }
 
+    return mlir::success();
+  }
+};
+
+static int64_t getMostDynamicDim(int64_t dim1, int64_t dim2) {
+  if (dim1 == dim2)
+    return dim1;
+
+  return mlir::ShapedType::kDynamic;
+}
+
+static std::optional<mlir::MemRefLayoutAttrInterface>
+getMostDynamicLayout(mlir::MemRefLayoutAttrInterface l1,
+                     mlir::MemRefLayoutAttrInterface l2) {
+  if (l1.isIdentity())
+    return l2;
+
+  if (l2.isIdentity())
+    return l1;
+
+  auto strided1 = mlir::dyn_cast<mlir::StridedLayoutAttr>(l1);
+  if (!strided1)
+    return std::nullopt;
+
+  auto strided2 = mlir::dyn_cast<mlir::StridedLayoutAttr>(l2);
+  if (!strided2)
+    return std::nullopt;
+
+  auto strides1 = strided1.getStrides();
+  auto strides2 = strided2.getStrides();
+  if (strides1.size() != strides2.size())
+    return std::nullopt;
+
+  auto newOffset =
+      getMostDynamicDim(strided1.getOffset(), strided2.getOffset());
+
+  llvm::SmallVector<int64_t> newStrides;
+  for (auto &&[i, it] : llvm::enumerate(llvm::zip(strides1, strides2))) {
+    auto &&[s1, s2] = it;
+    newStrides[i] = getMostDynamicDim(s1, s2);
+  }
+  return mlir::StridedLayoutAttr::get(l1.getContext(), newOffset, newStrides);
+}
+
+struct ChangeLayoutCall : public mlir::OpRewritePattern<mlir::func::CallOp> {
+  // Set benfit lower than canonicalization patterns.
+  ChangeLayoutCall(mlir::MLIRContext *context)
+      : mlir::OpRewritePattern<mlir::func::CallOp>(context, /*benefit*/ 0) {}
+
+  mlir::LogicalResult
+  matchAndRewrite(mlir::func::CallOp op,
+                  mlir::PatternRewriter &rewriter) const override {
+    auto mod = op->getParentOfType<mlir::ModuleOp>();
+    if (!mod)
+      return mlir::failure();
+
+    mlir::func::FuncOp func =
+        mod.lookupSymbol<mlir::func::FuncOp>(op.getCalleeAttr());
+    if (!func || func.isDeclaration() || !func.isPrivate())
+      return mlir::failure();
+
+    bool checked = false;
+    llvm::SmallVector<mlir::func::CallOp> otherCalls;
+    auto getUsers = [&]() -> bool {
+      if (checked)
+        return true;
+
+      auto uses = mlir::SymbolTable::getSymbolUses(func, mod);
+      if (!uses)
+        return false;
+
+      for (auto &use : *uses) {
+        auto call = mlir::dyn_cast<mlir::func::CallOp>(use.getUser());
+        if (!call)
+          return false;
+
+        if (call == op)
+          continue;
+
+        otherCalls.emplace_back(call);
+      }
+      checked = true;
+      return true;
+    };
+
+    mlir::ValueRange args = op.getOperands();
+
+    auto loc = op.getLoc();
+    llvm::SmallVector<mlir::Value> newArgs(args.begin(), args.end());
+    for (auto &&[i, arg] : llvm::enumerate(args)) {
+      auto dstType = mlir::dyn_cast<mlir::MemRefType>(arg.getType());
+      if (!dstType)
+        continue;
+
+      auto changeLayout = arg.getDefiningOp<numba::util::ChangeLayoutOp>();
+      if (!changeLayout)
+        continue;
+
+      mlir::Value src = changeLayout.getSource();
+      auto srcType = mlir::cast<mlir::MemRefType>(src.getType());
+      auto newLayout =
+          getMostDynamicLayout(srcType.getLayout(), dstType.getLayout());
+      if (!newLayout || *newLayout == dstType.getLayout())
+        continue;
+
+      if (!getUsers())
+        return mlir::failure();
+
+      auto newType =
+          mlir::MemRefType::get(dstType.getShape(), dstType.getElementType(),
+                                *newLayout, dstType.getMemorySpace());
+      if (srcType != newType)
+        src = rewriter.create<mlir::memref::CastOp>(loc, newType, src);
+
+      newArgs[i] = src;
+    }
+
+    if (!checked)
+      return mlir::failure();
+
+    rewriter.replaceOpWithNewOp<mlir::func::CallOp>(op, func, newArgs);
+
+    auto newArgTypes =
+        llvm::map_to_vector(newArgs, [](auto arg) { return arg.getType(); });
+    auto funcType = func.getFunctionType();
+    auto newFuncType = funcType.clone(newArgTypes, funcType.getResults());
+
+    mlir::OpBuilder::InsertionGuard g(rewriter);
+    rewriter.updateRootInPlace(func, [&]() {
+      func.setType(newFuncType);
+      assert(!func.getFunctionBody().empty());
+      auto &block = func.getFunctionBody().front();
+      rewriter.setInsertionPointToStart(&block);
+      assert(block.getNumArguments() == newArgTypes.size());
+      for (auto &&[arg, newType] :
+           llvm::zip(block.getArguments(), newArgTypes)) {
+        if (arg.getType() == newType)
+          continue;
+
+        auto oldType = arg.getType();
+        arg.setType(newType);
+        auto cast =
+            rewriter.create<numba::util::ChangeLayoutOp>(loc, oldType, arg);
+        rewriter.replaceAllUsesExcept(arg, cast.getResult(), cast);
+      }
+    });
+
+    for (auto call : otherCalls) {
+      auto loc = call.getLoc();
+      rewriter.setInsertionPoint(call);
+      auto args = call.getOperands();
+      for (auto &&[i, it] : llvm::enumerate(llvm::zip(args, newArgTypes))) {
+        auto &&[arg, newType] = it;
+        if (arg.getType() == newType) {
+          newArgs[i] = arg;
+          continue;
+        }
+
+        newArgs[i] = rewriter.create<mlir::memref::CastOp>(loc, newType, arg);
+      }
+
+      rewriter.replaceOpWithNewOp<mlir::func::CallOp>(call, func, newArgs);
+    }
     return mlir::success();
   }
 };
@@ -682,7 +854,7 @@ struct OptimizeStridedLayoutPass
 
     numba::populateCanonicalizationPatterns(patterns);
 
-    patterns.insert<ChangeLayoutReturn>(context);
+    patterns.insert<ChangeLayoutReturn, ChangeLayoutCall>(context);
 
     if (mlir::failed(mlir::applyPatternsAndFoldGreedily(getOperation(),
                                                         std::move(patterns))))

@@ -363,7 +363,6 @@ struct CastOpLowering
     assert(converter && "Type converter is not set");
 
     auto retType = converter->convertType<mlir::MemRefType>(origDstType);
-
     if (!retType)
       return mlir::failure();
 
@@ -379,10 +378,14 @@ struct CastOpLowering
       return mlir::failure();
 
     auto results = numba::util::wrapEnvRegion(
-        rewriter, op->getLoc(), origSrcType.getEnvironment(), retType,
-        [&](mlir::OpBuilder &builder, mlir::Location loc) {
-          return builder.create<mlir::memref::CastOp>(loc, retType, src)
-              .getResult();
+        rewriter, op.getLoc(), origSrcType.getEnvironment(), retType,
+        [&](mlir::OpBuilder &builder, mlir::Location loc) -> mlir::Value {
+          if (srcType.getLayout() == retType.getLayout()) {
+            return builder.create<mlir::memref::CastOp>(loc, retType, src);
+          } else {
+            return builder.create<numba::util::ChangeLayoutOp>(loc, retType,
+                                                               src);
+          }
         });
 
     rewriter.replaceOp(op, results);
