@@ -153,7 +153,6 @@ func.func @test(%arg1: !ntensor.ntensor<?x?xf32>, %arg2: index, %arg3: index) ->
   return %1: index
 }
 
-
 // -----
 
 // CHECK-LABEL: func @test
@@ -169,7 +168,6 @@ func.func @test(%arg1: memref<?xf32>) -> memref<?xf32> {
   return %3: memref<?xf32>
 }
 
-
 // -----
 
 // CHECK-LABEL: func @test
@@ -181,7 +179,6 @@ func.func @test(%arg: memref<?xf32>) -> index {
   %res = numba_util.get_alloc_token %0 : memref<2xf32> -> index
   return %res: index
 }
-
 
 // -----
 
@@ -195,7 +192,6 @@ func.func @test(%arg: memref<?xf32>) -> index {
   return %res: index
 }
 
-
 // -----
 
 // CHECK-LABEL: func @test
@@ -207,7 +203,6 @@ func.func @test(%arg: memref<?xf32>) -> index {
   %res = numba_util.get_alloc_token %0 : memref<f32> -> index
   return %res: index
 }
-
 
 // -----
 
