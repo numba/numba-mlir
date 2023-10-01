@@ -467,8 +467,8 @@ mlir::OpFoldResult ChangeLayoutOp::fold(FoldAdaptor) {
 
 namespace {
 static bool canTransformLayoutCast(mlir::Type src, mlir::Type dst) {
-  auto srcType = src.dyn_cast<mlir::MemRefType>();
-  auto dstType = dst.dyn_cast<mlir::MemRefType>();
+  auto srcType = mlir::dyn_cast<mlir::MemRefType>(src);
+  auto dstType = mlir::dyn_cast<mlir::MemRefType>(dst);
   if (!srcType || !dstType ||
       !mlir::memref::CastOp::areCastCompatible(srcType, dstType))
     return false;
