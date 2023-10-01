@@ -936,6 +936,78 @@ struct WhileOpMoveIfCond : public mlir::OpRewritePattern<mlir::scf::IfOp> {
   }
 };
 
+static std::optional<llvm::SmallVector<unsigned>>
+getArgsMapping(mlir::ValueRange args1, mlir::ValueRange args2) {
+  if (args1.size() != args2.size())
+    return std::nullopt;
+
+  llvm::SmallVector<unsigned> ret(args1.size());
+  for (auto &&[i, arg1] : llvm::enumerate(args1)) {
+    auto it = llvm::find(args2, arg1);
+    if (it == args2.end())
+      return std::nullopt;
+
+    auto j = it - args2.begin();
+    ret[j] = static_cast<unsigned>(i);
+  }
+
+  return ret;
+}
+
+struct WhileOpAlignBeforeArgs
+    : public mlir::OpRewritePattern<mlir::scf::WhileOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(mlir::scf::WhileOp loop,
+                  mlir::PatternRewriter &rewriter) const override {
+    auto oldBefore = loop.getBeforeBody();
+    auto oldTerm =
+        mlir::cast<mlir::scf::ConditionOp>(oldBefore->getTerminator());
+    mlir::ValueRange beforeArgs = oldBefore->getArguments();
+    mlir::ValueRange termArgs = oldTerm.getArgs();
+    if (beforeArgs == termArgs)
+      return mlir::failure();
+
+    auto mapping = getArgsMapping(beforeArgs, termArgs);
+    if (!mapping)
+      return mlir::failure();
+
+    {
+      mlir::OpBuilder::InsertionGuard g(rewriter);
+      rewriter.setInsertionPoint(oldTerm);
+      rewriter.replaceOpWithNewOp<mlir::scf::ConditionOp>(
+          oldTerm, oldTerm.getCondition(), beforeArgs);
+    }
+
+    auto oldAfter = loop.getAfterBody();
+
+    llvm::SmallVector<mlir::Type> newResultTypes(beforeArgs.size());
+    for (auto &&[i, j] : llvm::enumerate(*mapping))
+      newResultTypes[i] = loop.getResult(j).getType();
+
+    auto newLoop = rewriter.create<mlir::scf::WhileOp>(
+        loop.getLoc(), newResultTypes, loop.getInits(), nullptr, nullptr);
+    auto newBefore = newLoop.getBeforeBody();
+    auto newAfter = newLoop.getAfterBody();
+
+    llvm::SmallVector<mlir::Value> newResults(beforeArgs.size());
+    llvm::SmallVector<mlir::Value> newAfterArgs(beforeArgs.size());
+    for (auto &&[i, j] : llvm::enumerate(*mapping)) {
+      newResults[i] = newLoop.getResult(j);
+      newAfterArgs[i] = newAfter->getArgument(j);
+    }
+
+    rewriter.inlineBlockBefore(oldBefore, newBefore, newBefore->begin(),
+                               newBefore->getArguments());
+    rewriter.inlineBlockBefore(oldAfter, newAfter, newAfter->begin(),
+                               newAfterArgs);
+
+    rewriter.replaceOp(loop, newResults);
+    return mlir::success();
+  }
+};
+
 struct GPUGenGlobalId : public mlir::OpRewritePattern<mlir::arith::AddIOp> {
   using OpRewritePattern::OpRewritePattern;
 
@@ -1057,8 +1129,8 @@ void numba::populatePoisonOptsPatterns(mlir::RewritePatternSet &patterns) {
 
 void numba::populateLoopOptsPatterns(mlir::RewritePatternSet &patterns) {
   patterns.insert<CanonicalizeLoopMemrefIndex, MoveOpsFromBefore, WhileOpLICM,
-                  /*WhileOpExpandTuple,*/ WhileOpMoveIfCond>(
-      patterns.getContext());
+                  /*WhileOpExpandTuple,*/ WhileOpMoveIfCond,
+                  WhileOpAlignBeforeArgs>(patterns.getContext());
 }
 
 void numba::populateCommonOptsPatterns(mlir::RewritePatternSet &patterns) {
