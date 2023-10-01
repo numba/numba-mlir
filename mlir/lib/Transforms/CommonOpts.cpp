@@ -406,6 +406,25 @@ struct ResTruncFUnary : public mlir::OpRewritePattern<Op> {
 
 // TODO: Upstream
 template <typename Op>
+struct ResTruncIUnary : public mlir::OpRewritePattern<mlir::arith::TruncIOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(mlir::arith::TruncIOp op,
+                  mlir::PatternRewriter &rewriter) const override {
+    auto prev = op.getIn().getDefiningOp<Op>();
+    if (!prev)
+      return mlir::failure();
+
+    auto src = prev.getOperand();
+    auto resType = op.getType();
+    rewriter.replaceOpWithNewOp<Op>(op, resType, src);
+    return mlir::success();
+  }
+};
+
+// TODO: Upstream
+template <typename Op>
 struct ResTruncIBinary : public mlir::OpRewritePattern<Op> {
   using mlir::OpRewritePattern<Op>::OpRewritePattern;
 
@@ -1155,6 +1174,8 @@ void numba::populateCommonOptsPatterns(mlir::RewritePatternSet &patterns) {
       ResTruncFBinary<mlir::arith::SubFOp>,
       ResTruncFBinary<mlir::arith::MulFOp>,
       ResTruncFBinary<mlir::arith::DivFOp>,
+      ResTruncIUnary<mlir::arith::IndexCastOp>,
+      ResTruncIUnary<mlir::arith::FPToSIOp>,
       ResTruncIBinary<mlir::arith::AddIOp>,
       ResTruncIBinary<mlir::arith::SubIOp>,
       ResTruncIBinary<mlir::arith::MulIOp>,
