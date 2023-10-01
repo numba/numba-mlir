@@ -49,10 +49,11 @@ popd
 cd ./${GH_PAGE}/
 git config user.email "(none)"
 git config user.name "Benchmark automation"
+git checkout -b ${NUMBA_MLIR_BENCH_RUNNER_MACHINE}-bench
 git add *
 git commit -m "run benchmark"
 git pull --rebase origin ${GH_BRANCH}
-git push origin ${GH_BRANCH}
+git push origin ${NUMBA_MLIR_BENCH_RUNNER_MACHINE}-bench
 
 conda deactivate
 conda remove -n ${ENV_NAME} --all -y
