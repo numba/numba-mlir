@@ -44,6 +44,7 @@
 #include "numba/Compiler/PipelineRegistry.hpp"
 #include "numba/Conversion/NtensorToLinalg.hpp"
 #include "numba/Conversion/NtensorToMemref.hpp"
+#include "numba/Dialect/gpu_runtime/IR/GpuRuntimeOps.hpp"
 #include "numba/Dialect/ntensor/IR/NTensorOps.hpp"
 #include "numba/Dialect/ntensor/Transforms/CopyRemoval.hpp"
 #include "numba/Dialect/ntensor/Transforms/PropagateEnvironment.hpp"
@@ -3510,6 +3511,10 @@ struct GenAtomicAdd : public mlir::OpRewritePattern<mlir::memref::StoreOp> {
   }
 };
 
+struct GenAtomicOpsPass
+    : public numba::RewriteWrapperPass<GenAtomicOpsPass, void, void,
+                                       GenAtomicAdd> {};
+
 struct RemoveAtomicRegions
     : public mlir::OpRewritePattern<numba::util::EnvironmentRegionOp> {
   using OpRewritePattern::OpRewritePattern;
@@ -3531,9 +3536,68 @@ struct RemoveAtomicRegions
   }
 };
 
-struct GenAtomicOpsPass
-    : public numba::RewriteWrapperPass<GenAtomicOpsPass, void, void,
-                                       GenAtomicAdd, RemoveAtomicRegions> {};
+struct RemoveParallelRegions
+    : public mlir::OpRewritePattern<numba::util::EnvironmentRegionOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(numba::util::EnvironmentRegionOp op,
+                  mlir::PatternRewriter &rewriter) const override {
+    if (!mlir::isa<numba::util::ParallelAttr>(op.getEnvironment()))
+      return mlir::failure();
+
+    auto visitor = [](mlir::Operation *op) -> mlir::WalkResult {
+      if (mlir::isa<mlir::scf::WhileOp, mlir::scf::ForOp,
+                    mlir::scf::ParallelOp>(op))
+        return mlir::WalkResult::interrupt();
+
+      return mlir::WalkResult::advance();
+    };
+    if (op.getRegion().walk(visitor).wasInterrupted())
+      return mlir::failure();
+
+    numba::util::EnvironmentRegionOp::inlineIntoParent(rewriter, op);
+    return mlir::success();
+  }
+};
+
+// TODO: move to gpu dialect caonicalizations
+struct RemoveGPURegions
+    : public mlir::OpRewritePattern<numba::util::EnvironmentRegionOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(numba::util::EnvironmentRegionOp op,
+                  mlir::PatternRewriter &rewriter) const override {
+    if (!mlir::isa<gpu_runtime::GPURegionDescAttr>(op.getEnvironment()))
+      return mlir::failure();
+
+    auto visitor = [](mlir::Operation *op) -> mlir::WalkResult {
+      if (mlir::isa<mlir::memref::SubViewOp, mlir::memref::DimOp>(op))
+        return mlir::WalkResult::advance();
+
+      if (mlir::isa<mlir::scf::WhileOp, mlir::scf::ForOp,
+                    mlir::scf::ParallelOp>(op))
+        return mlir::WalkResult::interrupt();
+
+      if (mlir::isa<mlir::gpu::GPUDialect, mlir::memref::MemRefDialect,
+                    gpu_runtime::GpuRuntimeDialect>(op->getDialect()))
+        return mlir::WalkResult::interrupt();
+
+      return mlir::WalkResult::advance();
+    };
+    if (op.getRegion().walk(visitor).wasInterrupted())
+      return mlir::failure();
+
+    numba::util::EnvironmentRegionOp::inlineIntoParent(rewriter, op);
+    return mlir::success();
+  }
+};
+
+struct CleanupRegionsPass
+    : public numba::RewriteWrapperPass<
+          CleanupRegionsPass, void, void, RemoveAtomicRegions,
+          RemoveParallelRegions, RemoveGPURegions> {};
 
 struct RemoveAllAtomicRegions
     : public mlir::OpRewritePattern<numba::util::EnvironmentRegionOp> {
@@ -4183,6 +4247,8 @@ static void populatePlierToLinalgOptPipeline(mlir::OpPassManager &pm) {
         p.addPass(numba::createNormalizeMemrefArgsPass());
         p.addNestedPass<mlir::func::FuncOp>(
             std::make_unique<GenAtomicOpsPass>());
+        p.addNestedPass<mlir::func::FuncOp>(
+            std::make_unique<CleanupRegionsPass>());
         p.addNestedPass<mlir::func::FuncOp>(
             std::make_unique<MoveTrivialIntoRegionPass>());
         p.addNestedPass<mlir::func::FuncOp>(mlir::createCSEPass());
