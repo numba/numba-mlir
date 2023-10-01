@@ -806,9 +806,10 @@ struct ChangeLayoutCall : public mlir::OpRewritePattern<mlir::func::CallOp> {
         if (arg.getType() == newType)
           continue;
 
+        auto oldType = arg.getType();
         arg.setType(newType);
         auto cast =
-            rewriter.create<numba::util::ChangeLayoutOp>(loc, newType, arg);
+            rewriter.create<numba::util::ChangeLayoutOp>(loc, oldType, arg);
         rewriter.replaceAllUsesExcept(arg, cast.getResult(), cast);
       }
     });
