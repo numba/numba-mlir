@@ -1,0 +1,20 @@
+# SPDX-FileCopyrightText: 2010-2016 Ohio State University
+# SPDX-FileCopyrightText: 2021 ETH Zurich and the NPBench authors
+# SPDX-FileCopyrightText: 2022 - 2023 Intel Corporation
+#
+# SPDX-License-Identifier: BSD-3-Clause
+
+[benchmark]
+name = "LU Decomposition"
+
+[benchmark.parameters.S]
+N = 60
+
+[benchmark.parameters.M]
+N = 220
+
+[benchmark.parameters.L]
+N = 700
+
+[benchmark.parameters.paper]
+N = 2000
