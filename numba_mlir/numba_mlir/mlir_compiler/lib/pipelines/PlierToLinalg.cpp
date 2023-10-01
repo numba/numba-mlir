@@ -594,11 +594,19 @@ struct ChangeLayoutReturn
       if (!retType)
         continue;
 
-      auto cast = arg.getDefiningOp<mlir::memref::CastOp>();
-      if (!cast)
+      auto src = [&]() -> mlir::Value {
+        if (auto cast = arg.getDefiningOp<mlir::memref::CastOp>())
+          return cast.getSource();
+
+        if (auto cast = arg.getDefiningOp<numba::util::ChangeLayoutOp>())
+          return cast.getSource();
+
+        return nullptr;
+      }();
+
+      if (!src)
         continue;
 
-      auto src = cast.getSource();
       auto srcType = mlir::cast<mlir::MemRefType>(src.getType());
       assert(srcType.getElementType() == retType.getElementType());
 
@@ -662,8 +670,8 @@ struct ChangeLayoutReturn
         auto oldType = oldResults[i].getType();
         auto newType = newArgs[i].getType();
         if (oldType != newType)
-          newArgs[i] = rewriter.create<mlir::memref::CastOp>(callLoc, oldType,
-                                                             newArgs[i]);
+          newArgs[i] = rewriter.create<numba::util::ChangeLayoutOp>(
+              callLoc, oldType, newArgs[i]);
       }
       rewriter.replaceOp(call, newArgs);
     }
