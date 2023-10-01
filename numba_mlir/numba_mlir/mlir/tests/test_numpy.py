@@ -1046,18 +1046,39 @@ def test_np_reduce(dtype):
         assert ir.count("memref.load") == 1, ir
 
 
-def test_indirect_call_array():
+_indirect_array_call_args = [
+    np.arange(12),
+    np.arange(12).reshape(3, 4),
+    np.arange(12).reshape(3, 4).T,
+]
+
+
+@pytest.mark.parametrize("arr", _indirect_array_call_args)
+def test_indirect_call_array1(arr):
     def inner_func(a):
         return a + 3
 
-    def func(func, *args):
-        return func(*args)
+    def func(func, a):
+        return func(a)
 
     jit_inner_func = njit(inner_func)
     jit_func = njit(func)
 
-    arr = np.array([[1, 2, 3], [4, 5, 6]])
-    # arr = 5
+    assert_equal(func(inner_func, arr), jit_func(jit_inner_func, arr))
+
+
+@pytest.mark.parametrize("arr", _indirect_array_call_args)
+def test_indirect_call_array2(arr):
+    def inner_func(a):
+        return a
+
+    def func(func, a):
+        b = func(a)
+        return func(b)
+
+    jit_inner_func = njit(inner_func)
+    jit_func = njit(func)
+
     assert_equal(func(inner_func, arr), jit_func(jit_inner_func, arr))
 
 
