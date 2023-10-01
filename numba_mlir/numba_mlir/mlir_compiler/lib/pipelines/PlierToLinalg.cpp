@@ -801,7 +801,8 @@ struct ChangeLayoutCall : public mlir::OpRewritePattern<mlir::func::CallOp> {
       auto &block = func.getFunctionBody().front();
       rewriter.setInsertionPointToStart(&block);
       assert(block.getNumArguments() == newArgTypes.size());
-      for (auto [arg, newType] : llvm::zip(block.getArguments(), newArgTypes)) {
+      for (auto &&[arg, newType] :
+           llvm::zip(block.getArguments(), newArgTypes)) {
         if (arg.getType() == newType)
           continue;
 
