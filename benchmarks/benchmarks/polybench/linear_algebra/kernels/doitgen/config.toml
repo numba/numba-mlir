@@ -1,0 +1,28 @@
+# SPDX-FileCopyrightText: 2010-2016 Ohio State University
+# SPDX-FileCopyrightText: 2021 ETH Zurich and the NPBench authors
+# SPDX-FileCopyrightText: 2022 - 2023 Intel Corporation
+#
+# SPDX-License-Identifier: BSD-3-Clause
+
+[benchmark]
+name = "Multiresolution analysis kernel"
+
+[benchmark.parameters.S]
+NR = 60
+NQ = 60
+NP = 128
+
+[benchmark.parameters.M]
+NR = 110
+NQ = 125
+NP = 256
+
+[benchmark.parameters.L]
+NR = 220
+NQ = 250
+NP = 512
+
+[benchmark.parameters.paper]
+NR = 220
+NQ = 250
+NP = 270
