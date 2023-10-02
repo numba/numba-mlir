@@ -528,21 +528,15 @@ struct CmpInvIf : public mlir::OpRewritePattern<mlir::arith::CmpIOp> {
   mlir::LogicalResult
   matchAndRewrite(mlir::arith::CmpIOp op,
                   mlir::PatternRewriter &rewriter) const override {
-    llvm::errs() << "CmpInvIf 1\n";
     mlir::Operation *current = op;
     while (auto parent = current->getParentOfType<mlir::scf::IfOp>()) {
-      llvm::errs() << "CmpInvIf 2\n";
       current = parent;
       auto cond = parent.getCondition().getDefiningOp<mlir::arith::CmpIOp>();
       if (!cond)
         continue;
 
-      llvm::errs() << "CmpInvIf 3\n";
-
       if (cond.getLhs() != op.getLhs() || cond.getRhs() != op.getRhs())
         continue;
-
-      llvm::errs() << "CmpInvIf 4\n";
 
       auto pred = op.getPredicate();
       auto otherPred = cond.getPredicate();
@@ -555,8 +549,6 @@ struct CmpInvIf : public mlir::OpRewritePattern<mlir::arith::CmpIOp> {
       } else {
         continue;
       }
-
-      llvm::errs() << "CmpInvIf 5\n";
 
       int64_t value =
           inverted != parent.getThenRegion().isAncestor(op->getParentRegion());
