@@ -4,7 +4,6 @@
 
 #include "numba/Transforms/CommonOpts.hpp"
 
-#include "numba/Dialect/numba_util/Dialect.hpp"
 #include "numba/Transforms/IfRewrites.hpp"
 #include "numba/Transforms/IndexTypePropagation.hpp"
 #include "numba/Transforms/LoopRewrites.hpp"
@@ -406,6 +405,25 @@ struct ResTruncFUnary : public mlir::OpRewritePattern<Op> {
 
 // TODO: Upstream
 template <typename Op>
+struct ResTruncIUnary : public mlir::OpRewritePattern<mlir::arith::TruncIOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(mlir::arith::TruncIOp op,
+                  mlir::PatternRewriter &rewriter) const override {
+    auto prev = op.getIn().getDefiningOp<Op>();
+    if (!prev)
+      return mlir::failure();
+
+    auto src = prev.getOperand();
+    auto resType = op.getType();
+    rewriter.replaceOpWithNewOp<Op>(op, resType, src);
+    return mlir::success();
+  }
+};
+
+// TODO: Upstream
+template <typename Op>
 struct ResTruncIBinary : public mlir::OpRewritePattern<Op> {
   using mlir::OpRewritePattern<Op>::OpRewritePattern;
 
@@ -461,6 +479,83 @@ struct ResTruncFBinary : public mlir::OpRewritePattern<Op> {
     rewriter.replaceOp(trunc, newRes);
     rewriter.eraseOp(op);
     return mlir::success();
+  }
+};
+
+struct CmpOfIndexCast : public mlir::OpRewritePattern<mlir::arith::CmpIOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(mlir::arith::CmpIOp op,
+                  mlir::PatternRewriter &rewriter) const override {
+    for (auto reverse : {false, true}) {
+      auto cast = (reverse ? op.getRhs() : op.getLhs())
+                      .getDefiningOp<mlir::arith::IndexCastOp>();
+      if (!cast)
+        continue;
+
+      mlir::Operation *current = op;
+      while (auto parent = current->getParentOfType<mlir::scf::IfOp>()) {
+        current = parent;
+        auto cond = parent.getCondition().getDefiningOp<mlir::arith::CmpIOp>();
+        if (!cond)
+          continue;
+
+        mlir::Value lhs = cast.getIn();
+        if (lhs != cond.getLhs() && lhs != cond.getRhs())
+          continue;
+
+        mlir::Value rhs = (reverse ? op.getLhs() : op.getRhs());
+
+        auto newType = lhs.getType();
+        auto loc = op.getLoc();
+        rhs = rewriter.create<mlir::arith::IndexCastOp>(loc, newType, rhs);
+        if (reverse)
+          std::swap(lhs, rhs);
+
+        rewriter.replaceOpWithNewOp<mlir::arith::CmpIOp>(op, op.getPredicate(),
+                                                         lhs, rhs);
+        return mlir::success();
+      }
+    }
+    return mlir::failure();
+  }
+};
+
+struct CmpInvIf : public mlir::OpRewritePattern<mlir::arith::CmpIOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(mlir::arith::CmpIOp op,
+                  mlir::PatternRewriter &rewriter) const override {
+    mlir::Operation *current = op;
+    while (auto parent = current->getParentOfType<mlir::scf::IfOp>()) {
+      current = parent;
+      auto cond = parent.getCondition().getDefiningOp<mlir::arith::CmpIOp>();
+      if (!cond)
+        continue;
+
+      if (cond.getLhs() != op.getLhs() || cond.getRhs() != op.getRhs())
+        continue;
+
+      auto pred = op.getPredicate();
+      auto otherPred = cond.getPredicate();
+
+      bool inverted;
+      if (pred == otherPred) {
+        inverted = false;
+      } else if (pred == mlir::arith::invertPredicate(otherPred)) {
+        inverted = true;
+      } else {
+        continue;
+      }
+
+      int64_t value =
+          inverted != parent.getThenRegion().isAncestor(op->getParentRegion());
+      rewriter.replaceOpWithNewOp<mlir::arith::ConstantIntOp>(op, value, 1);
+      return mlir::success();
+    }
+    return mlir::failure();
   }
 };
 
@@ -1155,9 +1250,13 @@ void numba::populateCommonOptsPatterns(mlir::RewritePatternSet &patterns) {
       ResTruncFBinary<mlir::arith::SubFOp>,
       ResTruncFBinary<mlir::arith::MulFOp>,
       ResTruncFBinary<mlir::arith::DivFOp>,
+      ResTruncIUnary<mlir::arith::IndexCastOp>,
+      ResTruncIUnary<mlir::arith::FPToSIOp>,
       ResTruncIBinary<mlir::arith::AddIOp>,
       ResTruncIBinary<mlir::arith::SubIOp>,
       ResTruncIBinary<mlir::arith::MulIOp>,
+      CmpOfIndexCast,
+      CmpInvIf,
       GPUGenGlobalId
       // clang-format on
       >(patterns.getContext());
