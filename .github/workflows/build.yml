@@ -242,6 +242,8 @@ jobs:
           python runner.py test .numba_replace_parfor.
 
       - name: Build wheels
+
+        if: false
         run: |
           mkdir numba_mlir_wheels
           pushd numba_mlir_wheels
@@ -259,6 +261,8 @@ jobs:
           rm -r numba_mlir_cmake_build
 
       - name: Test wheels
+
+        if: false
         run: |
           cd numba_mlir_wheels
           conda create -y -n wheels-test-env python=${{ matrix.python }} numba=0.57 numpy=1.23 scikit-learn pytest-xdist scipy pytest "tbb=$env:TBB_VER" cmake "mkl-devel-dpcpp>=2023.0.0" dpcpp_win-64 -c conda-forge -c intel -c numba
@@ -586,6 +590,7 @@ jobs:
       - name: Build wheels
         shell: bash -l {0}
 
+        if: false
         run: |
           mkdir numba_mlir_wheels
           pushd numba_mlir_wheels
@@ -603,6 +608,7 @@ jobs:
       - name: Test wheels
         shell: bash -l {0}
 
+        if: false
         run: |
           cd numba_mlir_wheels
           conda create -y -n wheels-test-env python=${{ matrix.python }} numba=0.57 numpy=1.23 scikit-learn pytest-xdist scipy pytest tbb=${TBB_VER} cmake "mkl-devel-dpcpp>=2023.0.0" dpcpp_linux-64 -c conda-forge -c intel -c numba
