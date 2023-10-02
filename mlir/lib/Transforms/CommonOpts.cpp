@@ -522,6 +522,51 @@ struct CmpOfIndexCast : public mlir::OpRewritePattern<mlir::arith::CmpIOp> {
   }
 };
 
+struct CmpInvIf : public mlir::OpRewritePattern<mlir::arith::CmpIOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(mlir::arith::CmpIOp op,
+                  mlir::PatternRewriter &rewriter) const override {
+    llvm::errs() << "CmpInvIf 1\n";
+    mlir::Operation *current = op;
+    while (auto parent = current->getParentOfType<mlir::scf::IfOp>()) {
+      llvm::errs() << "CmpInvIf 2\n";
+      current = parent;
+      auto cond = parent.getCondition().getDefiningOp<mlir::arith::CmpIOp>();
+      if (!cond)
+        continue;
+
+      llvm::errs() << "CmpInvIf 3\n";
+
+      if (cond.getLhs() != op.getLhs() || cond.getRhs() != op.getRhs())
+        continue;
+
+      llvm::errs() << "CmpInvIf 4\n";
+
+      auto pred = op.getPredicate();
+      auto otherPred = cond.getPredicate();
+
+      bool inverted;
+      if (pred == otherPred) {
+        inverted = false;
+      } else if (pred == mlir::arith::invertPredicate(otherPred)) {
+        inverted = true;
+      } else {
+        continue;
+      }
+
+      llvm::errs() << "CmpInvIf 5\n";
+
+      int64_t value =
+          inverted != parent.getThenRegion().isAncestor(op->getParentRegion());
+      rewriter.replaceOpWithNewOp<mlir::arith::ConstantIntOp>(op, value, 1);
+      return mlir::success();
+    }
+    return mlir::failure();
+  }
+};
+
 struct CanonicalizeLoopMemrefIndex
     : public mlir::OpRewritePattern<mlir::memref::LoadOp> {
   using OpRewritePattern::OpRewritePattern;
@@ -1219,6 +1264,7 @@ void numba::populateCommonOptsPatterns(mlir::RewritePatternSet &patterns) {
       ResTruncIBinary<mlir::arith::SubIOp>,
       ResTruncIBinary<mlir::arith::MulIOp>,
       CmpOfIndexCast,
+      CmpInvIf,
       GPUGenGlobalId
       // clang-format on
       >(patterns.getContext());
