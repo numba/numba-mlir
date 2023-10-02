@@ -482,6 +482,29 @@ struct ResTruncFBinary : public mlir::OpRewritePattern<Op> {
   }
 };
 
+static llvm::SmallVector<mlir::arith::CmpIOp> getCondCmps(mlir::Value cond) {
+  llvm::SmallVector<mlir::Operation *> worklist;
+  auto addToWorklist = [&](mlir::Value val) {
+    if (auto op = val.getDefiningOp())
+      worklist.emplace_back(op);
+  };
+
+  addToWorklist(cond);
+
+  llvm::SmallVector<mlir::arith::CmpIOp> ret;
+  while (!worklist.empty()) {
+    auto op = worklist.pop_back_val();
+    if (auto cmpOp = mlir::dyn_cast<mlir::arith::CmpIOp>(op)) {
+      ret.emplace_back(cmpOp);
+    } else if (auto andOp = mlir::dyn_cast<mlir::arith::AndIOp>(op)) {
+      addToWorklist(andOp.getLhs());
+      addToWorklist(andOp.getRhs());
+    }
+  }
+
+  return ret;
+}
+
 struct CmpOfIndexCast : public mlir::OpRewritePattern<mlir::arith::CmpIOp> {
   using OpRewritePattern::OpRewritePattern;
 
@@ -497,25 +520,25 @@ struct CmpOfIndexCast : public mlir::OpRewritePattern<mlir::arith::CmpIOp> {
       mlir::Operation *current = op;
       while (auto parent = current->getParentOfType<mlir::scf::IfOp>()) {
         current = parent;
-        auto cond = parent.getCondition().getDefiningOp<mlir::arith::CmpIOp>();
-        if (!cond)
-          continue;
 
-        mlir::Value lhs = cast.getIn();
-        if (lhs != cond.getLhs() && lhs != cond.getRhs())
-          continue;
+        auto candidates = getCondCmps(parent.getCondition());
+        for (auto cond : candidates) {
+          mlir::Value lhs = cast.getIn();
+          if (lhs != cond.getLhs() && lhs != cond.getRhs())
+            continue;
 
-        mlir::Value rhs = (reverse ? op.getLhs() : op.getRhs());
+          mlir::Value rhs = (reverse ? op.getLhs() : op.getRhs());
 
-        auto newType = lhs.getType();
-        auto loc = op.getLoc();
-        rhs = rewriter.create<mlir::arith::IndexCastOp>(loc, newType, rhs);
-        if (reverse)
-          std::swap(lhs, rhs);
+          auto newType = lhs.getType();
+          auto loc = op.getLoc();
+          rhs = rewriter.create<mlir::arith::IndexCastOp>(loc, newType, rhs);
+          if (reverse)
+            std::swap(lhs, rhs);
 
-        rewriter.replaceOpWithNewOp<mlir::arith::CmpIOp>(op, op.getPredicate(),
-                                                         lhs, rhs);
-        return mlir::success();
+          rewriter.replaceOpWithNewOp<mlir::arith::CmpIOp>(
+              op, op.getPredicate(), lhs, rhs);
+          return mlir::success();
+        }
       }
     }
     return mlir::failure();
@@ -531,31 +554,64 @@ struct CmpInvIf : public mlir::OpRewritePattern<mlir::arith::CmpIOp> {
     mlir::Operation *current = op;
     while (auto parent = current->getParentOfType<mlir::scf::IfOp>()) {
       current = parent;
-      auto cond = parent.getCondition().getDefiningOp<mlir::arith::CmpIOp>();
-      if (!cond)
-        continue;
 
-      if (cond.getLhs() != op.getLhs() || cond.getRhs() != op.getRhs())
-        continue;
+      auto candidates = getCondCmps(parent.getCondition());
+      for (auto cond : candidates) {
+        if (cond.getLhs() != op.getLhs() || cond.getRhs() != op.getRhs())
+          continue;
 
-      auto pred = op.getPredicate();
-      auto otherPred = cond.getPredicate();
+        auto pred = op.getPredicate();
+        auto otherPred = cond.getPredicate();
 
-      bool inverted;
-      if (pred == otherPred) {
-        inverted = false;
-      } else if (pred == mlir::arith::invertPredicate(otherPred)) {
-        inverted = true;
-      } else {
-        continue;
+        bool inverted;
+        if (pred == otherPred) {
+          inverted = false;
+        } else if (pred == mlir::arith::invertPredicate(otherPred)) {
+          inverted = true;
+        } else {
+          continue;
+        }
+
+        int64_t value = inverted != parent.getThenRegion().isAncestor(
+                                        op->getParentRegion());
+        rewriter.replaceOpWithNewOp<mlir::arith::ConstantIntOp>(op, value, 1);
+        return mlir::success();
       }
-
-      int64_t value =
-          inverted != parent.getThenRegion().isAncestor(op->getParentRegion());
-      rewriter.replaceOpWithNewOp<mlir::arith::ConstantIntOp>(op, value, 1);
-      return mlir::success();
     }
     return mlir::failure();
+  }
+};
+
+struct MoveArithOutOfIf : public mlir::OpRewritePattern<mlir::scf::IfOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(mlir::scf::IfOp op,
+                  mlir::PatternRewriter &rewriter) const override {
+    bool changed = false;
+    for (auto body : {op.thenBlock(), op.elseBlock()}) {
+      if (!body)
+        continue;
+
+      auto ops = body->without_terminator();
+      auto onlyArithOps = [&]() -> bool {
+        for (auto &bodyOp : ops)
+          if (!mlir::isa<mlir::arith::ArithDialect>(bodyOp.getDialect()))
+            return false;
+
+        return true;
+      }();
+      if (!onlyArithOps)
+        continue;
+
+      for (auto &bodyOp : llvm::make_early_inc_range(ops)) {
+
+        rewriter.updateRootInPlace(&bodyOp, [&]() { bodyOp.moveBefore(op); });
+        changed = true;
+      }
+    }
+
+    return mlir::success(changed);
   }
 };
 
@@ -1257,6 +1313,7 @@ void numba::populateCommonOptsPatterns(mlir::RewritePatternSet &patterns) {
       ResTruncIBinary<mlir::arith::MulIOp>,
       CmpOfIndexCast,
       CmpInvIf,
+      MoveArithOutOfIf,
       GPUGenGlobalId
       // clang-format on
       >(patterns.getContext());
