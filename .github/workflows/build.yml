@@ -34,6 +34,11 @@ jobs:
         with:
           access_token: ${{ github.token }}
 
+      - name: Disable Defender
+        shell: powershell
+        run: |
+          Set-MpPreference -DisableRealtimeMonitoring $true
+
       - name: Checkout repo
         uses: actions/checkout@v2
         with:
@@ -156,6 +161,11 @@ jobs:
         uses: styfle/cancel-workflow-action@0.6.0
         with:
           access_token: ${{ github.token }}
+
+      - name: Disable Defender
+        shell: powershell
+        run: |
+          Set-MpPreference -DisableRealtimeMonitoring $true
 
       - name: Setup conda
         uses: conda-incubator/setup-miniconda@v2
@@ -292,6 +302,11 @@ jobs:
         uses: styfle/cancel-workflow-action@0.6.0
         with:
           access_token: ${{ github.token }}
+
+      - name: Disable Defender
+        shell: powershell
+        run: |
+          Set-MpPreference -DisableRealtimeMonitoring $true
 
       - name: Setup conda
         uses: conda-incubator/setup-miniconda@v2
