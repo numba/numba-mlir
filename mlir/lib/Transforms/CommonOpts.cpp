@@ -517,6 +517,11 @@ struct CmpOfIndexCast : public mlir::OpRewritePattern<mlir::arith::CmpIOp> {
       if (!cast)
         continue;
 
+      mlir::Value other = (reverse ? op.getLhs() : op.getRhs());
+      auto constVal = mlir::getConstantIntValue(other);
+      if (!constVal)
+        continue;
+
       mlir::Operation *current = op;
       while (auto parent = current->getParentOfType<mlir::scf::IfOp>()) {
         current = parent;
@@ -527,11 +532,11 @@ struct CmpOfIndexCast : public mlir::OpRewritePattern<mlir::arith::CmpIOp> {
           if (lhs != cond.getLhs() && lhs != cond.getRhs())
             continue;
 
-          mlir::Value rhs = (reverse ? op.getLhs() : op.getRhs());
-
           auto newType = lhs.getType();
+          auto newVal = rewriter.getIntegerAttr(newType, *constVal);
           auto loc = op.getLoc();
-          rhs = rewriter.create<mlir::arith::IndexCastOp>(loc, newType, rhs);
+          mlir::Value rhs =
+              rewriter.create<mlir::arith::ConstantOp>(loc, newType, newVal);
           if (reverse)
             std::swap(lhs, rhs);
 
