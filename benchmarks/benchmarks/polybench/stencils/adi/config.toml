@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2010-2016 Ohio State University
+# SPDX-FileCopyrightText: 2021 ETH Zurich and the NPBench authors
+# SPDX-FileCopyrightText: 2022 - 2023 Intel Corporation
+#
+# SPDX-License-Identifier: BSD-3-Clause
+
+[benchmark]
+name = "Alternating Direction Implicit Method"
+
+[benchmark.parameters.S]
+TSTEPS = 5
+N = 100
+
+[benchmark.parameters.M]
+TSTEPS = 20
+N = 200
+
+[benchmark.parameters.L]
+TSTEPS = 50
+N = 500
+
+[benchmark.parameters.paper]
+TSTEPS = 100
+N = 200
