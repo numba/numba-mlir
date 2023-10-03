@@ -36,6 +36,9 @@ pushd numba-mlir
 git checkout ${NUMBA_MLIR_COMMIT}
 cd benchmarks
 
+export NUMBA_THREADING_LAYER=tbb
+export NUMBA_DISABLE_PERFORMANCE_WARNINGS=1
+
 echo "Setup machine"
 python runner.py machine
 
