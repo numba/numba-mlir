@@ -1,0 +1,28 @@
+# SPDX-FileCopyrightText: 2010-2016 Ohio State University
+# SPDX-FileCopyrightText: 2021 ETH Zurich and the NPBench authors
+# SPDX-FileCopyrightText: 2022 - 2023 Intel Corporation
+#
+# SPDX-License-Identifier: BSD-3-Clause
+
+[benchmark]
+name = "2-D Finite Different Time Domain Kernel"
+
+[benchmark.parameters.S]
+TMAX = 20
+NX = 200
+NY = 220
+
+[benchmark.parameters.M]
+TMAX = 60
+NX = 400
+NY = 450
+
+[benchmark.parameters.L]
+TMAX = 150
+NX = 800
+NY = 900
+
+[benchmark.parameters.paper]
+TMAX = 500
+NX = 1000
+NY = 1200
