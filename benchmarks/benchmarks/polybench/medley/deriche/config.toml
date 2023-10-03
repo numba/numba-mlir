@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2010-2016 Ohio State University
+# SPDX-FileCopyrightText: 2021 ETH Zurich and the NPBench authors
+# SPDX-FileCopyrightText: 2022 - 2023 Intel Corporation
+#
+# SPDX-License-Identifier: BSD-3-Clause
+
+[benchmark]
+name = "Deriche Edge Detector"
+
+[benchmark.parameters.S]
+W = 400
+H = 200
+
+[benchmark.parameters.M]
+W = 1500
+H = 1000
+
+[benchmark.parameters.L]
+W = 6000
+H = 3000
+
+[benchmark.parameters.paper]
+W = 7680
+H = 4320

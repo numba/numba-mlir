@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2010-2016 Ohio State University
+# SPDX-FileCopyrightText: 2021 ETH Zurich and the NPBench authors
+# SPDX-FileCopyrightText: 2022 - 2023 Intel Corporation
+#
+# SPDX-License-Identifier: BSD-3-Clause
+
+[benchmark]
+name = "2-D Seidel stencil computation"
+
+[benchmark.parameters.S]
+TSTEPS = 8
+N = 50
+
+[benchmark.parameters.M]
+TSTEPS = 15
+N = 100
+
+[benchmark.parameters.L]
+TSTEPS = 40
+N = 200
+
+[benchmark.parameters.paper]
+TSTEPS = 100
+N = 400

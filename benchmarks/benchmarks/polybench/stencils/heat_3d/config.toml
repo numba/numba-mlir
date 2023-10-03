@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2010-2016 Ohio State University
+# SPDX-FileCopyrightText: 2021 ETH Zurich and the NPBench authors
+# SPDX-FileCopyrightText: 2022 - 2023 Intel Corporation
+#
+# SPDX-License-Identifier: BSD-3-Clause
+
+[benchmark]
+name = "Heat-3D"
+
+[benchmark.parameters.S]
+TSTEPS = 25
+N = 25
+
+[benchmark.parameters.M]
+TSTEPS = 50
+N = 40
+
+[benchmark.parameters.L]
+TSTEPS = 100
+N = 70
+
+[benchmark.parameters.paper]
+TSTEPS = 500
+N = 120
