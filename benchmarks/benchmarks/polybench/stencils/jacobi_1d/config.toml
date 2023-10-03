@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2010-2016 Ohio State University
+# SPDX-FileCopyrightText: 2021 ETH Zurich and the NPBench authors
+# SPDX-FileCopyrightText: 2022 - 2023 Intel Corporation
+#
+# SPDX-License-Identifier: BSD-3-Clause
+
+[benchmark]
+name = "1-D Jacobi stencil computation"
+
+[benchmark.parameters.S]
+TSTEPS = 800
+N = 3200
+
+[benchmark.parameters.M]
+TSTEPS = 3000
+N = 12000
+
+[benchmark.parameters.L]
+TSTEPS = 8500
+N = 34000
+
+[benchmark.parameters.paper]
+TSTEPS = 4000
+N = 32000
