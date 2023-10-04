@@ -41,6 +41,7 @@
 #include <mlir/Transforms/GreedyPatternRewriteDriver.h>
 
 #include <llvm/ADT/SmallBitVector.h>
+#include <llvm/Support/FormatVariadic.h>
 
 namespace {
 static gpu_runtime::GPURegionDescAttr getGpuRegionEnv(mlir::Operation *op) {
@@ -633,6 +634,99 @@ struct ConvertAtomicRMW
   }
 };
 
+static bool isBoolScalarOrVector(mlir::Type type) {
+  assert(type && "Not a valid type");
+  if (type.isInteger(1))
+    return true;
+
+  if (auto vecType = mlir::dyn_cast<mlir::VectorType>(type))
+    return vecType.getElementType().isInteger(1);
+
+  return false;
+}
+
+static mlir::LogicalResult
+getTypeConversionFailure(mlir::ConversionPatternRewriter &rewriter,
+                         mlir::Operation *op, mlir::Type srcType) {
+  return rewriter.notifyMatchFailure(
+      op->getLoc(),
+      llvm::formatv("failed to convert source type '{0}'", srcType));
+}
+
+static mlir::LogicalResult
+getTypeConversionFailure(mlir::ConversionPatternRewriter &rewriter,
+                         mlir::Operation *op) {
+  assert(op->getNumResults() == 1);
+  return getTypeConversionFailure(rewriter, op, op->getResultTypes().front());
+}
+
+// TODO: upstream
+struct ConvertI1SIndexCast
+    : public mlir::OpConversionPattern<mlir::arith::IndexCastOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(mlir::arith::IndexCastOp op, OpAdaptor adaptor,
+                  mlir::ConversionPatternRewriter &rewriter) const override {
+    mlir::Value operand = adaptor.getIn();
+    if (!isBoolScalarOrVector(operand.getType()))
+      return mlir::failure();
+
+    mlir::Location loc = op.getLoc();
+    mlir::Type dstType = getTypeConverter()->convertType(op.getType());
+    if (!dstType)
+      return getTypeConversionFailure(rewriter, op);
+
+    mlir::Value allOnes;
+    if (auto intTy = mlir::dyn_cast<mlir::IntegerType>(dstType)) {
+      unsigned componentBitwidth = intTy.getWidth();
+      allOnes = rewriter.create<mlir::spirv::ConstantOp>(
+          loc, intTy,
+          rewriter.getIntegerAttr(intTy,
+                                  llvm::APInt::getAllOnes(componentBitwidth)));
+    } else if (auto vectorTy = mlir::dyn_cast<mlir::VectorType>(dstType)) {
+      unsigned componentBitwidth = vectorTy.getElementTypeBitWidth();
+      allOnes = rewriter.create<mlir::spirv::ConstantOp>(
+          loc, vectorTy,
+          mlir::SplatElementsAttr::get(
+              vectorTy, llvm::APInt::getAllOnes(componentBitwidth)));
+    } else {
+      return rewriter.notifyMatchFailure(
+          loc, llvm::formatv("unhandled type: {0}", dstType));
+    }
+
+    mlir::Value zero = mlir::spirv::ConstantOp::getZero(dstType, loc, rewriter);
+    rewriter.replaceOpWithNewOp<mlir::spirv::SelectOp>(op, dstType, operand,
+                                                       allOnes, zero);
+    return mlir::success();
+  }
+};
+
+// TODO: upstream
+struct ConvertI1UIndexCast
+    : public mlir::OpConversionPattern<mlir::arith::IndexCastUIOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(mlir::arith::IndexCastUIOp op, OpAdaptor adaptor,
+                  mlir::ConversionPatternRewriter &rewriter) const override {
+    mlir::Type srcType = adaptor.getOperands().front().getType();
+    if (!isBoolScalarOrVector(srcType))
+      return mlir::failure();
+
+    mlir::Type dstType = getTypeConverter()->convertType(op.getType());
+    if (!dstType)
+      return getTypeConversionFailure(rewriter, op);
+
+    mlir::Location loc = op.getLoc();
+    mlir::Value zero = mlir::spirv::ConstantOp::getZero(dstType, loc, rewriter);
+    mlir::Value one = mlir::spirv::ConstantOp::getOne(dstType, loc, rewriter);
+    rewriter.replaceOpWithNewOp<mlir::spirv::SelectOp>(
+        op, dstType, adaptor.getOperands().front(), one, zero);
+    return mlir::success();
+  }
+};
+
 // TODO: use upstream memref conversion
 /// Returns true if the allocations of memref `type` generated from `allocOp`
 /// can be lowered to SPIR-V.
@@ -1070,8 +1164,9 @@ struct GPUToSpirvPass
       patterns.insert<
           ConvertBitcastOp<numba::util::BitcastOp>,
           ConvertBitcastOp<numba::util::MemrefBitcastOp>, ConvertAtomicRMW,
-          AllocaOpPattern, ConvertFunc, ConvertAssert, ConvertBarrierOp,
-          ConvertMemFenceOp, ConvertPoison, ConvertGlobalOp, ConvertGetGlobalOp,
+          ConvertI1SIndexCast, ConvertI1UIndexCast, AllocaOpPattern,
+          ConvertFunc, ConvertAssert, ConvertBarrierOp, ConvertMemFenceOp,
+          ConvertPoison, ConvertGlobalOp, ConvertGetGlobalOp,
           LaunchConfigConversion<mlir::gpu::BlockIdOp,
                                  mlir::spirv::BuiltIn::WorkgroupId>,
           LaunchConfigConversion<mlir::gpu::GridDimOp,
