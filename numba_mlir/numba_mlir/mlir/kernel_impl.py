@@ -323,8 +323,8 @@ del _define_atomic_funcs
 
 
 # mem fence
-CLK_LOCAL_MEM_FENCE = 0x1
-CLK_GLOBAL_MEM_FENCE = 0x2
+LOCAL_MEM_FENCE = 0x1
+GLOBAL_MEM_FENCE = 0x2
 
 
 def barrier(flags=None):
@@ -334,7 +334,7 @@ def barrier(flags=None):
 @registry.register_func("barrier", barrier)
 def _barrier_impl(builder, flags=None):
     if flags is None:
-        flags = CLK_GLOBAL_MEM_FENCE
+        flags = GLOBAL_MEM_FENCE
 
     res = 0  # TODO: remove
     return builder.external_call("kernel_barrier", inputs=flags, outputs=res)
@@ -352,7 +352,7 @@ def mem_fence(flags=None):
 @registry.register_func("mem_fence", mem_fence)
 def _memf_fence_impl(builder, flags=None):
     if flags is None:
-        flags = CLK_GLOBAL_MEM_FENCE
+        flags = GLOBAL_MEM_FENCE
 
     res = 0  # TODO: remove
     return builder.external_call("kernel_mem_fence", inputs=flags, outputs=res)
