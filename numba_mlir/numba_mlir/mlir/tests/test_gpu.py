@@ -897,7 +897,7 @@ def test_input_load_cse():
 
 @require_gpu
 @pytest.mark.parametrize("op", [barrier, mem_fence])
-@pytest.mark.parametrize("flags", [CLK_LOCAL_MEM_FENCE, CLK_GLOBAL_MEM_FENCE])
+@pytest.mark.parametrize("flags", [LOCAL_MEM_FENCE, GLOBAL_MEM_FENCE])
 @pytest.mark.parametrize("global_size", [1, 2, 27, 67, 101])
 @pytest.mark.parametrize("local_size", [1, 2, 7, 17, 33])
 def test_barrier_ops(op, flags, global_size, local_size):
@@ -937,7 +937,7 @@ def test_barrier1(global_size, local_size):
         i = get_global_id(0)
         off = i // local_size
         atomic_add(a, off, i)
-        barrier(CLK_GLOBAL_MEM_FENCE)
+        barrier(GLOBAL_MEM_FENCE)
         b[i] = a[off]
 
     sim_func = kernel_sim(func)
@@ -971,7 +971,7 @@ def test_local_memory1(blocksize):
         # preload
         lm[i] = A[i]
         # barrier local or global will both work as we only have one work group
-        barrier(CLK_LOCAL_MEM_FENCE)  # local mem fence
+        barrier(LOCAL_MEM_FENCE)  # local mem fence
         # write
         A[i] += lm[blocksize - 1 - i]
 
@@ -1004,7 +1004,7 @@ def test_local_memory2(blocksize):
         # preload
         lm[0, i] = A[i]
         # barrier local or global will both work as we only have one work group
-        barrier(CLK_LOCAL_MEM_FENCE)  # local mem fence
+        barrier(LOCAL_MEM_FENCE)  # local mem fence
         # write
         A[i] += lm[0, blocksize - 1 - i]
 
@@ -1034,7 +1034,7 @@ def test_private_memory1(blocksize):
         i = get_global_id(0)
         prvt_mem = private_array(shape=1, dtype=np.float32)
         prvt_mem[0] = i
-        barrier(CLK_LOCAL_MEM_FENCE)  # local mem fence
+        barrier(LOCAL_MEM_FENCE)  # local mem fence
         A[i] = prvt_mem[0] * 2
 
     sim_func = kernel_sim(func)
@@ -1063,7 +1063,7 @@ def test_private_memory2(blocksize):
         i = get_global_id(0)
         prvt_mem = private_array(shape=(1, 1), dtype=np.float32)
         prvt_mem[0, 0] = i
-        barrier(CLK_LOCAL_MEM_FENCE)  # local mem fence
+        barrier(LOCAL_MEM_FENCE)  # local mem fence
         A[i] = prvt_mem[0, 0] * 2
 
     sim_func = kernel_sim(func)
