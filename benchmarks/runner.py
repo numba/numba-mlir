@@ -16,6 +16,9 @@ from timeit import default_timer as timer
 BASE_PATH = os.path.join(os.getcwd(), ".asv")
 
 
+RAM_SIZE = os.environ.get("NUMBA_MLIR_BENCH_RUNNER_RAM_SIZE", None)
+
+
 def get_machine_name():
     from asv.machine import Machine
 
@@ -288,6 +291,8 @@ def setup_machine(params):
         "--num_cpu",
         str(num_cpu),
     ]
+    if RAM_SIZE:
+        args += ["--ram", str(RAM_SIZE)]
     asv_machine(["--yes"])
     asv_machine(args)
 
