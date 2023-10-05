@@ -156,50 +156,73 @@ struct PrepareForGPUPass
 static mlir::LogicalResult
 convertParallelToFor(mlir::scf::ParallelOp op,
                      mlir::PatternRewriter &rewriter) {
+  mlir::OpBuilder::InsertionGuard g(rewriter);
   auto lowerBounds = op.getLowerBound();
-  auto upperBound = op.getUpperBound();
+  auto upperBounds = op.getUpperBound();
   auto steps = op.getStep();
-  auto initVals = op.getInitVals();
+  mlir::ValueRange initVals = op.getInitVals();
   assert(!steps.empty());
-  if (steps.size() > 1)
-    return mlir::failure();
 
-  auto srcBlock = op.getBody();
-  assert(srcBlock->getNumArguments() == steps.size());
+  auto oldBody = op.getBody();
+  assert(oldBody->getNumArguments() == steps.size());
+  auto loopCount = steps.size();
 
-  auto buildFunc = [&](mlir::OpBuilder &builder, mlir::Location loc,
-                       mlir::Value index, mlir::ValueRange args) {
-    llvm::SmallVector<mlir::Value> yieldArgs(initVals.size());
-    mlir::IRMapping mapping;
-    mapping.map(srcBlock->getArgument(0), index);
-    unsigned reduceIndex = 0;
-    for (auto &bodyOp : srcBlock->without_terminator()) {
-      if (auto reduce = mlir::dyn_cast<mlir::scf::ReduceOp>(bodyOp)) {
-        auto &reduceBlock = reduce.getRegion().front();
-        assert(reduceBlock.getNumArguments() == 2);
-        mapping.map(reduceBlock.getArgument(0), args[reduceIndex]);
-        mapping.map(reduceBlock.getArgument(1),
-                    mapping.lookupOrDefault(reduce.getOperand()));
-        for (auto &reduceOp : reduceBlock.without_terminator())
-          builder.clone(reduceOp, mapping);
-
-        auto yieldResult =
-            mlir::cast<mlir::scf::ReduceReturnOp>(reduceBlock.getTerminator())
-                .getResult();
-        yieldArgs[reduceIndex] = mapping.lookupOrDefault(yieldResult);
-        ++reduceIndex;
-      } else {
-        builder.clone(bodyOp, mapping);
-      }
-    }
-    builder.create<mlir::scf::YieldOp>(loc, yieldArgs);
-  };
+  auto emptyBuilder = [](mlir::OpBuilder &, mlir::Location, mlir::Value,
+                         mlir::ValueRange) {};
 
   auto loc = op.getLoc();
-  auto res = rewriter.create<mlir::scf::ForOp>(
-      loc, lowerBounds.front(), upperBound.front(), steps.front(), initVals,
-      buildFunc);
-  rewriter.replaceOp(op, res.getResults());
+  mlir::scf::ForOp forOp;
+  mlir::ValueRange results;
+  llvm::SmallVector<mlir::Value> newIterVars(loopCount);
+  for (auto &&[i, it] : llvm::enumerate(llvm::zip(
+           lowerBounds, upperBounds, steps, oldBody->getArguments()))) {
+    auto &&[begin, end, step, iter] = it;
+    if (i != 0) {
+      rewriter.setInsertionPointToStart(forOp.getBody());
+    }
+    forOp = rewriter.create<mlir::scf::ForOp>(loc, begin, end, step, initVals,
+                                              emptyBuilder);
+    if (i == 0) {
+      results = forOp.getResults();
+    } else {
+      rewriter.create<mlir::scf::YieldOp>(loc, forOp.getResults());
+    }
+
+    initVals = forOp.getRegionIterArgs();
+    newIterVars[i] = forOp.getInductionVar();
+  }
+
+  auto newBody = forOp.getBody();
+
+  rewriter.inlineBlockBefore(oldBody, newBody, newBody->begin(), newIterVars);
+
+  llvm::SmallVector<mlir::Value> reduceResults;
+  reduceResults.reserve(initVals.size());
+  for (auto &innerOp :
+       llvm::make_early_inc_range(newBody->without_terminator())) {
+    auto reduce = mlir::dyn_cast<mlir::scf::ReduceOp>(innerOp);
+    if (!reduce)
+      continue;
+
+    rewriter.setInsertionPoint(reduce);
+    auto &reduceBody = reduce.getReductionOperator().front();
+    assert(reduceBody.getNumArguments() == 2);
+    auto term =
+        mlir::cast<mlir::scf::ReduceReturnOp>(reduceBody.getTerminator());
+    auto reduceIdx = reduceResults.size();
+    reduceResults.emplace_back(term.getResult());
+    rewriter.eraseOp(term);
+    mlir::Value reduceArgs[2] = {forOp.getRegionIterArgs()[reduceIdx],
+                                 reduce.getOperand()};
+    rewriter.inlineBlockBefore(&reduceBody, reduce, reduceArgs);
+    rewriter.eraseOp(reduce);
+  }
+
+  auto term = newBody->getTerminator();
+  rewriter.setInsertionPoint(term);
+  rewriter.replaceOpWithNewOp<mlir::scf::YieldOp>(term, reduceResults);
+
+  rewriter.replaceOp(op, results);
   return mlir::success();
 }
 
