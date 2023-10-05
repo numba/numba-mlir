@@ -1163,6 +1163,7 @@ struct GPUToSpirvPass
 
       patterns.insert<
           ConvertBitcastOp<numba::util::BitcastOp>,
+          ConvertBitcastOp<numba::util::MemrefApplyOffsetOp>,
           ConvertBitcastOp<numba::util::MemrefBitcastOp>, ConvertAtomicRMW,
           ConvertI1SIndexCast, ConvertI1UIndexCast, AllocaOpPattern,
           ConvertFunc, ConvertAssert, ConvertBarrierOp, ConvertMemFenceOp,

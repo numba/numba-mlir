@@ -2,17 +2,19 @@
 //
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "mlir/Dialect/Affine/IR/AffineOps.h"
-#include "mlir/Dialect/GPU/IR/GPUDialect.h"
-#include "mlir/Dialect/MemRef/IR/MemRef.h"
-#include "mlir/Dialect/Utils/IndexingUtils.h"
-#include "mlir/IR/AffineExpr.h"
-#include "mlir/IR/Builders.h"
-#include "mlir/IR/PatternMatch.h"
-#include "mlir/Pass/Pass.h"
-#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
-
 #include "numba/Conversion/GpuToGpuRuntime.hpp"
+
+#include "numba/Dialect/numba_util/Dialect.hpp"
+
+#include <mlir/Dialect/Affine/IR/AffineOps.h>
+#include <mlir/Dialect/GPU/IR/GPUDialect.h>
+#include <mlir/Dialect/MemRef/IR/MemRef.h>
+#include <mlir/Dialect/Utils/IndexingUtils.h>
+#include <mlir/IR/AffineExpr.h>
+#include <mlir/IR/Builders.h>
+#include <mlir/IR/PatternMatch.h>
+#include <mlir/Pass/Pass.h>
+#include <mlir/Transforms/GreedyPatternRewriteDriver.h>
 
 using namespace mlir;
 
@@ -85,9 +87,17 @@ static Value getFlatMemref(OpBuilder &rewriter, Location loc, Value source,
   SmallVector<OpFoldResult> offsetsTemp = getAsOpFoldResult(offsets);
   auto &&[base, offset, ignore] =
       getFlatOffsetAndStrides(rewriter, loc, source, offsetsTemp);
-  auto retType = cast<MemRefType>(base.getType());
-  return rewriter.create<memref::ReinterpretCastOp>(loc, retType, base, offset,
-                                                    std::nullopt, std::nullopt);
+  auto srcType = cast<MemRefType>(base.getType());
+  auto layout = StridedLayoutAttr::get(rewriter.getContext(),
+                                       ShapedType::kDynamic, std::nullopt);
+  auto retType = MemRefType::get(srcType.getShape(), srcType.getElementType(),
+                                 layout, srcType.getMemorySpace());
+  mlir::Value ret = rewriter.create<memref::ReinterpretCastOp>(
+      loc, retType, base, offset, std::nullopt, std::nullopt);
+  if (srcType != retType)
+    ret = rewriter.create<numba::util::MemrefApplyOffsetOp>(loc, srcType, ret);
+
+  return ret;
 }
 
 static bool needFlatten(Value val) {
