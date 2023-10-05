@@ -2013,7 +2013,7 @@ public:
   }
 };
 
-class ConvertF64ApplyAoffset
+class ConvertF64ApplyOffset
     : public mlir::OpConversionPattern<numba::util::MemrefApplyOffsetOp> {
 public:
   using OpConversionPattern::OpConversionPattern;
@@ -2110,7 +2110,7 @@ struct TruncateF64ForGPUPass
                                                         target);
 
     patterns.insert<ConvertF64LoadOp, ConvertF64StoreOp,
-                    ConvertF64ReinterpretCastOp, ConvertF64ApplyAoffset>(
+                    ConvertF64ReinterpretCastOp, ConvertF64ApplyOffset>(
         converter, ctx);
 
     target.addDynamicallyLegalOp<mlir::memref::LoadOp, mlir::memref::StoreOp,
