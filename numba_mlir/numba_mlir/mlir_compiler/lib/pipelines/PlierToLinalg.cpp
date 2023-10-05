@@ -4219,16 +4219,13 @@ static void populatePlierToLinalgOptPipeline(mlir::OpPassManager &pm) {
 
   pm.addNestedPass<mlir::func::FuncOp>(
       std::make_unique<MakeGenericReduceInnermostPass>());
+  pm.addNestedPass<mlir::func::FuncOp>(std::make_unique<LowerCopyOpsPass>());
   pm.addNestedPass<mlir::func::FuncOp>(
       mlir::createConvertLinalgToParallelLoopsPass());
   pm.addNestedPass<mlir::func::FuncOp>(
       std::make_unique<ReplaceMemrefPoisonPass>());
   pm.addNestedPass<mlir::func::FuncOp>(mlir::createCanonicalizerPass());
 
-  pm.addNestedPass<mlir::func::FuncOp>(std::make_unique<LowerCopyOpsPass>());
-  pm.addNestedPass<mlir::func::FuncOp>(
-      mlir::createConvertLinalgToParallelLoopsPass());
-  pm.addNestedPass<mlir::func::FuncOp>(mlir::createCanonicalizerPass());
   pm.addPass(numba::createForceInlinePass());
   pm.addPass(mlir::createSymbolDCEPass());
 
