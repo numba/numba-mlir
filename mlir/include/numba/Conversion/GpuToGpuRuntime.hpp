@@ -55,4 +55,6 @@ std::unique_ptr<mlir::Pass> createLowerGPUGlobalReducePass();
 /// memory access.
 std::unique_ptr<mlir::Pass> createSortParallelLoopsForGPU();
 
+std::unique_ptr<mlir::Pass> createGpuDecomposeMemrefsPass();
+
 } // namespace gpu_runtime

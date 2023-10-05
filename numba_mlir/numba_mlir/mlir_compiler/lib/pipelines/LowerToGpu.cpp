@@ -1810,46 +1810,6 @@ struct LowerGpuBuiltins2Pass
           LowerGpuBuiltins2Pass, void, void, ConvertBarrierOps, ConvertGroupOps,
           ConvertGroupOpsToSubgroup, LowerBuiltinCalls> {};
 
-// TODO: upstream
-class DecomposeAtomicRMWOp
-    : public mlir::OpRewritePattern<mlir::memref::AtomicRMWOp> {
-public:
-  using OpRewritePattern::OpRewritePattern;
-
-  mlir::LogicalResult
-  matchAndRewrite(mlir::memref::AtomicRMWOp op,
-                  mlir::PatternRewriter &rewriter) const override {
-    if (llvm::all_of(op.getIndices(),
-                     [](auto v) { return mlir::isConstantIntValue(v, 0); }))
-      return mlir::failure();
-
-    auto memref = op.getMemref();
-    auto memrefType = memref.getType();
-    auto rank = memrefType.getShape().size();
-    ;
-    llvm::SmallVector<mlir::OpFoldResult> offsets(rank);
-    llvm::copy(op.getIndices(), offsets.begin());
-
-    llvm::SmallVector<mlir::OpFoldResult> sizes(rank, rewriter.getIndexAttr(1));
-
-    auto loc = op.getLoc();
-    mlir::Value view = rewriter.create<mlir::memref::SubViewOp>(
-        loc, memref, offsets, sizes, sizes);
-
-    auto zero = rewriter.create<mlir::arith::ConstantIndexOp>(loc, 0);
-    llvm::SmallVector<mlir::Value> newIndices(rank, zero);
-    rewriter.updateRootInPlace(op, [&]() {
-      op.getIndicesMutable().assign(newIndices);
-      op.getMemrefMutable().assign(view);
-    });
-    return mlir::success();
-  }
-};
-
-struct PrepareForDecomposePass
-    : public numba::RewriteWrapperPass<PrepareForDecomposePass, void, void,
-                                       DecomposeAtomicRMWOp> {};
-
 class ConvertLocalArrayAllocOps
     : public mlir::OpRewritePattern<mlir::memref::AllocaOp> {
 public:
@@ -2246,8 +2206,7 @@ static void populateLowerToGPUPipelineMed(mlir::OpPassManager &pm) {
   funcPM.addPass(gpu_runtime::createInsertGPUAllocsPass());
   funcPM.addPass(mlir::createCanonicalizerPass());
   funcPM.addPass(std::make_unique<LowerGpuBuiltins2Pass>());
-  funcPM.addPass(std::make_unique<PrepareForDecomposePass>());
-  funcPM.addPass(mlir::createGpuDecomposeMemrefsPass());
+  funcPM.addPass(gpu_runtime::createGpuDecomposeMemrefsPass());
   funcPM.addPass(mlir::memref::createExpandStridedMetadataPass());
   funcPM.addPass(mlir::createLowerAffinePass());
 
