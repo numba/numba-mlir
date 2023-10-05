@@ -36,6 +36,7 @@ set(SOURCES_LIST
     lib/Compiler/Compiler.cpp
     lib/Compiler/PipelineRegistry.cpp
     lib/Conversion/CfgToScf.cpp
+    lib/Conversion/DecomposeMemrefs.cpp
     lib/Conversion/GpuRuntimeToLlvm.cpp
     lib/Conversion/GpuToGpuRuntime.cpp
     lib/Conversion/NtensorToLinalg.cpp

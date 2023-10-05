@@ -1163,6 +1163,7 @@ struct GPUToSpirvPass
 
       patterns.insert<
           ConvertBitcastOp<numba::util::BitcastOp>,
+          ConvertBitcastOp<numba::util::MemrefApplyOffsetOp>,
           ConvertBitcastOp<numba::util::MemrefBitcastOp>, ConvertAtomicRMW,
           ConvertI1SIndexCast, ConvertI1UIndexCast, AllocaOpPattern,
           ConvertFunc, ConvertAssert, ConvertBarrierOp, ConvertMemFenceOp,
@@ -1989,8 +1990,7 @@ public:
   using OpConversionPattern::OpConversionPattern;
 
   mlir::LogicalResult
-  matchAndRewrite(mlir::memref::ReinterpretCastOp op,
-                  mlir::memref::ReinterpretCastOp::Adaptor adaptor,
+  matchAndRewrite(mlir::memref::ReinterpretCastOp op, OpAdaptor adaptor,
                   mlir::ConversionPatternRewriter &rewriter) const override {
     auto converter = getTypeConverter();
     assert(converter && "Invalid type converter");
@@ -2009,6 +2009,27 @@ public:
 
     rewriter.replaceOpWithNewOp<mlir::memref::ReinterpretCastOp>(
         op, resType, adaptor.getSource(), offsets.front(), sizes, strides);
+    return mlir::success();
+  }
+};
+
+class ConvertF64ApplyOffset
+    : public mlir::OpConversionPattern<numba::util::MemrefApplyOffsetOp> {
+public:
+  using OpConversionPattern::OpConversionPattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(numba::util::MemrefApplyOffsetOp op, OpAdaptor adaptor,
+                  mlir::ConversionPatternRewriter &rewriter) const override {
+    auto converter = getTypeConverter();
+    assert(converter && "Invalid type converter");
+
+    auto resType = converter->convertType(op.getType());
+    if (!resType)
+      return rewriter.notifyMatchFailure(op, "Failed to convert result type");
+
+    rewriter.replaceOpWithNewOp<numba::util::MemrefApplyOffsetOp>(
+        op, resType, adaptor.getSource());
     return mlir::success();
   }
 };
@@ -2089,10 +2110,12 @@ struct TruncateF64ForGPUPass
                                                         target);
 
     patterns.insert<ConvertF64LoadOp, ConvertF64StoreOp,
-                    ConvertF64ReinterpretCastOp>(converter, ctx);
+                    ConvertF64ReinterpretCastOp, ConvertF64ApplyOffset>(
+        converter, ctx);
 
     target.addDynamicallyLegalOp<mlir::memref::LoadOp, mlir::memref::StoreOp,
-                                 mlir::memref::ReinterpretCastOp>(
+                                 mlir::memref::ReinterpretCastOp,
+                                 numba::util::MemrefApplyOffsetOp>(
         [&converter](mlir::Operation *op) -> std::optional<bool> {
           if (converter.isLegal(op))
             return true;
