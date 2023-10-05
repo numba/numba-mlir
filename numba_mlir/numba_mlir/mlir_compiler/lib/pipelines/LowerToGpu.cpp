@@ -222,6 +222,23 @@ struct RemoveNestedParallelPass
     : public numba::RewriteWrapperPass<RemoveNestedParallelPass, void, void,
                                        RemoveNestedParallel> {};
 
+struct CheckParallelToGpu
+    : public mlir::PassWrapper<CheckParallelToGpu, mlir::OperationPass<>> {
+  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(CheckParallelToGpu)
+
+  void runOnOperation() override {
+    auto visitor = [](mlir::scf::ParallelOp op) -> mlir::WalkResult {
+      if (getGpuRegionEnv(op)) {
+        op->emitError("scf.parallel op wasn't converted inside GPU region");
+        return mlir::WalkResult::interrupt();
+      }
+      return mlir::WalkResult::advance();
+    };
+    if (getOperation()->walk(visitor).wasInterrupted())
+      return signalPassFailure();
+  };
+};
+
 struct RemoveGpuRegion
     : public mlir::OpRewritePattern<numba::util::EnvironmentRegionOp> {
   using OpRewritePattern::OpRewritePattern;
@@ -2200,6 +2217,7 @@ static void populateLowerToGPUPipelineMed(mlir::OpPassManager &pm) {
   funcPM.addPass(gpu_runtime::createInsertGPUGlobalReducePass());
   funcPM.addPass(gpu_runtime::createParallelLoopGPUMappingPass());
   funcPM.addPass(mlir::createParallelLoopToGpuPass());
+  funcPM.addPass(std::make_unique<CheckParallelToGpu>());
   funcPM.addPass(mlir::createCanonicalizerPass());
   funcPM.addPass(gpu_runtime::createLowerGPUGlobalReducePass());
   commonOptPasses(funcPM);
