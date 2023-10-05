@@ -372,3 +372,19 @@ func.func @test(%arg: f32, %val: f32) -> f32 {
   }
   return %0 : f32
 }
+
+// -----
+
+// CHECK-LABEL: func @test
+//   CHECK-NOT:  scf.parallel
+func.func @test(%arg: f32, %val: f32) -> f32 {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %c10 = arith.constant 10 : index
+  %0 = scf.for %i0 = %c0 to %c10 step %c1 iter_args(%arg1 = %arg) -> (f32) {
+    %1 = arith.addf %arg1, %val : f32
+    %2 = arith.addf %arg1, %1 : f32
+    scf.yield %2 : f32
+  }
+  return %0 : f32
+}

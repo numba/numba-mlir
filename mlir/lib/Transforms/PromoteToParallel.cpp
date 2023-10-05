@@ -396,6 +396,11 @@ struct PromoteToParallel : public mlir::OpRewritePattern<mlir::scf::ForOp> {
       reductionOpsSet.insert(reductionOp);
     }
 
+    for (auto iterVar : iterVars)
+      for (auto user : iterVar.getUsers())
+        if (reductionOpsSet.count(user) == 0)
+          return mlir::failure();
+
     auto bodyBuilder = [&](mlir::OpBuilder &builder, mlir::Location loc,
                            mlir::ValueRange iterVals, mlir::ValueRange) {
       assert(1 == iterVals.size());
