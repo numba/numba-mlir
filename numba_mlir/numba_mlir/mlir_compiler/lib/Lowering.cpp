@@ -175,6 +175,14 @@ static std::optional<mlir::Attribute> makeElementsAttr(mlir::ShapedType type,
   return std::nullopt;
 }
 
+static int64_t getPyInt(py::handle obj) {
+  auto max = py::int_(std::numeric_limits<int64_t>::max());
+  if (obj <= max)
+    return obj.cast<int64_t>();
+
+  return static_cast<int64_t>(obj.cast<uint64_t>());
+}
+
 struct InstHandles {
   InstHandles() {
     auto mod = py::module::import("numba.core.ir");
@@ -254,7 +262,7 @@ static mlir::Attribute parseAttr(mlir::OpBuilder &builder, py::handle obj) {
     return builder.getBoolAttr(obj.cast<bool>());
 
   if (py::isinstance<py::int_>(obj))
-    return builder.getI64IntegerAttr(obj.cast<int64_t>());
+    return builder.getI64IntegerAttr(getPyInt(obj));
 
   numba::reportError(llvm::Twine("Invalid attribute: ") +
                      py::str(obj).cast<std::string>());
@@ -516,7 +524,7 @@ private:
         auto var = loadvar(obj);
         return builder.create<plier::CastOp>(loc, indexType, var);
       }
-      auto val = obj.cast<int64_t>();
+      auto val = getPyInt(obj);
       return builder.create<mlir::arith::ConstantIndexOp>(loc, val);
     };
 
@@ -815,7 +823,7 @@ private:
                                             nullptr);
     }
     if (py::isinstance<py::int_>(obj)) {
-      auto index = obj.cast<int64_t>();
+      auto index = getPyInt(obj);
       return builder.create<mlir::arith::ConstantIndexOp>(loc, index);
     }
     if (py::isinstance<py::slice>(obj)) {
@@ -837,6 +845,11 @@ private:
       auto tupleType = builder.getTupleType(types);
       return builder.create<plier::BuildTupleOp>(loc, tupleType, args);
     }
+    if (py::isinstance(obj, insts.npInt)) {
+      auto index = getPyInt(obj);
+      return builder.create<mlir::arith::ConstantIndexOp>(loc, index);
+    }
+
     numba::reportError(llvm::Twine("Unhandled index type: ") +
                        py::str(obj.get_type()).cast<std::string>());
   }
@@ -954,7 +967,7 @@ private:
   std::optional<mlir::Attribute> resolveConstant(py::handle val) {
     if (py::isinstance<py::int_>(val)) {
       auto type = builder.getIntegerType(64, /*isSigned*/ true);
-      return builder.getIntegerAttr(type, val.cast<int64_t>());
+      return builder.getIntegerAttr(type, getPyInt(val));
     }
 
     if (py::isinstance<py::float_>(val))
@@ -1000,7 +1013,7 @@ private:
 
     if (py::isinstance(val, insts.npInt)) {
       auto type = builder.getIntegerType(64, /*isSigned*/ true);
-      return builder.getIntegerAttr(type, val.cast<int64_t>());
+      return builder.getIntegerAttr(type, getPyInt(val));
     }
 
     if (py::isinstance(val, insts.npFloat))
@@ -1065,7 +1078,7 @@ private:
 
   mlir::Value lowerExhaustIter(py::handle inst) {
     auto value = loadvar(inst.attr("value"));
-    auto count = inst.attr("count").cast<int64_t>();
+    auto count = getPyInt(inst.attr("count"));
     return builder.create<plier::ExhaustIterOp>(getCurrentLoc(), value, count);
   }
 
