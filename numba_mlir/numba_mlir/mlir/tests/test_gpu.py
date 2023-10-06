@@ -1119,6 +1119,70 @@ def test_private_memory3(blocksize, priv_size):
 
 
 @require_gpu
+@pytest.mark.parametrize("blocksize", [1, 10, 17, 64, 67, 101])
+def test_private_memory4(blocksize):
+    private_array = private.array
+
+    def func(A):
+        i = get_global_id(0)
+        S = 10
+        prvt_mem = private_array(shape=(S, S), dtype=np.float32)
+        for j in range(S):
+            for k in range(S):
+                prvt_mem[j, k] = i
+
+        barrier(LOCAL_MEM_FENCE)  # local mem fence
+        A[i] = prvt_mem[i % S, i % S] * 2
+
+    sim_func = kernel_sim(func)
+    gpu_func = kernel_cached(func)
+
+    arr = np.zeros(blocksize).astype(np.float32)
+
+    sim_res = arr.copy()
+    sim_func[blocksize, blocksize](sim_res)
+
+    with print_pass_ir([], ["ConvertParallelLoopToGpu"]):
+        gpu_res = arr.copy()
+        gpu_func[blocksize, blocksize](gpu_res)
+        ir = get_print_buffer()
+        assert ir.count("gpu.launch blocks") == 1, ir
+
+    assert_allclose(sim_res, gpu_res)
+
+
+@require_gpu
+@pytest.mark.parametrize("blocksize", [1, 10, 17, 64, 67, 101])
+@pytest.mark.xfail(reason="Type inference issue for private mem")
+def test_private_memory5(blocksize):
+    private_array = private.array
+
+    def func(A):
+        i = get_global_id(0)
+        S = 10
+        prvt_mem = private_array(shape=(S, S), dtype=np.float32)
+        prvt_mem[:] = i
+        barrier(LOCAL_MEM_FENCE)  # local mem fence
+        A[i] = prvt_mem[i % S, i % S] * 2
+
+    sim_func = kernel_sim(func)
+    gpu_func = kernel_cached(func)
+
+    arr = np.zeros(blocksize).astype(np.float32)
+
+    sim_res = arr.copy()
+    sim_func[blocksize, blocksize](sim_res)
+
+    with print_pass_ir([], ["ConvertParallelLoopToGpu"]):
+        gpu_res = arr.copy()
+        gpu_func[blocksize, blocksize](gpu_res)
+        ir = get_print_buffer()
+        assert ir.count("gpu.launch blocks") == 1, ir
+
+    assert_allclose(sim_res, gpu_res)
+
+
+@require_gpu
 @pytest.mark.parametrize(
     "group_op", [group.reduce_add, group.reduce_mul, group.reduce_min, group.reduce_max]
 )

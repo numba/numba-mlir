@@ -70,7 +70,7 @@ static mlir::gpu::Processor getProcessor(unsigned val) {
 }
 struct ParallelLoopGPUMappingPass
     : public mlir::PassWrapper<ParallelLoopGPUMappingPass,
-                               mlir::OperationPass<mlir::func::FuncOp>> {
+                               mlir::OperationPass<>> {
   MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(ParallelLoopGPUMappingPass)
 
   virtual void
@@ -80,6 +80,8 @@ struct ParallelLoopGPUMappingPass
 
   void runOnOperation() override {
     auto func = getOperation();
+    auto attrName =
+        mlir::StringAttr::get(&getContext(), mlir::gpu::getMappingAttrName());
     func->walk([&](numba::util::EnvironmentRegionOp envOp) {
       if (!mlir::isa<gpu_runtime::GPURegionDescAttr>(envOp.getEnvironment()))
         return;
@@ -90,21 +92,38 @@ struct ParallelLoopGPUMappingPass
       auto identityMap = builder.getDimIdentityMap();
       llvm::SmallVector<mlir::gpu::ParallelLoopDimMappingAttr> mapping;
       auto visitor = [&](mlir::scf::ParallelOp parallel) -> mlir::WalkResult {
-        if (parallel->hasAttr(mlir::gpu::getMappingAttrName()))
-          return mlir::WalkResult::skip();
+        if (parallel->hasAttr(attrName))
+          return mlir::WalkResult::advance();
+
+        auto offset = [&]() -> unsigned {
+          auto parent = parallel->getParentOfType<mlir::scf::ParallelOp>();
+          if (!parent)
+            return 0;
+
+          auto attr = parent->getAttrOfType<mlir::ArrayAttr>(attrName);
+          if (!attr || attr.empty())
+            return 0;
+
+          auto last = mlir::dyn_cast<mlir::gpu::ParallelLoopDimMappingAttr>(
+              attr.getValue().back());
+          if (!last)
+            return 0;
+
+          return static_cast<unsigned>(last.getProcessor()) + 1;
+        }();
 
         auto numLoops = parallel.getNumLoops();
         mapping.resize(numLoops);
         for (auto i : llvm::seq(0u, numLoops))
           mapping[i] = builder.getAttr<mlir::gpu::ParallelLoopDimMappingAttr>(
-              getProcessor(i), identityMap, identityMap);
+              getProcessor(i + offset), identityMap, identityMap);
 
         if (mlir::failed(mlir::gpu::setMappingAttr(parallel, mapping))) {
           parallel->emitError("Failed to set mapping atter");
           return mlir::WalkResult::interrupt();
         }
 
-        return mlir::WalkResult::skip();
+        return mlir::WalkResult::advance();
       };
       if (region.walk(visitor).wasInterrupted())
         return signalPassFailure();
