@@ -837,6 +837,11 @@ private:
       auto tupleType = builder.getTupleType(types);
       return builder.create<plier::BuildTupleOp>(loc, tupleType, args);
     }
+    if (py::isinstance(obj, insts.npInt)) {
+      auto index = obj.cast<int64_t>();
+      return builder.create<mlir::arith::ConstantIndexOp>(loc, index);
+    }
+
     numba::reportError(llvm::Twine("Unhandled index type: ") +
                        py::str(obj.get_type()).cast<std::string>());
   }

@@ -426,9 +426,23 @@ def test_dtype_cast(a, dtype):
     assert_equal(py_func(a), jit_func(a))
 
 
-def test_staticgetitem():
+@pytest.mark.parametrize(
+    "idx",
+    [
+        1,
+        np.int8(1),
+        np.int16(1),
+        np.int32(1),
+        np.int64(1),
+        np.uint8(1),
+        np.uint16(1),
+        np.uint32(1),
+        np.uint64(1),
+    ],
+)
+def test_staticgetitem(idx):
     def py_func(a):
-        return a[1]
+        return a[idx]
 
     jit_func = njit(py_func)
     arr = np.asarray([5, 6, 7])
