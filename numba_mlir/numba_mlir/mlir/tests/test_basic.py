@@ -141,6 +141,17 @@ def test_cmp_ops(py_func, a, b):
     assert_equal(py_func(a, b), jit_func(a, b))
 
 
+@pytest.mark.parametrize(
+    "val", _test_values + [9_223_372_036_854_775_807, 9_223_372_036_854_775_807 + 10]
+)
+def test_const(val):
+    def py_func():
+        return val
+
+    jit_func = njit(py_func)
+    assert_equal(py_func(), jit_func())
+
+
 @parametrize_function_variants(
     "py_func",
     [
