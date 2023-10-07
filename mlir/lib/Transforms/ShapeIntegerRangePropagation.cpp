@@ -216,11 +216,6 @@ public:
     }
 
     if (auto reshape = mlir::dyn_cast<numba::util::ReshapeOp>(op)) {
-      auto srcShaped =
-          mlir::dyn_cast<mlir::ShapedType>(reshape.getSource().getType());
-      if (!srcShaped)
-        return;
-
       auto dstShaped =
           mlir::dyn_cast<mlir::ShapedType>(reshape.getResult().getType());
       if (!dstShaped)
@@ -244,15 +239,7 @@ public:
         ranges.emplace_back(value.getValue());
       }
 
-      ShapeValue newVal(ranges);
-      newVal = ShapeValue::intersect(newVal, {srcShaped});
-      newVal = ShapeValue::intersect(newVal, {dstShaped});
-
-      auto inputLatticeVal = operands.front()->getValue();
-      if (inputLatticeVal.isUninitialized())
-        return;
-
-      newVal = ShapeValue::intersect(newVal, inputLatticeVal);
+      auto newVal = ShapeValue::intersect({ranges}, {dstShaped});
 
       LLVM_DEBUG(llvm::dbgs() << "ShapeValueAnalysis: New reshape result: "
                               << newVal << "\n");
