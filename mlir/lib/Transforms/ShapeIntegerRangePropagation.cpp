@@ -125,63 +125,6 @@ inline llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
   return os;
 }
 
-struct TensorValueLattice : public mlir::dataflow::Lattice<ShapeValue> {
-  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(TensorValueLattice)
-  using Lattice::Lattice;
-};
-
-class TensorValueAnalysis
-    : public mlir::dataflow::SparseForwardDataFlowAnalysis<TensorValueLattice> {
-public:
-  using SparseForwardDataFlowAnalysis::SparseForwardDataFlowAnalysis;
-
-  void visitOperation(mlir::Operation *op,
-                      llvm::ArrayRef<const TensorValueLattice *> /*operands*/,
-                      llvm::ArrayRef<TensorValueLattice *> results) override {
-    LLVM_DEBUG(llvm::dbgs()
-               << "TensorValueAnalysis: Visiting operation: " << *op << "\n");
-
-    if (auto fromElements = mlir::dyn_cast<mlir::tensor::FromElementsOp>(op)) {
-      assert(results.size() == 1);
-      auto tensorType = mlir::cast<mlir::RankedTensorType>(
-          fromElements.getResult().getType());
-      if (tensorType.getRank() != 1 ||
-          mlir::ShapedType::isDynamic(tensorType.getShape().front()))
-        return;
-
-      auto args = fromElements.getElements();
-      llvm::SmallVector<mlir::ConstantIntRanges> ranges;
-      ranges.reserve(args.size());
-      for (auto arg : args) {
-        auto state =
-            getOrCreateFor<mlir::dataflow::IntegerValueRangeLattice>(op, arg);
-
-        if (!state)
-          return;
-
-        auto val = state->getValue();
-        if (val.isUninitialized())
-          return;
-
-        ranges.emplace_back(val.getValue());
-      }
-
-      ShapeValue newVal(ranges);
-      LLVM_DEBUG(llvm::dbgs()
-                 << "TensorValueAnalysis: New result val: " << newVal << "\n");
-
-      auto resultLattice = results.front();
-      auto changed = resultLattice->join(newVal);
-      propagateIfChanged(resultLattice, changed);
-      return;
-    }
-  }
-
-  void setToEntryState(TensorValueLattice *lattice) override {
-    propagateIfChanged(lattice, lattice->join(ShapeValue{}));
-  }
-};
-
 struct ShapeValueLattice : public mlir::dataflow::Lattice<ShapeValue> {
   MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(ShapeValueLattice)
   using Lattice::Lattice;
@@ -208,25 +151,6 @@ public:
                       llvm::ArrayRef<ShapeValueLattice *> results) override {
     LLVM_DEBUG(llvm::dbgs()
                << "ShapeValueAnalysis: Visiting operation: " << *op << "\n");
-
-    if (auto reshape = mlir::dyn_cast<mlir::tensor::ReshapeOp>(op)) {
-      assert(results.size() == 1);
-      auto state = getOrCreateFor<TensorValueLattice>(op, reshape.getShape());
-      if (!state)
-        return;
-
-      auto val = state->getValue();
-      if (val.isUninitialized())
-        return;
-
-      LLVM_DEBUG(llvm::dbgs()
-                 << "ShapeValueAnalysis: New reshape result: " << val << "\n");
-
-      auto resultLattice = results.front();
-      auto changed = resultLattice->join(val);
-      propagateIfChanged(resultLattice, changed);
-      return;
-    }
 
     if (auto sizesInterface =
             mlir::dyn_cast<mlir::OffsetSizeAndStrideOpInterface>(op)) {
@@ -284,6 +208,54 @@ public:
 
       LLVM_DEBUG(llvm::dbgs()
                  << "ShapeValueAnalysis: New view result: " << newVal << "\n");
+
+      auto resultLattice = results.front();
+      auto changed = resultLattice->join(newVal);
+      propagateIfChanged(resultLattice, changed);
+      return;
+    }
+
+    if (auto reshape = mlir::dyn_cast<numba::util::ReshapeOp>(op)) {
+      auto srcShaped =
+          mlir::dyn_cast<mlir::ShapedType>(reshape.getSource().getType());
+      if (!srcShaped)
+        return;
+
+      auto dstShaped =
+          mlir::dyn_cast<mlir::ShapedType>(reshape.getResult().getType());
+      if (!dstShaped)
+        return;
+
+      auto args = reshape.getShape();
+
+      llvm::SmallVector<mlir::ConstantIntRanges> ranges;
+      ranges.reserve(args.size());
+      for (auto arg : args) {
+        auto state =
+            getOrCreateFor<mlir::dataflow::IntegerValueRangeLattice>(op, arg);
+
+        if (!state)
+          return;
+
+        auto value = state->getValue();
+        if (value.isUninitialized())
+          return;
+
+        ranges.emplace_back(value.getValue());
+      }
+
+      ShapeValue newVal(ranges);
+      newVal = ShapeValue::intersect(newVal, {srcShaped});
+      newVal = ShapeValue::intersect(newVal, {dstShaped});
+
+      auto inputLatticeVal = operands.front()->getValue();
+      if (inputLatticeVal.isUninitialized())
+        return;
+
+      newVal = ShapeValue::intersect(newVal, inputLatticeVal);
+
+      LLVM_DEBUG(llvm::dbgs() << "ShapeValueAnalysis: New reshape result: "
+                              << newVal << "\n");
 
       auto resultLattice = results.front();
       auto changed = resultLattice->join(newVal);
@@ -665,7 +637,6 @@ struct ShapeIntegerRangePropagationPass
     auto op = getOperation();
     mlir::DataFlowSolver solver;
     solver.load<mlir::dataflow::DeadCodeAnalysis>();
-    solver.load<TensorValueAnalysis>();
     solver.load<ShapeValueAnalysis>();
     solver.load<IntegerRangeAnalysisEx>();
     if (failed(solver.initializeAndRun(op)))
