@@ -331,23 +331,29 @@ computeIdentityStrides(mlir::OpBuilder &builder, mlir::Location loc,
 }
 
 struct ReshapeChangeLayout
-    : public mlir::OpRewritePattern<mlir::memref::ReshapeOp> {
+    : public mlir::OpRewritePattern<numba::util::ReshapeOp> {
 
   // Set high benefit, so it will run earlier than ReshapeToReinterpret.
   ReshapeChangeLayout(mlir::MLIRContext *context)
-      : mlir::OpRewritePattern<mlir::memref::ReshapeOp>(context,
-                                                        /*benefit*/ 10) {}
+      : mlir::OpRewritePattern<numba::util::ReshapeOp>(context,
+                                                       /*benefit*/ 10) {}
 
   mlir::LogicalResult
-  matchAndRewrite(mlir::memref::ReshapeOp op,
+  matchAndRewrite(numba::util::ReshapeOp op,
                   mlir::PatternRewriter &rewriter) const override {
     auto cl = op.getSource().getDefiningOp<numba::util::ChangeLayoutOp>();
     if (!cl)
       return mlir::failure();
 
     auto src = cl.getSource();
-    auto srcType = src.getType().cast<mlir::MemRefType>();
-    auto dstType = op.getSource().getType().cast<mlir::MemRefType>();
+    auto srcType = mlir::dyn_cast<mlir::MemRefType>(src.getType());
+    if (!srcType)
+      return mlir::failure();
+
+    auto dstType = mlir::dyn_cast<mlir::MemRefType>(op.getSource().getType());
+    if (!dstType)
+      return mlir::failure();
+
     if (srcType.getRank() != dstType.getRank())
       return mlir::failure();
 
@@ -416,50 +422,36 @@ struct ReshapeChangeLayout
 
     auto res = rewriter.create<mlir::scf::IfOp>(loc, cmp, trueBody, falseBody)
                    .getResult(0);
-    rewriter.replaceOpWithNewOp<mlir::memref::ReshapeOp>(op, op.getType(), res,
-                                                         op.getShape());
+    rewriter.replaceOpWithNewOp<numba::util::ReshapeOp>(op, op.getType(), res,
+                                                        op.getShape());
     return mlir::success();
   }
 };
 
 struct ReshapeToReinterpret
-    : public mlir::OpRewritePattern<mlir::memref::ReshapeOp> {
+    : public mlir::OpRewritePattern<numba::util::ReshapeOp> {
   using OpRewritePattern::OpRewritePattern;
 
   mlir::LogicalResult
-  matchAndRewrite(mlir::memref::ReshapeOp op,
+  matchAndRewrite(numba::util::ReshapeOp op,
                   mlir::PatternRewriter &rewriter) const override {
     auto src = op.getSource();
-    auto srcType = src.getType().cast<mlir::MemRefType>();
-    if (!srcType.getLayout().isIdentity())
+    auto srcType = mlir::dyn_cast<mlir::MemRefType>(src.getType());
+    if (!srcType || !srcType.getLayout().isIdentity())
       return mlir::failure();
 
-    auto dstType = op.getResult().getType().cast<mlir::MemRefType>();
-    if (!dstType.getLayout().isIdentity())
+    auto dstType = mlir::dyn_cast<mlir::MemRefType>(op.getResult().getType());
+    if (!dstType || !dstType.getLayout().isIdentity())
       return mlir::failure();
 
-    auto shape = op.getShape();
-    auto shapeType = shape.getType().cast<mlir::MemRefType>();
-    if (!shapeType.getElementType().isIndex())
-      return mlir::failure();
-
+    llvm::SmallVector<mlir::OpFoldResult> shape = op.getShape();
     auto loc = op.getLoc();
-
-    auto dstRank = static_cast<unsigned>(dstType.getRank());
+    auto strides =
+        computeIdentityStrides(rewriter, loc, dstType.getShape(), shape);
 
     mlir::OpFoldResult offset = rewriter.getIndexAttr(0);
-    llvm::SmallVector<mlir::OpFoldResult> sizes(dstRank);
-    for (auto i : llvm::seq(0u, dstRank)) {
-      mlir::Value idx = rewriter.create<mlir::arith::ConstantIndexOp>(loc, i);
-      mlir::Value val = rewriter.create<mlir::memref::LoadOp>(loc, shape, idx);
-      sizes[i] = val;
-    }
-
-    auto strides =
-        computeIdentityStrides(rewriter, loc, dstType.getShape(), sizes);
-
     rewriter.replaceOpWithNewOp<mlir::memref::ReinterpretCastOp>(
-        op, dstType, src, offset, sizes, strides);
+        op, dstType, src, offset, shape, strides);
     return mlir::success();
   }
 };
