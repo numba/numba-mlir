@@ -396,6 +396,27 @@ struct ConvertLinalgYield
     return mlir::success();
   }
 };
+
+struct ConvertUtilReshape
+    : public mlir::OpConversionPattern<numba::util::ReshapeOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(numba::util::ReshapeOp op, OpAdaptor adaptor,
+                  mlir::ConversionPatternRewriter &rewriter) const override {
+    auto converter = this->getTypeConverter();
+    assert(converter);
+
+    auto oldResType = op.getType();
+    auto newResType = converter->convertType<mlir::ShapedType>(oldResType);
+    if (!newResType)
+      return mlir::failure();
+
+    rewriter.replaceOpWithNewOp<numba::util::ReshapeOp>(
+        op, newResType, adaptor.getSource(), adaptor.getShape());
+    return mlir::success();
+  }
+};
 } // namespace
 
 static std::optional<mlir::Type> makeSignlessType(mlir::Type type) {
@@ -433,7 +454,8 @@ void numba::populateMakeSignlessRewritesAndTarget(
       mlir::memref::ExtractStridedMetadataOp, mlir::tensor::FromElementsOp,
       mlir::tensor::ExpandShapeOp, mlir::tensor::ReshapeOp,
       mlir::tensor::ExtractSliceOp, mlir::tensor::InsertSliceOp,
-      mlir::linalg::FillOp, mlir::linalg::GenericOp, mlir::linalg::YieldOp>(
+      mlir::linalg::FillOp, mlir::linalg::GenericOp, mlir::linalg::YieldOp,
+      numba::util::ReshapeOp>(
       [&converter](mlir::Operation *op) { return converter.isLegal(op); });
 
   patterns.insert<
@@ -442,8 +464,8 @@ void numba::populateMakeSignlessRewritesAndTarget(
       ConvertDealloc, ConvertCastOp, ConvertSubview, ConvertExtractMetadata,
       ConvertTensorEmpty, ConvertTensorFromElements, ConvertTensorExpandShape,
       ConvertTensorReshape, ConvertTensorExtractSlice, ConvertTensorInserSlice,
-      ConvertLinalgFill, ConvertLinalgGeneric, ConvertLinalgYield>(
-      converter, patterns.getContext());
+      ConvertLinalgFill, ConvertLinalgGeneric, ConvertLinalgYield,
+      ConvertUtilReshape>(converter, patterns.getContext());
 }
 
 namespace {

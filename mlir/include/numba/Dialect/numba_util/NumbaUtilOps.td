@@ -396,4 +396,24 @@ def GetAllocTokenOp : NumbaUtil_Op<"get_alloc_token", [
   }];
 }
 
+def ReshapeOp : NumbaUtil_Op<"reshape", [
+    Pure, ViewLikeOpInterface]> {
+
+  let arguments = (ins
+    AnyShaped:$source,
+    Variadic<Index>:$shape
+  );
+  let results = (outs AnyShaped:$result);
+
+  let extraClassDeclaration = [{
+      ::mlir::Value getViewSource() { return getSource(); }
+  }];
+
+
+  let assemblyFormat = [{
+    $source `(` $shape `)` attr-dict `:` functional-type(operands, results)
+  }];
+}
+
+
 #endif // PLIER_UTIL_OPS

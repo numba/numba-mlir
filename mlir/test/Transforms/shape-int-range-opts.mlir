@@ -111,8 +111,7 @@ func.func @test(%arg1: tensor<?xf32> {numba.shape_range = [#numba_util.index_ran
 func.func @test(%arg1: tensor<?xf32>) -> i1 {
   %cst0 = arith.constant 0 : index
   %cst1 = arith.constant 1 : index
-  %0 = tensor.from_elements %cst0, %cst1 : tensor<2xindex>
-  %1 = tensor.reshape %arg1(%0) : (tensor<?xf32>, tensor<2xindex>) -> tensor<?x?xf32>
+  %1 = numba_util.reshape %arg1(%cst0, %cst1) : (tensor<?xf32>, index, index) -> tensor<?x?xf32>
   %2 = tensor.dim %1, %cst0 : tensor<?x?xf32>
   %3 = arith.cmpi eq, %2, %cst1 : index
   return %3: i1
@@ -126,8 +125,7 @@ func.func @test(%arg1: tensor<?xf32>) -> i1 {
 func.func @test(%arg1: tensor<?xf32>) -> i1 {
   %cst0 = arith.constant 0 : index
   %cst1 = arith.constant 1 : index
-  %0 = tensor.from_elements %cst0, %cst1 : tensor<2xindex>
-  %1 = tensor.reshape %arg1(%0) : (tensor<?xf32>, tensor<2xindex>) -> tensor<?x?xf32>
+  %1 = numba_util.reshape %arg1(%cst0, %cst1) : (tensor<?xf32>, index, index) -> tensor<?x?xf32>
   %2 = tensor.dim %1, %cst1 : tensor<?x?xf32>
   %3 = arith.cmpi eq, %2, %cst0 : index
   return %3: i1
