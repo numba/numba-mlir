@@ -3182,23 +3182,22 @@ struct MixedGenericsAliasAnalysis
 };
 
 struct BufferizeReshape
-    : public mlir::OpConversionPattern<mlir::tensor::ReshapeOp> {
+    : public mlir::OpConversionPattern<numba::util::ReshapeOp> {
   using OpConversionPattern::OpConversionPattern;
 
   mlir::LogicalResult
-  matchAndRewrite(mlir::tensor::ReshapeOp op,
-                  mlir::tensor::ReshapeOp::Adaptor adaptor,
+  matchAndRewrite(numba::util::ReshapeOp op, OpAdaptor adaptor,
                   mlir::ConversionPatternRewriter &rewriter) const override {
     auto getType = [&](mlir::Type type) {
-      auto shapedType = type.cast<mlir::ShapedType>();
+      auto shapedType = mlir::cast<mlir::ShapedType>(type);
       return mlir::MemRefType::get(shapedType.getShape(),
                                    shapedType.getElementType());
     };
     auto source = adaptor.getSource();
     auto shape = adaptor.getShape();
     auto resType = getType(op.getType());
-    rewriter.replaceOpWithNewOp<mlir::memref::ReshapeOp>(op, resType, source,
-                                                         shape);
+    rewriter.replaceOpWithNewOp<numba::util::ReshapeOp>(op, resType, source,
+                                                        shape);
     return mlir::success();
   }
 };
@@ -3393,8 +3392,9 @@ struct AdditionalBufferize
     target
         .addIllegalOp<mlir::tensor::ReshapeOp, mlir::tensor::ExtractSliceOp>();
     target.addLegalOp<mlir::memref::ReshapeOp>();
-    target.addDynamicallyLegalOp<numba::util::SignCastOp>(
-        [&](mlir::Operation *op) { return typeConverter.isLegal(op); });
+    target
+        .addDynamicallyLegalOp<numba::util::SignCastOp, numba::util::ReshapeOp>(
+            [&](mlir::Operation *op) { return typeConverter.isLegal(op); });
 
     target.addDynamicallyLegalOp<mlir::linalg::GenericOp>(
         [](mlir::linalg::GenericOp op) {
