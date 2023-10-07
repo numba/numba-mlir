@@ -125,6 +125,13 @@ inline llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
   return os;
 }
 
+inline llvm::raw_ostream &
+operator<<(llvm::raw_ostream &os,
+           const mlir::dataflow::IntegerValueRange &state) {
+  state.print(os);
+  return os;
+}
+
 struct ShapeValueLattice : public mlir::dataflow::Lattice<ShapeValue> {
   MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(ShapeValueLattice)
   using Lattice::Lattice;
@@ -379,7 +386,6 @@ public:
       return;
     }
 
-    // TODO: not yet possible due to gow BranchOpInterface works.
     if (auto generic = mlir::dyn_cast<mlir::linalg::GenericOp>(op)) {
       if (generic->getNumResults() == 0)
         return;
@@ -466,6 +472,30 @@ public:
       auto resultLattice = results.front();
       auto changed = resultLattice->join(newVal);
       propagateIfChanged(resultLattice, changed);
+      return;
+    }
+
+    if (auto region = mlir::dyn_cast<numba::util::EnvironmentRegionOp>(op)) {
+      auto term = mlir::cast<numba::util::EnvironmentRegionYieldOp>(
+          region.getBody()->getTerminator());
+
+      LLVM_DEBUG(llvm::dbgs() << "ShapeValueAnalysis: region: ");
+      for (auto &&[termArg, resultLattice] :
+           llvm::zip(term.getResults(), results)) {
+        auto state = getOrCreateFor<ShapeValueLattice>(term, termArg);
+        if (!state)
+          continue;
+
+        auto value = state->getValue();
+        if (value.isUninitialized())
+          continue;
+
+        LLVM_DEBUG(llvm::dbgs() << value << " ");
+
+        auto changed = resultLattice->join(value);
+        propagateIfChanged(resultLattice, changed);
+      }
+      LLVM_DEBUG(llvm::dbgs() << "\n");
       return;
     }
 
@@ -585,6 +615,31 @@ public:
             lattice->join(mlir::dataflow::IntegerValueRange{newRange});
         propagateIfChanged(lattice, changed);
       }
+      return;
+    }
+
+    if (auto region = mlir::dyn_cast<numba::util::EnvironmentRegionOp>(op)) {
+      auto term = mlir::cast<numba::util::EnvironmentRegionYieldOp>(
+          region.getBody()->getTerminator());
+
+      LLVM_DEBUG(llvm::dbgs() << "ShapeValueAnalysis: region: ");
+      for (auto &&[termArg, resultLattice] :
+           llvm::zip(term.getResults(), results)) {
+        auto state = getOrCreateFor<mlir::dataflow::IntegerValueRangeLattice>(
+            term, termArg);
+        if (!state)
+          continue;
+
+        auto value = state->getValue();
+        if (value.isUninitialized())
+          continue;
+
+        LLVM_DEBUG(llvm::dbgs() << value << " ");
+
+        auto changed = resultLattice->join(value);
+        propagateIfChanged(resultLattice, changed);
+      }
+      LLVM_DEBUG(llvm::dbgs() << "\n");
       return;
     }
 
