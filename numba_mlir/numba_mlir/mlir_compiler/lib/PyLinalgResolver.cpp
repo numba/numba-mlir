@@ -1036,11 +1036,8 @@ static py::object reshapeImpl(py::capsule context, py::handle src,
     return values;
   };
 
-  auto shapeTensor =
-      builder.create<mlir::tensor::FromElementsOp>(loc, toValues(newDimsVals));
-
-  mlir::Value reshaped = builder.create<mlir::tensor::ReshapeOp>(
-      loc, resultType, srcVal, shapeTensor);
+  mlir::Value reshaped = builder.create<numba::util::ReshapeOp>(
+      loc, resultType, srcVal, toValues(newDimsVals));
 
   return ctx.context.createVar(context, reshaped);
 }
