@@ -126,13 +126,6 @@ inline llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
   return os;
 }
 
-inline llvm::raw_ostream &
-operator<<(llvm::raw_ostream &os,
-           const mlir::dataflow::IntegerValueRange &state) {
-  state.print(os);
-  return os;
-}
-
 struct ShapeValueLattice : public mlir::dataflow::Lattice<ShapeValue> {
   MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(ShapeValueLattice)
   using Lattice::Lattice;
