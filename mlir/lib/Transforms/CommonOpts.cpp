@@ -1206,29 +1206,6 @@ struct GPUGenGlobalId : public mlir::OpRewritePattern<mlir::arith::AddIOp> {
   }
 };
 
-struct SelectOfPoison : public mlir::OpRewritePattern<mlir::arith::SelectOp> {
-  // SelectOfPoison benefit than upstream select patterns
-  SelectOfPoison(mlir::MLIRContext *context)
-      : mlir::OpRewritePattern<mlir::arith::SelectOp>(context, /*benefit*/ 10) {
-  }
-
-  mlir::LogicalResult
-  matchAndRewrite(mlir::arith::SelectOp op,
-                  mlir::PatternRewriter &rewriter) const override {
-    mlir::Value result;
-    if (op.getTrueValue().getDefiningOp<mlir::ub::PoisonOp>()) {
-      result = op.getFalseValue();
-    } else if (op.getFalseValue().getDefiningOp<mlir::ub::PoisonOp>()) {
-      result = op.getTrueValue();
-    } else {
-      return mlir::failure();
-    }
-
-    rewriter.replaceOp(op, result);
-    return mlir::success();
-  }
-};
-
 struct ReplacePoisonMath : public mlir::OpRewritePattern<mlir::ub::PoisonOp> {
   using OpRewritePattern::OpRewritePattern;
 
@@ -1280,7 +1257,7 @@ void numba::populateCanonicalizationPatterns(
 }
 
 void numba::populatePoisonOptsPatterns(mlir::RewritePatternSet &patterns) {
-  patterns.insert<SelectOfPoison, ReplacePoisonMath>(patterns.getContext());
+  patterns.insert<ReplacePoisonMath>(patterns.getContext());
 }
 
 void numba::populateLoopOptsPatterns(mlir::RewritePatternSet &patterns) {
