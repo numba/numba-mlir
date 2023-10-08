@@ -486,30 +486,6 @@ public:
       return;
     }
 
-    if (auto region = mlir::dyn_cast<numba::util::EnvironmentRegionOp>(op)) {
-      auto term = mlir::cast<numba::util::EnvironmentRegionYieldOp>(
-          region.getBody()->getTerminator());
-
-      LLVM_DEBUG(llvm::dbgs() << "ShapeValueAnalysis: region: ");
-      for (auto &&[termArg, resultLattice] :
-           llvm::zip(term.getResults(), results)) {
-        auto state = getOrCreateFor<ShapeValueLattice>(term, termArg);
-        if (!state)
-          continue;
-
-        auto value = state->getValue();
-        if (value.isUninitialized())
-          continue;
-
-        LLVM_DEBUG(llvm::dbgs() << value << " ");
-
-        auto changed = resultLattice->join(value);
-        propagateIfChanged(resultLattice, changed);
-      }
-      LLVM_DEBUG(llvm::dbgs() << "\n");
-      return;
-    }
-
     for (auto &&[res, resultLattice] : llvm::zip(op->getResults(), results)) {
       auto shaped = mlir::dyn_cast<mlir::ShapedType>(res.getType());
       if (!shaped)
@@ -626,31 +602,6 @@ public:
             lattice->join(mlir::dataflow::IntegerValueRange{newRange});
         propagateIfChanged(lattice, changed);
       }
-      return;
-    }
-
-    if (auto region = mlir::dyn_cast<numba::util::EnvironmentRegionOp>(op)) {
-      auto term = mlir::cast<numba::util::EnvironmentRegionYieldOp>(
-          region.getBody()->getTerminator());
-
-      LLVM_DEBUG(llvm::dbgs() << "IntegerRangeAnalysisEx: region: ");
-      for (auto &&[termArg, resultLattice] :
-           llvm::zip(term.getResults(), results)) {
-        auto state = getOrCreateFor<mlir::dataflow::IntegerValueRangeLattice>(
-            term, termArg);
-        if (!state)
-          continue;
-
-        auto value = state->getValue();
-        if (value.isUninitialized())
-          continue;
-
-        LLVM_DEBUG(llvm::dbgs() << value << " ");
-
-        auto changed = resultLattice->join(value);
-        propagateIfChanged(resultLattice, changed);
-      }
-      LLVM_DEBUG(llvm::dbgs() << "\n");
       return;
     }
 
