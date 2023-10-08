@@ -622,6 +622,43 @@ public:
   }
 };
 
+static void printShapeAnalysisState(mlir::DataFlowSolver &solver,
+                                    mlir::Operation *root) {
+  assert(root && "Invalid root");
+  auto ctx = root->getContext();
+  auto attrName = mlir::StringAttr::get(ctx, "int_range");
+  auto addAttr = [&](mlir::Operation *op) {
+    if (op->getNumResults() == 0)
+      return;
+
+    std::string str;
+    llvm::raw_string_ostream os(str);
+    for (auto &&[i, res] : llvm::enumerate(op->getResults())) {
+      if (i != 0)
+        os << ", ";
+
+      auto *lattice =
+          solver.lookupState<mlir::dataflow::IntegerValueRangeLattice>(res);
+      if (!lattice || lattice->getValue().isUninitialized()) {
+        os << "<none>";
+        continue;
+      }
+
+      lattice->getValue().print(os);
+    }
+    os.flush();
+
+    auto attr = mlir::StringAttr::get(ctx, str);
+    op->setAttr(attrName, attr);
+  };
+
+  auto removeAttr = [&](mlir::Operation *op) { op->removeAttr(attrName); };
+
+  root->walk(addAttr);
+  llvm::dbgs() << *root;
+  root->walk(removeAttr);
+}
+
 struct ShapeIntegerRangePropagationPass
     : public mlir::PassWrapper<ShapeIntegerRangePropagationPass,
                                mlir::OperationPass<void>> {
@@ -645,6 +682,8 @@ struct ShapeIntegerRangePropagationPass
     solver.load<IntegerRangeAnalysisEx>();
     if (failed(solver.initializeAndRun(op)))
       return signalPassFailure();
+
+    LLVM_DEBUG(printShapeAnalysisState(solver, op));
 
     auto *ctx = &getContext();
     mlir::RewritePatternSet patterns(ctx);
