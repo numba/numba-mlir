@@ -289,3 +289,22 @@ func.func @test(%arg1: tensor<?xf32> {numba.shape_range = [#numba_util.index_ran
   %3 = arith.cmpi eq, %0, %cst0 : index
   return %3: i1
 }
+
+// -----
+
+// CHECK-LABEL: func @test
+//       CHECK1:   %[[C:.*]] = arith.constant false
+//       CHECK:   return %[[C]]
+func.func @test(%arg1: tensor<?xf32> {numba.shape_range = [#numba_util.index_range<[1,10]>]}) -> i1 {
+  %cst0 = arith.constant 0 : index
+  %cst1 = arith.constant 1 : index
+  %0 = numba_util.env_region "test" -> tensor<?xf32> {
+    %1 = tensor.dim %arg1, %cst0 : tensor<?xf32>
+    %2 = tensor.empty(%1) : tensor<?xf32>
+    "test.test"(%2) : (tensor<?xf32>) -> ()
+    numba_util.env_region_yield %2: tensor<?xf32>
+  }
+  %2 = tensor.dim %0, %cst0 : tensor<?xf32>
+  %3 = arith.cmpi eq, %2, %cst0 : index
+  return %3: i1
+}

@@ -8,6 +8,7 @@
 #include "numba/Dialect/numba_util/Dialect.hpp"
 
 #include <llvm/Support/Debug.h>
+#include <mlir/Analysis/DataFlow/ConstantPropagationAnalysis.h>
 #include <mlir/Analysis/DataFlow/DeadCodeAnalysis.h>
 #include <mlir/Analysis/DataFlow/IntegerRangeAnalysis.h>
 #include <mlir/Dialect/Arith/IR/Arith.h>
@@ -135,6 +136,16 @@ operator<<(llvm::raw_ostream &os,
 struct ShapeValueLattice : public mlir::dataflow::Lattice<ShapeValue> {
   MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(ShapeValueLattice)
   using Lattice::Lattice;
+
+  void onUpdate(mlir::DataFlowSolver *solver) const {
+    Lattice::onUpdate(solver);
+
+    auto value = point.get<mlir::Value>();
+    auto *cv =
+        solver->getOrCreateState<Lattice<mlir::dataflow::ConstantValue>>(value);
+    return solver->propagateIfChanged(
+        cv, cv->join(mlir::dataflow::ConstantValue::getUnknownConstant()));
+  }
 };
 
 static bool isShapedCast(mlir::Operation *op) {
@@ -622,7 +633,7 @@ public:
       auto term = mlir::cast<numba::util::EnvironmentRegionYieldOp>(
           region.getBody()->getTerminator());
 
-      LLVM_DEBUG(llvm::dbgs() << "ShapeValueAnalysis: region: ");
+      LLVM_DEBUG(llvm::dbgs() << "IntegerRangeAnalysisEx: region: ");
       for (auto &&[termArg, resultLattice] :
            llvm::zip(term.getResults(), results)) {
         auto state = getOrCreateFor<mlir::dataflow::IntegerValueRangeLattice>(
