@@ -240,6 +240,19 @@ def test_binary_scalar_const(py_func, a):
     assert_allclose(py_func(a), jit_func(a), rtol=1e-7, atol=1e-7)
 
 
+@pytest.mark.parametrize(
+    "val", [0, 1, -1, 2**24, 2**24 - 1, np.uint64(0xFFFFFFFF_FFFFFFFF)]
+)
+@pytest.mark.parametrize("s", [0, 1, 7])
+def test_rshift(val, s):
+    def py_func(val, s):
+        return val >> s
+
+    jit_func = njit(py_func)
+    s = type(val)(s)
+    assert_equal(py_func(val, s), jit_func(val, s))
+
+
 @parametrize_function_variants(
     "py_func",
     [
