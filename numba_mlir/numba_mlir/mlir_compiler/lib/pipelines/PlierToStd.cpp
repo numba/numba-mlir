@@ -297,6 +297,25 @@ static mlir::Value replaceOp(mlir::PatternRewriter &rewriter,
   return numba::doConvert(rewriter, loc, res, newType);
 }
 
+static mlir::Value replaceRShiftOp(mlir::PatternRewriter &rewriter,
+                                   mlir::Location loc,
+                                   mlir::ValueRange operands,
+                                   mlir::Type newType) {
+  auto isUnsigned = newType.isUnsignedInteger();
+  auto signlessType = numba::makeSignlessType(newType);
+  llvm::SmallVector<mlir::Value> newOperands(operands.size());
+  for (auto &&[i, val] : llvm::enumerate(operands))
+    newOperands[i] = numba::doConvert(rewriter, loc, val, signlessType);
+
+  mlir::Value res;
+  if (isUnsigned) {
+    res = rewriter.createOrFold<mlir::arith::ShRUIOp>(loc, newOperands);
+  } else {
+    res = rewriter.createOrFold<mlir::arith::ShRSIOp>(loc, newOperands);
+  }
+  return numba::doConvert(rewriter, loc, res, newType);
+}
+
 mlir::Value replaceIpowOp(mlir::PatternRewriter &rewriter, mlir::Location loc,
                           mlir::ValueRange operands, mlir::Type newType) {
   auto f64Type = rewriter.getF64Type();
@@ -473,8 +492,7 @@ struct BinOpLowering : public mlir::OpConversionPattern<plier::BinOp> {
          &invalidReplaceOp},
         {"^", &replaceOp<mlir::arith::XOrIOp>, &invalidReplaceOp,
          &invalidReplaceOp},
-        {">>", &replaceOp<mlir::arith::ShRSIOp>, &invalidReplaceOp,
-         &invalidReplaceOp},
+        {">>", &replaceRShiftOp, &invalidReplaceOp, &invalidReplaceOp},
         {"<<", &replaceOp<mlir::arith::ShLIOp>, &invalidReplaceOp,
          &invalidReplaceOp},
 
