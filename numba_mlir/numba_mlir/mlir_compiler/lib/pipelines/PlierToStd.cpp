@@ -301,7 +301,7 @@ static mlir::Value replaceRShiftOp(mlir::PatternRewriter &rewriter,
                                    mlir::Location loc,
                                    mlir::ValueRange operands,
                                    mlir::Type newType) {
-  auto isUnsigned = !newType.isSignedInteger();
+  auto isUnsigned = newType.isUnsignedInteger();
   auto signlessType = numba::makeSignlessType(newType);
   llvm::SmallVector<mlir::Value> newOperands(operands.size());
   for (auto &&[i, val] : llvm::enumerate(operands))
