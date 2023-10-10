@@ -1395,9 +1395,29 @@ private:
     return opts;
   }
 };
+
+struct Timer {
+  using clock = std::chrono::high_resolution_clock;
+
+  Timer(const char *name_) : name(name_), begin(clock::now()) {}
+
+  ~Timer() {
+    auto end = clock::now();
+    auto dur =
+        std::chrono::duration_cast<std::chrono::milliseconds>(end - begin);
+    llvm::errs() << name << " took " << dur.count() << "ms\n";
+  }
+
+private:
+  const char *name;
+  clock::time_point begin;
+};
+
+#define TIME_FUNC() Timer t(__func__)
 } // namespace
 
 py::capsule initCompiler(py::dict settings) {
+  TIME_FUNC();
   auto debugType = settings["debug_type"].cast<py::list>();
   auto debugTypeSize = debugType.size();
   if (debugTypeSize != 0) {
@@ -1427,6 +1447,7 @@ static bool getDictVal(py::dict &dict, const char *str, T &&def) {
 }
 
 py::capsule createModule(py::dict settings) {
+  TIME_FUNC();
   ModuleSettings modSettings;
   modSettings.enableGpuPipeline =
       getDictVal(settings, "enable_gpu_pipeline", false);
@@ -1444,6 +1465,7 @@ py::capsule createModule(py::dict settings) {
 
 py::capsule lowerFunction(const py::object &compilationContext,
                           const py::capsule &pyMod, const py::object &funcIr) {
+  TIME_FUNC();
   auto mod = static_cast<Module *>(pyMod);
   auto &context = mod->context;
   auto &module = mod->module;
@@ -1455,6 +1477,7 @@ py::capsule lowerFunction(const py::object &compilationContext,
 py::capsule lowerParfor(const pybind11::object &compilationContext,
                         const pybind11::capsule &pyMod,
                         const pybind11::object &parforInst) {
+  TIME_FUNC();
   auto mod = static_cast<Module *>(pyMod);
   auto &context = mod->context;
   auto &module = mod->module;
@@ -1466,6 +1489,7 @@ py::capsule lowerParfor(const pybind11::object &compilationContext,
 py::capsule compileModule(const py::capsule &compiler,
                           const py::object &compilationContext,
                           const py::capsule &pyMod) {
+  TIME_FUNC();
   auto context = static_cast<GlobalCompilerContext *>(compiler);
   assert(context);
   auto mod = static_cast<Module *>(pyMod);
@@ -1495,6 +1519,7 @@ void registerSymbol(const py::capsule &compiler, const py::str &name,
 
 py::int_ getFunctionPointer(const py::capsule &compiler,
                             const py::capsule &module, py::str funcName) {
+  TIME_FUNC();
   auto context = static_cast<GlobalCompilerContext *>(compiler);
   assert(context);
   auto handle = static_cast<numba::ExecutionEngine::ModuleHandle *>(module);
@@ -1510,6 +1535,7 @@ py::int_ getFunctionPointer(const py::capsule &compiler,
 }
 
 void releaseModule(const py::capsule &compiler, const py::capsule &module) {
+  TIME_FUNC();
   auto context = static_cast<GlobalCompilerContext *>(compiler);
   assert(context);
   auto handle = static_cast<numba::ExecutionEngine::ModuleHandle *>(module);
