@@ -62,6 +62,7 @@
 
 namespace py = pybind11;
 namespace {
+#if 0 // Enable func timings
 struct Timer {
   using clock = std::chrono::high_resolution_clock;
 
@@ -87,7 +88,10 @@ private:
 };
 thread_local int Timer::depth = 0;
 
-#define TIME_FUNC() Timer t(__func__)
+#define TIME_FUNC() Timer _scope_timer(__func__)
+#else
+#define TIME_FUNC() (void)0
+#endif
 
 class dummy_complex : public py::object {
 public:
