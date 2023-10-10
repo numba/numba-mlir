@@ -4,6 +4,8 @@
 
 import functools
 
+from time import perf_counter
+
 import llvmlite.ir
 from numba.core import types, cgutils
 from numba.core.compiler import Flags, compile_result
@@ -21,6 +23,14 @@ from . import func_registry
 from .. import mlir_compiler
 from .compiler_context import global_compiler_context
 from .utils import scoped_time
+
+@contextmanager
+def scoped_time(desc):
+    t1 = t2 = perf_counter()
+    yield lambda: t2 - t1
+    t2 = perf_counter()
+    print(f"{str(desc)} took {t2 - t1}")
+
 
 _print_before = []
 _print_after = []
@@ -106,15 +116,16 @@ class MlirBackendBase(FunctionPass):
         FunctionPass.__init__(self)
 
     def run_pass(self, state):
-        if self._push_func_stack:
-            func_registry.push_active_funcs_stack()
-            try:
-                res = self.run_pass_impl(state)
-            finally:
-                func_registry.pop_active_funcs_stack()
-            return res
-        else:
-            return self.run_pass_impl(state)
+        with scoped_time(self.run_pass) as t:
+            if self._push_func_stack:
+                func_registry.push_active_funcs_stack()
+                try:
+                    res = self.run_pass_impl(state)
+                finally:
+                    func_registry.pop_active_funcs_stack()
+                return res
+            else:
+                return self.run_pass_impl(state)
 
     def _resolve_func_name(self, state, obj):
         name, func, flags = self._resolve_func_impl(state, obj)
