@@ -736,6 +736,7 @@ private:
   }
 
   void lowerBlock(py::handle irBlock) {
+    TIME_FUNC();
     for (auto it : getBody(irBlock))
       lowerInst(it);
   }
@@ -1431,25 +1432,6 @@ private:
     return opts;
   }
 };
-
-struct Timer {
-  using clock = std::chrono::high_resolution_clock;
-
-  Timer(const char *name_) : name(name_), begin(clock::now()) {}
-
-  ~Timer() {
-    auto end = clock::now();
-    auto dur =
-        std::chrono::duration_cast<std::chrono::milliseconds>(end - begin);
-    llvm::errs() << name << " took " << dur.count() << "ms\n";
-  }
-
-private:
-  const char *name;
-  clock::time_point begin;
-};
-
-#define TIME_FUNC() Timer t(__func__)
 } // namespace
 
 py::capsule initCompiler(py::dict settings) {
