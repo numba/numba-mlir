@@ -4,8 +4,6 @@
 
 import functools
 
-from time import perf_counter
-
 import llvmlite.ir
 from numba.core import types, cgutils
 from numba.core.compiler import Flags, compile_result
@@ -22,15 +20,7 @@ from .settings import DUMP_IR, OPT_LEVEL, DUMP_DIAGNOSTICS
 from . import func_registry
 from .. import mlir_compiler
 from .compiler_context import global_compiler_context
-
-
-@contextmanager
-def scoped_time(desc):
-    t1 = t2 = perf_counter()
-    yield lambda: t2 - t1
-    t2 = perf_counter()
-    print(f"{str(desc)} took {t2 - t1}")
-
+from .utils import scoped_time
 
 _print_before = []
 _print_after = []

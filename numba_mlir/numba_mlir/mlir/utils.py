@@ -8,6 +8,8 @@ import numba_mlir
 import os
 import sys
 import warnings
+from time import perf_counter
+from contextlib import contextmanager
 import llvmlite.binding as ll
 from .. import mlir_compiler
 
@@ -78,3 +80,11 @@ def readenv(name, ctor, default):
             RuntimeWarning,
         )
         return default
+
+
+@contextmanager
+def scoped_time(desc):
+    t1 = t2 = perf_counter()
+    yield lambda: t2 - t1
+    t2 = perf_counter()
+    print(f"{str(desc)} took {t2 - t1} sec")
