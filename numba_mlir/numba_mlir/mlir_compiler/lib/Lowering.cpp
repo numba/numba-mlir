@@ -65,19 +65,27 @@ namespace {
 struct Timer {
   using clock = std::chrono::high_resolution_clock;
 
-  Timer(const char *name_) : name(name_), begin(clock::now()) {}
+  Timer(const char *name_) : name(name_), begin(clock::now()) { ++depth; }
 
   ~Timer() {
+    auto d = --depth;
     auto end = clock::now();
     auto dur =
         std::chrono::duration_cast<std::chrono::milliseconds>(end - begin);
+    for (auto i : llvm::seq(0, d)) {
+      (void)i;
+      llvm::errs() << "  ";
+    }
+
     llvm::errs() << name << " took " << dur.count() << "ms\n";
   }
 
 private:
   const char *name;
   clock::time_point begin;
+  static thread_local int depth;
 };
+thread_local int Timer::depth = 0;
 
 #define TIME_FUNC() Timer t(__func__)
 
