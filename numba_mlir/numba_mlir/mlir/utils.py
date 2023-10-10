@@ -88,3 +88,15 @@ def scoped_time(desc):
     yield lambda: t2 - t1
     t2 = perf_counter()
     print(f"{str(desc)} took {(t2 - t1):.3f} sec")
+
+
+def print_numba_pass_timings(dispatcher):
+    sigs = dispatcher.signatures
+    if not sigs:
+        return
+
+    md = dispatcher.get_metadata(sigs[-1])
+    for pipeline, timings in md["pipeline_times"].items():
+        print("pipeline:", pipeline)
+        for p, t in timings.items():
+            print("  ", p, f"{t.run:.3f} sec")
