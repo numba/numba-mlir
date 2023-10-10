@@ -4,8 +4,6 @@
 
 import functools
 
-from time import perf_counter
-
 import llvmlite.ir
 from numba.core import types, cgutils
 from numba.core.compiler import Flags, compile_result
