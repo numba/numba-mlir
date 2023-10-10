@@ -62,6 +62,24 @@
 
 namespace py = pybind11;
 namespace {
+struct Timer {
+  using clock = std::chrono::high_resolution_clock;
+
+  Timer(const char *name_) : name(name_), begin(clock::now()) {}
+
+  ~Timer() {
+    auto end = clock::now();
+    auto dur =
+        std::chrono::duration_cast<std::chrono::milliseconds>(end - begin);
+    llvm::errs() << name << " took " << dur.count() << "ms\n";
+  }
+
+private:
+  const char *name;
+  clock::time_point begin;
+};
+
+#define TIME_FUNC() Timer t(__func__)
 
 class dummy_complex : public py::object {
 public:
@@ -293,6 +311,7 @@ struct PlierLowerer final {
 
   mlir::func::FuncOp lower(const py::object &compilationContext,
                            mlir::ModuleOp mod, const py::object &funcIr) {
+    TIME_FUNC();
     auto newFunc = createFunc(compilationContext, mod);
     lowerFuncBody(funcIr);
     return newFunc;
@@ -301,6 +320,7 @@ struct PlierLowerer final {
   mlir::func::FuncOp lowerParfor(const py::object &compilationContext,
                                  mlir::ModuleOp mod,
                                  const py::object &parforInst) {
+    TIME_FUNC();
     auto newFunc = createFunc(compilationContext, mod);
     auto block = func.addEntryBlock();
     mlir::ValueRange blockArgs = block->getArguments();
@@ -471,6 +491,7 @@ private:
 
   mlir::func::FuncOp createFunc(const py::object &compilationContext,
                                 mlir::ModuleOp mod) {
+    TIME_FUNC();
     assert(!func);
     typemap = compilationContext["typemap"];
     funcNameResolver = compilationContext["resolve_func"];
@@ -502,6 +523,7 @@ private:
   }
 
   void lowerFuncBody(py::handle funcIr) {
+    TIME_FUNC();
     auto irBlocks = getBlocks(funcIr.attr("blocks"));
     assert(!irBlocks.empty());
     blocks.reserve(irBlocks.size());
@@ -517,6 +539,7 @@ private:
   }
 
   mlir::ValueRange lowerParforBody(py::handle parforInst) {
+    TIME_FUNC();
     auto indexType = builder.getIndexType();
     auto getIndexVal = [&](py::handle obj) -> mlir::Value {
       auto loc = getCurrentLoc();
@@ -651,6 +674,7 @@ private:
       llvm::function_ref<mlir::ValueRange(mlir::OpBuilder &, mlir::Location l,
                                           mlir::ValueRange, mlir::ValueRange)>
           bodyBuilder) {
+    TIME_FUNC();
     assert(!begins.empty());
     assert(begins.size() == ends.size());
     assert(begins.size() == steps.size());
@@ -700,6 +724,7 @@ private:
   }
 
   void lowerBlock(py::handle irBlock) {
+    TIME_FUNC();
     for (auto it : getBody(irBlock))
       lowerInst(it);
   }
@@ -1395,25 +1420,6 @@ private:
     return opts;
   }
 };
-
-struct Timer {
-  using clock = std::chrono::high_resolution_clock;
-
-  Timer(const char *name_) : name(name_), begin(clock::now()) {}
-
-  ~Timer() {
-    auto end = clock::now();
-    auto dur =
-        std::chrono::duration_cast<std::chrono::milliseconds>(end - begin);
-    llvm::errs() << name << " took " << dur.count() << "ms\n";
-  }
-
-private:
-  const char *name;
-  clock::time_point begin;
-};
-
-#define TIME_FUNC() Timer t(__func__)
 } // namespace
 
 py::capsule initCompiler(py::dict settings) {
