@@ -736,7 +736,6 @@ private:
   }
 
   void lowerBlock(py::handle irBlock) {
-    TIME_FUNC();
     for (auto it : getBody(irBlock))
       lowerInst(it);
   }
