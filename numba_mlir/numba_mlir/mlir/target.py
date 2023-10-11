@@ -248,7 +248,6 @@ class NumbaMLIRDispatcher(Dispatcher):
         return tp
 
     def compile(self, *args, **kwargs):
-        print(is_nested_compile())
         if is_nested_compile():
             return self._dummy_compile(*args, **kwargs)
 
