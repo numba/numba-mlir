@@ -22,6 +22,7 @@ from .. import mlir_compiler
 from .compiler_context import global_compiler_context
 from .utils import scoped_time
 
+
 @contextmanager
 def scoped_time(desc):
     t1 = t2 = perf_counter()
@@ -74,14 +75,6 @@ def print_pass_ir(print_before, print_after):
 
 _mlir_last_compiled_func = None
 _mlir_active_module = None
-
-
-def _create_flags(fp64_truncate, use_64bit_index):
-    flags = Flags()
-    flags.nrt = True
-    setattr(flags, "gpu_fp64_truncate", fp64_truncate)
-    setattr(flags, "gpu_use_64bit_index", use_64bit_index)
-    return flags
 
 
 def _get_flag(flags, name, default):
@@ -228,7 +221,9 @@ class MlirBackendBase(FunctionPass):
             func_attrs["numba.fastmath"] = None
 
         flags = state.flags
-        if flags.inline.is_always_inline or flags.mlir_force_inline:
+        if flags.inline.is_always_inline or _get_flag(
+            flags, "mlir_force_inline", False
+        ):
             func_attrs["numba.force_inline"] = None
 
         if flags.auto_parallel.enabled:
