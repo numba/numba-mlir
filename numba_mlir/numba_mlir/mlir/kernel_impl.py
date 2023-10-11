@@ -158,7 +158,7 @@ class Kernel(KernelBase):
         fp64_truncate = kwargs.get("gpu_fp64_truncate", False)
         use_64bit_index = kwargs.get("gpu_use_64bit_index", True)
         self._jit_func = mlir_njit(
-            inline="always",
+            mlir_force_inline=True,
             enable_gpu_pipeline=True,
             gpu_fp64_truncate=fp64_truncate,
             gpu_use_64bit_index=use_64bit_index,
@@ -208,7 +208,7 @@ def kernel(func=None, **kwargs):
 
 DEFAULT_LOCAL_SIZE = ()
 
-kernel_func = mlir_njit(inline="always")
+kernel_func = mlir_njit(mlir_force_inline=True)
 
 
 def _define_api_funcs():

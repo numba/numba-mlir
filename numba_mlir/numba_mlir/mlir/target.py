@@ -150,12 +150,14 @@ class NumbaMLIRTargetOptions(cpu.CPUTargetOptions):
     gpu_fp64_truncate = _option_mapping("gpu_fp64_truncate", _map_f64truncate)
     gpu_use_64bit_index = _option_mapping("gpu_use_64bit_index")
     enable_gpu_pipeline = _option_mapping("enable_gpu_pipeline")
+    mlir_force_inline = _option_mapping("mlir_force_inline")
 
     def finalize(self, flags, options):
         super().finalize(flags, options)
         _set_option(flags, "gpu_fp64_truncate", options, False)
         _set_option(flags, "gpu_use_64bit_index", options, True)
         _set_option(flags, "enable_gpu_pipeline", options, True)
+        _set_option(flags, "mlir_force_inline", options, False)
         assert flags.gpu_fp64_truncate in [
             True,
             False,

@@ -56,7 +56,7 @@ def _gen_vectorize(func):
 
         from ..decorators import mlir_njit
 
-        jit_func = mlir_njit(func, inline="always")
+        jit_func = mlir_njit(func, mlir_force_inline=True)
 
         @register_func(func_name, vec_func_inner)
         def impl(builder, arg):
@@ -65,6 +65,6 @@ def _gen_vectorize(func):
         def vec_func(arg):
             return vec_func_inner(arg)
 
-        return mlir_njit(vec_func, inline="always")
+        return mlir_njit(vec_func, mlir_force_inline=True)
     else:
         assert False
