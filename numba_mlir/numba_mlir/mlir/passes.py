@@ -106,16 +106,15 @@ class MlirBackendBase(FunctionPass):
         FunctionPass.__init__(self)
 
     def run_pass(self, state):
-        with scoped_time(self.run_pass) as t:
-            if self._push_func_stack:
-                func_registry.push_active_funcs_stack()
-                try:
-                    res = self.run_pass_impl(state)
-                finally:
-                    func_registry.pop_active_funcs_stack()
-                return res
-            else:
-                return self.run_pass_impl(state)
+        if self._push_func_stack:
+            func_registry.push_active_funcs_stack()
+            try:
+                res = self.run_pass_impl(state)
+            finally:
+                func_registry.pop_active_funcs_stack()
+            return res
+        else:
+            return self.run_pass_impl(state)
 
     def _resolve_func_name(self, state, obj):
         name, func, flags = self._resolve_func_impl(state, obj)
