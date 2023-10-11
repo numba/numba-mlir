@@ -91,6 +91,25 @@ def _get_flag(flags, name, default):
     return default
 
 
+def _init_flags(src):
+    flags = Flags()
+    flags.nrt = True
+    custom_flags = [
+        ("gpu_fp64_truncate", False),
+        ("gpu_use_64bit_index", True),
+        ("mlir_force_inline", False),
+    ]
+    for name, default in custom_flags:
+        if hasattr(src, name):
+            val = getattr(src, name)
+        else:
+            val = default
+
+        setattr(flags, name, val)
+
+    return flags
+
+
 def _get_cellvars(func):
     ret = {}
     closure = func.__closure__
@@ -131,43 +150,46 @@ class MlirBackendBase(FunctionPass):
         return name
 
     def _resolve_func_impl(self, state, obj):
-        fp64_truncate = _get_flag(state.flags, "gpu_fp64_truncate", "auto")
-        use_64bit_index = _get_flag(state.flags, "gpu_use_64bit_index", True)
-        print('ZXCzxczxc',state.flags)
+        new_flags = _init_flags(state.flags)
         if isinstance(obj, types.Function):
             func = obj.typing_key
             return (
                 self._get_func_name(func),
                 None,
-                _create_flags(fp64_truncate, use_64bit_index),
+                new_flags,
             )
         if isinstance(obj, types.BoundFunction):
             return (
                 str(obj.typing_key),
                 None,
-                _create_flags(fp64_truncate, use_64bit_index),
+                new_flags,
             )
         if isinstance(obj, numba.core.types.functions.Dispatcher):
-            flags = _create_flags(fp64_truncate, use_64bit_index)
             func = obj.dispatcher.py_func
-            inline_type = obj.dispatcher.targetoptions.get("inline", None)
+            targetoptions = obj.dispatcher.targetoptions
+
+            inline_type = targetoptions.get("inline", None)
             if inline_type is not None:
-                flags.inline._inline = inline_type
+                new_flags.inline._inline = inline_type
 
-            parallel_type = obj.dispatcher.targetoptions.get("parallel", None)
+            parallel_type = targetoptions.get("parallel", None)
             if parallel_type is not None:
-                flags.auto_parallel = parallel_type
+                new_flags.auto_parallel = parallel_type
 
-            fastmath_type = obj.dispatcher.targetoptions.get("fastmath", None)
+            fastmath_type = targetoptions.get("fastmath", None)
             if fastmath_type is not None:
-                flags.fastmath = fastmath_type
+                new_flags.fastmath = fastmath_type
 
-            return (func.__module__ + "." + func.__qualname__, func, flags)
+            mlir_force_inline = targetoptions.get("mlir_force_inline", None)
+            if mlir_force_inline is not None:
+                new_flags.mlir_force_inline = mlir_force_inline
+
+            return (func.__module__ + "." + func.__qualname__, func, new_flags)
         if isinstance(obj, types.NumberClass):
             return (
                 "$number." + str(obj.instance_type),
                 None,
-                _create_flags(fp64_truncate, use_64bit_index),
+                new_flags,
             )
         return (None, None, None)
 
