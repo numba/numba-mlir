@@ -31,19 +31,18 @@ import llvmlite.binding as llvm
 
 class mlir_lower(orig_Lower):
     def lower(self):
-        with scoped_time(self.lower) as t:
-            if USE_MLIR:
-                self.emit_environment_object()
-                self.genlower = None
-                self.lower_normal_function(self.fndesc)
-                self.context.post_lowering(self.module, self.library)
+        if USE_MLIR:
+            self.emit_environment_object()
+            self.genlower = None
+            self.lower_normal_function(self.fndesc)
+            self.context.post_lowering(self.module, self.library)
 
-                # Skip check that all numba symbols defined
-                setattr(self.library, "_verify_declare_only_symbols", lambda: None)
+            # Skip check that all numba symbols defined
+            setattr(self.library, "_verify_declare_only_symbols", lambda: None)
 
-                self.library.add_ir_module(self.module)
-            else:
-                super().lower(self)
+            self.library.add_ir_module(self.module)
+        else:
+            super().lower(self)
 
     def lower_normal_function(self, fndesc):
         if USE_MLIR:
