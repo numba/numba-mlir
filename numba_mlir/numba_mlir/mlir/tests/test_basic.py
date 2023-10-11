@@ -460,7 +460,7 @@ def test_indirect_call_inline():
         return func(*args)
 
     with print_pass_ir([], ["PostLinalgOptPass"]):
-        jit_inner_func = njit(inner_func, inline="always")
+        jit_inner_func = njit(inner_func, mlir_force_inline=True)
         jit_func = njit(func)
 
         assert_equal(func(inner_func, 5), jit_func(jit_inner_func, 5))
