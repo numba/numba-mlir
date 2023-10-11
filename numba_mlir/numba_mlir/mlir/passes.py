@@ -133,6 +133,7 @@ class MlirBackendBase(FunctionPass):
     def _resolve_func_impl(self, state, obj):
         fp64_truncate = _get_flag(state.flags, "gpu_fp64_truncate", "auto")
         use_64bit_index = _get_flag(state.flags, "gpu_use_64bit_index", True)
+        print('ZXCzxczxc',state.flags)
         if isinstance(obj, types.Function):
             func = obj.typing_key
             return (
@@ -205,7 +206,7 @@ class MlirBackendBase(FunctionPass):
             func_attrs["numba.fastmath"] = None
 
         flags = state.flags
-        if flags.inline.is_always_inline:
+        if flags.inline.is_always_inline or flags.mlir_force_inline:
             func_attrs["numba.force_inline"] = None
 
         if flags.auto_parallel.enabled:
