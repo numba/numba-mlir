@@ -226,11 +226,6 @@ class NumbaMLIRDispatcher(Dispatcher):
             py_func, self.targetdescr, targetoptions, locals, dummy_compiler_pipeline
         )
 
-        # if pipeline_class is not dummy_compiler_pipeline:
-        #     self._dummy_dispatcher = NumbaMLIRDispatcher(py_func, locals, targetoptions, impl_kind, dummy_compiler_pipeline)
-        # else:
-        #     self._dummy_dispatcher = None
-
     def typeof_pyval(self, val):
         """
         Resolve the Numba type of Python value *val*.
