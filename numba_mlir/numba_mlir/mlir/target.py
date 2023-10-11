@@ -2,8 +2,10 @@
 #
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+import threading
 from enum import Enum
 from functools import singledispatch, cached_property
+from contextlib import contextmanager
 
 from numba.core import types, cpu, utils, compiler, options
 from numba.extending import typeof_impl as numba_typeof_impl
@@ -186,8 +188,43 @@ class NumbaMLIRTarget(CPUTarget):
 numba_mlir_target = NumbaMLIRTarget(target_name)
 
 
+tls_state = threading.local()
+tls_state.compiler_nest = 0
+
+
+@contextmanager
+def compile_scope():
+    tls_state.compiler_nest += 1
+    try:
+        yield tls_state.compiler_nest
+    finally:
+        tls_state.compiler_nest -= 1
+
+
+def is_nested_compile():
+    return tls_state.compiler_nest > 0
+
+
 class NumbaMLIRDispatcher(Dispatcher):
     targetdescr = numba_mlir_target
+
+    def __init__(
+        self,
+        py_func,
+        locals={},
+        targetoptions={},
+        impl_kind="direct",
+        pipeline_class=compiler.Compiler,
+    ):
+        super().__init__(py_func, locals, targetoptions, impl_kind, pipeline_class)
+
+        # Import locally to avoid circular module dependency
+        from .compiler import dummy_compiler_pipeline
+
+        compiler_class = self._impl_kinds[impl_kind]
+        self._dummy_compiler = compiler_class(
+            py_func, self.targetdescr, targetoptions, locals, dummy_compiler_pipeline
+        )
 
     def typeof_pyval(self, val):
         """
@@ -206,6 +243,21 @@ class NumbaMLIRDispatcher(Dispatcher):
                 tp = types.pyobject
         self._types_active_call.append(tp)
         return tp
+
+    def compile(self, *args, **kwargs):
+        if is_nested_compile():
+            return self._dummy_compile(*args, **kwargs)
+
+        with compile_scope() as s:
+            return super().compile(*args, **kwargs)
+
+    def _dummy_compile(self, *args, **kwargs):
+        old_compiler = self._compiler
+        self._compiler = self._dummy_compiler
+        try:
+            return super().compile(*args, **kwargs)
+        finally:
+            self._compiler = old_compiler
 
 
 dispatcher_registry[target_registry[target_name]] = NumbaMLIRDispatcher
@@ -233,7 +285,7 @@ class numba_mlir_jit(JitDecorator):
         return NumbaMLIRDispatcher
 
     def dispatcher_wrapper(self):
-        # Import locally to avoid circular module depdndency
+        # Import locally to avoid circular module dependency
         from .compiler import mlir_compiler_pipeline, dummy_compiler_pipeline
 
         disp = self.get_dispatcher()

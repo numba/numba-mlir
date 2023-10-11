@@ -23,6 +23,8 @@ from .math_runtime import *
 from .numba_runtime import *
 from .gpu_runtime import *
 
+from .utils import scoped_time
+
 import llvmlite.ir as ir
 import llvmlite.binding as llvm
 

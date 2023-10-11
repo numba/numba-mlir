@@ -20,7 +20,7 @@ from .settings import DUMP_IR, OPT_LEVEL, DUMP_DIAGNOSTICS
 from . import func_registry
 from .. import mlir_compiler
 from .compiler_context import global_compiler_context
-
+from .utils import scoped_time
 
 _print_before = []
 _print_after = []
