@@ -195,8 +195,10 @@ tls_state.compiler_nest = 0
 @contextmanager
 def compile_scope():
     tls_state.compiler_nest += 1
-    yield None
-    tls_state.compiler_nest -= 1
+    try:
+        yield tls_state.compiler_nest
+    finally:
+        tls_state.compiler_nest -= 1
 
 
 def is_nested_compile():
