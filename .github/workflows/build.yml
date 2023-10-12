@@ -710,47 +710,11 @@ jobs:
           retention-days: 30
 
 
-  upload_packages_preprocess:
-    name: Upload packages preprocess
-    timeout-minutes: 450
-    needs: [build_win_python, build_win_conda_package, build_linux_python, build_linux_conda_package]
-    runs-on: ubuntu-20.04
-    steps:
-      - uses: conda-incubator/setup-miniconda@v2
-        with:
-          auto-update-conda: true
-          run-post: false
-          auto-activate-base: true
-          activate-environment: ""
-          miniforge-variant: Mambaforge
-          miniforge-version: latest
-          channel-priority: "disabled"
-          channels: intel,conda-forge
-
-      - name: Add conda to system path
-        run: echo $CONDA/bin >> $GITHUB_PATH
-
-      - name: Install anaconda-client
-        run: conda install anaconda-client
-
-      - name: Checkout repo
-        uses: actions/checkout@v2
-        with:
-          fetch-depth: 0
-
-      - name: Cleanup old packages
-        shell: bash -el {0}
-        run: |
-          python scripts/cleanup-old-packages.py \
-          --verbose --dry-run \
-          --package dppy/numba-mlir --label dev \
-          --max-size 1073741824 --max-priority 2
-
   upload_packages:
     name: Upload conda packages
     if: ${{ github.ref == 'refs/heads/main' }}
     timeout-minutes: 450
-    needs: [upload_packages_preprocess]
+    needs: [build_win_python, build_win_conda_package, build_linux_python, build_linux_conda_package]
     strategy:
       fail-fast: false
       matrix:
@@ -787,26 +751,21 @@ jobs:
         run: |
           anaconda --token ${{ env.ANACONDA_TOKEN }} upload --user dppy --label dev numba-mlir-*.tar.bz2
 
+
   cleanup_packages:
-    name: Clean up conda packages
-    timeout-minutes: 450
-    if: ${{ github.ref == 'refs/heads/main' }}
+    name: Clean up anaconda packages
     needs: [upload_packages]
     runs-on: 'ubuntu-latest'
+    defaults:
+      run:
+        shell: bash -el {0}
     steps:
       - uses: conda-incubator/setup-miniconda@v2
         with:
-          auto-update-conda: true
           run-post: false
-          auto-activate-base: true
-          activate-environment: ""
-          miniforge-variant: Mambaforge
-          miniforge-version: latest
           channel-priority: "disabled"
-          channels: intel,conda-forge
-
-      - name: Add conda to system path
-        run: echo $CONDA/bin >> $GITHUB_PATH
+          channels: conda-forge
+          python-version: '3.11'
 
       - name: Install anaconda-client
         run: conda install anaconda-client
@@ -814,12 +773,11 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v2
         with:
+          repository: IntelPython/devops-tools
           fetch-depth: 0
 
       - name: Cleanup old packages
-        shell: bash -el {0}
         run: |
           python scripts/cleanup-old-packages.py \
-          --verbose --force --token ${{ env.ANACONDA_TOKEN }} \
-          --package dppy/numba-mlir --label dev \
-          --max-size 1073741824 --max-priority 2
+          --verbose --force --token ${{ secrets.ANACONDA_TOKEN }} \
+          --package dppy/numba-mlir --label dev
