@@ -924,6 +924,19 @@ def test_omitted_args_none():
     assert_equal(py_func2(1), jit_func2(1))
 
 
+@pytest.mark.xfail(reason="https://github.com/numba/numba/issues/9242")
+def test_conditionally_defined_var():
+    def py_func(a):
+        c = a > 0
+        if c:
+            d = a + 5
+
+        return c and d > 0
+
+    jit_func = njit(py_func)
+    assert_equal(py_func(10), jit_func(10))
+
+
 def _skip_builtin_funcs2_cases(args):
     # TODO: Skip bools
     # TODO: Use xfail but contition is too complicated
