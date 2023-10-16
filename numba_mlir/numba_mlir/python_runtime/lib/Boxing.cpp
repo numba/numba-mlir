@@ -120,11 +120,11 @@ nmrtUnboxSyclInterface(PyObject *obj, arystruct_t *arystruct) {
     }
   } else {
     for (decltype(ndim) i = 0; i < ndim; i++) {
-      auto elem = makeRef(PyTuple_GetItem(stridesObj, i));
-      if (!elem || !PyLong_Check(elem.get()))
+      auto elem = PyTuple_GetItem(stridesObj, i);
+      if (!elem || !PyLong_Check(elem))
         return -1;
 
-      strides[i] = PyLong_AsLong(elem.get()) * itemsize;
+      strides[i] = PyLong_AsLong(elem) * itemsize;
     }
   }
 
