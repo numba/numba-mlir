@@ -579,6 +579,19 @@ def PrimitiveOp : NTensor_OpBase<"primitive", [Pure]> {
   let assemblyFormat = "$op ` ` attr-dict `(` $args `)` (`:` type($args)^)? (`->` type($results)^)?";
 }
 
+def PrimitiveSeOp : NTensor_OpBase<"primitive_se"> {
+  let summary = "Primitive operation with side effect.";
+  let description = [{
+
+  }];
+
+  let arguments = (ins Arg<Variadic<AnyType>, "", [MemRead, MemWrite]>:$args, StrAttr:$op);
+
+  let results = (outs Res<Variadic<AnyType>, "", [MemAlloc<DefaultResource>]>:$results);
+
+  let assemblyFormat = "$op ` ` attr-dict `(` $args `)` (`:` type($args)^)? (`->` type($results)^)?";
+}
+
 def ViewPrimitiveOp : NTensor_OpBase<"view_primitive", [
     Pure, ViewLikeOpInterface
   ]> {

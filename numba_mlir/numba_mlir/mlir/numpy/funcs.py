@@ -63,10 +63,16 @@ def _get_func(name):
     return _registered_funcs.get(name, None)
 
 
-_FuncDesc = namedtuple("_FuncDesc", "params out view_like")
+class PrimitiveType:
+    Default = 0
+    View = 1
+    SideEffect = 2
 
 
-def _get_wrapper(name, orig, out=None, view_like=False):
+_FuncDesc = namedtuple("_FuncDesc", "params out primitive_type")
+
+
+def _get_wrapper(name, orig, out=None, primitive_type=PrimitiveType.Default):
     if out is None:
         out = ()
     elif not isinstance(out, tuple) and not isinstance(out, list):
@@ -83,20 +89,22 @@ def _get_wrapper(name, orig, out=None, view_like=False):
         paramCount = len(paramsNames)
         outParams = tuple((name, i + paramCount) for i, name in enumerate(out))
         funcParams = [(n, params[n]) for n in paramsNames]
-        _registered_funcs[name] = _FuncDesc(funcParams, outParams, view_like)
+        _registered_funcs[name] = _FuncDesc(funcParams, outParams, primitive_type)
         return orig(func)
 
     return _decorator
 
 
-def register_func(name, orig_func=None, out=None, view_like=False):
+def register_func(name, orig_func=None, out=None, primitive_type=PrimitiveType.Default):
     global registry
-    return _get_wrapper(name, registry.register_func(name, orig_func), out, view_like)
+    return _get_wrapper(
+        name, registry.register_func(name, orig_func), out, primitive_type
+    )
 
 
-def register_attr(name, view_like=False):
+def register_attr(name, primitive_type=PrimitiveType.Default):
     global registry
-    return _get_wrapper(name, registry.register_attr(name), None, view_like)
+    return _get_wrapper(name, registry.register_attr(name), None, primitive_type)
 
 
 def promote_int(t, b):
@@ -684,7 +692,7 @@ def _check_mkl_strides(arr):
 
 
 @_mkl_func
-def _mkl_gemm(builder, a, b, alpha, beta, shape1, shape2):
+def _mkl_gemm(builder, a, b, alpha, beta, shape1, shape2, out=None):
     copy_a = _check_mkl_strides(a)
     copy_b = _check_mkl_strides(b)
 
@@ -695,8 +703,11 @@ def _mkl_gemm(builder, a, b, alpha, beta, shape1, shape2):
     func_name = f"mkl_gemm_{dtype_str(builder, dtype)}"
     device_func_name = func_name + "_device"
 
-    res_shape = (shape1[0], shape2[1])
-    c = builder.init_tensor(res_shape, dtype)
+    if out is None:
+        res_shape = (shape1[0], shape2[1])
+        c = builder.init_tensor(res_shape, dtype)
+    else:
+        c = out
 
     alpha = builder.cast(alpha, dtype)
     beta = builder.cast(beta, dtype)
@@ -785,6 +796,19 @@ def _dot_broadcasted(builder, a, b, shape1, shape2):
         res = builder.subview(res, (0, 0), (shape1[0], 1), result_rank=1)
 
     return res
+
+
+def __internal_gemm(a, b, c, alpha, beta):
+    c[:] = beta * c + alpha * numpy.dot(a, b)
+
+
+@register_func(
+    "__internal_gemm", __internal_gemm, primitive_type=PrimitiveType.SideEffect
+)
+def __internal_gemm_impl(builder, a, b, c, alpha, beta):
+    shape1 = a.shape
+    shape2 = b.shape
+    return _mkl_gemm(builder, a, b, alpha, beta, shape1, shape2, c)
 
 
 @register_func("numpy.dot", numpy.dot, out="out")
@@ -960,8 +984,8 @@ def dtype_impl(builder, arg):
     return arg.dtype
 
 
-@register_func("array.reshape", view_like=True)
-@register_func("numpy.reshape", numpy.reshape, view_like=True)
+@register_func("array.reshape", primitive_type=PrimitiveType.View)
+@register_func("numpy.reshape", numpy.reshape, primitive_type=PrimitiveType.View)
 def reshape_impl(builder, arg, *new_shape):
     new_shape = literal(new_shape)
     if len(new_shape) == 1:

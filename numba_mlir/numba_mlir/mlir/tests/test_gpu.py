@@ -1825,6 +1825,61 @@ def test_cfd_dot(a, b, py_func):
     assert_equal(res_py, gpu_res)
 
 
+gemm_array_square = [
+    np.zeros((4, 4), np.float32),
+    np.ones((4, 4), np.float32),
+    np.arange(4 * 4).reshape((4, 4)).astype(np.float32),
+]
+gemm_array = [
+    np.zeros((4, 6), np.float32),
+    np.ones((4, 6), np.float32),
+    np.arange(4 * 6).reshape((4, 6)).astype(np.float32),
+]
+gemm_array_t = [a.T for a in gemm_array]
+alpha_beta = [0, 1, 0.5]
+
+
+@require_dpctl
+@pytest.mark.parametrize(
+    "a,b,c,alpha,beta",
+    list(
+        itertools.product(
+            gemm_array_square,
+            gemm_array_square,
+            gemm_array_square,
+            alpha_beta,
+            alpha_beta,
+        )
+    )
+    + list(
+        itertools.product(
+            gemm_array, gemm_array_t, gemm_array_square, alpha_beta, alpha_beta
+        )
+    ),
+)
+def test_internal_gemm(a, b, c, alpha, beta):
+    from numba_mlir.mlir.numpy.funcs import __internal_gemm
+
+    def py_func(a, b, c, alpha, beta):
+        __internal_gemm(a, b, c, alpha, beta)
+
+    jit_func = njit(py_func)
+
+    py_c = np.copy(c)
+    cc = np.copy(c)
+
+    py_func(a, b, py_c, alpha, beta)
+
+    da = _from_host(a, buffer="device")
+    db = _from_host(b, buffer="device")
+    dc = _from_host(cc, buffer="device")
+
+    jit_func(da, db, dc, alpha, beta)
+
+    _to_host(dc, cc)
+    assert_equal(py_c, cc)
+
+
 @pytest.mark.smoke
 @require_dpctl
 def test_l2_norm():

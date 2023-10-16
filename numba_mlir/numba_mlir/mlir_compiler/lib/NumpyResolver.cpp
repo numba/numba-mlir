@@ -81,11 +81,13 @@ parseDefault(mlir::OpBuilder &builder, mlir::Location loc, py::handle obj) {
   return std::nullopt;
 }
 
-mlir::LogicalResult NumpyResolver::resolveFuncArgs(
-    mlir::OpBuilder &builder, mlir::Location loc, llvm::StringRef name,
-    mlir::ValueRange args, mlir::ArrayAttr argsNames,
-    llvm::SmallVectorImpl<mlir::Value> &resultArgs,
-    llvm::SmallVectorImpl<mlir::Value> &outArgs, bool &viewLike) {
+mlir::LogicalResult
+NumpyResolver::resolveFuncArgs(mlir::OpBuilder &builder, mlir::Location loc,
+                               llvm::StringRef name, mlir::ValueRange args,
+                               mlir::ArrayAttr argsNames,
+                               llvm::SmallVectorImpl<mlir::Value> &resultArgs,
+                               llvm::SmallVectorImpl<mlir::Value> &outArgs,
+                               PrimitiveType &primitive_type) {
   assert(args.size() == argsNames.size() && "args and names count mismatch");
   auto res = impl->getFuncDesc(name);
   if (res.is_none())
@@ -180,6 +182,7 @@ mlir::LogicalResult NumpyResolver::resolveFuncArgs(
   if (!argsNamesAndValues.empty())
     return mlir::failure();
 
-  viewLike = res.attr("view_like").cast<bool>();
+  primitive_type =
+      static_cast<PrimitiveType>(res.attr("primitive_type").cast<int>());
   return mlir::success();
 }

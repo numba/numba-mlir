@@ -7,12 +7,14 @@ import numpy as np
 from numba.core import types
 from numba.core.typing import npydecl
 from numba.core.extending import overload
+from numba.core.types.abstract import Number
 from numba.core.types.scalars import Integer, Float
 from numba.core.types.npytypes import Array
 from numba.np.numpy_support import is_nonelike
 from numba.core.typing.templates import signature, AbstractTemplate
 
 from ..target import typing_registry, infer_global
+from .funcs import __internal_gemm
 
 
 def _get_init_like_impl(init_func, dtype, shape):
@@ -287,3 +289,26 @@ class ClipId(get_abstract_template(_ternary_pattern)):
             return signature(return_type, a, a_min, a_max)
         else:
             return signature(return_type, a, a_min, a_max, out)
+
+
+def _gemm_pattern(a, b, out, alpha, beta):
+    return a, b, out, alpha, beta
+
+
+@infer_global(__internal_gemm)
+class GemmId(get_abstract_template(_gemm_pattern)):
+    prefer_literal = True
+
+    def generic_impl(self, a, b, out, alpha, beta):
+        if not isinstance(a, Array) or not isinstance(b, Array):
+            return
+
+        if not isinstance(out, Array):
+            return
+
+        if not isinstance(alpha, Number) or not isinstance(beta, Number):
+            return
+
+        return_type = out
+
+        return signature(return_type, a, b, out, a.dtype, a.dtype)
