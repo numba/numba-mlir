@@ -2079,6 +2079,35 @@ private:
   PyLinalgResolver resolver;
 };
 
+struct NtensorPrimitiveSeCallsLowering final
+    : public mlir::OpRewritePattern<numba::ntensor::PrimitiveSeOp> {
+  NtensorPrimitiveSeCallsLowering(mlir::MLIRContext *context)
+      : OpRewritePattern(context),
+        resolver("numba_mlir.mlir.numpy.funcs", "registry") {}
+
+  mlir::LogicalResult
+  matchAndRewrite(numba::ntensor::PrimitiveSeOp op,
+                  mlir::PatternRewriter &rewriter) const override {
+    auto env = getEnvAttr(op);
+    if (mlir::failed(env))
+      return mlir::failure();
+
+    auto opName = op.getOp();
+    auto loc = op.getLoc();
+    auto newRes = rewritePrimitiveFunc(rewriter, loc, resolver, op.getArgs(),
+                                       op.getResultTypes(), *env, opName);
+    if (mlir::failed(newRes))
+      return mlir::failure();
+
+    rerunScfPipeline(op);
+    rewriter.replaceOp(op, *newRes);
+    return mlir::success();
+  }
+
+private:
+  PyLinalgResolver resolver;
+};
+
 struct NtensorViewPrimitiveCallsLowering final
     : public mlir::OpRewritePattern<numba::ntensor::ViewPrimitiveOp> {
   NtensorViewPrimitiveCallsLowering(mlir::MLIRContext *context)
@@ -2122,13 +2151,13 @@ struct NumpyCallsResolver
     auto loc = op.getLoc();
     llvm::SmallVector<mlir::Value> args;
     llvm::SmallVector<mlir::Value> outResults;
-    bool viewLike;
-    if (mlir::failed(resolver.resolveFuncArgs(rewriter, loc, funcName,
-                                              op.getArgs(), op.getArgsNames(),
-                                              args, outResults, viewLike)))
+    PrimitiveType primitive_type;
+    if (mlir::failed(resolver.resolveFuncArgs(
+            rewriter, loc, funcName, op.getArgs(), op.getArgsNames(), args,
+            outResults, primitive_type)))
       return mlir::failure();
 
-    if (viewLike) {
+    if (primitive_type == PrimitiveType::View) {
       if (op.getNumResults() != 1 || args.size() < 1)
         return mlir::failure();
 
@@ -2138,22 +2167,29 @@ struct NumpyCallsResolver
     }
 
     auto results = [&]() -> mlir::ValueRange {
-      if (viewLike) {
+      switch (primitive_type) {
+      case PrimitiveType::Default:
+        return rewriter
+            .create<numba::ntensor::PrimitiveOp>(loc, op->getResultTypes(),
+                                                 args, funcName)
+            .getResults();
+      case PrimitiveType::View:
         return rewriter
             .create<numba::ntensor::ViewPrimitiveOp>(
                 loc, op.getResult(0).getType(), args.front(),
                 llvm::ArrayRef(args).drop_front(), funcName)
             ->getResults();
-      } else {
+      case PrimitiveType::SideEffect:
         return rewriter
-            .create<numba::ntensor::PrimitiveOp>(loc, op->getResultTypes(),
-                                                 args, funcName)
+            .create<numba::ntensor::PrimitiveSeOp>(loc, op->getResultTypes(),
+                                                   args, funcName)
             .getResults();
       }
     }();
 
-    for (auto &&[dst, src] : llvm::zip(outResults, results))
-      rewriter.create<numba::ntensor::CopyOp>(loc, src, dst);
+    if (primitive_type != PrimitiveType::SideEffect)
+      for (auto &&[dst, src] : llvm::zip(outResults, results))
+        rewriter.create<numba::ntensor::CopyOp>(loc, src, dst);
 
     rewriter.replaceOp(op, results);
     return mlir::success();
@@ -2233,8 +2269,9 @@ struct ResolveNtensorPass
     auto &ctx = getContext();
     mlir::RewritePatternSet patterns(&ctx);
 
-    patterns.insert<NtensorPrimitiveCallsLowering,
-                    NtensorViewPrimitiveCallsLowering>(&ctx);
+    patterns
+        .insert<NtensorPrimitiveCallsLowering, NtensorPrimitiveSeCallsLowering,
+                NtensorViewPrimitiveCallsLowering>(&ctx);
 
     if (mlir::failed(mlir::applyPatternsAndFoldGreedily(getOperation(),
                                                         std::move(patterns))))

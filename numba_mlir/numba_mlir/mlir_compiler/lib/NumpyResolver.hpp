@@ -23,6 +23,8 @@ class ValueRange;
 struct LogicalResult;
 } // namespace mlir
 
+enum class PrimitiveType { Default = 0, View = 1, SideEffect = 2 };
+
 class NumpyResolver {
 public:
   NumpyResolver(const char *modName, const char *mapName);
@@ -35,7 +37,8 @@ public:
                   llvm::StringRef name, mlir::ValueRange args,
                   mlir::ArrayAttr argsNames,
                   llvm::SmallVectorImpl<mlir::Value> &resultArgs,
-                  llvm::SmallVectorImpl<mlir::Value> &outArgs, bool &viewLike);
+                  llvm::SmallVectorImpl<mlir::Value> &outArgs,
+                  PrimitiveType &primitive_type);
 
 private:
   class Impl;

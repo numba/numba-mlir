@@ -15,6 +15,13 @@ def parametrize_function_variants(name, strings):
     return pytest.mark.parametrize(name, funcs, ids=strings)
 
 
+def code_or_obj(func):
+    try:
+        return func.__code__
+    except:
+        return func
+
+
 class JitfuncCache:
     def __init__(self, decorator):
         self._cached_funcs = {}
