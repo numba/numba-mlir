@@ -1140,7 +1140,7 @@ struct WhileOpAlignBeforeArgs
 
     llvm::SmallVector<mlir::Type> newResultTypes(beforeArgs.size());
     for (auto &&[i, j] : llvm::enumerate(*mapping))
-      newResultTypes[i] = loop.getResult(j).getType();
+      newResultTypes[j] = loop.getResult(i).getType();
 
     auto newLoop = rewriter.create<mlir::scf::WhileOp>(
         loop.getLoc(), newResultTypes, loop.getInits(), nullptr, nullptr);
