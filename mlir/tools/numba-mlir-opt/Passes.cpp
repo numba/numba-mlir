@@ -24,6 +24,7 @@
 #include "numba/Dialect/ntensor/Transforms/PropagateEnvironment.hpp"
 #include "numba/Dialect/ntensor/Transforms/ResolveArrayOps.hpp"
 #include "numba/Transforms/CanonicalizeReductions.hpp"
+#include "numba/Transforms/CommonOpts.hpp"
 #include "numba/Transforms/ExpandTuple.hpp"
 #include "numba/Transforms/FuncTransforms.hpp"
 #include "numba/Transforms/MakeSignless.hpp"
@@ -212,3 +213,7 @@ static mlir::PassPipelineRegistration<>
                     [](mlir::OpPassManager &pm) {
                       pm.addPass(gpu_runtime::createSortParallelLoopsForGPU());
                     });
+
+static mlir::PassPipelineRegistration<> commonOpts(
+    "numba-common-opts", "Common optimization patterns",
+    [](mlir::OpPassManager &pm) { pm.addPass(numba::createCommonOptsPass()); });
