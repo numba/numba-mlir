@@ -265,3 +265,74 @@ def test_linalg_inv(n, dtype, order):
 
     a = _specific_sample_matrix((n, n), dtype, order)
     _inv_checker(py_func, jit_func, a)
+
+
+def _solve_checker(py_func, cfunc, a, b):
+    expected = py_func(a, b)
+    got = cfunc(a, b)
+
+    # check that the computed results are contig and in the same way
+    # self.assert_contig_sanity(got, "F")
+
+    use_reconstruction = False
+    # try plain match of the result first
+    try:
+        np.testing.assert_array_almost_equal_nulp(got, expected, nulp=10)
+    except AssertionError:
+        # plain match failed, test by reconstruction
+        use_reconstruction = True
+
+    # If plain match fails then reconstruction is used,
+    # this checks that AX ~= B.
+    # Plain match can fail due to numerical fuzziness associated
+    # with system size and conditioning, or more simply from
+    # numpy using double precision routines for computation that
+    # could be done in single precision (which is what numba does).
+    # Therefore minor differences in results can appear due to
+    # e.g. numerical roundoff being different between two precisions.
+    if use_reconstruction:
+        # check they are dimensionally correct
+        assert got.shape == expected.shape
+
+        # check AX=B
+        rec = np.dot(a, got)
+        resolution = np.finfo(a.dtype).resolution
+        np.testing.assert_allclose(
+            b,
+            rec,
+            rtol=10 * resolution,
+            atol=100 * resolution,  # zeros tend to be fuzzy
+        )
+
+
+@pytest.mark.parametrize("a_size", [(1, 1), (3, 3), (7, 7)])
+@pytest.mark.parametrize("b_size", [None, 1, 13])
+@pytest.mark.parametrize("dtype", _linalg_dtypes)
+@pytest.mark.parametrize("a_order", "CF")
+@pytest.mark.parametrize("b_order", "CF")
+def test_linalg_solve(a_size, b_size, dtype, a_order, b_order):
+    def py_func(a, b):
+        return np.linalg.solve(a, b)
+
+    jit_func = njit(py_func)
+
+    a = _specific_sample_matrix(a_size, dtype, a_order)
+    n = a.shape[0]
+    if b_size is None:
+        b = _specific_sample_matrix((n, 1), dtype, b_order).reshape((n,))
+    else:
+        b = _specific_sample_matrix((n, b_size), dtype, b_order)
+
+    _solve_checker(py_func, jit_func, a, b)
+
+
+def test_linalg_solve_empty():
+    def py_func(a, b):
+        return np.linalg.solve(a, b)
+
+    jit_func = njit(py_func)
+
+    a = np.empty((0, 0))
+    b = np.empty((0,))
+
+    _solve_checker(py_func, jit_func, a, b)

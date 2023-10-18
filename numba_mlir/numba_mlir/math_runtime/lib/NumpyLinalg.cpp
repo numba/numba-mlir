@@ -136,7 +136,7 @@ using GetriFunc = lapack_int(int, lapack_int, T *, lapack_int,
 
 template <typename T>
 static int cpuInv(GetrfFunc<T> getrf, GetriFunc<T> getri, Memref<2, T> *a,
-                  Memref<1, lapack_int> *ipiv) {
+                  Memref<1, MKL_INT> *ipiv) {
   assert(a);
   assert(ipiv);
 
@@ -157,7 +157,40 @@ static int cpuInv(GetrfFunc<T> getrf, GetriFunc<T> getri, Memref<2, T> *a,
   if (auto res = getrf(layout, n, n, data, lda, ipivData))
     return static_cast<int>(res);
 
-  return static_cast<int>((getri(layout, n, data, lda, ipivData)));
+  return static_cast<int>(getri(layout, n, data, lda, ipivData));
+}
+
+template <typename T>
+using GesvFunc = lapack_int(int matrix_layout, lapack_int, lapack_int, T *,
+                            lapack_int, lapack_int *, T *, lapack_int);
+
+template <typename T>
+static int cpuSolve(GesvFunc<T> gesv, Memref<2, T> *a, Memref<2, T> *b,
+                    Memref<1, MKL_INT> *ipiv) {
+  assert(a);
+  assert(b);
+  assert(ipiv);
+
+  // Nothing to do for empty arrays.
+  if (isEmpty2d(a, 'a'))
+    return 0;
+
+  checkSquare(a, 'a');
+
+  auto n = static_cast<MKL_INT>(a->dims[0]);
+  auto nrhs = static_cast<MKL_INT>(b->dims[1]);
+
+  auto layout = isRowm(a) ? CblasRowMajor : CblasColMajor;
+
+  auto aData = a->data;
+  auto bData = b->data;
+  auto ipivData = ipiv->data;
+
+  auto lda = static_cast<MKL_INT>(isRowm(a) ? a->strides[0] : a->strides[1]);
+  auto ldb = static_cast<MKL_INT>(isRowm(b) ? b->strides[0] : b->strides[1]);
+
+  return static_cast<int>(
+      gesv(layout, n, nrhs, aData, lda, ipivData, bData, ldb));
 }
 
 #endif
@@ -183,6 +216,7 @@ EIG_VARIANT(double, float64)
 
 #define MKL_GETRF(Prefix) LAPACKE_##Prefix##getrf
 #define MKL_GETRI(Prefix) LAPACKE_##Prefix##getri
+#define MKL_GETSV(Prefix) LAPACKE_##Prefix##gesv
 #else
 static inline void ALL_UNUSED(int dummy, ...) { (void)dummy; }
 #define MKL_CALL(f, ...)                                                       \
@@ -193,6 +227,7 @@ static inline void ALL_UNUSED(int dummy, ...) { (void)dummy; }
 
 #define MKL_GETRF(Prefix) 0
 #define MKL_GETRI(Prefix) 0
+#define MKL_GETSV(Prefix) 0
 #endif
 
 #define GEMM_VARIANT(T, Prefix, Suff)                                          \
@@ -209,7 +244,7 @@ GEMM_VARIANT(double, d, float64)
 
 #define INV_VARIANT(T, Prefix, Suff)                                           \
   NUMBA_MLIR_MATH_RUNTIME_EXPORT void mkl_inv_##Suff(                          \
-      Memref<2, T> *a, Memref<1, lapack_int> *ipiv) {                          \
+      Memref<2, T> *a, Memref<1, MKL_INT> *ipiv) {                             \
     MKL_CALL(cpuInv<T>, MKL_GETRF(Prefix), MKL_GETRI(Prefix), a, ipiv);        \
   }
 
@@ -219,4 +254,17 @@ INV_VARIANT(MKL_Complex8, c, complex64)
 INV_VARIANT(MKL_Complex16, z, complex128)
 
 #undef INV_VARIANT
+
+#define SOLVE_VARIANT(T, Prefix, Suff)                                         \
+  NUMBA_MLIR_MATH_RUNTIME_EXPORT void mkl_solve_##Suff(                        \
+      Memref<2, T> *a, Memref<2, T> *b, Memref<1, MKL_INT> *ipiv) {            \
+    MKL_CALL(cpuSolve<T>, MKL_GETSV(Prefix), a, b, ipiv);                      \
+  }
+
+SOLVE_VARIANT(float, s, float32)
+SOLVE_VARIANT(double, d, float64)
+SOLVE_VARIANT(MKL_Complex8, c, complex64)
+SOLVE_VARIANT(MKL_Complex16, z, complex128)
+
+#undef SOLVE_VARIANT
 }
