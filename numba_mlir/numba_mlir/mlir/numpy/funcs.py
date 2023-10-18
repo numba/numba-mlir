@@ -841,6 +841,39 @@ def matmul_impl(builder, a, b):
     return _matmul2d(builder, a, b, shape1, shape2)
 
 
+@_mkl_func
+def _mkl_inv(builder, a, shape):
+    n = shape[0]
+    dtype = a.dtype
+
+    func_name = f"mkl_inv_{dtype_str(builder, dtype)}"
+    device_func_name = func_name + "_device"
+
+    a = builder.force_copy(a)
+    ipiv = builder.init_tensor((n,), builder.int64)
+
+    res_init = builder.cast(0, builder.int32)
+
+    res = builder.external_call(
+        func_name,
+        (a, ipiv),
+        res_init,
+        attrs={"gpu_runtime.device_func": device_func_name},
+    )
+    # TODO check res
+
+    return a
+
+
+@register_func("numpy.linalg.inv", numpy.linalg.inv)
+def dot_impl(builder, a):
+    shape = a.shape
+    if len(shape) != 2:
+        return
+
+    return _mkl_inv(builder, a, shape)
+
+
 @register_func("numpy.where", numpy.where)
 def where_impl(builder, cond, x, y):
     cond, x, y = builder.broadcast(cond, x, y, result_type=None)
