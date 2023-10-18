@@ -31,6 +31,9 @@ if MKL_AVAILABLE:
     load_function_variants(
         runtime_lib, "mkl_inv_%s", ["float32", "float64", "complex64", "complex128"]
     )
+    load_function_variants(
+        runtime_lib, "mkl_solve_%s", ["float32", "float64", "complex64", "complex128"]
+    )
 if SYCL_MKL_AVAILABLE:
     load_function_variants(
         runtime_sycl_lib, "mkl_gemm_%s_device", ["float32", "float64"]
