@@ -212,6 +212,8 @@ GEMM_VARIANT(double, d, float64)
 
 INV_VARIANT(float, s, float32)
 INV_VARIANT(double, d, float64)
+INV_VARIANT(MKL_Complex8, c, complex64)
+INV_VARIANT(MKL_Complex16, z, complex128)
 
 #undef INV_VARIANT
 }
