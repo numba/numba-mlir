@@ -306,7 +306,7 @@ def _solve_checker(py_func, cfunc, a, b):
 
 
 @pytest.mark.parametrize("a_size", [(1, 1), (3, 3), (7, 7)])
-@pytest.mark.parametrize("b_size", [1, 13])
+@pytest.mark.parametrize("b_size", [None, 1, 13])
 @pytest.mark.parametrize("dtype", _linalg_dtypes)
 @pytest.mark.parametrize("a_order", "CF")
 @pytest.mark.parametrize("b_order", "CF")
@@ -317,5 +317,22 @@ def test_linalg_solve(a_size, b_size, dtype, a_order, b_order):
     jit_func = njit(py_func)
 
     a = _specific_sample_matrix(a_size, dtype, a_order)
-    b = _specific_sample_matrix((a.shape[0], b_size), dtype, b_order)
+    n = a.shape[0]
+    if b_size is None:
+        b = _specific_sample_matrix((n, 1), dtype, b_order).reshape((n,))
+    else:
+        b = _specific_sample_matrix((n, b_size), dtype, b_order)
+
+    _solve_checker(py_func, jit_func, a, b)
+
+
+def test_linalg_solve_empty():
+    def py_func(a, b):
+        return np.linalg.solve(a, b)
+
+    jit_func = njit(py_func)
+
+    a = np.empty((0, 0))
+    b = np.empty((0,))
+
     _solve_checker(py_func, jit_func, a, b)
