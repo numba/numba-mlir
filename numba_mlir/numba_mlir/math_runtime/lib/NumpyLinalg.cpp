@@ -136,7 +136,7 @@ using GetriFunc = lapack_int(int, lapack_int, T *, lapack_int,
 
 template <typename T>
 static int cpuInv(GetrfFunc<T> getrf, GetriFunc<T> getri, Memref<2, T> *a,
-                  Memref<1, int64_t> *ipiv) {
+                  Memref<1, MKL_INT> *ipiv) {
   assert(a);
   assert(ipiv);
 
