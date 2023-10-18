@@ -2,6 +2,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include <cassert>
 #include <stdio.h>
 #include <string_view>
 
@@ -34,6 +35,43 @@ void eigImpl(Memref<2, const T> *input, Memref<1, T> *vals,
 #endif
 }
 
+template <typename T>
+static void checkSquare(const Memref<2, T> *arr, char arrName) {
+  if (arr->dims[0] != arr->dims[1]) {
+    fatal_failure("Array '%c' is not square,  dims are %d and %d.\n", arrName,
+                  int(arr->dims[0]), int(arr->dims[1]));
+  }
+};
+
+template <typename T>
+static bool isEmpty2d(const Memref<2, T> *arr, char arrName) {
+  if (arr->dims[0] < 0 || arr->dims[1] < 0) {
+    fatal_failure("Array dims must not be negative. '%c' dims are %d and %d.\n",
+                  arrName, int(arr->dims[0]), int(arr->dims[1]));
+  }
+  return arr->dims[0] == 0 && arr->dims[1] == 0;
+};
+
+template <typename T>
+static void isContiguous2d(const Memref<2, T> *arr, char arrName) {
+  if (arr->strides[0] <= 0 || arr->strides[1] <= 0) {
+    fatal_failure("Strides must be positive. '%c' strides are %d and %d.\n",
+                  arrName, int(arr->strides[0]), int(arr->strides[1]));
+  }
+
+  if (arr->strides[0] != 1 && arr->strides[1] != 1) {
+    fatal_failure(
+        "mkl gemm suports only arrays contiguous on inner dimension.\n"
+        "stride for at least one dimension should be equal to 1.\n"
+        "'%c' parameter is not contiguous. '%c' strides are %d and %d.\n",
+        arrName, arrName, int(arr->strides[0]), int(arr->strides[1]));
+  }
+};
+
+template <typename T> static bool isRowm(const Memref<2, T> *arr) {
+  return arr->strides[1] == 1;
+};
+
 #ifdef NUMBA_MLIR_USE_MKL
 template <typename T>
 using GemmFunc = void(const CBLAS_LAYOUT, const CBLAS_TRANSPOSE,
@@ -44,39 +82,17 @@ using GemmFunc = void(const CBLAS_LAYOUT, const CBLAS_TRANSPOSE,
 template <typename T>
 static void cpuGemm(GemmFunc<T> Gemm, const Memref<2, T> *a,
                     const Memref<2, T> *b, Memref<2, T> *c, T alpha, T beta) {
-  auto isEmpty = [](const Memref<2, T> *arr, char arrName) {
-    if (arr->dims[0] < 0 || arr->dims[1] < 0) {
-      fatal_failure(
-          "Array dims must not be negative. '%c' dims are %d and %d.\n",
-          arrName, int(arr->dims[0]), int(arr->dims[1]));
-    }
-    return arr->dims[0] == 0 && arr->dims[1] == 0;
-  };
+  assert(a);
+  assert(b);
+  assert(c);
 
   // Special case when we matmul empty arrays. Nothing to do in this case.
-  if (isEmpty(a, 'a') && isEmpty(b, 'b'))
+  if (isEmpty2d(a, 'a') && isEmpty2d(b, 'b'))
     return;
 
-  auto isContiguous = [](const Memref<2, T> *arr, char arrName) {
-    if (arr->strides[0] <= 0 || arr->strides[1] <= 0) {
-      fatal_failure("Strides must be positive. '%c' strides are %d and %d.\n",
-                    arrName, int(arr->strides[0]), int(arr->strides[1]));
-    }
-
-    if (arr->strides[0] != 1 && arr->strides[1] != 1) {
-      fatal_failure(
-          "mkl gemm suports only arrays contiguous on inner dimension.\n"
-          "stride for at least one dimension should be equal to 1.\n"
-          "'%c' parameter is not contiguous. '%c' strides are %d and %d.\n",
-          arrName, arrName, int(arr->strides[0]), int(arr->strides[1]));
-    }
-  };
-
-  isContiguous(a, 'a');
-  isContiguous(b, 'b');
-  isContiguous(c, 'c');
-
-  auto isRowm = [](const Memref<2, T> *arr) { return arr->strides[1] == 1; };
+  isContiguous2d(a, 'a');
+  isContiguous2d(b, 'b');
+  isContiguous2d(c, 'c');
 
   auto layout = isRowm(c) ? CblasRowMajor : CblasColMajor;
   auto transA = isRowm(a) == isRowm(c) ? CblasNoTrans : CblasTrans;
@@ -111,6 +127,39 @@ static void cpuGemm(GemmFunc<T> Gemm, const Memref<2, T> *a,
   );
 }
 
+template <typename T>
+using GetrfFunc = lapack_int(int, lapack_int, lapack_int, T *, lapack_int,
+                             lapack_int *);
+template <typename T>
+using GetriFunc = lapack_int(int, lapack_int, T *, lapack_int,
+                             const lapack_int *);
+
+template <typename T>
+static int cpuInv(GetrfFunc<T> getrf, GetriFunc<T> getri, Memref<2, T> *a,
+                  Memref<1, lapack_int> *ipiv) {
+  assert(a);
+  assert(ipiv);
+
+  // Nothing to do for empty arrays.
+  if (isEmpty2d(a, 'a'))
+    return 0;
+
+  checkSquare(a, 'a');
+
+  auto n = static_cast<MKL_INT>(a->dims[0]);
+
+  auto layout = isRowm(a) ? CblasRowMajor : CblasColMajor;
+  auto data = a->data;
+  auto ipivData = ipiv->data;
+
+  auto lda = static_cast<MKL_INT>(isRowm(a) ? a->strides[0] : a->strides[1]);
+
+  if (auto res = getrf(layout, n, n, data, lda, ipivData))
+    return static_cast<int>(res);
+
+  return static_cast<int>((getri(layout, n, data, lda, ipivData)));
+}
+
 #endif
 } // namespace
 
@@ -129,13 +178,21 @@ EIG_VARIANT(double, float64)
 
 #ifdef NUMBA_MLIR_USE_MKL
 #define MKL_CALL(f, ...) f(__VA_ARGS__)
+
 #define MKL_GEMM(Prefix) cblas_##Prefix##gemm
+
+#define MKL_GETRF(Prefix) LAPACKE_##Prefix##getrf
+#define MKL_GETRI(Prefix) LAPACKE_##Prefix##getri
 #else
 static inline void ALL_UNUSED(int dummy, ...) { (void)dummy; }
-#define MKL_GEMM(Prefix) 0
 #define MKL_CALL(f, ...)                                                       \
   ALL_UNUSED(0, __VA_ARGS__);                                                  \
   fatal_failure("Math runtime was compiled without MKL support\n");
+
+#define MKL_GEMM(Prefix) 0
+
+#define MKL_GETRF(Prefix) 0
+#define MKL_GETRI(Prefix) 0
 #endif
 
 #define GEMM_VARIANT(T, Prefix, Suff)                                          \
@@ -149,5 +206,17 @@ GEMM_VARIANT(float, s, float32)
 GEMM_VARIANT(double, d, float64)
 
 #undef GEMM_VARIANT
-#undef MKL_CALL
+
+#define INV_VARIANT(T, Prefix, Suff)                                           \
+  NUMBA_MLIR_MATH_RUNTIME_EXPORT void mkl_inv_##Suff(                          \
+      Memref<2, T> *a, Memref<1, lapack_int> *ipiv) {                          \
+    MKL_CALL(cpuInv<T>, MKL_GETRF(Prefix), MKL_GETRI(Prefix), a, ipiv);        \
+  }
+
+INV_VARIANT(float, s, float32)
+INV_VARIANT(double, d, float64)
+INV_VARIANT(MKL_Complex8, c, complex64)
+INV_VARIANT(MKL_Complex16, z, complex128)
+
+#undef INV_VARIANT
 }

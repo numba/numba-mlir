@@ -28,6 +28,9 @@ def load_function_variants(runtime_lib, func_name, suffixes):
 load_function_variants(runtime_lib, "dpnp_linalg_eig_%s", ["float32", "float64"])
 if MKL_AVAILABLE:
     load_function_variants(runtime_lib, "mkl_gemm_%s", ["float32", "float64"])
+    load_function_variants(
+        runtime_lib, "mkl_inv_%s", ["float32", "float64", "complex64", "complex128"]
+    )
 if SYCL_MKL_AVAILABLE:
     load_function_variants(
         runtime_sycl_lib, "mkl_gemm_%s_device", ["float32", "float64"]
