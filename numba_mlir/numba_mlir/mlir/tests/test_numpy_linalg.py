@@ -254,7 +254,7 @@ def _inv_checker(py_func, cfunc, a):
         _assert_is_identity_matrix(rec)
 
 
-@pytest.mark.parametrize("n", [0, 10])
+@pytest.mark.parametrize("n", [0, 10, 107])
 @pytest.mark.parametrize("dtype", _linalg_dtypes)
 @pytest.mark.parametrize("order", "CF")
 def test_linalg_inv(n, dtype, order):
