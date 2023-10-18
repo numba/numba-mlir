@@ -162,7 +162,7 @@ static int cpuInv(GetrfFunc<T> getrf, GetriFunc<T> getri, Memref<2, T> *a,
 
 template <typename T>
 using GesvFunc = lapack_int(int matrix_layout, lapack_int, lapack_int, T *,
-                            lapack_int, lapack_int *, T *, lapack_int ldb);
+                            lapack_int, lapack_int *, T *, lapack_int);
 
 template <typename T>
 static int cpuSolve(GesvFunc<T> gesv, Memref<2, T> *a, Memref<2, T> *b,
