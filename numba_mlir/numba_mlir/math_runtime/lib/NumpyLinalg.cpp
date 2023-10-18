@@ -149,12 +149,15 @@ static int cpuInv(GetrfFunc<T> getrf, GetriFunc<T> getri, Memref<2, T> *a,
   auto n = static_cast<MKL_INT>(a->dims[0]);
 
   auto layout = isRowm(a) ? CblasRowMajor : CblasColMajor;
+  auto data = a->data;
+  auto ipivData = ipiv->data;
+
   auto lda = static_cast<MKL_INT>(isRowm(a) ? a->strides[0] : a->strides[1]);
 
-  if (auto res = getrf(layout, n, n, a->data, lda, ipiv->data))
+  if (auto res = getrf(layout, n, n, data, lda, ipivData))
     return static_cast<int>(res);
 
-  return static_cast<int>((getri(layout, n, a->data, lda, ipiv->data)));
+  return static_cast<int>((getri(layout, n, data, lda, ipivData)));
 }
 
 #endif
@@ -206,7 +209,7 @@ GEMM_VARIANT(double, d, float64)
 
 #define INV_VARIANT(T, Prefix, Suff)                                           \
   NUMBA_MLIR_MATH_RUNTIME_EXPORT void mkl_inv_##Suff(                          \
-      Memref<2, T> *a, Memref<1, int64_t> *ipiv) {                             \
+      Memref<2, T> *a, Memref<1, lapack_int> *ipiv) {                          \
     MKL_CALL(cpuInv<T>, MKL_GETRF(Prefix), MKL_GETRI(Prefix), a, ipiv);        \
   }
 
