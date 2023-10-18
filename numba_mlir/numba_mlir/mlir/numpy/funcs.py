@@ -842,8 +842,8 @@ def matmul_impl(builder, a, b):
 
 
 @_mkl_func
-def _mkl_inv(builder, a, shape):
-    n = shape[0]
+def _mkl_inv(builder, a):
+    n = a.shape[0]
     dtype = a.dtype
 
     func_name = f"mkl_inv_{dtype_str(builder, dtype)}"
@@ -866,12 +866,59 @@ def _mkl_inv(builder, a, shape):
 
 
 @register_func("numpy.linalg.inv", numpy.linalg.inv)
-def dot_impl(builder, a):
-    shape = a.shape
-    if len(shape) != 2:
+def inv_impl(builder, a):
+    if len(a.shape) != 2:
         return
 
-    return _mkl_inv(builder, a, shape)
+    return _mkl_inv(builder, a)
+
+
+@_mkl_func
+def _mkl_solve(builder, a, b):
+    a_shape = a.shape
+    b_shape = b.shape
+    dtype = a.dtype
+
+    func_name = f"mkl_solve_{dtype_str(builder, dtype)}"
+    device_func_name = func_name + "_device"
+
+    n = a_shape[0]
+
+    a = builder.force_copy(a)
+    b = builder.force_copy(b)
+    if len(b_shape) == 1:
+        nrhs = 1
+        b = builder.reshape(b, (b_shape[0], 1))
+    else:
+        nrhs = b_shape[1]
+
+    ipiv = builder.init_tensor((n,), builder.int64)
+
+    res_init = builder.cast(0, builder.int32)
+
+    res = builder.external_call(
+        func_name,
+        (a, b, ipiv),
+        res_init,
+        attrs={"gpu_runtime.device_func": device_func_name},
+    )
+    # TODO check res
+
+    if len(b_shape) == 1:
+        return flatten_impl(builder, b)
+    else:
+        return b
+
+
+@register_func("numpy.linalg.solve", numpy.linalg.solve)
+def solve_impl(builder, a, b):
+    if len(a.shape) != 2:
+        return
+
+    if len(a.shape) not in (1, 2):
+        return
+
+    return _mkl_solve(builder, a, b)
 
 
 @register_func("numpy.where", numpy.where)
