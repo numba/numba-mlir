@@ -149,6 +149,19 @@ def _assert_is_identity_matrix(got, rtol=None, atol=None):
     np.testing.assert_allclose(got, eye, rtol, atol)
 
 
+def _sample_matrix(m, dtype, order):
+    # pd. (positive definite) matrix has eigenvalues in Z+
+    np.random.seed(0)  # repeatable seed
+    A = np.random.rand(m, m)
+    # orthonormal q needed to form up q^{-1}*D*q
+    # no "orth()" in numpy
+    q, _ = np.linalg.qr(A)
+    L = np.arange(1, m + 1)  # some positive eigenvalues
+    Q = np.dot(np.dot(q.T, np.diag(L)), q)  # construct
+    Q = np.array(Q, dtype=dtype, order=order)  # sort out order/type
+    return Q
+
+
 def _specific_sample_matrix(size, dtype, order, rank=None, condition=None):
     """
     Provides a sample matrix with an optionally specified rank or condition
@@ -265,6 +278,41 @@ def test_linalg_inv(n, dtype, order):
 
     a = _specific_sample_matrix((n, n), dtype, order)
     _inv_checker(py_func, jit_func, a)
+
+
+def _cholesky_checker(py_func, cfunc, a):
+    expected = py_func(a)
+    got = cfunc(a)
+    use_reconstruction = False
+    # check that the computed results are contig and in the same way
+    # self.assert_contig_sanity(got, "C")
+
+    # try strict
+    try:
+        np.testing.assert_array_almost_equal_nulp(got, expected, nulp=10)
+    except AssertionError:
+        # fall back to reconstruction
+        use_reconstruction = True
+
+    # try via reconstruction
+    if use_reconstruction:
+        rec = np.dot(got, np.conj(got.T))
+        resolution = 5 * np.finfo(a.dtype).resolution
+        np.testing.assert_allclose(a, rec, rtol=resolution, atol=resolution)
+
+
+@pytest.mark.parametrize("n", [0, 10, 107])
+@pytest.mark.parametrize("dtype", _linalg_dtypes)
+@pytest.mark.parametrize("order", "CF")
+def test_linalg_cholesky(n, dtype, order):
+    def py_func(a):
+        return np.linalg.cholesky(a)
+
+    jit_func = njit(py_func)
+
+    a = _sample_matrix(n, dtype, order)
+
+    _cholesky_checker(py_func, jit_func, a)
 
 
 def _solve_checker(py_func, cfunc, a, b):
