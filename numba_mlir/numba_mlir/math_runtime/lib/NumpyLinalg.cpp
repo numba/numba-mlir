@@ -161,8 +161,8 @@ static int cpuInv(GetrfFunc<T> getrf, GetriFunc<T> getri, Memref<2, T> *a,
 }
 
 template <typename T>
-using GesvFunc = lapack_int(int matrix_layout, lapack_int, lapack_int, T *,
-                            lapack_int, lapack_int *, T *, lapack_int);
+using GesvFunc = lapack_int(int, lapack_int, lapack_int, T *, lapack_int,
+                            lapack_int *, T *, lapack_int);
 
 template <typename T>
 static int cpuSolve(GesvFunc<T> gesv, Memref<2, T> *a, Memref<2, T> *b,
@@ -193,6 +193,28 @@ static int cpuSolve(GesvFunc<T> gesv, Memref<2, T> *a, Memref<2, T> *b,
       gesv(layout, n, nrhs, aData, lda, ipivData, bData, ldb));
 }
 
+template <typename T>
+using PotrfFunc = lapack_int(int, char, lapack_int, T *, lapack_int);
+
+template <typename T>
+static int cpuCholesky(PotrfFunc<T> potrf, Memref<2, T> *a) {
+  assert(a);
+
+  // Nothing to do for empty arrays.
+  if (isEmpty2d(a, 'a'))
+    return 0;
+
+  checkSquare(a, 'a');
+
+  auto n = static_cast<MKL_INT>(a->dims[0]);
+
+  auto layout = CblasColMajor;
+  auto data = a->data;
+  auto lda = static_cast<MKL_INT>(a->strides[0]);
+
+  return static_cast<int>(potrf(layout, 'U', n, data, lda));
+}
+
 #endif
 } // namespace
 
@@ -217,6 +239,7 @@ EIG_VARIANT(double, float64)
 #define MKL_GETRF(Prefix) LAPACKE_##Prefix##getrf
 #define MKL_GETRI(Prefix) LAPACKE_##Prefix##getri
 #define MKL_GETSV(Prefix) LAPACKE_##Prefix##gesv
+#define MKL_POTRF(Prefix) LAPACKE_##Prefix##potrf
 #else
 static inline void ALL_UNUSED(int dummy, ...) { (void)dummy; }
 #define MKL_CALL(f, ...)                                                       \
@@ -228,6 +251,7 @@ static inline void ALL_UNUSED(int dummy, ...) { (void)dummy; }
 #define MKL_GETRF(Prefix) 0
 #define MKL_GETRI(Prefix) 0
 #define MKL_GETSV(Prefix) 0
+#define MKL_POTRF(Prefix) 0
 #endif
 
 #define GEMM_VARIANT(T, Prefix, Suff)                                          \
@@ -267,4 +291,16 @@ SOLVE_VARIANT(MKL_Complex8, c, complex64)
 SOLVE_VARIANT(MKL_Complex16, z, complex128)
 
 #undef SOLVE_VARIANT
+
+#define CHOLESKY_VARIANT(T, Prefix, Suff)                                      \
+  NUMBA_MLIR_MATH_RUNTIME_EXPORT void mkl_cholesky_##Suff(Memref<2, T> *a) {   \
+    MKL_CALL(cpuCholesky<T>, MKL_POTRF(Prefix), a);                            \
+  }
+
+CHOLESKY_VARIANT(float, s, float32)
+CHOLESKY_VARIANT(double, d, float64)
+CHOLESKY_VARIANT(MKL_Complex8, c, complex64)
+CHOLESKY_VARIANT(MKL_Complex16, z, complex128)
+
+#undef CHOLESKY_VARIANT
 }
