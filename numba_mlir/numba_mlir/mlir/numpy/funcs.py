@@ -874,6 +874,37 @@ def inv_impl(builder, a):
 
 
 @_mkl_func
+def _mkl_cholesky(builder, a):
+    n = a.shape[0]
+    dtype = a.dtype
+
+    func_name = f"mkl_cholesky_{dtype_str(builder, dtype)}"
+    device_func_name = func_name + "_device"
+
+    a = builder.force_copy(a)
+
+    res_init = builder.cast(0, builder.int32)
+
+    res = builder.external_call(
+        func_name,
+        a,
+        res_init,
+        attrs={"gpu_runtime.device_func": device_func_name},
+    )
+    # TODO check res
+
+    return _xtri_impl(builder, a, 0, False)
+
+
+@register_func("numpy.linalg.cholesky", numpy.linalg.cholesky)
+def cholesky_impl(builder, a):
+    if len(a.shape) != 2:
+        return
+
+    return _mkl_cholesky(builder, a)
+
+
+@_mkl_func
 def _mkl_solve(builder, a, b):
     a_shape = a.shape
     b_shape = b.shape
