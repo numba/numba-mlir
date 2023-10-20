@@ -981,6 +981,48 @@ def eig_impl(builder, a):
 
 
 @_mkl_func
+def _mkl_eigh(builder, a):
+    n = a.shape[0]
+    dtype = a.dtype
+
+    if dtype == builder.complex128:
+        w_dtype = builder.float64
+    elif dtype == builder.complex64:
+        w_dtype = builder.float32
+    else:
+        w_dtype = dtype
+
+    func_name = f"mkl_eigh_{dtype_str(builder, dtype)}"
+    device_func_name = func_name + "_device"
+
+    JOBZ = builder.cast(ord("V"), builder.int8)
+    UPLO = builder.cast(ord("L"), builder.int8)
+
+    a = builder.force_copy(a)
+    w = builder.init_tensor((n,), w_dtype)
+
+    res_init = builder.cast(0, builder.int32)
+
+    res = builder.external_call(
+        func_name,
+        (JOBZ, UPLO, a, w),
+        res_init,
+        attrs={"gpu_runtime.device_func": device_func_name},
+    )
+    # TODO check res
+
+    return (w, a)
+
+
+@register_func("numpy.linalg.eigh", numpy.linalg.eigh)
+def eigh_impl(builder, a):
+    if len(a.shape) != 2:
+        return
+
+    return _mkl_eigh(builder, a)
+
+
+@_mkl_func
 def _mkl_solve(builder, a, b):
     a_shape = a.shape
     b_shape = b.shape
