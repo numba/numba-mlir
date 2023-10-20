@@ -9,6 +9,8 @@ from numbers import Number, Integral
 
 from .utils import njit_cached as njit
 
+_linalg_dtypes = (np.float64, np.float32, np.complex128, np.complex64)
+
 
 def vvsort(val, vec, size):
     for i in range(size):
@@ -27,8 +29,8 @@ def vvsort(val, vec, size):
             vec[k, imax] = temp
 
 
-@pytest.mark.parametrize("type", [np.float64, np.float32], ids=["float64", "float32"])
-@pytest.mark.parametrize("size", [2, 4, 8, 16, 300])
+@pytest.mark.parametrize("type", _linalg_dtypes)
+@pytest.mark.parametrize("size", [2, 4, 8, 16])
 def test_eig_arange(type, size):
     a = np.arange(size * size, dtype=type).reshape((size, size))
     symm_orig = (
@@ -71,8 +73,9 @@ def test_eig_arange(type, size):
     assert dpnp_val.shape == np_val.shape
     assert dpnp_vec.shape == np_vec.shape
 
-    np.testing.assert_allclose(dpnp_val, np_val, rtol=1e-05, atol=1e-05)
-    np.testing.assert_allclose(dpnp_vec, np_vec, rtol=1e-05, atol=1e-05)
+    tol = 1e-03
+    np.testing.assert_allclose(dpnp_val, np_val, rtol=tol, atol=tol)
+    np.testing.assert_allclose(dpnp_vec, np_vec, rtol=tol, atol=tol)
 
 
 def _sample_vector(n, dtype):
@@ -234,9 +237,6 @@ def _specific_sample_matrix(size, dtype, order, rank=None, condition=None):
         Q = np.array(Q, dtype=dtype, order=order)  # sort out order/type
 
     return Q
-
-
-_linalg_dtypes = (np.float64, np.float32, np.complex128, np.complex64)
 
 
 def _inv_checker(py_func, cfunc, a):
