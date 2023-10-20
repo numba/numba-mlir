@@ -32,6 +32,7 @@ if MKL_AVAILABLE:
     load_function_variants(runtime_lib, "mkl_inv_%s", _dtypes)
     load_function_variants(runtime_lib, "mkl_solve_%s", _dtypes)
     load_function_variants(runtime_lib, "mkl_cholesky_%s", _dtypes)
+    load_function_variants(runtime_lib, "mkl_eig_%s", _dtypes)
 if SYCL_MKL_AVAILABLE:
     load_function_variants(
         runtime_sycl_lib, "mkl_gemm_%s_device", ["float32", "float64"]

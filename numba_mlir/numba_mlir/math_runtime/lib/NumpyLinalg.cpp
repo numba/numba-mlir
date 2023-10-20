@@ -194,6 +194,73 @@ static int choleskyImpl(PotrfFunc<T> potrf, Memref<2, T> *a) {
   return static_cast<int>(potrf(layout, 'U', n, data, lda));
 }
 
+template <typename T>
+using GeevRealFunc = lapack_int(int, char, char, lapack_int, T *, lapack_int,
+                                T *, T *, T *, lapack_int, T *, lapack_int);
+
+template <typename T>
+static int eigImplReal(GeevRealFunc<T> geev, char jobvl, char jobvr,
+                       Memref<2, T> *a, Memref<1, T> *wr, Memref<1, T> *wi,
+                       Memref<2, T> *vl, Memref<2, T> *vr) {
+  assert(a);
+
+  // Nothing to do for empty arrays.
+  if (isEmpty2d(a, 'a'))
+    return 0;
+
+  checkSquare(a, 'a');
+
+  auto n = static_cast<MKL_INT>(a->dims[0]);
+  auto layout = CblasColMajor;
+  auto data = a->data;
+  auto lda = static_cast<MKL_INT>(a->strides[0]);
+
+  auto wrData = wr->data;
+  auto wiData = wi->data;
+
+  auto vlData = vl->data;
+  auto ldvl = static_cast<MKL_INT>(vl->strides[0]);
+
+  auto vrData = vr->data;
+  auto ldvr = static_cast<MKL_INT>(vr->strides[0]);
+
+  return static_cast<int>(geev(layout, jobvl, jobvr, n, data, lda, wrData,
+                               wiData, vlData, ldvl, vrData, ldvr));
+}
+
+template <typename T>
+using GeevComplexFunc = lapack_int(int, char, char, lapack_int, T *, lapack_int,
+                                   T *, T *, lapack_int, T *, lapack_int);
+
+template <typename T>
+static int eigImplComplex(GeevComplexFunc<T> geev, char jobvl, char jobvr,
+                          Memref<2, T> *a, Memref<1, T> *w, Memref<2, T> *vl,
+                          Memref<2, T> *vr) {
+  assert(a);
+
+  // Nothing to do for empty arrays.
+  if (isEmpty2d(a, 'a'))
+    return 0;
+
+  checkSquare(a, 'a');
+
+  auto n = static_cast<MKL_INT>(a->dims[0]);
+  auto layout = CblasColMajor;
+  auto data = a->data;
+  auto lda = static_cast<MKL_INT>(a->strides[0]);
+
+  auto wData = w->data;
+
+  auto vlData = vl->data;
+  auto ldvl = static_cast<MKL_INT>(vl->strides[0]);
+
+  auto vrData = vr->data;
+  auto ldvr = static_cast<MKL_INT>(vr->strides[0]);
+
+  return static_cast<int>(geev(layout, jobvl, jobvr, n, data, lda, wData,
+                               vlData, ldvl, vrData, ldvr));
+}
+
 #endif
 } // namespace
 
@@ -207,6 +274,7 @@ extern "C" {
 #define MKL_GETRI(Prefix) LAPACKE_##Prefix##getri
 #define MKL_GETSV(Prefix) LAPACKE_##Prefix##gesv
 #define MKL_POTRF(Prefix) LAPACKE_##Prefix##potrf
+#define MKL_GEEV(Prefix) LAPACKE_##Prefix##geev
 #else
 static inline void ALL_UNUSED(int dummy, ...) { (void)dummy; }
 #define MKL_CALL(f, ...)                                                       \
@@ -219,6 +287,7 @@ static inline void ALL_UNUSED(int dummy, ...) { (void)dummy; }
 #define MKL_GETRI(Prefix) 0
 #define MKL_GETSV(Prefix) 0
 #define MKL_POTRF(Prefix) 0
+#define MKL_GEEV(Prefix) 0
 #endif
 
 #define GEMM_VARIANT(T, Prefix, Suff)                                          \
@@ -270,4 +339,26 @@ CHOLESKY_VARIANT(MKL_Complex8, c, complex64)
 CHOLESKY_VARIANT(MKL_Complex16, z, complex128)
 
 #undef CHOLESKY_VARIANT
+
+#define EIG_VARIANT_REAL(T, Prefix, Suff)                                      \
+  NUMBA_MLIR_MATH_RUNTIME_EXPORT void mkl_eig_##Suff(                          \
+      char jobvl, char jobvr, Memref<2, T> *a, Memref<1, T> *wr,               \
+      Memref<1, T> *wi, Memref<2, T> *vl, Memref<2, T> *vr) {                  \
+    MKL_CALL(eigImplReal<T>, MKL_GEEV(Prefix), jobvl, jobvr, a, wr, wi, vl,    \
+             vr);                                                              \
+  }
+#define EIG_VARIANT_COMPLEX(T, Prefix, Suff)                                   \
+  NUMBA_MLIR_MATH_RUNTIME_EXPORT void mkl_eig_##Suff(                          \
+      char jobvl, char jobvr, Memref<2, T> *a, Memref<1, T> *w,                \
+      Memref<2, T> *vl, Memref<2, T> *vr) {                                    \
+    MKL_CALL(eigImplComplex<T>, MKL_GEEV(Prefix), jobvl, jobvr, a, w, vl, vr); \
+  }
+
+EIG_VARIANT_REAL(float, s, float32)
+EIG_VARIANT_REAL(double, d, float64)
+EIG_VARIANT_COMPLEX(MKL_Complex8, c, complex64)
+EIG_VARIANT_COMPLEX(MKL_Complex16, z, complex128)
+
+#undef EIG_VARIANT_REAL
+#undef EIG_VARIANT_COMPLEX
 }
