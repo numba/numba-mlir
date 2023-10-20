@@ -27,7 +27,6 @@ def vvsort(val, vec, size):
             vec[k, imax] = temp
 
 
-@require_dpnp
 @pytest.mark.parametrize("type", [np.float64, np.float32], ids=["float64", "float32"])
 @pytest.mark.parametrize("size", [2, 4, 8, 16, 300])
 def test_eig_arange(type, size):
