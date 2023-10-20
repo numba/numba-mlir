@@ -905,7 +905,7 @@ def cholesky_impl(builder, a):
 
 
 @_mkl_func
-def _mkl_eig(builder, a):
+def _mkl_eig(builder, a, is_vals):
     n = a.shape[0]
     dtype = a.dtype
     use_complex = is_complex(dtype, builder)
@@ -916,10 +916,17 @@ def _mkl_eig(builder, a):
     a = builder.force_copy(a)
 
     JOBVL = builder.cast(ord("N"), builder.int8)
-    JOBVR = builder.cast(ord("V"), builder.int8)
+    if is_vals:
+        JOBVR = builder.cast(ord("N"), builder.int8)
+    else:
+        JOBVR = builder.cast(ord("V"), builder.int8)
 
     ldvl = 1
-    ldvr = n
+    if is_vals:
+        ldvr = 1
+    else:
+        ldvr = n
+
     if use_complex:
         w = builder.init_tensor((n,), dtype)
     else:
@@ -944,12 +951,17 @@ def _mkl_eig(builder, a):
     )
     # TODO check res
 
-    vr = transpose_impl(builder, vr)
-
-    if use_complex:
-        return (w, vr)
+    if is_vals:
+        if use_complex:
+            return w
+        else:
+            return wr
     else:
-        return (wr, vr)
+        vr = transpose_impl(builder, vr)
+        if use_complex:
+            return (w, vr)
+        else:
+            return (wr, vr)
 
 
 @register_func("numpy.linalg.eig", numpy.linalg.eig)
@@ -957,7 +969,15 @@ def eig_impl(builder, a):
     if len(a.shape) != 2:
         return
 
-    return _mkl_eig(builder, a)
+    return _mkl_eig(builder, a, False)
+
+
+@register_func("numpy.linalg.eigvals", numpy.linalg.eigvals)
+def eig_impl(builder, a):
+    if len(a.shape) != 2:
+        return
+
+    return _mkl_eig(builder, a, True)
 
 
 @_mkl_func
