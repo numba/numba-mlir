@@ -375,3 +375,103 @@ def test_linalg_solve_empty():
     b = np.empty((0,))
 
     _solve_checker(py_func, jit_func, a, b)
+
+
+def _eig_check_worker(cfunc, name, expected_res_len):
+    def check(*args):
+        expected = cfunc.py_func(*args)
+        got = cfunc(*args)
+        a = args[0]
+        # check that the returned tuple is same length
+        assert len(expected) == len(got)
+        # and that dimension is correct
+        res_is_tuple = False
+        if isinstance(got, tuple):
+            res_is_tuple = True
+            assert len(got) == expected_res_len
+        else:  # its an array
+            assert got.ndim == expected_res_len
+
+        use_reconstruction = False
+        # try plain match of each array to np first
+        for k in range(len(expected)):
+            try:
+                np.testing.assert_array_almost_equal_nulp(got[k], expected[k], nulp=10)
+            except AssertionError:
+                # plain match failed, test by reconstruction
+                use_reconstruction = True
+
+        # If plain match fails then reconstruction is used.
+        # this checks that A*V ~== V*diag(W)
+        # i.e. eigensystem ties out
+        # this is required as numpy uses only double precision lapack
+        # routines and computation of eigenvectors is numerically
+        # sensitive, numba uses the type specific routines therefore
+        # sometimes comes out with a different (but entirely
+        # valid) answer (eigenvectors are not unique etc.).
+        # This is only applicable if eigenvectors are computed
+        # along with eigenvalues i.e. result is a tuple.
+        resolution = 10 * np.finfo(a.dtype).resolution
+        # resolution = 5 * np.finfo(a.dtype).resolution
+        if use_reconstruction:
+            if res_is_tuple:
+                w, v = got
+                # modify 'a' if hermitian eigensystem functionality is
+                # being tested. 'L' for use lower part is default and
+                # the only thing used at present so we conjugate transpose
+                # the lower part into the upper for use in the
+                # reconstruction. By construction the sample matrix is
+                # tridiag so this is just a question of copying the lower
+                # diagonal into the upper and conjugating on the way.
+                if name[-1] == "h":
+                    idxl = np.nonzero(np.eye(a.shape[0], a.shape[1], -1))
+                    idxu = np.nonzero(np.eye(a.shape[0], a.shape[1], 1))
+                    cfunc(*args)
+                    # upper idx must match lower for default uplo="L"
+                    # if complex, conjugate
+                    a[idxu] = np.conj(a[idxl])
+                    # also, only the real part of the diagonals is
+                    # considered in the calculation so the imag is zeroed
+                    # out for the purposes of use in reconstruction.
+                    a[np.diag_indices(a.shape[0])] = np.real(np.diag(a))
+
+                lhs = np.dot(a, v)
+                rhs = np.dot(v, np.diag(w))
+
+                np.testing.assert_allclose(
+                    lhs.real, rhs.real, rtol=resolution, atol=resolution
+                )
+                if np.iscomplexobj(v):
+                    np.testing.assert_allclose(
+                        lhs.imag, rhs.imag, rtol=resolution, atol=resolution
+                    )
+            else:
+                # This isn't technically reconstruction but is here to
+                # deal with that the order of the returned eigenvalues
+                # may differ in the case of routines just returning
+                # eigenvalues and there's no true reconstruction
+                # available with which to perform a check.
+                np.testing.assert_allclose(
+                    np.sort(expected), np.sort(got), rtol=resolution, atol=resolution
+                )
+
+    return check
+
+
+@pytest.mark.parametrize("n", [0, 10])
+@pytest.mark.parametrize("dtype", _linalg_dtypes)
+@pytest.mark.parametrize("order", "CF")
+@pytest.mark.parametrize("func", ["eig", "eigvals"])
+def test_linalg_eig(n, dtype, order, func):
+    expected_len = 1 if "vals" in func else 2
+    func = eval("np.linalg." + func)
+
+    def py_func(a):
+        return func(a)
+
+    jit_func = njit(py_func)
+
+    checker = _eig_check_worker(jit_func, "eig", expected_len)
+
+    a = _sample_matrix(n, dtype, order)
+    checker(a)
