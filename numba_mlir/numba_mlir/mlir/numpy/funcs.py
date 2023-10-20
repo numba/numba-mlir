@@ -1262,18 +1262,6 @@ def setitem_impl(builder, arr, index, val):
     return builder.inline_func(func, arr.type, arr, index, val)
 
 
-# @register_func("numpy.linalg.eig", numpy.linalg.eig)
-# def eig_impl(builder, arg):
-#     shape = arg.shape
-#     if len(shape) == 2:
-#         dtype = arg.dtype
-#         func_name = f"dpnp_linalg_eig_{dtype_str(builder, dtype)}"
-#         size = shape[0]
-#         vals = builder.init_tensor([size], dtype)
-#         vecs = builder.init_tensor([size, size], dtype)
-#         return builder.external_call(func_name, arg, (vals, vecs))
-
-
 @register_func("numpy.atleast_2d", numpy.atleast_2d)
 def atleast2d_impl(builder, arr):
     shape = arr.shape
