@@ -59,8 +59,8 @@ using GemmFunc = void(const CBLAS_LAYOUT, const CBLAS_TRANSPOSE,
                       const T *, const MKL_INT, const T, T *, const MKL_INT);
 
 template <typename T>
-static void cpuGemm(GemmFunc<T> Gemm, const Memref<2, T> *a,
-                    const Memref<2, T> *b, Memref<2, T> *c, T alpha, T beta) {
+static void gemmImpl(GemmFunc<T> Gemm, const Memref<2, T> *a,
+                     const Memref<2, T> *b, Memref<2, T> *c, T alpha, T beta) {
   assert(a);
   assert(b);
   assert(c);
@@ -114,8 +114,8 @@ using GetriFunc = lapack_int(int, lapack_int, T *, lapack_int,
                              const lapack_int *);
 
 template <typename T>
-static int cpuInv(GetrfFunc<T> getrf, GetriFunc<T> getri, Memref<2, T> *a,
-                  Memref<1, MKL_INT> *ipiv) {
+static int invImpl(GetrfFunc<T> getrf, GetriFunc<T> getri, Memref<2, T> *a,
+                   Memref<1, MKL_INT> *ipiv) {
   assert(a);
   assert(ipiv);
 
@@ -144,8 +144,8 @@ using GesvFunc = lapack_int(int, lapack_int, lapack_int, T *, lapack_int,
                             lapack_int *, T *, lapack_int);
 
 template <typename T>
-static int cpuSolve(GesvFunc<T> gesv, Memref<2, T> *a, Memref<2, T> *b,
-                    Memref<1, MKL_INT> *ipiv) {
+static int solveImpl(GesvFunc<T> gesv, Memref<2, T> *a, Memref<2, T> *b,
+                     Memref<1, MKL_INT> *ipiv) {
   assert(a);
   assert(b);
   assert(ipiv);
@@ -176,7 +176,7 @@ template <typename T>
 using PotrfFunc = lapack_int(int, char, lapack_int, T *, lapack_int);
 
 template <typename T>
-static int cpuCholesky(PotrfFunc<T> potrf, Memref<2, T> *a) {
+static int choleskyImpl(PotrfFunc<T> potrf, Memref<2, T> *a) {
   assert(a);
 
   // Nothing to do for empty arrays.
@@ -225,7 +225,7 @@ static inline void ALL_UNUSED(int dummy, ...) { (void)dummy; }
   NUMBA_MLIR_MATH_RUNTIME_EXPORT void mkl_gemm_##Suff(                         \
       const Memref<2, T> *a, const Memref<2, T> *b, T alpha, T beta,           \
       Memref<2, T> *c) {                                                       \
-    MKL_CALL(cpuGemm<T>, MKL_GEMM(Prefix), a, b, c, alpha, beta);              \
+    MKL_CALL(gemmImpl<T>, MKL_GEMM(Prefix), a, b, c, alpha, beta);             \
   }
 
 GEMM_VARIANT(float, s, float32)
@@ -236,7 +236,7 @@ GEMM_VARIANT(double, d, float64)
 #define INV_VARIANT(T, Prefix, Suff)                                           \
   NUMBA_MLIR_MATH_RUNTIME_EXPORT void mkl_inv_##Suff(                          \
       Memref<2, T> *a, Memref<1, MKL_INT> *ipiv) {                             \
-    MKL_CALL(cpuInv<T>, MKL_GETRF(Prefix), MKL_GETRI(Prefix), a, ipiv);        \
+    MKL_CALL(invImpl<T>, MKL_GETRF(Prefix), MKL_GETRI(Prefix), a, ipiv);       \
   }
 
 INV_VARIANT(float, s, float32)
@@ -249,7 +249,7 @@ INV_VARIANT(MKL_Complex16, z, complex128)
 #define SOLVE_VARIANT(T, Prefix, Suff)                                         \
   NUMBA_MLIR_MATH_RUNTIME_EXPORT void mkl_solve_##Suff(                        \
       Memref<2, T> *a, Memref<2, T> *b, Memref<1, MKL_INT> *ipiv) {            \
-    MKL_CALL(cpuSolve<T>, MKL_GETSV(Prefix), a, b, ipiv);                      \
+    MKL_CALL(solveImpl<T>, MKL_GETSV(Prefix), a, b, ipiv);                     \
   }
 
 SOLVE_VARIANT(float, s, float32)
@@ -261,7 +261,7 @@ SOLVE_VARIANT(MKL_Complex16, z, complex128)
 
 #define CHOLESKY_VARIANT(T, Prefix, Suff)                                      \
   NUMBA_MLIR_MATH_RUNTIME_EXPORT void mkl_cholesky_##Suff(Memref<2, T> *a) {   \
-    MKL_CALL(cpuCholesky<T>, MKL_POTRF(Prefix), a);                            \
+    MKL_CALL(choleskyImpl<T>, MKL_POTRF(Prefix), a);                           \
   }
 
 CHOLESKY_VARIANT(float, s, float32)
