@@ -973,7 +973,7 @@ def eig_impl(builder, a):
 
 
 @register_func("numpy.linalg.eigvals", numpy.linalg.eigvals)
-def eig_impl(builder, a):
+def eigvals_impl(builder, a):
     if len(a.shape) != 2:
         return
 
@@ -981,7 +981,7 @@ def eig_impl(builder, a):
 
 
 @_mkl_func
-def _mkl_eigh(builder, a):
+def _mkl_eigh(builder, a, is_vals):
     n = a.shape[0]
     dtype = a.dtype
 
@@ -995,7 +995,11 @@ def _mkl_eigh(builder, a):
     func_name = f"mkl_eigh_{dtype_str(builder, dtype)}"
     device_func_name = func_name + "_device"
 
-    JOBZ = builder.cast(ord("V"), builder.int8)
+    if is_vals:
+        JOBZ = builder.cast(ord("N"), builder.int8)
+    else:
+        JOBZ = builder.cast(ord("V"), builder.int8)
+
     UPLO = builder.cast(ord("L"), builder.int8)
 
     a = builder.force_copy(a)
@@ -1011,7 +1015,10 @@ def _mkl_eigh(builder, a):
     )
     # TODO check res
 
-    return (w, a)
+    if is_vals:
+        return w
+    else:
+        return (w, a)
 
 
 @register_func("numpy.linalg.eigh", numpy.linalg.eigh)
@@ -1019,7 +1026,15 @@ def eigh_impl(builder, a):
     if len(a.shape) != 2:
         return
 
-    return _mkl_eigh(builder, a)
+    return _mkl_eigh(builder, a, False)
+
+
+@register_func("numpy.linalg.eigvalsh", numpy.linalg.eigvalsh)
+def eigvalsh_impl(builder, a):
+    if len(a.shape) != 2:
+        return
+
+    return _mkl_eigh(builder, a, True)
 
 
 @_mkl_func
