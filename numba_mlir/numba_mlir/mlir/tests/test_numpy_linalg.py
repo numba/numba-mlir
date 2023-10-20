@@ -9,14 +9,6 @@ from numbers import Number, Integral
 
 from .utils import njit_cached as njit
 
-DPNP_TESTS_ENABLED = readenv("NUMBA_MLIR_ENABLE_DPNP_TESTS", int, 0)
-
-
-def require_dpnp(func):
-    return pytest.mark.skipif(not DPNP_TESTS_ENABLED, reason="DPNP tests disabled")(
-        func
-    )
-
 
 def vvsort(val, vec, size):
     for i in range(size):

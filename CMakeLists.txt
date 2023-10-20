@@ -60,11 +60,6 @@ if (CMAKE_SYSTEM_NAME STREQUAL Darwin)
     # add_compile_options(-mcet) # v8.0 and newer # unrecognized command line option '-mcet', only recommended
 endif()
 
-option(NUMBA_MLIR_USE_DPNP
-    "Use the dpnp Python NumPy-like library for some math functions"
-    OFF
-)
-
 option(NUMBA_MLIR_USE_MKL
     "Enable mkl support"
     ON
@@ -92,7 +87,6 @@ option(NUMBA_MLIR_ENABLE_TESTS
     OFF
 )
 
-message(STATUS "NUMBA_MLIR_USE_DPNP ${NUMBA_MLIR_USE_DPNP}")
 message(STATUS "NUMBA_MLIR_USE_MKL ${NUMBA_MLIR_USE_MKL}")
 message(STATUS "NUMBA_MLIR_USE_SYCL ${NUMBA_MLIR_USE_SYCL}")
 message(STATUS "NUMBA_MLIR_ENABLE_IGPU_DIALECT ${NUMBA_MLIR_ENABLE_IGPU_DIALECT}")

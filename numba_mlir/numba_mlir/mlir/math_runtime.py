@@ -25,7 +25,6 @@ def load_function_variants(runtime_lib, func_name, suffixes):
         register_cfunc(mlir_name, func)
 
 
-load_function_variants(runtime_lib, "dpnp_linalg_eig_%s", ["float32", "float64"])
 if MKL_AVAILABLE:
     load_function_variants(runtime_lib, "mkl_gemm_%s", ["float32", "float64"])
 

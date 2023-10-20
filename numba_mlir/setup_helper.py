@@ -172,21 +172,6 @@ def build_runtime(install_dir):
     if NUMBA_MLIR_USE_MKL is not None:
         cmake_cmd += ["-DNUMBA_MLIR_USE_MKL=" + NUMBA_MLIR_USE_MKL]
 
-    # DPNP
-    # try:
-    #     from dpnp import get_include as dpnp_get_include
-
-    #     DPNP_LIBRARY_DIR = os.path.join(dpnp_get_include(), "..", "..")
-    #     DPNP_INCLUDE_DIR = dpnp_get_include()
-    #     cmake_cmd += [
-    #         "-DDPNP_LIBRARY_DIR=" + DPNP_LIBRARY_DIR,
-    #         "-DDPNP_INCLUDE_DIR=" + DPNP_INCLUDE_DIR,
-    #         "-DNUMBA_MLIR_USE_DPNP=ON",
-    #     ]
-    #     print("Found DPNP at", DPNP_LIBRARY_DIR)
-    # except ImportError:
-    #     print("DPNP not found")
-
     if NUMBA_MLIR_USE_L0 is not None or NUMBA_MLIR_USE_SYCL is not None:
         print("Enable GPU pipeline")
         cmake_cmd += ["-DNUMBA_MLIR_ENABLE_IGPU_DIALECT=ON"]

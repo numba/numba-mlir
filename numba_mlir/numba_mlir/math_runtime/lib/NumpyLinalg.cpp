@@ -9,32 +9,11 @@
 #include "Common.hpp"
 #include "numba-mlir-math-runtime_export.h"
 
-#ifdef NUMBA_MLIR_USE_DPNP
-#include <dpnp_iface.hpp>
-#endif
-
 #ifdef NUMBA_MLIR_USE_MKL
 #include "mkl.h"
 #endif
 
 namespace {
-
-template <typename T>
-void eigImpl(Memref<2, const T> *input, Memref<1, T> *vals,
-             Memref<2, T> *vecs) {
-#ifdef NUMBA_MLIR_USE_DPNP
-  dpnp_eig_c<T, T>(input->data, vals->data, vecs->data, input->dims[0]);
-#else
-  (void)input;
-  (void)vals;
-  (void)vecs;
-  // direct MKL call or another implementation?
-  fprintf(stderr, "Math runtime was compiled without DPNP support\n");
-  fflush(stderr);
-  abort();
-#endif
-}
-
 template <typename T>
 static void checkSquare(const Memref<2, T> *arr, char arrName) {
   if (arr->dims[0] != arr->dims[1]) {
@@ -219,18 +198,6 @@ static int cpuCholesky(PotrfFunc<T> potrf, Memref<2, T> *a) {
 } // namespace
 
 extern "C" {
-
-#define EIG_VARIANT(T, Suff)                                                   \
-  NUMBA_MLIR_MATH_RUNTIME_EXPORT void dpnp_linalg_eig_##Suff(                  \
-      Memref<2, const T> *input, Memref<1, T> *vals, Memref<2, T> *vecs) {     \
-    eigImpl(input, vals, vecs);                                                \
-  }
-
-EIG_VARIANT(float, float32)
-EIG_VARIANT(double, float64)
-
-#undef EIG_VARIANT
-
 #ifdef NUMBA_MLIR_USE_MKL
 #define MKL_CALL(f, ...) f(__VA_ARGS__)
 
