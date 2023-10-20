@@ -461,7 +461,7 @@ def _eig_check_worker(cfunc, name, expected_res_len):
 @pytest.mark.parametrize("n", [0, 10])
 @pytest.mark.parametrize("dtype", _linalg_dtypes)
 @pytest.mark.parametrize("order", "CF")
-@pytest.mark.parametrize("func", ["eig", "eigvals"])
+@pytest.mark.parametrize("func", ["eig", "eigvals", "eigh"])
 def test_linalg_eig(n, dtype, order, func):
     expected_len = 1 if "vals" in func else 2
     func = eval("np.linalg." + func)
