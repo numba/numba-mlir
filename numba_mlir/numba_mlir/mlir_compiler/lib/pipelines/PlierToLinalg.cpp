@@ -1251,6 +1251,48 @@ static mlir::Value castType(mlir::OpBuilder &builder, mlir::Location loc,
 
 static std::optional<mlir::Value> doCast(mlir::OpBuilder &builder,
                                          mlir::Location loc, mlir::Value src,
+                                         mlir::Type dstType);
+
+static std::optional<mlir::Value> doTupleCast(mlir::OpBuilder &builder,
+                                              mlir::Location loc,
+                                              mlir::Value src,
+                                              mlir::Type dstType) {
+  auto srcTupleType = mlir::dyn_cast<mlir::TupleType>(src.getType());
+  if (!srcTupleType)
+    return std::nullopt;
+
+  auto dstTupleType = mlir::dyn_cast<mlir::TupleType>(dstType);
+  if (!dstTupleType)
+    return std::nullopt;
+
+  if (srcTupleType.size() != dstTupleType.size())
+    return std::nullopt;
+
+  llvm::SmallVector<mlir::Value> elems;
+  elems.reserve(srcTupleType.size());
+
+  for (auto &&[i, it] : llvm::enumerate(
+           llvm::zip(srcTupleType.getTypes(), dstTupleType.getTypes()))) {
+    auto &&[srcElemType, dstElemType] = it;
+    auto srcElem = builder.create<numba::util::TupleExtractOp>(loc, src, i);
+    if (srcElemType == dstElemType) {
+      elems.emplace_back(srcElem);
+      continue;
+    }
+
+    auto elem = doCast(builder, loc, srcElem, dstElemType);
+    if (!elem)
+      return std::nullopt;
+
+    elems.emplace_back(*elem);
+  }
+
+  mlir::Value ret = builder.create<numba::util::BuildTupleOp>(loc, elems);
+  return ret;
+}
+
+static std::optional<mlir::Value> doCast(mlir::OpBuilder &builder,
+                                         mlir::Location loc, mlir::Value src,
                                          mlir::Type dstType) {
   auto srcType = src.getType();
   if (srcType == dstType)
@@ -1258,6 +1300,9 @@ static std::optional<mlir::Value> doCast(mlir::OpBuilder &builder,
 
   if (numba::canConvert(srcType, dstType))
     return numba::doConvert(builder, loc, src, dstType);
+
+  if (auto ret = doTupleCast(builder, loc, src, dstType))
+    return ret;
 
   if (auto srcArrayType = srcType.dyn_cast<numba::ntensor::NTensorType>()) {
     auto dstShapedType = dstType.dyn_cast<mlir::ShapedType>();

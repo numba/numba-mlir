@@ -8,14 +8,6 @@
 
 #include "Lowering.hpp"
 
-static bool is_dpnp_supported() {
-#ifdef NUMBA_MLIR_USE_DPNP
-  return true;
-#else
-  return false;
-#endif
-}
-
 static bool is_mkl_supported() {
 #ifdef NUMBA_MLIR_USE_MKL
   return true;
@@ -42,7 +34,6 @@ PYBIND11_MODULE(mlir_compiler, m) {
   m.def("get_function_pointer", &getFunctionPointer, "No docs");
   m.def("release_module", &releaseModule, "No docs");
   m.def("module_str", &moduleStr, "No docs");
-  m.def("is_dpnp_supported", &is_dpnp_supported, "No docs");
   m.def("is_mkl_supported", &is_mkl_supported, "No docs");
   m.def("is_sycl_mkl_supported", &is_sycl_mkl_supported, "No docs");
 }

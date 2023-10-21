@@ -9,32 +9,11 @@
 #include "Common.hpp"
 #include "numba-mlir-math-runtime_export.h"
 
-#ifdef NUMBA_MLIR_USE_DPNP
-#include <dpnp_iface.hpp>
-#endif
-
 #ifdef NUMBA_MLIR_USE_MKL
 #include "mkl.h"
 #endif
 
 namespace {
-
-template <typename T>
-void eigImpl(Memref<2, const T> *input, Memref<1, T> *vals,
-             Memref<2, T> *vecs) {
-#ifdef NUMBA_MLIR_USE_DPNP
-  dpnp_eig_c<T, T>(input->data, vals->data, vecs->data, input->dims[0]);
-#else
-  (void)input;
-  (void)vals;
-  (void)vecs;
-  // direct MKL call or another implementation?
-  fprintf(stderr, "Math runtime was compiled without DPNP support\n");
-  fflush(stderr);
-  abort();
-#endif
-}
-
 template <typename T>
 static void checkSquare(const Memref<2, T> *arr, char arrName) {
   if (arr->dims[0] != arr->dims[1]) {
@@ -80,8 +59,8 @@ using GemmFunc = void(const CBLAS_LAYOUT, const CBLAS_TRANSPOSE,
                       const T *, const MKL_INT, const T, T *, const MKL_INT);
 
 template <typename T>
-static void cpuGemm(GemmFunc<T> Gemm, const Memref<2, T> *a,
-                    const Memref<2, T> *b, Memref<2, T> *c, T alpha, T beta) {
+static void gemmImpl(GemmFunc<T> Gemm, const Memref<2, T> *a,
+                     const Memref<2, T> *b, Memref<2, T> *c, T alpha, T beta) {
   assert(a);
   assert(b);
   assert(c);
@@ -135,8 +114,8 @@ using GetriFunc = lapack_int(int, lapack_int, T *, lapack_int,
                              const lapack_int *);
 
 template <typename T>
-static int cpuInv(GetrfFunc<T> getrf, GetriFunc<T> getri, Memref<2, T> *a,
-                  Memref<1, MKL_INT> *ipiv) {
+static int invImpl(GetrfFunc<T> getrf, GetriFunc<T> getri, Memref<2, T> *a,
+                   Memref<1, MKL_INT> *ipiv) {
   assert(a);
   assert(ipiv);
 
@@ -165,8 +144,8 @@ using GesvFunc = lapack_int(int, lapack_int, lapack_int, T *, lapack_int,
                             lapack_int *, T *, lapack_int);
 
 template <typename T>
-static int cpuSolve(GesvFunc<T> gesv, Memref<2, T> *a, Memref<2, T> *b,
-                    Memref<1, MKL_INT> *ipiv) {
+static int solveImpl(GesvFunc<T> gesv, Memref<2, T> *a, Memref<2, T> *b,
+                     Memref<1, MKL_INT> *ipiv) {
   assert(a);
   assert(b);
   assert(ipiv);
@@ -197,7 +176,7 @@ template <typename T>
 using PotrfFunc = lapack_int(int, char, lapack_int, T *, lapack_int);
 
 template <typename T>
-static int cpuCholesky(PotrfFunc<T> potrf, Memref<2, T> *a) {
+static int choleskyImpl(PotrfFunc<T> potrf, Memref<2, T> *a) {
   assert(a);
 
   // Nothing to do for empty arrays.
@@ -215,22 +194,110 @@ static int cpuCholesky(PotrfFunc<T> potrf, Memref<2, T> *a) {
   return static_cast<int>(potrf(layout, 'U', n, data, lda));
 }
 
+template <typename T>
+using GeevRealFunc = lapack_int(int, char, char, lapack_int, T *, lapack_int,
+                                T *, T *, T *, lapack_int, T *, lapack_int);
+
+template <typename T>
+static int eigImplReal(GeevRealFunc<T> geev, char jobvl, char jobvr,
+                       Memref<2, T> *a, Memref<1, T> *wr, Memref<1, T> *wi,
+                       Memref<2, T> *vl, Memref<2, T> *vr) {
+  assert(a);
+  assert(wr);
+  assert(wi);
+  assert(vl);
+  assert(vr);
+
+  // Nothing to do for empty arrays.
+  if (isEmpty2d(a, 'a'))
+    return 0;
+
+  checkSquare(a, 'a');
+
+  auto n = static_cast<MKL_INT>(a->dims[0]);
+  auto layout = CblasColMajor;
+  auto data = a->data;
+  auto lda = static_cast<MKL_INT>(a->strides[0]);
+
+  auto wrData = wr->data;
+  auto wiData = wi->data;
+
+  auto vlData = vl->data;
+  auto ldvl = static_cast<MKL_INT>(vl->strides[0]);
+
+  auto vrData = vr->data;
+  auto ldvr = static_cast<MKL_INT>(vr->strides[0]);
+
+  return static_cast<int>(geev(layout, jobvl, jobvr, n, data, lda, wrData,
+                               wiData, vlData, ldvl, vrData, ldvr));
+}
+
+template <typename T>
+using GeevComplexFunc = lapack_int(int, char, char, lapack_int, T *, lapack_int,
+                                   T *, T *, lapack_int, T *, lapack_int);
+
+template <typename T>
+static int eigImplComplex(GeevComplexFunc<T> geev, char jobvl, char jobvr,
+                          Memref<2, T> *a, Memref<1, T> *w, Memref<2, T> *vl,
+                          Memref<2, T> *vr) {
+  assert(a);
+  assert(w);
+  assert(vl);
+  assert(vr);
+
+  // Nothing to do for empty arrays.
+  if (isEmpty2d(a, 'a'))
+    return 0;
+
+  checkSquare(a, 'a');
+
+  auto n = static_cast<MKL_INT>(a->dims[0]);
+  auto layout = CblasColMajor;
+  auto data = a->data;
+  auto lda = static_cast<MKL_INT>(a->strides[0]);
+
+  auto wData = w->data;
+
+  auto vlData = vl->data;
+  auto ldvl = static_cast<MKL_INT>(vl->strides[0]);
+
+  auto vrData = vr->data;
+  auto ldvr = static_cast<MKL_INT>(vr->strides[0]);
+
+  return static_cast<int>(geev(layout, jobvl, jobvr, n, data, lda, wData,
+                               vlData, ldvl, vrData, ldvr));
+}
+
+template <typename T, typename TW>
+using XxxevdFunc = lapack_int(int, char, char, lapack_int, T *, lapack_int,
+                              TW *);
+
+template <typename T, typename TW>
+static int eighImpl(XxxevdFunc<T, TW> xxxevd, char jobz, char uplo,
+                    Memref<2, T> *a, Memref<1, TW> *w) {
+  assert(a);
+  assert(w);
+
+  // Nothing to do for empty arrays.
+  if (isEmpty2d(a, 'a'))
+    return 0;
+
+  checkSquare(a, 'a');
+
+  auto n = static_cast<MKL_INT>(a->dims[0]);
+  auto layout = CblasRowMajor;
+  auto data = a->data;
+  auto lda = static_cast<MKL_INT>(a->strides[0]);
+
+  auto wData = w->data;
+
+  return static_cast<int>(xxxevd(layout, jobz, uplo, n, data, lda, wData));
+}
+
 #endif
 } // namespace
 
 extern "C" {
-
-#define EIG_VARIANT(T, Suff)                                                   \
-  NUMBA_MLIR_MATH_RUNTIME_EXPORT void dpnp_linalg_eig_##Suff(                  \
-      Memref<2, const T> *input, Memref<1, T> *vals, Memref<2, T> *vecs) {     \
-    eigImpl(input, vals, vecs);                                                \
-  }
-
-EIG_VARIANT(float, float32)
-EIG_VARIANT(double, float64)
-
-#undef EIG_VARIANT
-
 #ifdef NUMBA_MLIR_USE_MKL
 #define MKL_CALL(f, ...) f(__VA_ARGS__)
 
@@ -240,6 +307,9 @@ EIG_VARIANT(double, float64)
 #define MKL_GETRI(Prefix) LAPACKE_##Prefix##getri
 #define MKL_GETSV(Prefix) LAPACKE_##Prefix##gesv
 #define MKL_POTRF(Prefix) LAPACKE_##Prefix##potrf
+#define MKL_GEEV(Prefix) LAPACKE_##Prefix##geev
+#define MKL_SYEVD(Prefix) LAPACKE_##Prefix##syevd
+#define MKL_HEEVD(Prefix) LAPACKE_##Prefix##heevd
 #else
 static inline void ALL_UNUSED(int dummy, ...) { (void)dummy; }
 #define MKL_CALL(f, ...)                                                       \
@@ -252,13 +322,16 @@ static inline void ALL_UNUSED(int dummy, ...) { (void)dummy; }
 #define MKL_GETRI(Prefix) 0
 #define MKL_GETSV(Prefix) 0
 #define MKL_POTRF(Prefix) 0
+#define MKL_GEEV(Prefix) 0
+#define MKL_SYEVD(Prefix) 0
+#define MKL_HEEVD(Prefix) 0
 #endif
 
 #define GEMM_VARIANT(T, Prefix, Suff)                                          \
   NUMBA_MLIR_MATH_RUNTIME_EXPORT void mkl_gemm_##Suff(                         \
       const Memref<2, T> *a, const Memref<2, T> *b, T alpha, T beta,           \
       Memref<2, T> *c) {                                                       \
-    MKL_CALL(cpuGemm<T>, MKL_GEMM(Prefix), a, b, c, alpha, beta);              \
+    MKL_CALL(gemmImpl<T>, MKL_GEMM(Prefix), a, b, c, alpha, beta);             \
   }
 
 GEMM_VARIANT(float, s, float32)
@@ -267,9 +340,10 @@ GEMM_VARIANT(double, d, float64)
 #undef GEMM_VARIANT
 
 #define INV_VARIANT(T, Prefix, Suff)                                           \
-  NUMBA_MLIR_MATH_RUNTIME_EXPORT void mkl_inv_##Suff(                          \
+  NUMBA_MLIR_MATH_RUNTIME_EXPORT int mkl_inv_##Suff(                           \
       Memref<2, T> *a, Memref<1, MKL_INT> *ipiv) {                             \
-    MKL_CALL(cpuInv<T>, MKL_GETRF(Prefix), MKL_GETRI(Prefix), a, ipiv);        \
+    return MKL_CALL(invImpl<T>, MKL_GETRF(Prefix), MKL_GETRI(Prefix), a,       \
+                    ipiv);                                                     \
   }
 
 INV_VARIANT(float, s, float32)
@@ -280,9 +354,9 @@ INV_VARIANT(MKL_Complex16, z, complex128)
 #undef INV_VARIANT
 
 #define SOLVE_VARIANT(T, Prefix, Suff)                                         \
-  NUMBA_MLIR_MATH_RUNTIME_EXPORT void mkl_solve_##Suff(                        \
+  NUMBA_MLIR_MATH_RUNTIME_EXPORT int mkl_solve_##Suff(                         \
       Memref<2, T> *a, Memref<2, T> *b, Memref<1, MKL_INT> *ipiv) {            \
-    MKL_CALL(cpuSolve<T>, MKL_GETSV(Prefix), a, b, ipiv);                      \
+    return MKL_CALL(solveImpl<T>, MKL_GETSV(Prefix), a, b, ipiv);              \
   }
 
 SOLVE_VARIANT(float, s, float32)
@@ -293,8 +367,8 @@ SOLVE_VARIANT(MKL_Complex16, z, complex128)
 #undef SOLVE_VARIANT
 
 #define CHOLESKY_VARIANT(T, Prefix, Suff)                                      \
-  NUMBA_MLIR_MATH_RUNTIME_EXPORT void mkl_cholesky_##Suff(Memref<2, T> *a) {   \
-    MKL_CALL(cpuCholesky<T>, MKL_POTRF(Prefix), a);                            \
+  NUMBA_MLIR_MATH_RUNTIME_EXPORT int mkl_cholesky_##Suff(Memref<2, T> *a) {    \
+    return MKL_CALL(choleskyImpl<T>, MKL_POTRF(Prefix), a);                    \
   }
 
 CHOLESKY_VARIANT(float, s, float32)
@@ -303,4 +377,47 @@ CHOLESKY_VARIANT(MKL_Complex8, c, complex64)
 CHOLESKY_VARIANT(MKL_Complex16, z, complex128)
 
 #undef CHOLESKY_VARIANT
+
+#define EIG_VARIANT_REAL(T, Prefix, Suff)                                      \
+  NUMBA_MLIR_MATH_RUNTIME_EXPORT int mkl_eig_##Suff(                           \
+      char jobvl, char jobvr, Memref<2, T> *a, Memref<1, T> *wr,               \
+      Memref<1, T> *wi, Memref<2, T> *vl, Memref<2, T> *vr) {                  \
+    return MKL_CALL(eigImplReal<T>, MKL_GEEV(Prefix), jobvl, jobvr, a, wr, wi, \
+                    vl, vr);                                                   \
+  }
+#define EIG_VARIANT_COMPLEX(T, Prefix, Suff)                                   \
+  NUMBA_MLIR_MATH_RUNTIME_EXPORT int mkl_eig_##Suff(                           \
+      char jobvl, char jobvr, Memref<2, T> *a, Memref<1, T> *w,                \
+      Memref<2, T> *vl, Memref<2, T> *vr) {                                    \
+    return MKL_CALL(eigImplComplex<T>, MKL_GEEV(Prefix), jobvl, jobvr, a, w,   \
+                    vl, vr);                                                   \
+  }
+
+EIG_VARIANT_REAL(float, s, float32)
+EIG_VARIANT_REAL(double, d, float64)
+EIG_VARIANT_COMPLEX(MKL_Complex8, c, complex64)
+EIG_VARIANT_COMPLEX(MKL_Complex16, z, complex128)
+
+#undef EIG_VARIANT_REAL
+#undef EIG_VARIANT_COMPLEX
+
+#define EIGH_VARIANT_REAL(T, TW, Prefix, Suff)                                 \
+  NUMBA_MLIR_MATH_RUNTIME_EXPORT int mkl_eigh_##Suff(                          \
+      char jobz, char uplo, Memref<2, T> *a, Memref<1, TW> *w) {               \
+    return MKL_CALL(eighImpl<T>, MKL_SYEVD(Prefix), jobz, uplo, a, w);         \
+  }
+
+#define EIGH_VARIANT_COMPLEX(T, TW, Prefix, Suff)                              \
+  NUMBA_MLIR_MATH_RUNTIME_EXPORT int mkl_eigh_##Suff(                          \
+      char jobz, char uplo, Memref<2, T> *a, Memref<1, TW> *w) {               \
+    return MKL_CALL(eighImpl<T>, MKL_HEEVD(Prefix), jobz, uplo, a, w);         \
+  }
+
+EIGH_VARIANT_REAL(float, float, s, float32)
+EIGH_VARIANT_REAL(double, double, d, float64)
+EIGH_VARIANT_COMPLEX(MKL_Complex8, float, c, complex64)
+EIGH_VARIANT_COMPLEX(MKL_Complex16, double, z, complex128)
+
+#undef EIGH_VARIANT_REAL
+#undef EIGH_VARIANT_COMPLEX
 }

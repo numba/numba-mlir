@@ -905,6 +905,139 @@ def cholesky_impl(builder, a):
 
 
 @_mkl_func
+def _mkl_eig(builder, a, is_vals):
+    n = a.shape[0]
+    dtype = a.dtype
+    use_complex = is_complex(dtype, builder)
+
+    func_name = f"mkl_eig_{dtype_str(builder, dtype)}"
+    device_func_name = func_name + "_device"
+
+    a = builder.force_copy(a)
+
+    JOBVL = builder.cast(ord("N"), builder.int8)
+    if is_vals:
+        JOBVR = builder.cast(ord("N"), builder.int8)
+    else:
+        JOBVR = builder.cast(ord("V"), builder.int8)
+
+    ldvl = 1
+    if is_vals:
+        ldvr = 1
+    else:
+        ldvr = n
+
+    if use_complex:
+        w = builder.init_tensor((n,), dtype)
+    else:
+        wr = builder.init_tensor((n,), dtype)
+        wi = builder.init_tensor((n,), dtype)
+
+    vl = builder.init_tensor((n, ldvl), dtype)
+    vr = builder.init_tensor((n, ldvr), dtype)
+
+    if use_complex:
+        args = (JOBVL, JOBVR, a, w, vl, vr)
+    else:
+        args = (JOBVL, JOBVR, a, wr, wi, vl, vr)
+
+    res_init = builder.cast(0, builder.int32)
+
+    res = builder.external_call(
+        func_name,
+        args,
+        res_init,
+        attrs={"gpu_runtime.device_func": device_func_name},
+    )
+    # TODO check res
+
+    if is_vals:
+        if use_complex:
+            return w
+        else:
+            return wr
+    else:
+        vr = transpose_impl(builder, vr)
+        if use_complex:
+            return (w, vr)
+        else:
+            return (wr, vr)
+
+
+@register_func("numpy.linalg.eig", numpy.linalg.eig)
+def eig_impl(builder, a):
+    if len(a.shape) != 2:
+        return
+
+    return _mkl_eig(builder, a, False)
+
+
+@register_func("numpy.linalg.eigvals", numpy.linalg.eigvals)
+def eigvals_impl(builder, a):
+    if len(a.shape) != 2:
+        return
+
+    return _mkl_eig(builder, a, True)
+
+
+@_mkl_func
+def _mkl_eigh(builder, a, is_vals):
+    n = a.shape[0]
+    dtype = a.dtype
+
+    if dtype == builder.complex128:
+        w_dtype = builder.float64
+    elif dtype == builder.complex64:
+        w_dtype = builder.float32
+    else:
+        w_dtype = dtype
+
+    func_name = f"mkl_eigh_{dtype_str(builder, dtype)}"
+    device_func_name = func_name + "_device"
+
+    if is_vals:
+        JOBZ = builder.cast(ord("N"), builder.int8)
+    else:
+        JOBZ = builder.cast(ord("V"), builder.int8)
+
+    UPLO = builder.cast(ord("L"), builder.int8)
+
+    a = builder.force_copy(a)
+    w = builder.init_tensor((n,), w_dtype)
+
+    res_init = builder.cast(0, builder.int32)
+
+    res = builder.external_call(
+        func_name,
+        (JOBZ, UPLO, a, w),
+        res_init,
+        attrs={"gpu_runtime.device_func": device_func_name},
+    )
+    # TODO check res
+
+    if is_vals:
+        return w
+    else:
+        return (w, a)
+
+
+@register_func("numpy.linalg.eigh", numpy.linalg.eigh)
+def eigh_impl(builder, a):
+    if len(a.shape) != 2:
+        return
+
+    return _mkl_eigh(builder, a, False)
+
+
+@register_func("numpy.linalg.eigvalsh", numpy.linalg.eigvalsh)
+def eigvalsh_impl(builder, a):
+    if len(a.shape) != 2:
+        return
+
+    return _mkl_eigh(builder, a, True)
+
+
+@_mkl_func
 def _mkl_solve(builder, a, b):
     a_shape = a.shape
     b_shape = b.shape
@@ -1184,18 +1317,6 @@ def setitem_impl(builder, arr, index, val):
         return res
 
     return builder.inline_func(func, arr.type, arr, index, val)
-
-
-@register_func("numpy.linalg.eig", numpy.linalg.eig)
-def eig_impl(builder, arg):
-    shape = arg.shape
-    if len(shape) == 2:
-        dtype = arg.dtype
-        func_name = f"dpnp_linalg_eig_{dtype_str(builder, dtype)}"
-        size = shape[0]
-        vals = builder.init_tensor([size], dtype)
-        vecs = builder.init_tensor([size, size], dtype)
-        return builder.external_call(func_name, arg, (vals, vecs))
 
 
 @register_func("numpy.atleast_2d", numpy.atleast_2d)

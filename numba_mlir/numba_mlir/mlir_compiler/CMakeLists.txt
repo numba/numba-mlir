@@ -112,10 +112,6 @@ target_include_directories(${PROJECT_NAME} SYSTEM PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/../../../numba_mlir_gpu_common
     ./lib)
 
-if(NUMBA_MLIR_USE_DPNP)
-    target_compile_definitions(${PROJECT_NAME} PRIVATE NUMBA_MLIR_USE_DPNP=1)
-endif()
-
 if(NUMBA_MLIR_USE_MKL)
     target_compile_definitions(${PROJECT_NAME} PRIVATE NUMBA_MLIR_USE_MKL=1)
 endif()

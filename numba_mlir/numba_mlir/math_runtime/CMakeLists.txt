@@ -41,20 +41,3 @@ if(NUMBA_MLIR_USE_MKL)
     target_link_libraries(${PROJECT_NAME} PUBLIC $<LINK_ONLY:MKL::MKL>)
     target_compile_definitions(${PROJECT_NAME} PRIVATE NUMBA_MLIR_USE_MKL=1)
 endif()
-
-if(NUMBA_MLIR_USE_DPNP)
-    target_include_directories(${PROJECT_NAME} PRIVATE
-        ${DPNP_INCLUDE_DIR}
-        )
-
-    target_link_directories(${PROJECT_NAME} PUBLIC ${DPNP_LIBRARY_DIR})
-    target_link_libraries(${PROJECT_NAME} PUBLIC "dpnp_backend_c")
-
-    set(DPNP_RPATH "${DPNP_LIBRARY_DIR}" "$ORIGIN/../dpnp")
-    set_target_properties(${PROJECT_NAME}
-        PROPERTIES
-        INSTALL_RPATH "${DPNP_RPATH}"
-    )
-
-    target_compile_definitions(${PROJECT_NAME} PRIVATE NUMBA_MLIR_USE_DPNP=1)
-endif()

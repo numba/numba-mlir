@@ -25,7 +25,6 @@ def load_function_variants(runtime_lib, func_name, suffixes):
         register_cfunc(mlir_name, func)
 
 
-load_function_variants(runtime_lib, "dpnp_linalg_eig_%s", ["float32", "float64"])
 if MKL_AVAILABLE:
     load_function_variants(runtime_lib, "mkl_gemm_%s", ["float32", "float64"])
 
@@ -33,6 +32,8 @@ if MKL_AVAILABLE:
     load_function_variants(runtime_lib, "mkl_inv_%s", _dtypes)
     load_function_variants(runtime_lib, "mkl_solve_%s", _dtypes)
     load_function_variants(runtime_lib, "mkl_cholesky_%s", _dtypes)
+    load_function_variants(runtime_lib, "mkl_eig_%s", _dtypes)
+    load_function_variants(runtime_lib, "mkl_eigh_%s", _dtypes)
 if SYCL_MKL_AVAILABLE:
     load_function_variants(
         runtime_sycl_lib, "mkl_gemm_%s_device", ["float32", "float64"]
