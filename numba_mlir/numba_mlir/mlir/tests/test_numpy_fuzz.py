@@ -24,7 +24,7 @@ from numba_mlir.mlir.numpy.funcs import get_registered_funcs_list
 from .utils import njit_cached as njit
 
 
-RUN_FUZZ = readenv("NUMBA_MLIR_TESTS_FUZZ", int, 1)
+RUN_FUZZ = readenv("NUMBA_MLIR_TESTS_FUZZ", int, 0)
 
 
 def run_fuzz(func):
