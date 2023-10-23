@@ -69,10 +69,10 @@ class PrimitiveType:
     SideEffect = 2
 
 
-_FuncDesc = namedtuple("_FuncDesc", "params out primitive_type")
+_FuncDesc = namedtuple("_FuncDesc", "params out primitive_type py_func")
 
 
-def _get_wrapper(name, orig, out=None, primitive_type=PrimitiveType.Default):
+def _get_wrapper(name, orig, py_func, out=None, primitive_type=PrimitiveType.Default):
     if out is None:
         out = ()
     elif not isinstance(out, tuple) and not isinstance(out, list):
@@ -89,7 +89,9 @@ def _get_wrapper(name, orig, out=None, primitive_type=PrimitiveType.Default):
         paramCount = len(paramsNames)
         outParams = tuple((name, i + paramCount) for i, name in enumerate(out))
         funcParams = [(n, params[n]) for n in paramsNames]
-        _registered_funcs[name] = _FuncDesc(funcParams, outParams, primitive_type)
+        _registered_funcs[name] = _FuncDesc(
+            funcParams, outParams, primitive_type, py_func
+        )
         return orig(func)
 
     return _decorator
@@ -98,13 +100,21 @@ def _get_wrapper(name, orig, out=None, primitive_type=PrimitiveType.Default):
 def register_func(name, orig_func=None, out=None, primitive_type=PrimitiveType.Default):
     global registry
     return _get_wrapper(
-        name, registry.register_func(name, orig_func), out, primitive_type
+        name, registry.register_func(name, orig_func), orig_func, out, primitive_type
     )
 
 
 def register_attr(name, primitive_type=PrimitiveType.Default):
     global registry
-    return _get_wrapper(name, registry.register_attr(name), None, primitive_type)
+    return _get_wrapper(name, registry.register_attr(name), None, None, primitive_type)
+
+
+def get_registered_funcs():
+    ret = []
+    for name, (params, _, _, func) in _registered_funcs.items():
+        ret.append((name, func, params))
+
+    return ret
 
 
 def promote_int(t, b):
