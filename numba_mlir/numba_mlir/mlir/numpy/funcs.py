@@ -109,7 +109,7 @@ def register_attr(name, primitive_type=PrimitiveType.Default):
     return _get_wrapper(name, registry.register_attr(name), None, None, primitive_type)
 
 
-def get_registered_funcs_list():
+def get_registered_funcs():
     ret = []
     for name, (params, _, _, func) in _registered_funcs.items():
         ret.append((name, func, params))

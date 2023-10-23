@@ -19,7 +19,7 @@ except ImportError:
     given = assume = settings = example = _dummy_dec
 
 from numba_mlir.mlir.utils import readenv
-from numba_mlir.mlir.numpy.funcs import get_registered_funcs_list
+from numba_mlir.mlir.numpy.funcs import get_registered_funcs
 
 from .utils import njit_cached as njit
 
@@ -35,7 +35,7 @@ def _get_funcs():
     unary_funcs = []
     binary_funcs = []
 
-    funcs = get_registered_funcs_list()
+    funcs = get_registered_funcs()
     for name, func, args in funcs:
         if not isinstance(func, ufunc):
             continue
