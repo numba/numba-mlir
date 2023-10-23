@@ -624,7 +624,7 @@
         "warmup_time": -1
     },
     "npbench.contour_integral.numba_mlir.Benchmark.time_benchmark": {
-        "code": "def contour_integral(NR, NM, slab_per_bc, Ham, int_pts, Y):\n    P0 = np.zeros((NR, NM), dtype=np.complex128)\n    P1 = np.zeros((NR, NM), dtype=np.complex128)\n    for z in int_pts:\n        Tz = np.zeros((NR, NR), dtype=np.complex128)\n        for n in range(slab_per_bc + 1):\n            zz = np.power(z, slab_per_bc / 2 - n)\n            Tz += zz * Ham[n]\n        if NR == NM:\n            X = np.linalg.inv(Tz)\n        else:\n            X = np.linalg.solve(Tz, Y)\n        if abs(z) < 1.0:\n            X = -X\n        P0 += X\n        P1 += z * X\n\n    return P0, P1\n\n\ndef initialize(self, preset):\n    self.is_expected_failure = True  # np.linalg.inv\n    preset = parameters[preset]\n    return initialize(**preset)",
+        "code": "def contour_integral(NR, NM, slab_per_bc, Ham, int_pts, Y):\n    P0 = np.zeros((NR, NM), dtype=np.complex128)\n    P1 = np.zeros((NR, NM), dtype=np.complex128)\n    for z in int_pts:\n        Tz = np.zeros((NR, NR), dtype=np.complex128)\n        for n in range(slab_per_bc + 1):\n            zz = np.power(z, slab_per_bc / 2 - n)\n            Tz += zz * Ham[n]\n        if NR == NM:\n            X = np.linalg.inv(Tz)\n        else:\n            X = np.linalg.solve(Tz, Y)\n        if abs(z) < 1.0:\n            X = -X\n        P0 += X\n        P1 += z * X\n\n    return P0, P1\n\n\ndef initialize(self, preset):\n    preset = parameters[preset]\n    return initialize(**preset)",
         "min_run_count": 2,
         "name": "npbench.contour_integral.numba_mlir.Benchmark.time_benchmark",
         "number": 0,
@@ -3660,7 +3660,7 @@
         "warmup_time": -1
     },
     "polybench.linear_algebra.solvers.cholesky2.numba_mlir.Benchmark.time_benchmark": {
-        "code": "def wrapper(A):\n    kernel(A)\n    return A\n\n\ndef initialize(self, preset):\n    self.is_expected_failure = True\n    preset = parameters[preset]\n    return initialize(**preset)",
+        "code": "def wrapper(A):\n    kernel(A)\n    return A\n\n\ndef initialize(self, preset):\n    preset = parameters[preset]\n    return initialize(**preset)",
         "min_run_count": 2,
         "name": "polybench.linear_algebra.solvers.cholesky2.numba_mlir.Benchmark.time_benchmark",
         "number": 0,
