@@ -3,6 +3,7 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 import pytest
+import numpy as np
 from numpy import ufunc
 from numpy.testing import assert_equal, assert_allclose
 
@@ -81,9 +82,19 @@ def _array_strat():
     return arrays(dtype_strat, array_shapes())
 
 
+def _check_numpy_func(func, *args, **kwargs):
+    try:
+        res = func(*args, **kwargs)
+        failed = False
+    except:
+        failed = True
+
+    assume(not failed)
+
+
 def _get_tol(arr):
     dtype = arr.dtype
-    if np.issubdtype(dtype, np.integer) or np.issubdtype(dtype, np.boolean):
+    if np.issubdtype(dtype, np.integer) or np.issubdtype(dtype, bool):
         return 0, 0
 
     if dtype == np.float16:
@@ -100,10 +111,7 @@ def test_unary_ufunc(func, arr):
     def py_func(a):
         return func(a)
 
-    try:
-        expected = py_func(arr)
-    except:
-        assume(False)
+    _check_numpy_func(py_func, arr)
 
     jit_func = njit(py_func)
     got = jit_func(arr)
@@ -119,10 +127,7 @@ def test_binary_ufunc(func, arr1, arr2):
     def py_func(a1, a2):
         return func(a1, a2)
 
-    try:
-        expected = py_func(arr1, arr2)
-    except:
-        assume(False)
+    _check_numpy_func(py_func, arr1, arr2)
 
     jit_func = njit(py_func)
     got = jit_func(arr1, arr2)
