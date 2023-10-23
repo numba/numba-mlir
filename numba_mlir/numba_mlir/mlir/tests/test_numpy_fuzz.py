@@ -49,8 +49,6 @@ def _get_funcs():
         else:
             assert False, f"Unhandled ufunc {name}"
 
-
-
     return unary_funcs, binary_funcs
 
 
