@@ -237,30 +237,36 @@ def abs_impl(builder, arg):
     return builder.external_call(fname, arg, res, decorate=False)
 
 
-@register_func("mlir.helper_funcs.exp", helper_funcs.exp)
-def abs_impl(builder, arg):
+def _build_math_func(builder, arg, name):
     t = arg.type
     if is_int(t, builder):
         t = builder.float64
         arg = builder.cast(arg, t)
 
-    fname = _get_math_func_name(builder, "exp", t)
+    fname = _get_math_func_name(builder, name, t)
 
     res = builder.cast(0, t)
     return builder.external_call(fname, arg, res, decorate=False)
+
+
+@register_func("mlir.helper_funcs.exp", helper_funcs.exp)
+def exp_impl(builder, arg):
+    return _build_math_func(builder, arg, "exp")
 
 
 @register_func("mlir.helper_funcs.sqrt", helper_funcs.sqrt)
-def abs_impl(builder, arg):
-    t = arg.type
-    if is_int(t, builder):
-        t = builder.float64
-        arg = builder.cast(arg, t)
+def sqrt_impl(builder, arg):
+    return _build_math_func(builder, arg, "sqrt")
 
-    fname = _get_math_func_name(builder, "sqrt", t)
 
-    res = builder.cast(0, t)
-    return builder.external_call(fname, arg, res, decorate=False)
+@register_func("mlir.helper_funcs.sin", helper_funcs.sin)
+def exp_impl(builder, arg):
+    return _build_math_func(builder, arg, "sin")
+
+
+@register_func("mlir.helper_funcs.cos", helper_funcs.cos)
+def sqrt_impl(builder, arg):
+    return _build_math_func(builder, arg, "cos")
 
 
 def _get_min_max_values(builder, dtype):

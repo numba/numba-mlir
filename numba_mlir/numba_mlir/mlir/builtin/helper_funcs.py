@@ -27,8 +27,18 @@ def sqrt():
     _stub_error()
 
 
+def sin():
+    _stub_error()
+
+
+def cos():
+    _stub_error()
+
+
 @infer_global(exp)
 @infer_global(sqrt)
+@infer_global(sin)
+@infer_global(cos)
 class _UnaryFuncId(ConcreteTemplate):
     cases = [
         signature(types.float64, types.int8),
