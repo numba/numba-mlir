@@ -46,8 +46,10 @@ def _get_funcs():
             unary_funcs.append(pytest.param(func, id=name))
         elif nargs == 2:
             binary_funcs.append(pytest.param(func, id=name))
+        else:
+            assert False, f"Unhandled ufunc {name}"
 
-        # print(name, func, args)
+
 
     return unary_funcs, binary_funcs
 
