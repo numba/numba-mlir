@@ -74,22 +74,19 @@ def _array_strat():
     # TODO: f16, datetime, timedelta
     dtype_strat = st.one_of(
         boolean_dtypes(),
-        integer_dtypes(),
-        unsigned_integer_dtypes(),
-        floating_dtypes(sizes=(32, 64)),
-        complex_number_dtypes(),
+        integer_dtypes(endianness="="),
+        unsigned_integer_dtypes(endianness="="),
+        floating_dtypes(endianness="=", sizes=(32, 64)),
+        complex_number_dtypes(endianness="="),
     )
     return arrays(dtype_strat, array_shapes())
 
 
 def _check_numpy_func(func, *args, **kwargs):
     try:
-        res = func(*args, **kwargs)
-        failed = False
+        return func(*args, **kwargs)
     except:
-        failed = True
-
-    assume(not failed)
+        assume(False)
 
 
 def _get_tol(arr):
@@ -111,7 +108,7 @@ def test_unary_ufunc(func, arr):
     def py_func(a):
         return func(a)
 
-    _check_numpy_func(py_func, arr)
+    expected = _check_numpy_func(py_func, arr)
 
     jit_func = njit(py_func)
     got = jit_func(arr)
@@ -127,7 +124,7 @@ def test_binary_ufunc(func, arr1, arr2):
     def py_func(a1, a2):
         return func(a1, a2)
 
-    _check_numpy_func(py_func, arr1, arr2)
+    expected = _check_numpy_func(py_func, arr1, arr2)
 
     jit_func = njit(py_func)
     got = jit_func(arr1, arr2)
