@@ -722,6 +722,7 @@ _scalars = [1, 2.5, 3.6 + 4.7j]
 _complex_arrays = [
     np.array([1, 2, 3]),
     np.array([1.5, 2.6, 3.7]),
+    np.array([0.0 + 0.0j], dtype=np.complex64),
     np.array([1.0 + 2.0j, -3.0 + 4.0j, 5.0 + -6.0j]),
 ]
 
