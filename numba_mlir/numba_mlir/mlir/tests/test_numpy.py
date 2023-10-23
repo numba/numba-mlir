@@ -734,6 +734,8 @@ _complex_arrays = [
         "lambda a: np.abs(a)",
         "lambda a: np.exp(a)",
         "lambda a: np.sqrt(a)",
+        "lambda a: np.sin(a)",
+        "lambda a: np.cos(a)",
     ],
 )
 def test_complex_unary(a, py_func):

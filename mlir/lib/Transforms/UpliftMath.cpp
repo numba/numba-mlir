@@ -170,6 +170,8 @@ struct UpliftComplexCalls : public mlir::OpRewritePattern<mlir::func::CallOp> {
     const std::pair<llvm::StringRef, func_t> handlers[] = {
         {"cexp", &replaceOp1<mlir::complex::ExpOp>},
         {"csqrt", &replaceOp1<mlir::complex::SqrtOp>},
+        {"csin", &replaceOp1<mlir::complex::SinOp>},
+        {"ccos", &replaceOp1<mlir::complex::CosOp>},
     };
 
     for (auto &handler : handlers) {
