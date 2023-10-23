@@ -81,6 +81,17 @@ def _array_strat():
     return arrays(dtype_strat, array_shapes())
 
 
+def _get_tol(arr):
+    dtype = arr.dtype
+    if np.issubdtype(dtype, np.integer) or np.issubdtype(dtype, np.boolean):
+        return 0, 0
+
+    if dtype == np.float16:
+        return 1e-3, 1e-3
+
+    return 1e-5, 1e-5
+
+
 @settings(deadline=None)
 @given(arr=_array_strat())
 @pytest.mark.parametrize("func", _unary_funcs)
@@ -96,7 +107,8 @@ def test_unary_ufunc(func, arr):
 
     jit_func = njit(py_func)
     got = jit_func(arr)
-    assert_allclose(got, expected, rtol=1e-5, atol=1e-5)
+    rtol, atol = _get_tol(expected)
+    assert_allclose(got, expected, rtol=rtol, atol=atol)
 
 
 @settings(deadline=None)
@@ -114,4 +126,5 @@ def test_binary_ufunc(func, arr1, arr2):
 
     jit_func = njit(py_func)
     got = jit_func(arr1, arr2)
-    assert_allclose(got, expected, rtol=1e-5, atol=1e-5)
+    rtol, atol = _get_tol(expected)
+    assert_allclose(got, expected, rtol=rtol, atol=atol)
