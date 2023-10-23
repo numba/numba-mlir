@@ -154,13 +154,16 @@ struct UpliftComplexCalls : public mlir::OpRewritePattern<mlir::func::CallOp> {
       return mlir::failure();
 
     auto val = op.getOperands().front();
-    auto srcType = val.getType().dyn_cast<mlir::ComplexType>();
+    auto srcType = mlir::dyn_cast<mlir::ComplexType>(val.getType());
 
     if (!srcType || srcType != op.getResult(0).getType())
       return mlir::failure();
 
-    llvm::StringRef funcNameF =
+    llvm::StringRef funcNameFPref =
         (funcName.front() == 'f' ? funcName.drop_front() : llvm::StringRef{});
+
+    llvm::StringRef funcNameFPost =
+        (funcName.back() == 'f' ? funcName.drop_back() : llvm::StringRef{});
 
     using func_t = mlir::Operation *(*)(mlir::OpBuilder &, mlir::Location,
                                         mlir::ValueRange);
@@ -171,7 +174,7 @@ struct UpliftComplexCalls : public mlir::OpRewritePattern<mlir::func::CallOp> {
 
     for (auto &handler : handlers) {
       auto name = handler.first;
-      if (name == funcName || name == funcNameF) {
+      if (name == funcName || name == funcNameFPref || name == funcNameFPost) {
         auto res = handler.second(rewriter, op.getLoc(), op.getOperands());
         if (!res)
           return mlir::failure();
@@ -182,7 +185,7 @@ struct UpliftComplexCalls : public mlir::OpRewritePattern<mlir::func::CallOp> {
       }
     }
 
-    return mlir::success();
+    return mlir::failure();
   }
 };
 
