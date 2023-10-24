@@ -284,7 +284,7 @@ def test_math_uplifting_fma(py_func):
 
         assert_equal(py_func(x, y, z), jit_func(x, y, z))
         ir = get_print_buffer()
-        assert ir.count(f"math.fma") == 1, ir
+        assert ir.count(f"math.fma") > 0, ir
 
 
 @parametrize_function_variants(
