@@ -924,6 +924,18 @@ def test_omitted_args_none():
     assert_equal(py_func2(1), jit_func2(1))
 
 
+def test_tuple_while_var():
+    def py_func(a):
+        b = (1, 2, 3)
+        while b[0] < a:
+            b = (b[0] * 2, b[2], b[1])
+        return b
+
+    jit_func = njit(py_func)
+
+    assert_equal(py_func(10), jit_func(10))
+
+
 @pytest.mark.xfail(reason="https://github.com/numba/numba/issues/9242")
 def test_conditionally_defined_var():
     def py_func(a):
