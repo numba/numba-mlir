@@ -270,6 +270,136 @@ public:
     return success();
   }
 };
+
+// CRTP
+// A base class that takes care of 1:N type conversion, which maps the converted
+// op results (computed by the derived class) and materializes 1:N conversion.
+template <typename SourceOp, typename ConcretePattern>
+class Structural1ToNConversionPattern : public OpConversionPattern<SourceOp> {
+public:
+  using OpConversionPattern<SourceOp>::typeConverter;
+  using OpConversionPattern<SourceOp>::OpConversionPattern;
+  using OpAdaptor = typename OpConversionPattern<SourceOp>::OpAdaptor;
+
+  //
+  // Derived classes should provide the following method which performs the
+  // actual conversion. It should return std::nullopt upon conversion failure
+  // and return the converted operation upon success.
+  //
+  // std::optional<SourceOp> convertSourceOp(SourceOp op, OpAdaptor adaptor,
+  //                                    ConversionPatternRewriter &rewriter,
+  //                                    TypeRange dstTypes) const;
+
+  LogicalResult
+  matchAndRewrite(SourceOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    SmallVector<Type> dstTypes;
+    SmallVector<unsigned> offsets;
+    offsets.push_back(0);
+    // Do the type conversion and record the offsets.
+    for (Type type : op.getResultTypes()) {
+      if (failed(typeConverter->convertTypes(type, dstTypes)))
+        return rewriter.notifyMatchFailure(op, "could not convert result type");
+      offsets.push_back(dstTypes.size());
+    }
+
+    // Calls the actual converter implementation to convert the operation.
+    std::optional<SourceOp> newOp =
+        static_cast<const ConcretePattern *>(this)->convertSourceOp(
+            op, adaptor, rewriter, dstTypes);
+
+    if (!newOp)
+      return rewriter.notifyMatchFailure(op, "could not convert operation");
+
+    // Packs the return value.
+    SmallVector<Value> packedRets;
+    for (unsigned i = 1, e = offsets.size(); i < e; i++) {
+      unsigned start = offsets[i - 1], end = offsets[i];
+      unsigned len = end - start;
+      ValueRange mappedValue = newOp->getResults().slice(start, len);
+      if (len != 1) {
+        // 1 : N type conversion.
+        Type origType = op.getResultTypes()[i - 1];
+        Value mat = typeConverter->materializeSourceConversion(
+            rewriter, op.getLoc(), origType, mappedValue);
+        if (!mat) {
+          return rewriter.notifyMatchFailure(
+              op, "Failed to materialize 1:N type conversion");
+        }
+        packedRets.push_back(mat);
+      } else {
+        // 1 : 1 type conversion.
+        packedRets.push_back(mappedValue.front());
+      }
+    }
+
+    rewriter.replaceOp(op, packedRets);
+    return success();
+  }
+};
+
+class ConvertWhileOpTypes
+    : public Structural1ToNConversionPattern<scf::WhileOp,
+                                             ConvertWhileOpTypes> {
+public:
+  ConvertWhileOpTypes(TypeConverter &typeConverter, MLIRContext *context)
+      : Structural1ToNConversionPattern<scf::WhileOp, ConvertWhileOpTypes>(
+            typeConverter, context,
+            /*benefit*/ 10) {}
+
+  std::optional<scf::WhileOp>
+  convertSourceOp(scf::WhileOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter,
+                  TypeRange dstTypes) const {
+    // Unpacked the iteration arguments.
+    SmallVector<Value> flatArgs;
+    for (Value arg : adaptor.getOperands())
+      unpackUnrealizedConversionCast(arg, flatArgs);
+
+    auto newOp = rewriter.create<scf::WhileOp>(op.getLoc(), dstTypes, flatArgs);
+
+    for (auto i : {0u, 1u}) {
+      if (failed(rewriter.convertRegionTypes(&op.getRegion(i), *typeConverter)))
+        return std::nullopt;
+      auto &dstRegion = newOp.getRegion(i);
+      rewriter.inlineRegionBefore(op.getRegion(i), dstRegion, dstRegion.end());
+    }
+    return newOp;
+  }
+};
+
+class ConvertYieldOpTypes : public OpConversionPattern<scf::YieldOp> {
+public:
+  using OpConversionPattern::OpConversionPattern;
+  LogicalResult
+  matchAndRewrite(scf::YieldOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    SmallVector<Value> unpackedYield;
+    for (Value operand : adaptor.getOperands())
+      unpackUnrealizedConversionCast(operand, unpackedYield);
+
+    rewriter.replaceOpWithNewOp<scf::YieldOp>(op, unpackedYield);
+    return success();
+  }
+};
+
+class ConvertConditionOpTypes : public OpConversionPattern<scf::ConditionOp> {
+public:
+  ConvertConditionOpTypes(TypeConverter &typeConverter, MLIRContext *context)
+      : OpConversionPattern<scf::ConditionOp>(typeConverter, context,
+                                              /*benefit*/ 10) {}
+
+  LogicalResult
+  matchAndRewrite(scf::ConditionOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    SmallVector<Value> unpackedYield;
+    for (Value operand : adaptor.getOperands())
+      unpackUnrealizedConversionCast(operand, unpackedYield);
+
+    rewriter.updateRootInPlace(op, [&]() { op->setOperands(unpackedYield); });
+    return success();
+  }
+};
 } // namespace
 
 namespace {
@@ -382,7 +512,9 @@ void numba::populateControlFlowTypeConversionRewritesAndTarget(
                                                              patterns, target);
 
   patterns.insert<ConvertSelectOp, ConvertEnvRegionYield, ConvertEnvRegion,
-                  ConvertForOpTypes>(typeConverter, patterns.getContext());
+                  ConvertForOpTypes, ConvertWhileOpTypes, ConvertYieldOpTypes,
+                  ConvertConditionOpTypes>(typeConverter,
+                                           patterns.getContext());
 }
 
 namespace {
