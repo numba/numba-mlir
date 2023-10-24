@@ -866,6 +866,39 @@ def test_fastmath():
 
 
 @require_gpu
+def test_fastmath_nested_range():
+    def func(a, b, res):
+        i = get_global_id(0)
+        d = np.float32(0)
+        for j in range(10):
+            d += a[i] * b[i]
+        res[i] = d
+
+    sim_func = kernel_sim(func)
+    a = np.array([1, 2, 3, 4], np.float32)
+    b = np.array([5, 6, 7, 8], np.float32)
+
+    sim_res = np.zeros(a.shape, a.dtype)
+    sim_func[a.shape, DEFAULT_LOCAL_SIZE](a, b, sim_res)
+
+    with print_pass_ir([], ["GPUToSpirvPass"]):
+        gpu_res = np.zeros(a.shape, a.dtype)
+        gpu_func = kernel(fastmath=False)(func)
+        gpu_func[a.shape, DEFAULT_LOCAL_SIZE](a, b, gpu_res)
+        ir = get_print_buffer()
+        assert ir.count("spirv.CL.fma") == 0, ir
+        assert_equal(gpu_res, sim_res)
+
+    with print_pass_ir([], ["GPUToSpirvPass"]):
+        gpu_res = np.zeros(a.shape, a.dtype)
+        gpu_func = kernel(fastmath=True)(func)
+        gpu_func[a.shape, DEFAULT_LOCAL_SIZE](a, b, gpu_res)
+        ir = get_print_buffer()
+        assert ir.count("spirv.CL.fma") == 1, ir
+        assert_equal(gpu_res, sim_res)
+
+
+@require_gpu
 def test_input_load_cse():
     def func(c):
         i = get_global_id(0)

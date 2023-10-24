@@ -18,6 +18,7 @@
 #include <mlir/Dialect/GPU/Transforms/Passes.h>
 #include <mlir/Dialect/GPU/Transforms/Utils.h>
 #include <mlir/Dialect/Math/IR/Math.h>
+#include <mlir/Dialect/Math/Transforms/Passes.h>
 #include <mlir/Dialect/MemRef/IR/MemRef.h>
 #include <mlir/Dialect/MemRef/Transforms/Passes.h>
 #include <mlir/Dialect/SCF/IR/SCF.h>
@@ -2235,6 +2236,7 @@ static void populateLowerToGPUPipelineMed(mlir::OpPassManager &pm) {
   funcPM.addPass(std::make_unique<PrepareForGPUPass>());
   funcPM.addPass(mlir::createCanonicalizerPass());
   funcPM.addPass(std::make_unique<RemoveNestedParallelPass>());
+  funcPM.addPass(mlir::math::createMathUpliftToFMA());
   funcPM.addPass(gpu_runtime::createSortParallelLoopsForGPU());
   funcPM.addPass(gpu_runtime::createTileParallelLoopsForGPUPass());
   funcPM.addPass(gpu_runtime::createInsertGPUGlobalReducePass());
