@@ -1984,3 +1984,20 @@ def test_pairwise2():
 
     _to_host(dgpu_res, gpu_res)
     assert_allclose(res, gpu_res, rtol=1e-5)
+
+
+@require_gpu
+def test_sycl_id_fit_in_int():
+    @kernel_cached
+    def func(a, b):
+        i = get_global_id(0)
+        if i == b:
+            a[0] = b
+
+    arr = np.zeros(1).astype(np.float32)
+    gpu_arr = _from_host(arr, buffer="device")
+    b = 10
+
+    func[2**31 + 1,](gpu_arr, b)
+    _to_host(gpu_arr, arr)
+    assert arr[0] == b

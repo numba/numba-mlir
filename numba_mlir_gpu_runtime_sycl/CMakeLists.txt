@@ -35,6 +35,7 @@ target_include_directories(${PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/../numba_mlir_gpu_common
     ${LevelZero_INCLUDE_DIR}
 )
+target_compile_options(${PROJECT_NAME} PRIVATE -fno-sycl-id-queries-fit-in-int)
 
 install(TARGETS ${PROJECT_NAME}
         DESTINATION "${SYCL_RUNTIME_INSTALL_PATH}"

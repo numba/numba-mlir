@@ -57,6 +57,7 @@ if(NUMBA_MLIR_USE_SYCL AND NUMBA_MLIR_USE_MKL)
 
     target_compile_definitions(${PROJECT_NAME} PRIVATE NUMBA_MLIR_USE_SYCL_MKL=1)
 endif()
+target_compile_options(${PROJECT_NAME} PRIVATE -fno-sycl-id-queries-fit-in-int)
 
 install(TARGETS ${PROJECT_NAME}
         DESTINATION "${MATH_SYCL_RUNTIME_INSTALL_PATH}"
