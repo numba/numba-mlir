@@ -47,7 +47,6 @@ set(SOURCES_LIST
     lib/Dialect/gpu_runtime/IR/GpuRuntimeOps.cpp
     lib/Dialect/gpu_runtime/Transforms/MakeBarriersUniform.cpp
     lib/Dialect/ntensor/IR/NTensorOps.cpp
-    lib/Dialect/ntensor/Transforms/CopyRemoval.cpp
     lib/Dialect/ntensor/Transforms/PropagateEnvironment.cpp
     lib/Dialect/ntensor/Transforms/ResolveArrayOps.cpp
     lib/Dialect/numba_util/Dialect.cpp
@@ -59,6 +58,7 @@ set(SOURCES_LIST
     lib/Transforms/CastUtils.cpp
     lib/Transforms/CommonOpts.cpp
     lib/Transforms/CompositePass.cpp
+    lib/Transforms/CopyRemoval.cpp
     lib/Transforms/ConstUtils.cpp
     lib/Transforms/ExpandTuple.cpp
     lib/Transforms/FuncTransforms.cpp
@@ -97,7 +97,6 @@ set(HEADERS_LIST
     include/numba/Dialect/gpu_runtime/IR/GpuRuntimeOps.hpp
     include/numba/Dialect/gpu_runtime/Transforms/MakeBarriersUniform.hpp
     include/numba/Dialect/ntensor/IR/NTensorOps.hpp
-    include/numba/Dialect/ntensor/Transforms/CopyRemoval.hpp
     include/numba/Dialect/ntensor/Transforms/PropagateEnvironment.hpp
     include/numba/Dialect/ntensor/Transforms/ResolveArrayOps.hpp
     include/numba/Dialect/numba_util/Dialect.hpp
@@ -110,6 +109,7 @@ set(HEADERS_LIST
     include/numba/Transforms/CastUtils.hpp
     include/numba/Transforms/CommonOpts.hpp
     include/numba/Transforms/CompositePass.hpp
+    include/numba/Transforms/CopyRemoval.hpp
     include/numba/Transforms/ConstUtils.hpp
     include/numba/Transforms/ExpandTuple.hpp
     include/numba/Transforms/FuncTransforms.hpp
