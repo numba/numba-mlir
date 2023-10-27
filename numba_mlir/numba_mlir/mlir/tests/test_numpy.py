@@ -1097,6 +1097,29 @@ def test_propagate_layout_for():
     assert_equal(py_func(10, a), jit_func(10, a))
 
 
+def test_propagate_layout_while1():
+    def py_func1(a, b):
+        return a
+
+    jit_func1 = njit(py_func1)
+
+    def py_func(n, a):
+        b = a
+        i = 1
+        while i < n:
+            if i == 5:
+                b = jit_func1(a, b)
+            else:
+                b = a
+            i *= 2
+        return b
+
+    jit_func = njit(py_func)
+
+    a = np.array([1, 2, 3, 4, 5], dtype=np.int32)
+    assert_equal(py_func(10, a), jit_func(10, a))
+
+
 _indirect_array_call_args = [
     np.arange(12),
     np.arange(12).reshape(3, 4),

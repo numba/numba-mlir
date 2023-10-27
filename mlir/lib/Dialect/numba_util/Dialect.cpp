@@ -995,6 +995,92 @@ struct ChangeLayoutFor : public mlir::OpRewritePattern<mlir::scf::YieldOp> {
   }
 };
 
+struct ChangeLayoutWhileBefore
+    : public mlir::OpRewritePattern<mlir::scf::ConditionOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(mlir::scf::ConditionOp op,
+                  mlir::PatternRewriter &rewriter) const override {
+    if (op.getArgs().empty())
+      return mlir::failure();
+
+    auto whileOp = mlir::cast<mlir::scf::WhileOp>(op->getParentOp());
+
+    bool changed = false;
+    auto newArgs = llvm::to_vector(op.getArgs());
+
+    for (auto &&[i, arg] : llvm::enumerate(op.getArgs())) {
+      auto type = arg.getType();
+      if (!mlir::isa<mlir::MemRefType>(type))
+        continue;
+
+      auto cl = arg.getDefiningOp<numba::util::ChangeLayoutOp>();
+      if (!cl)
+        continue;
+
+      auto src = cl.getSource();
+      newArgs[i] = src;
+      changed = true;
+    }
+
+    if (!changed)
+      return mlir::failure();
+
+    rewriter.replaceOpWithNewOp<mlir::scf::ConditionOp>(op, op.getCondition(),
+                                                        newArgs);
+
+    mlir::OpBuilder::InsertionGuard g(rewriter);
+    rewriter.setInsertionPoint(whileOp);
+
+    auto loc = op.getLoc();
+    mlir::ValueRange argsRange(newArgs);
+    auto newWhile = rewriter.create<mlir::scf::WhileOp>(
+        loc, argsRange.getTypes(), whileOp.getInits(), nullptr, nullptr);
+
+    auto oldBefore = whileOp.getBeforeBody();
+    auto oldAfter = whileOp.getAfterBody();
+    auto newBefore = newWhile.getBeforeBody();
+    auto newAfter = newWhile.getAfterBody();
+
+    rewriter.inlineBlockBefore(oldBefore, newBefore, newBefore->begin(),
+                               newBefore->getArguments());
+
+    rewriter.setInsertionPointToStart(newAfter);
+    newArgs.resize(newAfter->getNumArguments());
+    for (auto &&[i, arg] : llvm::enumerate(newAfter->getArguments())) {
+      auto oldType = oldAfter->getArgument(i).getType();
+      auto newType = arg.getType();
+      if (oldType == newType) {
+        newArgs[i] = arg;
+        continue;
+      }
+
+      newArgs[i] =
+          rewriter.create<numba::util::ChangeLayoutOp>(loc, oldType, arg);
+    }
+
+    rewriter.inlineBlockBefore(oldAfter, newAfter, newAfter->end(), newArgs);
+
+    rewriter.setInsertionPointAfter(newWhile);
+    newArgs.resize(newWhile->getNumResults());
+    for (auto &&[i, res] : llvm::enumerate(newWhile.getResults())) {
+      auto oldType = whileOp.getResult(i).getType();
+      auto newType = res.getType();
+      if (oldType == newType) {
+        newArgs[i] = res;
+        continue;
+      }
+
+      newArgs[i] =
+          rewriter.create<numba::util::ChangeLayoutOp>(loc, oldType, res);
+    }
+
+    rewriter.replaceOp(whileOp, newArgs);
+    return mlir::success();
+  }
+};
+
 static std::optional<unsigned> getSingleDynamicDim(mlir::ShapedType type) {
   if (!type.hasRank())
     return std::nullopt;
@@ -1296,14 +1382,14 @@ struct ChangeLayoutAtomicRMW
 
 void ChangeLayoutOp::getCanonicalizationPatterns(
     ::mlir::RewritePatternSet &results, ::mlir::MLIRContext *context) {
-  results
-      .insert<ChangeLayoutIdentity, ChangeLayoutDim, ChangeLayoutClone,
-              PropagateCloneType, ChangeLayoutCast, ChangeLayoutFromCast,
-              ChangeLayoutLoad, ChangeLayoutStore, ChangeLayoutSubview,
-              ChangeLayoutLinalgGeneric, ChangeLayoutLinalgFill, ChangeLayoutIf,
-              ChangeLayoutFor, ChangeLayout1DReshape, ChangeLayoutSliceGetItem,
-              ChangeLayoutCopy, ChangeLayoutExpandShape, ChangeLayoutSelect,
-              ChangeLayoutEnvRegion, ChangeLayoutAtomicRMW>(context);
+  results.insert<ChangeLayoutIdentity, ChangeLayoutDim, ChangeLayoutClone,
+                 PropagateCloneType, ChangeLayoutCast, ChangeLayoutFromCast,
+                 ChangeLayoutLoad, ChangeLayoutStore, ChangeLayoutSubview,
+                 ChangeLayoutLinalgGeneric, ChangeLayoutLinalgFill,
+                 ChangeLayoutIf, ChangeLayoutFor, ChangeLayoutWhileBefore,
+                 ChangeLayout1DReshape, ChangeLayoutSliceGetItem,
+                 ChangeLayoutCopy, ChangeLayoutExpandShape, ChangeLayoutSelect,
+                 ChangeLayoutEnvRegion, ChangeLayoutAtomicRMW>(context);
 }
 
 bool ChangeLayoutOp::areCastCompatible(mlir::TypeRange inputs,
