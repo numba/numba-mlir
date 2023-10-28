@@ -1081,6 +1081,85 @@ struct ChangeLayoutWhileBefore
   }
 };
 
+struct ChangeLayoutWhileInit
+    : public mlir::OpRewritePattern<mlir::scf::WhileOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(mlir::scf::WhileOp op,
+                  mlir::PatternRewriter &rewriter) const override {
+    if (op.getInits().empty())
+      return mlir::failure();
+
+    bool changed = false;
+    auto newArgs = llvm::to_vector(op.getInits());
+
+    for (auto &&[i, init] : llvm::enumerate(newArgs)) {
+      auto type = init.getType();
+      if (!mlir::isa<mlir::MemRefType>(type))
+        continue;
+
+      auto cl = init.getDefiningOp<numba::util::ChangeLayoutOp>();
+      if (!cl)
+        continue;
+
+      auto src = cl.getSource();
+      newArgs[i] = src;
+      changed = true;
+    }
+
+    if (!changed)
+      return mlir::failure();
+
+    auto loc = op.getLoc();
+
+    mlir::OpBuilder::InsertionGuard g(rewriter);
+    auto newWhile = rewriter.create<mlir::scf::WhileOp>(
+        loc, op->getResultTypes(), newArgs, nullptr, nullptr);
+
+    auto oldBefore = op.getBeforeBody();
+    auto oldAfter = op.getAfterBody();
+    auto newBefore = newWhile.getBeforeBody();
+    auto newAfter = newWhile.getAfterBody();
+
+    rewriter.setInsertionPointToStart(newBefore);
+    for (auto &&[i, arg] : llvm::enumerate(newBefore->getArguments())) {
+      auto oldType = oldBefore->getArgument(i).getType();
+      auto newType = arg.getType();
+      if (oldType == newType) {
+        newArgs[i] = arg;
+        continue;
+      }
+
+      newArgs[i] =
+          rewriter.create<numba::util::ChangeLayoutOp>(loc, oldType, arg);
+    }
+
+    rewriter.inlineBlockBefore(oldBefore, newBefore, newBefore->end(), newArgs);
+
+    auto oldTerm = mlir::cast<mlir::scf::YieldOp>(oldAfter->getTerminator());
+    rewriter.setInsertionPoint(oldTerm);
+
+    for (auto &&[i, arg] : llvm::enumerate(oldTerm.getResults())) {
+      auto oldType = arg.getType();
+      auto newType = newWhile.getInits()[i].getType();
+      if (oldType == newType) {
+        newArgs[i] = arg;
+        continue;
+      }
+
+      newArgs[i] =
+          rewriter.create<numba::util::ChangeLayoutOp>(loc, newType, arg);
+    }
+
+    rewriter.replaceOpWithNewOp<mlir::scf::YieldOp>(oldTerm, newArgs);
+    rewriter.inlineBlockBefore(oldAfter, newAfter, newAfter->end(),
+                               newAfter->getArguments());
+    rewriter.replaceOp(op, newWhile.getResults());
+    return mlir::success();
+  }
+};
+
 static std::optional<unsigned> getSingleDynamicDim(mlir::ShapedType type) {
   if (!type.hasRank())
     return std::nullopt;
@@ -1382,14 +1461,15 @@ struct ChangeLayoutAtomicRMW
 
 void ChangeLayoutOp::getCanonicalizationPatterns(
     ::mlir::RewritePatternSet &results, ::mlir::MLIRContext *context) {
-  results.insert<ChangeLayoutIdentity, ChangeLayoutDim, ChangeLayoutClone,
-                 PropagateCloneType, ChangeLayoutCast, ChangeLayoutFromCast,
-                 ChangeLayoutLoad, ChangeLayoutStore, ChangeLayoutSubview,
-                 ChangeLayoutLinalgGeneric, ChangeLayoutLinalgFill,
-                 ChangeLayoutIf, ChangeLayoutFor, ChangeLayoutWhileBefore,
-                 ChangeLayout1DReshape, ChangeLayoutSliceGetItem,
-                 ChangeLayoutCopy, ChangeLayoutExpandShape, ChangeLayoutSelect,
-                 ChangeLayoutEnvRegion, ChangeLayoutAtomicRMW>(context);
+  results
+      .insert<ChangeLayoutIdentity, ChangeLayoutDim, ChangeLayoutClone,
+              PropagateCloneType, ChangeLayoutCast, ChangeLayoutFromCast,
+              ChangeLayoutLoad, ChangeLayoutStore, ChangeLayoutSubview,
+              ChangeLayoutLinalgGeneric, ChangeLayoutLinalgFill, ChangeLayoutIf,
+              ChangeLayoutFor, ChangeLayoutWhileBefore, ChangeLayoutWhileInit,
+              ChangeLayout1DReshape, ChangeLayoutSliceGetItem, ChangeLayoutCopy,
+              ChangeLayoutExpandShape, ChangeLayoutSelect,
+              ChangeLayoutEnvRegion, ChangeLayoutAtomicRMW>(context);
 }
 
 bool ChangeLayoutOp::areCastCompatible(mlir::TypeRange inputs,
