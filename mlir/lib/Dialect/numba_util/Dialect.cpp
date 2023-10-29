@@ -1138,7 +1138,7 @@ struct ChangeLayoutWhileAfter
     }
 
     auto newWhile = rewriter.create<mlir::scf::WhileOp>(
-        loc, op->getResultTypes(), newArgs, nullptr, nullptr);
+        loc, whileOp->getResultTypes(), newArgs, nullptr, nullptr);
 
     auto oldBefore = whileOp.getBeforeBody();
     auto oldAfter = whileOp.getAfterBody();
@@ -1146,6 +1146,8 @@ struct ChangeLayoutWhileAfter
     auto newAfter = newWhile.getAfterBody();
 
     rewriter.setInsertionPointToStart(newBefore);
+
+    assert(newArgs.size() == newBefore->getNumArguments());
     for (auto &&[i, arg] : llvm::enumerate(newBefore->getArguments())) {
       auto oldType = oldBefore->getArgument(i).getType();
       auto newType = arg.getType();
