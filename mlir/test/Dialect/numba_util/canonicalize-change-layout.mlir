@@ -105,3 +105,26 @@ func.func @test_change_layout() -> memref<?xi32> {
   }
   return %0 : memref<?xi32>
 }
+
+// -----
+
+// CHECK-LABEL: func @test_change_layout
+//       CHECK:   %[[RES:.*]] = scf.while
+//       CHECK:   %[[M1:.*]] = "test.test"() : () -> memref<?xi32, strided<[?], offset: ?>>
+//       CHECK:   scf.condition(%{{.*}}) %[[M1]] : memref<?xi32, strided<[?], offset: ?>>
+//       CHECK:   ^bb0(%{{.*}}: memref<?xi32, strided<[?], offset: ?>>):
+//       CHECK:   %[[RES1:.]] = numba_util.change_layout %[[RES]] : memref<?xi32, strided<[?], offset: ?>> to memref<?xi32>
+//       CHECK:   return %[[RES1]]
+func.func @test_change_layout() -> memref<?xi32> {
+  %0 = "test.test"() : () -> memref<?xi32, strided<[?], offset: ?>>
+  %1 = scf.while () : () -> (memref<?xi32>) {
+    %cond = "test.test"() : () -> i1
+    %2 = "test.test"() : () -> memref<?xi32, strided<[?], offset: ?>>
+    %3 = numba_util.change_layout %2 : memref<?xi32, strided<[?], offset: ?>> to memref<?xi32>
+    scf.condition(%cond) %3 : memref<?xi32>
+  } do {
+  ^bb0(%arg2: memref<?xi32>):
+    scf.yield
+  }
+  return %1 : memref<?xi32>
+}
