@@ -912,6 +912,341 @@ struct ChangeLayoutIf : public mlir::OpRewritePattern<mlir::scf::YieldOp> {
   }
 };
 
+struct ChangeLayoutFor : public mlir::OpRewritePattern<mlir::scf::YieldOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(mlir::scf::YieldOp op,
+                  mlir::PatternRewriter &rewriter) const override {
+    if (op.getResults().empty())
+      return mlir::failure();
+
+    auto forOp = mlir::dyn_cast<mlir::scf::ForOp>(op->getParentOp());
+    if (!forOp)
+      return mlir::failure();
+
+    bool changed = false;
+    auto newArgs = llvm::to_vector(op.getResults());
+    auto newInits = llvm::to_vector(forOp.getInitArgs());
+
+    auto loc = op.getLoc();
+    for (auto &&[i, arg] : llvm::enumerate(op.getResults())) {
+      auto type = arg.getType();
+      if (!mlir::isa<mlir::MemRefType>(type))
+        continue;
+
+      auto cl = arg.getDefiningOp<numba::util::ChangeLayoutOp>();
+      if (!cl)
+        continue;
+
+      mlir::OpBuilder::InsertionGuard g(rewriter);
+      auto src = cl.getSource();
+      newArgs[i] = src;
+      rewriter.setInsertionPoint(forOp);
+      newInits[i] = rewriter.create<numba::util::ChangeLayoutOp>(
+          loc, src.getType(), newInits[i]);
+      changed = true;
+    }
+
+    if (!changed)
+      return mlir::failure();
+
+    mlir::OpBuilder::InsertionGuard g(rewriter);
+    rewriter.replaceOpWithNewOp<mlir::scf::YieldOp>(op, newArgs);
+
+    rewriter.setInsertionPoint(forOp);
+    auto emptyBuilder = [](mlir::OpBuilder &, mlir::Location, mlir::Value,
+                           mlir::ValueRange) {};
+    auto newFor = rewriter.create<mlir::scf::ForOp>(
+        forOp.getLoc(), forOp.getLowerBound(), forOp.getUpperBound(),
+        forOp.getStep(), newInits, emptyBuilder);
+
+    auto oldBody = forOp.getBody();
+    auto newBody = newFor.getBody();
+
+    newArgs.clear();
+    rewriter.setInsertionPointToStart(newBody);
+    for (auto &&[i, arg] : llvm::enumerate(newBody->getArguments())) {
+      auto oldArgType = oldBody->getArgument(i).getType();
+      if (arg.getType() == oldArgType) {
+        newArgs.emplace_back(arg);
+        continue;
+      }
+
+      newArgs.emplace_back(
+          rewriter.create<numba::util::ChangeLayoutOp>(loc, oldArgType, arg));
+    }
+    rewriter.inlineBlockBefore(oldBody, newBody, newBody->end(), newArgs);
+
+    newArgs.clear();
+    rewriter.setInsertionPointAfter(newFor);
+    for (auto &&[i, res] : llvm::enumerate(newFor.getResults())) {
+      auto oldResType = forOp.getResult(i).getType();
+      if (res.getType() == oldResType) {
+        newArgs.emplace_back(res);
+        continue;
+      }
+
+      newArgs.emplace_back(
+          rewriter.create<numba::util::ChangeLayoutOp>(loc, oldResType, res));
+    }
+    rewriter.replaceOp(forOp, newArgs);
+    return mlir::success();
+  }
+};
+
+struct ChangeLayoutWhileBefore
+    : public mlir::OpRewritePattern<mlir::scf::ConditionOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(mlir::scf::ConditionOp op,
+                  mlir::PatternRewriter &rewriter) const override {
+    if (op.getArgs().empty())
+      return mlir::failure();
+
+    auto whileOp = mlir::cast<mlir::scf::WhileOp>(op->getParentOp());
+
+    bool changed = false;
+    auto newArgs = llvm::to_vector(op.getArgs());
+
+    for (auto &&[i, arg] : llvm::enumerate(op.getArgs())) {
+      auto type = arg.getType();
+      if (!mlir::isa<mlir::MemRefType>(type))
+        continue;
+
+      auto cl = arg.getDefiningOp<numba::util::ChangeLayoutOp>();
+      if (!cl)
+        continue;
+
+      auto src = cl.getSource();
+      newArgs[i] = src;
+      changed = true;
+    }
+
+    if (!changed)
+      return mlir::failure();
+
+    rewriter.replaceOpWithNewOp<mlir::scf::ConditionOp>(op, op.getCondition(),
+                                                        newArgs);
+
+    mlir::OpBuilder::InsertionGuard g(rewriter);
+    rewriter.setInsertionPoint(whileOp);
+
+    auto loc = op.getLoc();
+    mlir::ValueRange argsRange(newArgs);
+    auto newWhile = rewriter.create<mlir::scf::WhileOp>(
+        loc, argsRange.getTypes(), whileOp.getInits(), nullptr, nullptr);
+
+    auto oldBefore = whileOp.getBeforeBody();
+    auto oldAfter = whileOp.getAfterBody();
+    auto newBefore = newWhile.getBeforeBody();
+    auto newAfter = newWhile.getAfterBody();
+
+    rewriter.inlineBlockBefore(oldBefore, newBefore, newBefore->begin(),
+                               newBefore->getArguments());
+
+    rewriter.setInsertionPointToStart(newAfter);
+    newArgs.resize(newAfter->getNumArguments());
+    for (auto &&[i, arg] : llvm::enumerate(newAfter->getArguments())) {
+      auto oldType = oldAfter->getArgument(i).getType();
+      auto newType = arg.getType();
+      if (oldType == newType) {
+        newArgs[i] = arg;
+        continue;
+      }
+
+      newArgs[i] =
+          rewriter.create<numba::util::ChangeLayoutOp>(loc, oldType, arg);
+    }
+
+    rewriter.inlineBlockBefore(oldAfter, newAfter, newAfter->end(), newArgs);
+
+    rewriter.setInsertionPointAfter(newWhile);
+    newArgs.resize(newWhile->getNumResults());
+    for (auto &&[i, res] : llvm::enumerate(newWhile.getResults())) {
+      auto oldType = whileOp.getResult(i).getType();
+      auto newType = res.getType();
+      if (oldType == newType) {
+        newArgs[i] = res;
+        continue;
+      }
+
+      newArgs[i] =
+          rewriter.create<numba::util::ChangeLayoutOp>(loc, oldType, res);
+    }
+
+    rewriter.replaceOp(whileOp, newArgs);
+    return mlir::success();
+  }
+};
+
+struct ChangeLayoutWhileAfter
+    : public mlir::OpRewritePattern<mlir::scf::YieldOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(mlir::scf::YieldOp op,
+                  mlir::PatternRewriter &rewriter) const override {
+    if (op.getResults().empty())
+      return mlir::failure();
+
+    auto whileOp = mlir::dyn_cast<mlir::scf::WhileOp>(op->getParentOp());
+    if (!whileOp)
+      return mlir::failure();
+
+    bool changed = false;
+    auto newArgs = llvm::to_vector(op.getResults());
+
+    for (auto &&[i, arg] : llvm::enumerate(op.getResults())) {
+      auto dstType = mlir::dyn_cast<mlir::MemRefType>(arg.getType());
+      if (!dstType)
+        continue;
+
+      auto cl = arg.getDefiningOp<numba::util::ChangeLayoutOp>();
+      if (!cl)
+        continue;
+
+      auto srcType = mlir::cast<mlir::MemRefType>(cl.getSource().getType());
+      if (!canTransformLayoutCast(dstType, srcType))
+        continue;
+
+      auto src = cl.getSource();
+      newArgs[i] = src;
+      changed = true;
+    }
+
+    if (!changed)
+      return mlir::failure();
+
+    rewriter.replaceOpWithNewOp<mlir::scf::YieldOp>(op, newArgs);
+
+    auto loc = op.getLoc();
+    mlir::OpBuilder::InsertionGuard g(rewriter);
+    rewriter.setInsertionPoint(whileOp);
+
+    assert(newArgs.size() == whileOp.getInits().size());
+    for (auto &&[i, init] : llvm::enumerate(whileOp.getInits())) {
+      auto oldType = init.getType();
+      auto newType = newArgs[i].getType();
+      if (oldType == newType) {
+        newArgs[i] = init;
+        continue;
+      }
+
+      newArgs[i] = rewriter.create<mlir::memref::CastOp>(loc, newType, init);
+    }
+
+    auto newWhile = rewriter.create<mlir::scf::WhileOp>(
+        loc, whileOp->getResultTypes(), newArgs, nullptr, nullptr);
+
+    auto oldBefore = whileOp.getBeforeBody();
+    auto oldAfter = whileOp.getAfterBody();
+    auto newBefore = newWhile.getBeforeBody();
+    auto newAfter = newWhile.getAfterBody();
+
+    rewriter.setInsertionPointToStart(newBefore);
+
+    assert(newArgs.size() == newBefore->getNumArguments());
+    for (auto &&[i, arg] : llvm::enumerate(newBefore->getArguments())) {
+      auto oldType = oldBefore->getArgument(i).getType();
+      auto newType = arg.getType();
+      if (oldType == newType) {
+        newArgs[i] = arg;
+        continue;
+      }
+
+      newArgs[i] =
+          rewriter.create<numba::util::ChangeLayoutOp>(loc, oldType, arg);
+    }
+
+    rewriter.inlineBlockBefore(oldBefore, newBefore, newBefore->end(), newArgs);
+    rewriter.inlineBlockBefore(oldAfter, newAfter, newAfter->end(),
+                               newAfter->getArguments());
+    rewriter.replaceOp(whileOp, newWhile.getResults());
+    return mlir::success();
+  }
+};
+
+struct ChangeLayoutWhileInit
+    : public mlir::OpRewritePattern<mlir::scf::WhileOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(mlir::scf::WhileOp op,
+                  mlir::PatternRewriter &rewriter) const override {
+    if (op.getInits().empty())
+      return mlir::failure();
+
+    bool changed = false;
+    auto newArgs = llvm::to_vector(op.getInits());
+
+    for (auto &&[i, init] : llvm::enumerate(newArgs)) {
+      auto type = init.getType();
+      if (!mlir::isa<mlir::MemRefType>(type))
+        continue;
+
+      auto cl = init.getDefiningOp<numba::util::ChangeLayoutOp>();
+      if (!cl)
+        continue;
+
+      auto src = cl.getSource();
+      newArgs[i] = src;
+      changed = true;
+    }
+
+    if (!changed)
+      return mlir::failure();
+
+    auto loc = op.getLoc();
+
+    mlir::OpBuilder::InsertionGuard g(rewriter);
+    auto newWhile = rewriter.create<mlir::scf::WhileOp>(
+        loc, op->getResultTypes(), newArgs, nullptr, nullptr);
+
+    auto oldBefore = op.getBeforeBody();
+    auto oldAfter = op.getAfterBody();
+    auto newBefore = newWhile.getBeforeBody();
+    auto newAfter = newWhile.getAfterBody();
+
+    rewriter.setInsertionPointToStart(newBefore);
+    for (auto &&[i, arg] : llvm::enumerate(newBefore->getArguments())) {
+      auto oldType = oldBefore->getArgument(i).getType();
+      auto newType = arg.getType();
+      if (oldType == newType) {
+        newArgs[i] = arg;
+        continue;
+      }
+
+      newArgs[i] =
+          rewriter.create<numba::util::ChangeLayoutOp>(loc, oldType, arg);
+    }
+
+    rewriter.inlineBlockBefore(oldBefore, newBefore, newBefore->end(), newArgs);
+
+    auto oldTerm = mlir::cast<mlir::scf::YieldOp>(oldAfter->getTerminator());
+    rewriter.setInsertionPoint(oldTerm);
+
+    for (auto &&[i, arg] : llvm::enumerate(oldTerm.getResults())) {
+      auto oldType = arg.getType();
+      auto newType = newWhile.getInits()[i].getType();
+      if (oldType == newType) {
+        newArgs[i] = arg;
+        continue;
+      }
+
+      newArgs[i] =
+          rewriter.create<numba::util::ChangeLayoutOp>(loc, newType, arg);
+    }
+
+    rewriter.replaceOpWithNewOp<mlir::scf::YieldOp>(oldTerm, newArgs);
+    rewriter.inlineBlockBefore(oldAfter, newAfter, newAfter->end(),
+                               newAfter->getArguments());
+    rewriter.replaceOp(op, newWhile.getResults());
+    return mlir::success();
+  }
+};
+
 static std::optional<unsigned> getSingleDynamicDim(mlir::ShapedType type) {
   if (!type.hasRank())
     return std::nullopt;
@@ -1213,14 +1548,15 @@ struct ChangeLayoutAtomicRMW
 
 void ChangeLayoutOp::getCanonicalizationPatterns(
     ::mlir::RewritePatternSet &results, ::mlir::MLIRContext *context) {
-  results
-      .insert<ChangeLayoutIdentity, ChangeLayoutDim, ChangeLayoutClone,
-              PropagateCloneType, ChangeLayoutCast, ChangeLayoutFromCast,
-              ChangeLayoutLoad, ChangeLayoutStore, ChangeLayoutSubview,
-              ChangeLayoutLinalgGeneric, ChangeLayoutLinalgFill, ChangeLayoutIf,
-              ChangeLayout1DReshape, ChangeLayoutSliceGetItem, ChangeLayoutCopy,
-              ChangeLayoutExpandShape, ChangeLayoutSelect,
-              ChangeLayoutEnvRegion, ChangeLayoutAtomicRMW>(context);
+  results.insert<ChangeLayoutIdentity, ChangeLayoutDim, ChangeLayoutClone,
+                 PropagateCloneType, ChangeLayoutCast, ChangeLayoutFromCast,
+                 ChangeLayoutLoad, ChangeLayoutStore, ChangeLayoutSubview,
+                 ChangeLayoutLinalgGeneric, ChangeLayoutLinalgFill,
+                 ChangeLayoutIf, ChangeLayoutFor, ChangeLayoutWhileBefore,
+                 ChangeLayoutWhileAfter, ChangeLayoutWhileInit,
+                 ChangeLayout1DReshape, ChangeLayoutSliceGetItem,
+                 ChangeLayoutCopy, ChangeLayoutExpandShape, ChangeLayoutSelect,
+                 ChangeLayoutEnvRegion, ChangeLayoutAtomicRMW>(context);
 }
 
 bool ChangeLayoutOp::areCastCompatible(mlir::TypeRange inputs,

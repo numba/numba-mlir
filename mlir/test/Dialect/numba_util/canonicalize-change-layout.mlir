@@ -105,3 +105,51 @@ func.func @test_change_layout() -> memref<?xi32> {
   }
   return %0 : memref<?xi32>
 }
+
+// -----
+
+// CHECK-LABEL: func @test_change_layout
+//       CHECK:   %[[RES:.*]] = scf.while
+//       CHECK:   %[[M1:.*]] = "test.test"() : () -> memref<?xi32, strided<[?], offset: ?>>
+//       CHECK:   scf.condition(%{{.*}}) %[[M1]] : memref<?xi32, strided<[?], offset: ?>>
+//       CHECK:   ^bb0(%{{.*}}: memref<?xi32, strided<[?], offset: ?>>):
+//       CHECK:   %[[RES1:.]] = numba_util.change_layout %[[RES]] : memref<?xi32, strided<[?], offset: ?>> to memref<?xi32>
+//       CHECK:   return %[[RES1]]
+func.func @test_change_layout() -> memref<?xi32> {
+  %1 = scf.while () : () -> (memref<?xi32>) {
+    %cond = "test.test"() : () -> i1
+    %2 = "test.test"() : () -> memref<?xi32, strided<[?], offset: ?>>
+    %3 = numba_util.change_layout %2 : memref<?xi32, strided<[?], offset: ?>> to memref<?xi32>
+    scf.condition(%cond) %3 : memref<?xi32>
+  } do {
+  ^bb0(%arg2: memref<?xi32>):
+    scf.yield
+  }
+  return %1 : memref<?xi32>
+}
+
+// -----
+
+// CHECK-LABEL: func @test_change_layout
+//       CHECK:   %[[SRC1:.*]] = "test.test"() : () -> memref<?xi32>
+//       CHECK:   %[[SRC2:.*]] = memref.cast %[[SRC1]] : memref<?xi32> to memref<?xi32, strided<[?], offset: ?>>
+//       CHECK:   scf.while (%[[ARG:.*]] = %[[SRC2]]) : (memref<?xi32, strided<[?], offset: ?>>) -> ()
+//       CHECK:   %[[CL:.*]] = numba_util.change_layout %[[ARG]] : memref<?xi32, strided<[?], offset: ?>> to memref<?xi32>
+//       CHECK:   %{{.*}} = "test.test"(%[[CL]]) : (memref<?xi32>) -> i1
+//       CHECK:   } do {
+//       CHECK:   %[[V:.*]] = "test.test"() : () -> memref<?xi32, strided<[?], offset: ?>>
+//       CHECK:   scf.yield %[[V]] : memref<?xi32, strided<[?], offset: ?>>
+//       CHECK:   return
+func.func @test_change_layout() {
+  %0 = "test.test"() : () -> memref<?xi32>
+  scf.while (%arg2 = %0) : (memref<?xi32>) -> () {
+    %cond = "test.test"(%arg2) : (memref<?xi32>) -> i1
+    scf.condition(%cond)
+  } do {
+  ^bb0():
+    %1 = "test.test"() : () -> memref<?xi32, strided<[?], offset: ?>>
+    %2 = numba_util.change_layout %1 : memref<?xi32, strided<[?], offset: ?>> to memref<?xi32>
+    scf.yield %2 : memref<?xi32>
+  }
+  return
+}
