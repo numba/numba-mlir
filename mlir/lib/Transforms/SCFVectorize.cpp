@@ -223,13 +223,14 @@ numba::vectorizeLoop(mlir::OpBuilder &builder, mlir::scf::ParallelOp loop,
     auto type = orig.getType();
     assert(isSupportedVecElem(type));
 
+    mlir::Value val = orig;
     auto origIndexVars = loop.getInductionVars();
     auto it = llvm::find(origIndexVars, orig);
     if (it != origIndexVars.end())
-      orig = newLoop.getInductionVars()[it - origIndexVars.begin()];
+      val = newLoop.getInductionVars()[it - origIndexVars.begin()];
 
     auto vecType = toVectorType(type);
-    mlir::Value vec = builder.create<mlir::vector::SplatOp>(loc, orig, vecType);
+    mlir::Value vec = builder.create<mlir::vector::SplatOp>(loc, val, vecType);
     mapping.map(orig, vec);
     return vec;
   };
