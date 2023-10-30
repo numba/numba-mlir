@@ -43,6 +43,54 @@ static bool isSupportedVecElem(mlir::Type type) {
   return type.isIntOrIndexOrFloat();
 }
 
+static bool isRangePermutation(mlir::ValueRange val1, mlir::ValueRange val2) {
+  if (val1.size() != val2.size())
+    return false;
+
+  for (auto v1 : val1) {
+    auto it = llvm::find(val2, v1);
+    if (it == val2.end())
+      return false;
+  }
+  return true;
+}
+
+template <typename Op>
+static std::optional<unsigned>
+cavTriviallyVectorizeMemOpImpl(mlir::ValueRange loopIndexVars, unsigned dim,
+                               Op memOp) {
+  assert(dim < loopIndexVars.size());
+  auto memref = memOp.getMemRef();
+  auto type = mlir::cast<mlir::MemRefType>(memref.getType());
+  auto width = getTypeBitWidth(type.getElementType());
+  if (width == 0)
+    return std::nullopt;
+
+  if (!type.getLayout().isIdentity())
+    return std::nullopt;
+
+  if (!isRangePermutation(memOp.getIndices(), loopIndexVars))
+    return std::nullopt;
+
+  if (memOp.getIndices().back() != loopIndexVars[dim])
+    return std::nullopt;
+
+  return width;
+}
+
+static std::optional<unsigned>
+cavTriviallyVectorizeMemOp(mlir::ValueRange loopIndexVars, unsigned dim,
+                           mlir::Operation &op) {
+  assert(dim < loopIndexVars.size());
+  if (auto storeOp = mlir::dyn_cast<mlir::memref::StoreOp>(op))
+    return cavTriviallyVectorizeMemOpImpl(loopIndexVars, dim, storeOp);
+
+  if (auto loadOp = mlir::dyn_cast<mlir::memref::LoadOp>(op))
+    return cavTriviallyVectorizeMemOpImpl(loopIndexVars, dim, loadOp);
+
+  return std::nullopt;
+}
+
 std::optional<numba::SCFVectorizeInfo>
 numba::getLoopVectorizeInfo(mlir::scf::ParallelOp loop, unsigned dim,
                             unsigned vectorBitwidth) {
@@ -64,6 +112,15 @@ numba::getLoopVectorizeInfo(mlir::scf::ParallelOp loop, unsigned dim,
     if (op.getNumRegions() > 0)
       return std::nullopt;
 
+    if (auto w = cavTriviallyVectorizeMemOp(loop.getInductionVars(), dim, op)) {
+      auto newFactor = vectorBitwidth / *w;
+      if (newFactor > 1) {
+        factor = std::min(factor, newFactor);
+        ++count;
+      }
+      continue;
+    }
+
     if (!isSupportedVectorOp(op))
       continue;
 
@@ -71,9 +128,11 @@ numba::getLoopVectorizeInfo(mlir::scf::ParallelOp loop, unsigned dim,
     if (width == 0)
       continue;
 
-    factor = std::min(factor, vectorBitwidth / width);
-    if (factor <= 1)
-      return std::nullopt;
+    auto newFactor = vectorBitwidth / width;
+    if (newFactor <= 1)
+      continue;
+
+    factor = std::min(factor, newFactor);
 
     ++count;
   }
