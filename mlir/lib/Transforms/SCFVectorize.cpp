@@ -111,8 +111,8 @@ numba::vectorizeLoop(mlir::OpBuilder &builder, mlir::scf::ParallelOp loop,
       builder.create<mlir::arith::DivSIOp>(loc, count, factorVal);
   upper[dim] = builder.create<mlir::arith::AddIOp>(loc, origLower, newCount);
 
-  auto newLoop = builder.create<mlir::scf::ParallelOp>(
-      loc, lower, upper, step, loop.getInits(), nullptr);
+  auto newLoop = builder.create<mlir::scf::ParallelOp>(loc, lower, upper, step,
+                                                       loop.getInitVals());
   auto newIndexVar = newLoop.getInductionVars()[dim];
 
   auto toVectorType = [&](mlir::Type elemType) -> mlir::VectorType {
