@@ -307,8 +307,14 @@ numba::vectorizeLoop(mlir::OpBuilder &builder, mlir::scf::ParallelOp loop,
     scalarMapping.map(loop.getInductionVars(), newLoop.getInductionVars());
 
     llvm::SmallVector<mlir::Value> ret(indices.size());
-    for (auto &&[i, val] : llvm::enumerate(indices))
+    for (auto &&[i, val] : llvm::enumerate(indices)) {
+      if (val == origIndexVar) {
+        ret[i] =
+            builder.create<mlir::arith::MulIOp>(loc, newIndexVar, factorVal);
+        continue;
+      }
       ret[i] = scalarMapping.lookup(val);
+    }
 
     return ret;
   };
