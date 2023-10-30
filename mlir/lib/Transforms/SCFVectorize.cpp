@@ -39,6 +39,10 @@ static bool isSupportedVectorOp(mlir::Operation &op) {
       op.getDialect());
 }
 
+static bool isSupportedVecElem(mlir::Type type) {
+  return type.isIntOrIndexOrFloat();
+}
+
 std::optional<numba::SCFVectorizeInfo>
 numba::getLoopVectorizeInfo(mlir::scf::ParallelOp loop, unsigned dim,
                             unsigned vectorBitwidth) {
@@ -123,7 +127,7 @@ numba::vectorizeLoop(mlir::OpBuilder &builder, mlir::scf::ParallelOp loop,
   mlir::IRMapping mapping;
   mlir::IRMapping scalarMapping;
 
-  auto getVar = [&](mlir::Value orig) -> mlir::Value {
+  auto getVecVal = [&](mlir::Value orig) -> mlir::Value {
     if (auto mapped = mapping.lookupOrNull(orig))
       return mapped;
 
@@ -145,11 +149,55 @@ numba::vectorizeLoop(mlir::OpBuilder &builder, mlir::scf::ParallelOp loop,
       mapping.map(orig, vec);
       return vec;
     }
+    auto type = orig.getType();
+    assert(isSupportedVecElem(type));
 
-    auto vecType = toVectorType(orig.getType());
+    auto vecType = toVectorType(type);
     mlir::Value vec = builder.create<mlir::vector::SplatOp>(loc, orig, vecType);
     mapping.map(orig, vec);
     return vec;
+  };
+
+  llvm::DenseMap<mlir::Value, llvm::SmallVector<mlir::Value>> unpackedVals;
+  auto getUnpackedVals = [&](mlir::Value val) -> mlir::ValueRange {
+    auto it = unpackedVals.find(val);
+    if (it != unpackedVals.end())
+      return it->second;
+
+    auto &ret = unpackedVals[val];
+    assert(ret.empty());
+    if (!isSupportedVecElem(val.getType())) {
+      ret.resize(factor, val);
+      return ret;
+    }
+
+    auto vecVal = getVecVal(val);
+    ret.resize(factor);
+    for (auto i : llvm::seq(0u, factor)) {
+      mlir::Value idx = builder.create<mlir::arith::ConstantIndexOp>(loc, i);
+      ret[i] = builder.create<mlir::vector::ExtractElementOp>(loc, vecVal, idx);
+    }
+    return ret;
+  };
+
+  auto setUnpackedVals = [&](mlir::Value origVal, mlir::ValueRange newVals) {
+    assert(newVals.size() == factor);
+    assert(unpackedVals.count(origVal) == 0);
+    unpackedVals[origVal].append(newVals.begin(), newVals.end());
+
+    auto type = origVal.getType();
+    if (!isSupportedVecElem(type))
+      return;
+
+    auto vecType = toVectorType(type);
+
+    mlir::Value vec = builder.create<mlir::ub::PoisonOp>(loc, vecType, nullptr);
+    for (auto i : llvm::seq(0u, factor)) {
+      mlir::Value idx = builder.create<mlir::arith::ConstantIndexOp>(loc, i);
+      vec = builder.create<mlir::vector::InsertElementOp>(loc, newVals[i], vec,
+                                                          idx);
+    }
+    mapping.map(origVal, vec);
   };
 
   mlir::Value zeroIndex;
@@ -184,24 +232,14 @@ numba::vectorizeLoop(mlir::OpBuilder &builder, mlir::scf::ParallelOp loop,
     return op.getIndices()[0] == origIndexVar;
   };
 
+  llvm::SmallVector<mlir::Value> duplicatedArgs;
+  llvm::SmallVector<mlir::Value> duplicatedResults;
+
   builder.setInsertionPointToStart(newLoop.getBody());
   for (mlir::Operation &op : loop.getBody()->without_terminator()) {
-    auto extractElem = [&](mlir::Value arg, unsigned i) -> mlir::Value {
-      auto loc = op.getLoc();
-      mlir::Value idx = builder.create<mlir::arith::ConstantIndexOp>(loc, i);
-      return builder.create<mlir::vector::ExtractElementOp>(loc, arg, idx);
-    };
-
-    auto insertElem = [&](mlir::Value arg, mlir::Value val,
-                          unsigned i) -> mlir::Value {
-      auto loc = op.getLoc();
-      mlir::Value idx = builder.create<mlir::arith::ConstantIndexOp>(loc, i);
-      return builder.create<mlir::vector::InsertElementOp>(loc, val, arg, idx);
-    };
-
     if (isSupportedVectorOp(op)) {
       for (auto arg : op.getOperands())
-        getVar(arg); // init mapper for op args
+        getVecVal(arg); // init mapper for op args
 
       auto newOp = builder.clone(op, mapping);
       for (auto res : newOp->getResults())
@@ -218,15 +256,16 @@ numba::vectorizeLoop(mlir::OpBuilder &builder, mlir::scf::ParallelOp loop,
       assert(reduceBody.getNumArguments() == 2);
       auto lhs = reduceBody.getArgument(0);
       auto rhs = reduceBody.getArgument(1);
-      mlir::Value arg = getVar(reduceOp.getOperand());
-      mlir::Value reduceVal = extractElem(arg, 0);
+      auto unpacked = getUnpackedVals(reduceOp.getOperand());
+      assert(unpacked.size() == factor);
+      mlir::Value reduceVal = unpacked.front();
       for (auto i : llvm::seq(1u, factor)) {
-        mlir::Value val = extractElem(arg, i);
+        mlir::Value val = unpacked[i];
         scalarMapping.map(lhs, reduceVal);
         scalarMapping.map(rhs, val);
-        for (auto &redOp : reduceBody.without_terminator()) {
+        for (auto &redOp : reduceBody.without_terminator())
           builder.clone(redOp, scalarMapping);
-        }
+
         reduceVal = scalarMapping.lookupOrDefault(reduceTerm.getResult());
       }
       scalarMapping.clear();
@@ -245,7 +284,7 @@ numba::vectorizeLoop(mlir::OpBuilder &builder, mlir::scf::ParallelOp loop,
           mapping.map(loadOp.getResult(), vecLoad.getResult());
         } else {
           auto mask = getMask();
-          auto indexVec = getVar(loadOp.getIndices()[0]);
+          auto indexVec = getVecVal(loadOp.getIndices()[0]);
           auto init =
               builder.create<mlir::ub::PoisonOp>(op.getLoc(), resType, nullptr);
 
@@ -261,13 +300,13 @@ numba::vectorizeLoop(mlir::OpBuilder &builder, mlir::scf::ParallelOp loop,
     if (auto storeOp = mlir::dyn_cast<mlir::memref::StoreOp>(op)) {
       if (canVectorizeMemOp(storeOp)) {
         auto memref = storeOp.getMemRef();
-        auto value = getVar(storeOp.getValueToStore());
+        auto value = getVecVal(storeOp.getValueToStore());
         if (canTriviallyVectorizeMemOp(storeOp)) {
           builder.create<mlir::vector::StoreOp>(op.getLoc(), value, memref,
                                                 newIndexVar);
         } else {
           auto mask = getMask();
-          auto indexVec = getVar(storeOp.getIndices()[0]);
+          auto indexVec = getVecVal(storeOp.getIndices()[0]);
 
           builder.create<mlir::vector::ScatterOp>(
               op.getLoc(), memref, getZeroIndex(), indexVec, mask, value);
@@ -278,26 +317,34 @@ numba::vectorizeLoop(mlir::OpBuilder &builder, mlir::scf::ParallelOp loop,
 
     // Fallback: Failed to vectorize op, just duplicate it `factor` times
     scalarMapping.clear();
-    llvm::SmallVector<mlir::Value> args;
-    for (auto arg : op.getOperands())
-      args.emplace_back(getVar(arg));
 
-    llvm::SmallVector<mlir::Value> results;
-    for (auto res : op.getResultTypes())
-      results.emplace_back(builder.create<mlir::ub::PoisonOp>(
-          op.getLoc(), toVectorType(res), nullptr));
+    auto numArgs = op.getNumOperands();
+    auto numResults = op.getNumResults();
+    duplicatedArgs.resize(numArgs * factor);
+    duplicatedResults.resize(numResults * factor);
 
-    for (auto i : llvm::seq(0u, factor)) {
-      for (auto &&[j, arg] : llvm::enumerate(op.getOperands()))
-        scalarMapping.map(arg, extractElem(args[j], i));
-
-      auto newOp = builder.clone(op, scalarMapping);
-      for (auto &&[j, res] : llvm::enumerate(newOp->getResults()))
-        results[j] = insertElem(results[j], res, i);
+    for (auto &&[i, arg] : llvm::enumerate(op.getOperands())) {
+      auto unpacked = getUnpackedVals(arg);
+      llvm::copy(unpacked, duplicatedArgs.begin() + i * factor);
     }
 
-    for (auto &&[i, res] : llvm::enumerate(op.getResults()))
-      mapping.map(res, results[i]);
+    for (auto i : llvm::seq(0u, factor)) {
+      auto args = mlir::ValueRange(duplicatedArgs)
+                      .drop_front(numArgs * i)
+                      .take_front(numArgs);
+      scalarMapping.map(op.getOperands(), args);
+      auto results = builder.clone(op, scalarMapping)->getResults();
+
+      for (auto j : llvm::seq(0u, numResults))
+        duplicatedResults[j * factor + i] = results[j];
+    }
+
+    for (auto i : llvm::seq(0u, numResults)) {
+      auto results = mlir::ValueRange(duplicatedResults)
+                         .drop_front(factor * i)
+                         .take_front(factor);
+      setUnpackedVals(op.getResult(i), results);
+    }
   }
 
   builder.setInsertionPoint(loop);
