@@ -30,6 +30,9 @@
 #include <mlir/Dialect/MemRef/Transforms/Passes.h>
 #include <mlir/Dialect/SCF/IR/SCF.h>
 #include <mlir/Dialect/UB/IR/UBOps.h>
+#include <mlir/Dialect/Vector/IR/VectorOps.h>
+#include <mlir/Dialect/Vector/Transforms/LoweringPatterns.h>
+#include <mlir/Dialect/Vector/Transforms/VectorTransforms.h>
 #include <mlir/IR/Builders.h>
 #include <mlir/IR/IRMapping.h>
 #include <mlir/IR/PatternMatch.h>
@@ -1726,6 +1729,29 @@ struct PostLLVMLowering
   }
 };
 
+struct LowerVectorOps
+    : public mlir::PassWrapper<LowerVectorOps, mlir::OperationPass<>> {
+  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(LowerVectorOps)
+
+  /// Run the dialect converter on the module.
+  void runOnOperation() override {
+    using namespace mlir::vector;
+    mlir::RewritePatternSet patterns(&getContext());
+    populateVectorToVectorCanonicalizationPatterns(patterns);
+    populateVectorBroadcastLoweringPatterns(patterns);
+    populateVectorContractLoweringPatterns(patterns, VectorTransformsOptions());
+    populateVectorMaskOpLoweringPatterns(patterns);
+    populateVectorShapeCastLoweringPatterns(patterns);
+    populateVectorTransposeLoweringPatterns(patterns,
+                                            VectorTransformsOptions());
+    // Vector transfer ops with rank > 1 should be lowered with VectorToSCF.
+    populateVectorTransferLoweringPatterns(patterns, /*maxTransferRank=*/1);
+    if (mlir::failed(mlir::applyPatternsAndFoldGreedily(getOperation(),
+                                                        std::move(patterns))))
+      return signalPassFailure();
+  }
+};
+
 // Copypasted from mlir
 struct LLVMLoweringPass
     : public mlir::PassWrapper<LLVMLoweringPass,
@@ -1803,6 +1829,7 @@ static void populateLowerToLlvmPipeline(mlir::OpPassManager &pm) {
   pm.addNestedPass<mlir::func::FuncOp>(mlir::createLowerAffinePass());
   pm.addNestedPass<mlir::func::FuncOp>(mlir::arith::createArithExpandOpsPass());
   pm.addNestedPass<mlir::func::FuncOp>(mlir::createConvertMathToLLVMPass());
+  pm.addNestedPass<mlir::func::FuncOp>(std::make_unique<LowerVectorOps>());
   pm.addPass(mlir::createConvertMathToLibmPass());
   pm.addPass(numba::createUtilToLLVMPass(&getLLVMOptions));
   pm.addPass(std::make_unique<LLVMLoweringPass>());
