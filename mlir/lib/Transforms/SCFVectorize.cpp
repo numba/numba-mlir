@@ -134,12 +134,12 @@ numba::vectorizeLoop(mlir::OpBuilder &builder, mlir::scf::ParallelOp loop,
       for (auto i : llvm::seq(0u, factor)) {
         mlir::Value idx = builder.create<mlir::arith::ConstantIndexOp>(loc, i);
         mlir::Value off =
-            builder.create<mlir::arith::AddIOp>(loc, origIndexVar, idx);
+            builder.create<mlir::arith::AddIOp>(loc, newIndexVar, idx);
         vec = builder.create<mlir::vector::InsertElementOp>(loc, off, vec, idx);
       }
 
-      mlir::Value idx = builder.create<mlir::arith::MulIOp>(
-          loc, newLoop.getInductionVars()[dim], factorVal);
+      mlir::Value idx =
+          builder.create<mlir::arith::MulIOp>(loc, newIndexVar, factorVal);
       idx = builder.create<mlir::vector::SplatOp>(loc, idx, vecType);
       vec = builder.create<mlir::arith::AddIOp>(loc, idx, vec);
       mapping.map(orig, vec);
