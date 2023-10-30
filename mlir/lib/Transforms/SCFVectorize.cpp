@@ -190,14 +190,22 @@ numba::vectorizeLoop(mlir::OpBuilder &builder, mlir::scf::ParallelOp loop,
   mlir::IRMapping mapping;
   mlir::IRMapping scalarMapping;
 
+  auto createPosionVec = [&](mlir::VectorType vecType) -> mlir::Value {
+    // TODO: crash in insertelement folding
+    // return builder.create<mlir::ub::PoisonOp>(loc, vecType, nullptr);
+    auto elemType = vecType.getElementType();
+    mlir::Value poison =
+        builder.create<mlir::ub::PoisonOp>(loc, elemType, nullptr);
+    return builder.create<mlir::vector::SplatOp>(loc, poison, vecType);
+  };
+
   auto getVecVal = [&](mlir::Value orig) -> mlir::Value {
     if (auto mapped = mapping.lookupOrNull(orig))
       return mapped;
 
     if (orig == origIndexVar) {
       auto vecType = toVectorType(builder.getIndexType());
-      mlir::Value vec =
-          builder.create<mlir::ub::PoisonOp>(loc, vecType, nullptr);
+      mlir::Value vec = createPosionVec(vecType);
       for (auto i : llvm::seq(0u, factor)) {
         mlir::Value idx = builder.create<mlir::arith::ConstantIndexOp>(loc, i);
         mlir::Value off =
@@ -259,7 +267,7 @@ numba::vectorizeLoop(mlir::OpBuilder &builder, mlir::scf::ParallelOp loop,
 
     auto vecType = toVectorType(type);
 
-    mlir::Value vec = builder.create<mlir::ub::PoisonOp>(loc, vecType, nullptr);
+    mlir::Value vec = createPosionVec(vecType);
     for (auto i : llvm::seq(0u, factor)) {
       mlir::Value idx = builder.create<mlir::arith::ConstantIndexOp>(loc, i);
       vec = builder.create<mlir::vector::InsertElementOp>(loc, newVals[i], vec,
@@ -372,8 +380,7 @@ numba::vectorizeLoop(mlir::OpBuilder &builder, mlir::scf::ParallelOp loop,
         auto memref = loadOp.getMemRef();
         auto mask = getMask();
         auto indexVec = getVecVal(loadOp.getIndices()[0]);
-        auto init =
-            builder.create<mlir::ub::PoisonOp>(op.getLoc(), resType, nullptr);
+        auto init = createPosionVec(resType);
 
         auto gather = builder.create<mlir::vector::GatherOp>(
             op.getLoc(), resType, memref, getZeroIndex(), indexVec, mask, init);
