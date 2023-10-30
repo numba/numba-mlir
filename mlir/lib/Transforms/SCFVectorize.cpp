@@ -207,13 +207,12 @@ numba::vectorizeLoop(mlir::OpBuilder &builder, mlir::scf::ParallelOp loop,
 
     if (orig == origIndexVar) {
       auto vecType = toVectorType(builder.getIndexType());
-      mlir::Value vec = createPosionVec(vecType);
-      for (auto i : llvm::seq(0u, factor)) {
-        mlir::Value idx = builder.create<mlir::arith::ConstantIndexOp>(loc, i);
-        mlir::Value off =
-            builder.create<mlir::arith::AddIOp>(loc, newIndexVar, idx);
-        vec = builder.create<mlir::vector::InsertElementOp>(loc, off, vec, idx);
-      }
+      llvm::SmallVector<mlir::Attribute> elems(factor);
+      for (auto i : llvm::seq(0u, factor))
+        elems[i] = builder.getIndexAttr(i);
+      auto attr = mlir::DenseElementsAttr::get(vecType, elems);
+      mlir::Value vec =
+          builder.create<mlir::arith::ConstantOp>(loc, vecType, attr);
 
       mlir::Value idx =
           builder.create<mlir::arith::MulIOp>(loc, newIndexVar, factorVal);
