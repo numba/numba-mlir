@@ -175,7 +175,10 @@ numba::vectorizeLoop(mlir::OpBuilder &builder, mlir::scf::ParallelOp loop,
       builder.create<mlir::arith::SubIOp>(loc, origUpper, origLower);
   mlir::Value newCount =
       builder.create<mlir::arith::DivSIOp>(loc, count, factorVal);
-  upper[dim] = builder.create<mlir::arith::AddIOp>(loc, origLower, newCount);
+
+  mlir::Value zero = builder.create<mlir::arith::ConstantIndexOp>(loc, 0);
+  lower[dim] = zero;
+  upper[dim] = newCount;
 
   auto newLoop = builder.create<mlir::scf::ParallelOp>(loc, lower, upper, step,
                                                        loop.getInitVals());
@@ -214,6 +217,7 @@ numba::vectorizeLoop(mlir::OpBuilder &builder, mlir::scf::ParallelOp loop,
 
       mlir::Value idx =
           builder.create<mlir::arith::MulIOp>(loc, newIndexVar, factorVal);
+      idx = builder.create<mlir::arith::AddIOp>(loc, idx, origLower);
       idx = builder.create<mlir::vector::SplatOp>(loc, idx, vecType);
       vec = builder.create<mlir::arith::AddIOp>(loc, idx, vec);
       mapping.map(orig, vec);
@@ -276,15 +280,6 @@ numba::vectorizeLoop(mlir::OpBuilder &builder, mlir::scf::ParallelOp loop,
     mapping.map(origVal, vec);
   };
 
-  mlir::Value zeroIndex;
-  auto getZeroIndex = [&]() -> mlir::Value {
-    if (zeroIndex)
-      return zeroIndex;
-
-    zeroIndex = builder.create<mlir::arith::ConstantIndexOp>(loc, 0);
-    return zeroIndex;
-  };
-
   mlir::Value mask;
   auto getMask = [&]() -> mlir::Value {
     if (mask)
@@ -309,8 +304,10 @@ numba::vectorizeLoop(mlir::OpBuilder &builder, mlir::scf::ParallelOp loop,
     llvm::SmallVector<mlir::Value> ret(indices.size());
     for (auto &&[i, val] : llvm::enumerate(indices)) {
       if (val == origIndexVar) {
-        ret[i] =
+        mlir::Value idx =
             builder.create<mlir::arith::MulIOp>(loc, newIndexVar, factorVal);
+        idx = builder.create<mlir::arith::AddIOp>(loc, idx, origLower);
+        ret[i] = idx;
         continue;
       }
       ret[i] = scalarMapping.lookup(val);
@@ -389,7 +386,7 @@ numba::vectorizeLoop(mlir::OpBuilder &builder, mlir::scf::ParallelOp loop,
         auto init = createPosionVec(resType);
 
         auto gather = builder.create<mlir::vector::GatherOp>(
-            op.getLoc(), resType, memref, getZeroIndex(), indexVec, mask, init);
+            op.getLoc(), resType, memref, zero, indexVec, mask, init);
         mapping.map(loadOp.getResult(), gather.getResult());
         continue;
       }
@@ -410,8 +407,8 @@ numba::vectorizeLoop(mlir::OpBuilder &builder, mlir::scf::ParallelOp loop,
         auto mask = getMask();
         auto indexVec = getVecVal(storeOp.getIndices()[0]);
 
-        builder.create<mlir::vector::ScatterOp>(
-            op.getLoc(), memref, getZeroIndex(), indexVec, mask, value);
+        builder.create<mlir::vector::ScatterOp>(op.getLoc(), memref, zero,
+                                                indexVec, mask, value);
       }
     }
 
