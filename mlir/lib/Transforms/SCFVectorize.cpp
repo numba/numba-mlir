@@ -35,8 +35,7 @@ static unsigned getArgsTypeWidth(mlir::Operation &op) {
 }
 
 static bool isSupportedVectorOp(mlir::Operation &op) {
-  return mlir::isa<mlir::arith::ArithDialect, mlir::math::MathDialect>(
-      op.getDialect());
+  return op.hasTrait<mlir::OpTrait::Vectorizable>();
 }
 
 static bool isSupportedVecElem(mlir::Type type) {
