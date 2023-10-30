@@ -57,8 +57,9 @@ static bool isRangePermutation(mlir::ValueRange val1, mlir::ValueRange val2) {
 
 template <typename Op>
 static std::optional<unsigned>
-cavTriviallyVectorizeMemOpImpl(mlir::ValueRange loopIndexVars, unsigned dim,
+cavTriviallyVectorizeMemOpImpl(mlir::scf::ParallelOp loop, unsigned dim,
                                Op memOp) {
+  auto loopIndexVars = loop.getInductionVars();
   assert(dim < loopIndexVars.size());
   auto memref = memOp.getMemRef();
   auto type = mlir::cast<mlir::MemRefType>(memref.getType());
@@ -75,18 +76,22 @@ cavTriviallyVectorizeMemOpImpl(mlir::ValueRange loopIndexVars, unsigned dim,
   if (memOp.getIndices().back() != loopIndexVars[dim])
     return std::nullopt;
 
+  mlir::DominanceInfo dom;
+  if (!dom.properlyDominates(memref, loop))
+    return std::nullopt;
+
   return width;
 }
 
 static std::optional<unsigned>
-cavTriviallyVectorizeMemOp(mlir::ValueRange loopIndexVars, unsigned dim,
+cavTriviallyVectorizeMemOp(mlir::scf::ParallelOp loop, unsigned dim,
                            mlir::Operation &op) {
-  assert(dim < loopIndexVars.size());
+  assert(dim < loop.getInductionVars().size());
   if (auto storeOp = mlir::dyn_cast<mlir::memref::StoreOp>(op))
-    return cavTriviallyVectorizeMemOpImpl(loopIndexVars, dim, storeOp);
+    return cavTriviallyVectorizeMemOpImpl(loop, dim, storeOp);
 
   if (auto loadOp = mlir::dyn_cast<mlir::memref::LoadOp>(op))
-    return cavTriviallyVectorizeMemOpImpl(loopIndexVars, dim, loadOp);
+    return cavTriviallyVectorizeMemOpImpl(loop, dim, loadOp);
 
   return std::nullopt;
 }
@@ -112,7 +117,7 @@ numba::getLoopVectorizeInfo(mlir::scf::ParallelOp loop, unsigned dim,
     if (op.getNumRegions() > 0)
       return std::nullopt;
 
-    if (auto w = cavTriviallyVectorizeMemOp(loop.getInductionVars(), dim, op)) {
+    if (auto w = cavTriviallyVectorizeMemOp(loop, dim, op)) {
       auto newFactor = vectorBitwidth / *w;
       if (newFactor > 1) {
         factor = std::min(factor, newFactor);
@@ -126,7 +131,7 @@ numba::getLoopVectorizeInfo(mlir::scf::ParallelOp loop, unsigned dim,
 
     auto width = getArgsTypeWidth(op);
     if (width == 0)
-      continue;
+      return std::nullopt;
 
     auto newFactor = vectorBitwidth / width;
     if (newFactor <= 1)
@@ -293,7 +298,28 @@ numba::vectorizeLoop(mlir::OpBuilder &builder, mlir::scf::ParallelOp loop,
   };
 
   auto canTriviallyVectorizeMemOp = [&](auto op) -> bool {
-    return op.getIndices()[0] == origIndexVar;
+    return !!::cavTriviallyVectorizeMemOpImpl(loop, dim, op);
+  };
+
+  auto getMemrefVecIndices = [&](mlir::ValueRange indices) {
+    scalarMapping.clear();
+    scalarMapping.map(loop.getInductionVars(), newLoop.getInductionVars());
+
+    llvm::SmallVector<mlir::Value> ret(indices.size());
+    for (auto &&[i, val] : llvm::enumerate(indices))
+      ret[i] = scalarMapping.lookup(val);
+
+    return ret;
+  };
+
+  auto canGatherScatter = [&](auto op) {
+    auto memref = op.getMemRef();
+    auto memrefType = mlir::cast<mlir::MemRefType>(memref.getType());
+    if (!isSupportedVecElem(memrefType.getElementType()))
+      return false;
+
+    return dom.properlyDominates(memref, loop) && op.getIndices().size() == 1 &&
+           memrefType.getLayout().isIdentity();
   };
 
   llvm::SmallVector<mlir::Value> duplicatedArgs;
@@ -339,43 +365,47 @@ numba::vectorizeLoop(mlir::OpBuilder &builder, mlir::scf::ParallelOp loop,
     }
 
     if (auto loadOp = mlir::dyn_cast<mlir::memref::LoadOp>(op)) {
-      if (canVectorizeMemOp(loadOp)) {
+      if (canTriviallyVectorizeMemOp(loadOp)) {
+        auto indices = getMemrefVecIndices(loadOp.getIndices());
         auto resType = toVectorType(loadOp.getResult().getType());
         auto memref = loadOp.getMemRef();
-        if (canTriviallyVectorizeMemOp(loadOp)) {
-          auto vecLoad = builder.create<mlir::vector::LoadOp>(
-              op.getLoc(), resType, memref, newIndexVar);
-          mapping.map(loadOp.getResult(), vecLoad.getResult());
-        } else {
-          auto mask = getMask();
-          auto indexVec = getVecVal(loadOp.getIndices()[0]);
-          auto init =
-              builder.create<mlir::ub::PoisonOp>(op.getLoc(), resType, nullptr);
+        auto vecLoad = builder.create<mlir::vector::LoadOp>(
+            op.getLoc(), resType, memref, indices);
+        mapping.map(loadOp.getResult(), vecLoad.getResult());
+        continue;
+      }
+      if (canGatherScatter(loadOp)) {
+        auto resType = toVectorType(loadOp.getResult().getType());
+        auto memref = loadOp.getMemRef();
+        auto mask = getMask();
+        auto indexVec = getVecVal(loadOp.getIndices()[0]);
+        auto init =
+            builder.create<mlir::ub::PoisonOp>(op.getLoc(), resType, nullptr);
 
-          auto gather = builder.create<mlir::vector::GatherOp>(
-              op.getLoc(), resType, memref, getZeroIndex(), indexVec, mask,
-              init);
-          mapping.map(loadOp.getResult(), gather.getResult());
-        }
+        auto gather = builder.create<mlir::vector::GatherOp>(
+            op.getLoc(), resType, memref, getZeroIndex(), indexVec, mask, init);
+        mapping.map(loadOp.getResult(), gather.getResult());
         continue;
       }
     }
 
     if (auto storeOp = mlir::dyn_cast<mlir::memref::StoreOp>(op)) {
-      if (canVectorizeMemOp(storeOp)) {
+      if (canTriviallyVectorizeMemOp(storeOp)) {
+        auto indices = getMemrefVecIndices(storeOp.getIndices());
+        auto value = getVecVal(storeOp.getValueToStore());
+        auto memref = storeOp.getMemRef();
+        builder.create<mlir::vector::StoreOp>(op.getLoc(), value, memref,
+                                              indices);
+        continue;
+      }
+      if (canGatherScatter(storeOp)) {
         auto memref = storeOp.getMemRef();
         auto value = getVecVal(storeOp.getValueToStore());
-        if (canTriviallyVectorizeMemOp(storeOp)) {
-          builder.create<mlir::vector::StoreOp>(op.getLoc(), value, memref,
-                                                newIndexVar);
-        } else {
-          auto mask = getMask();
-          auto indexVec = getVecVal(storeOp.getIndices()[0]);
+        auto mask = getMask();
+        auto indexVec = getVecVal(storeOp.getIndices()[0]);
 
-          builder.create<mlir::vector::ScatterOp>(
-              op.getLoc(), memref, getZeroIndex(), indexVec, mask, value);
-        }
-        continue;
+        builder.create<mlir::vector::ScatterOp>(
+            op.getLoc(), memref, getZeroIndex(), indexVec, mask, value);
       }
     }
 
