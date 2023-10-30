@@ -152,6 +152,11 @@ numba::vectorizeLoop(mlir::OpBuilder &builder, mlir::scf::ParallelOp loop,
     auto type = orig.getType();
     assert(isSupportedVecElem(type));
 
+    auto origIndexVars = loop.getInductionVars();
+    auto it = llvm::find(origIndexVars, orig);
+    if (it != origIndexVars.end())
+      orig = newLoop.getInductionVars()[it - origIndexVars.begin()];
+
     auto vecType = toVectorType(type);
     mlir::Value vec = builder.create<mlir::vector::SplatOp>(loc, orig, vecType);
     mapping.map(orig, vec);
@@ -325,7 +330,9 @@ numba::vectorizeLoop(mlir::OpBuilder &builder, mlir::scf::ParallelOp loop,
 
     for (auto &&[i, arg] : llvm::enumerate(op.getOperands())) {
       auto unpacked = getUnpackedVals(arg);
-      llvm::copy(unpacked, duplicatedArgs.begin() + i * factor);
+      assert(unpacked.size() == factor);
+      for (auto j : llvm::seq(0u, factor))
+        duplicatedArgs[j * numArgs + i] = unpacked[j];
     }
 
     for (auto i : llvm::seq(0u, factor)) {
