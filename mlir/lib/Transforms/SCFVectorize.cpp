@@ -81,7 +81,7 @@ numba::getLoopVectorizeInfo(mlir::scf::ParallelOp loop, unsigned dim,
   if (count == 0)
     return std::nullopt;
 
-  return SCFVectorizeInfo{factor, count};
+  return SCFVectorizeInfo{dim, factor, count};
 }
 
 mlir::LogicalResult
@@ -384,14 +384,31 @@ struct SCFVectorizePass
         std::pair<mlir::scf::ParallelOp, numba::SCFVectorizeParams>>
         toVectorize;
 
+    auto getBenefit = [](const numba::SCFVectorizeInfo &info) {
+      return info.factor * info.count;
+    };
+
     getOperation()->walk([&](mlir::scf::ParallelOp loop) {
-      unsigned dim = 0;
-      auto info = numba::getLoopVectorizeInfo(loop, dim, 256);
-      if (!info)
+      std::optional<numba::SCFVectorizeInfo> best;
+      for (auto dim : llvm::seq(0u, loop.getNumLoops())) {
+        auto info = numba::getLoopVectorizeInfo(loop, dim, 256);
+        if (!info)
+          continue;
+
+        if (!best) {
+          best = *info;
+          continue;
+        }
+
+        if (getBenefit(*info) > getBenefit(*best))
+          best = *info;
+      }
+
+      if (!best)
         return;
 
-      toVectorize.emplace_back(loop,
-                               numba::SCFVectorizeParams{dim, info->factor});
+      toVectorize.emplace_back(
+          loop, numba::SCFVectorizeParams{best->dim, best->factor});
     });
 
     if (toVectorize.empty())

@@ -18,6 +18,7 @@ class ParallelOp;
 
 namespace numba {
 struct SCFVectorizeInfo {
+  unsigned dim = 0;
   unsigned factor = 0;
   unsigned count = 0;
 };
