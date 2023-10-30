@@ -290,12 +290,6 @@ numba::vectorizeLoop(mlir::OpBuilder &builder, mlir::scf::ParallelOp loop,
   };
 
   mlir::DominanceInfo dom;
-  auto canVectorizeMemOp = [&](auto op) -> bool {
-    auto memref = op.getMemRef();
-    auto memrefType = mlir::cast<mlir::MemRefType>(memref.getType());
-    return dom.properlyDominates(memref, loop) && op.getIndices().size() == 1 &&
-           memrefType.getLayout().isIdentity();
-  };
 
   auto canTriviallyVectorizeMemOp = [&](auto op) -> bool {
     return !!::cavTriviallyVectorizeMemOpImpl(loop, dim, op);
