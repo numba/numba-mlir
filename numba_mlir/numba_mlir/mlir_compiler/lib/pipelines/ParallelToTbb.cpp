@@ -21,6 +21,7 @@
 #include "numba/Dialect/numba_util/Dialect.hpp"
 #include "numba/Transforms/FuncUtils.hpp"
 #include "numba/Transforms/RewriteWrapper.hpp"
+#include "numba/Transforms/SCFVectorize.hpp"
 
 namespace {
 static mlir::MemRefType getReduceType(mlir::Type type, int64_t count) {
@@ -390,6 +391,8 @@ static void populateParallelToTbbPipeline(mlir::OpPassManager &pm) {
   pm.addNestedPass<mlir::func::FuncOp>(std::make_unique<ParallelToTbbPass>());
   pm.addNestedPass<mlir::func::FuncOp>(
       std::make_unique<HoistBufferAllocsPass>());
+  pm.addNestedPass<mlir::func::FuncOp>(mlir::createCanonicalizerPass());
+  pm.addNestedPass<mlir::func::FuncOp>(numba::createSCFVectorizePass());
   pm.addNestedPass<mlir::func::FuncOp>(mlir::createCanonicalizerPass());
 }
 } // namespace
