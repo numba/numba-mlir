@@ -19,6 +19,7 @@
 #include <mlir/Conversion/MemRefToLLVM/MemRefToLLVM.h>
 #include <mlir/Conversion/SCFToControlFlow/SCFToControlFlow.h>
 #include <mlir/Conversion/UBToLLVM/UBToLLVM.h>
+#include <mlir/Conversion/VectorToLLVM/ConvertVectorToLLVM.h>
 #include <mlir/Dialect/Arith/IR/Arith.h>
 #include <mlir/Dialect/Arith/Transforms/Passes.h>
 #include <mlir/Dialect/ControlFlow/IR/ControlFlowOps.h>
@@ -1768,6 +1769,7 @@ struct LLVMLoweringPass
     arith::populateArithToLLVMConversionPatterns(typeConverter, patterns);
     populateComplexToLLVMConversionPatterns(typeConverter, patterns);
     ub::populateUBToLLVMConversionPatterns(typeConverter, patterns);
+    populateVectorToLLVMConversionPatterns(typeConverter, patterns);
 
     patterns.insert<AllocOpLowering, DeallocOpLowering, LowerRetainOp,
                     LowerWrapAllocPointerOp, LowerGetAllocToken,
