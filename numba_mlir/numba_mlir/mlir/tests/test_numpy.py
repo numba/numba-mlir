@@ -995,8 +995,24 @@ def test_array_vectorize(arr):
         assert ir.count("vector.store") > 0, ir
 
 
+def test_prange_vectorize_1d():
+    def py_func(a):
+        b = np.zeros_like(a)
+        for i in numba.prange(a.shape[0]):
+            b[i] = a[i] + i
+        return b
+
+    with print_pass_ir([], ["SCFVectorizePass"]):
+        arr = np.arange(2 * 3, dtype=np.float32)
+        jit_func = njit(py_func)
+        assert_allclose(py_func(arr), jit_func(arr))
+        ir = get_print_buffer()
+        assert ir.count("vector.load") > 0, ir
+        assert ir.count("vector.store") > 0, ir
+
+
 @pytest.mark.xfail
-def test_prange_vectorize():
+def test_prange_vectorize_2d():
     def py_func(a):
         b = np.zeros_like(a)
         for i in numba.prange(a.shape[0]):
