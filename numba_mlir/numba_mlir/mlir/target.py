@@ -141,6 +141,33 @@ def _map_f64truncate(val):
         raise ValueError(f"Invalid f64 truncate value: {val}")
 
 
+def _get_host_vec_length():
+    from .settings import DISABLE_VECTORIZE
+
+    if DISABLE_VECTORIZE:
+        return 0
+
+    from ..mlir_compiler import get_vector_length
+
+    return get_vector_length()
+
+
+_def_vector_len = _get_host_vec_length()
+
+
+def _map_vectorize(val):
+    if isinstance(val, int):
+        return val
+
+    if val is True:
+        _def_vector_len
+
+    if val is False:
+        return 0
+
+    raise ValueError(f"Invalid mlir_vectorize value: {val}")
+
+
 def _set_option(flags, name, options, default, mapping=lambda a: a):
     value = mapping(options.get(name, default))
     setattr(flags, name, value)
@@ -151,6 +178,7 @@ class NumbaMLIRTargetOptions(cpu.CPUTargetOptions):
     gpu_use_64bit_index = _option_mapping("gpu_use_64bit_index")
     enable_gpu_pipeline = _option_mapping("enable_gpu_pipeline")
     mlir_force_inline = _option_mapping("mlir_force_inline")
+    mlir_vectorize = _option_mapping("mlir_vectorize", _map_vectorize)
 
     def finalize(self, flags, options):
         super().finalize(flags, options)
@@ -158,6 +186,7 @@ class NumbaMLIRTargetOptions(cpu.CPUTargetOptions):
         _set_option(flags, "gpu_use_64bit_index", options, True)
         _set_option(flags, "enable_gpu_pipeline", options, True)
         _set_option(flags, "mlir_force_inline", options, False)
+        _set_option(flags, "mlir_vectorize", options, _def_vector_len)
         assert flags.gpu_fp64_truncate in [
             True,
             False,

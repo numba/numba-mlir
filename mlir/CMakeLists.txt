@@ -73,6 +73,7 @@ set(SOURCES_LIST
     lib/Transforms/PipelineUtils.cpp
     lib/Transforms/PromoteBoolMemref.cpp
     lib/Transforms/PromoteToParallel.cpp
+    lib/Transforms/SCFVectorize.cpp
     lib/Transforms/ScalarOpsConversion.cpp
     lib/Transforms/ShapeIntegerRangePropagation.cpp
     lib/Transforms/TypeConversion.cpp
@@ -124,6 +125,7 @@ set(HEADERS_LIST
     include/numba/Transforms/PromoteBoolMemref.hpp
     include/numba/Transforms/PromoteToParallel.hpp
     include/numba/Transforms/RewriteWrapper.hpp
+    include/numba/Transforms/SCFVectorize.hpp
     include/numba/Transforms/ScalarOpsConversion.hpp
     include/numba/Transforms/ShapeIntegerRangePropagation.hpp
     include/numba/Transforms/TypeConversion.hpp

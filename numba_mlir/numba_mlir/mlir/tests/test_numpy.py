@@ -923,7 +923,7 @@ def test_loop_fusion1():
     with print_pass_ir([], ["PostLinalgOptPass"]):
         jit_func = njit(py_func)
         arr = np.arange(1, 15, dtype=np.float32)
-        assert_equal(py_func(arr), jit_func(arr))
+        assert_allclose(py_func(arr), jit_func(arr))
         ir = get_print_buffer()
         assert ir.count("scf.parallel") == 1, ir
         assert ir.count("memref.load") == 1, ir
@@ -947,7 +947,7 @@ def test_loop_fusion2():
     with print_pass_ir([], ["PostLinalgOptPass"]):
         jit_func = njit(py_func)
         arr = np.arange(1, 15, dtype=np.float32)
-        assert_equal(py_func(arr), jit_func(arr))
+        assert_allclose(py_func(arr), jit_func(arr))
         ir = get_print_buffer()
         assert ir.count("scf.parallel") == 1, ir
         assert ir.count("memref.load") == 1, ir
@@ -969,10 +969,92 @@ def test_loop_fusion3():
     with print_pass_ir([], ["PostLinalgOptPass"]):
         jit_func = njit(py_func)
         arr = np.arange(1, 15, dtype=np.float32)
-        assert_equal(py_func(arr), jit_func(arr))
+        assert_allclose(py_func(arr), jit_func(arr))
         ir = get_print_buffer()
         assert ir.count("scf.parallel") == 2, ir
         assert ir.count("memref.load") == 2, ir
+
+
+@pytest.mark.parametrize(
+    "arr",
+    [
+        np.arange(3, dtype=np.int32),
+        np.arange(3 * 4, dtype=np.int32).reshape(3, 4),
+        np.arange(3 * 4 * 5, dtype=np.int32).reshape(3, 4, 5),
+    ],
+)
+def test_array_vectorize(arr):
+    def py_func(arr):
+        return arr + 2 * 3
+
+    with print_pass_ir([], ["SCFVectorizePass"]):
+        jit_func = njit(py_func)
+        assert_allclose(py_func(arr), jit_func(arr))
+        ir = get_print_buffer()
+        assert ir.count("vector.load") > 0, ir
+        assert ir.count("vector.store") > 0, ir
+
+
+@pytest.mark.parametrize(
+    "arr",
+    [
+        np.arange(1, 1 + 2, dtype=np.int32),
+        np.arange(1, 1 + 2 * 3, dtype=np.int32).reshape(2, 3),
+        np.arange(1, 1 + 2 * 2 * 2, dtype=np.int32).reshape(2, 2, 2),
+        np.arange(1, 1 + 2, dtype=np.float32),
+        np.arange(1, 1 + 2 * 3, dtype=np.float32).reshape(2, 3),
+        np.arange(1, 1 + 2 * 2 * 2, dtype=np.float32).reshape(2, 2, 2),
+    ],
+)
+@parametrize_function_variants(
+    "py_func",
+    [
+        "lambda a: a.sum()",
+        "lambda a: np.sum(a)",
+        "lambda a: np.prod(a)",
+    ],
+)
+def test_array_reduction_vectorize(py_func, arr):
+    with print_pass_ir([], ["SCFVectorizePass"]):
+        jit_func = njit(py_func)
+        assert_allclose(py_func(arr), jit_func(arr))
+        ir = get_print_buffer()
+        assert ir.count("vector.load") > 0, ir
+        assert ir.count("vector.reduction") > 0, ir
+
+
+def test_prange_vectorize_1d():
+    def py_func(a):
+        b = np.zeros_like(a)
+        for i in numba.prange(a.shape[0]):
+            b[i] = a[i] + i
+        return b
+
+    with print_pass_ir([], ["SCFVectorizePass"]):
+        arr = np.arange(2 * 3, dtype=np.float32)
+        jit_func = njit(py_func)
+        assert_allclose(py_func(arr), jit_func(arr))
+        ir = get_print_buffer()
+        assert ir.count("vector.load") > 0, ir
+        assert ir.count("vector.store") > 0, ir
+
+
+@pytest.mark.xfail
+def test_prange_vectorize_2d():
+    def py_func(a):
+        b = np.zeros_like(a)
+        for i in numba.prange(a.shape[0]):
+            for j in numba.prange(a.shape[1]):
+                b[i, j] = a[i, j] + i + j * 100
+        return b
+
+    with print_pass_ir([], ["SCFVectorizePass"]):
+        arr = np.arange(2 * 3, dtype=np.float32).reshape(2, 3)
+        jit_func = njit(py_func)
+        assert_allclose(py_func(arr), jit_func(arr))
+        ir = get_print_buffer()
+        assert ir.count("vector.load") > 0, ir
+        assert ir.count("vector.store") > 0, ir
 
 
 def test_copy_fusion():

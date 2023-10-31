@@ -19,6 +19,7 @@
 #include <mlir/Conversion/MemRefToLLVM/MemRefToLLVM.h>
 #include <mlir/Conversion/SCFToControlFlow/SCFToControlFlow.h>
 #include <mlir/Conversion/UBToLLVM/UBToLLVM.h>
+#include <mlir/Conversion/VectorToLLVM/ConvertVectorToLLVM.h>
 #include <mlir/Dialect/Arith/IR/Arith.h>
 #include <mlir/Dialect/Arith/Transforms/Passes.h>
 #include <mlir/Dialect/ControlFlow/IR/ControlFlowOps.h>
@@ -29,6 +30,9 @@
 #include <mlir/Dialect/MemRef/Transforms/Passes.h>
 #include <mlir/Dialect/SCF/IR/SCF.h>
 #include <mlir/Dialect/UB/IR/UBOps.h>
+#include <mlir/Dialect/Vector/IR/VectorOps.h>
+#include <mlir/Dialect/Vector/Transforms/LoweringPatterns.h>
+#include <mlir/Dialect/Vector/Transforms/VectorTransforms.h>
 #include <mlir/IR/Builders.h>
 #include <mlir/IR/IRMapping.h>
 #include <mlir/IR/PatternMatch.h>
@@ -1725,6 +1729,29 @@ struct PostLLVMLowering
   }
 };
 
+struct LowerVectorOps
+    : public mlir::PassWrapper<LowerVectorOps, mlir::OperationPass<>> {
+  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(LowerVectorOps)
+
+  /// Run the dialect converter on the module.
+  void runOnOperation() override {
+    using namespace mlir::vector;
+    mlir::RewritePatternSet patterns(&getContext());
+    populateVectorToVectorCanonicalizationPatterns(patterns);
+    populateVectorBroadcastLoweringPatterns(patterns);
+    populateVectorContractLoweringPatterns(patterns, VectorTransformsOptions());
+    populateVectorMaskOpLoweringPatterns(patterns);
+    populateVectorShapeCastLoweringPatterns(patterns);
+    populateVectorTransposeLoweringPatterns(patterns,
+                                            VectorTransformsOptions());
+    // Vector transfer ops with rank > 1 should be lowered with VectorToSCF.
+    populateVectorTransferLoweringPatterns(patterns, /*maxTransferRank=*/1);
+    if (mlir::failed(mlir::applyPatternsAndFoldGreedily(getOperation(),
+                                                        std::move(patterns))))
+      return signalPassFailure();
+  }
+};
+
 // Copypasted from mlir
 struct LLVMLoweringPass
     : public mlir::PassWrapper<LLVMLoweringPass,
@@ -1768,6 +1795,7 @@ struct LLVMLoweringPass
     arith::populateArithToLLVMConversionPatterns(typeConverter, patterns);
     populateComplexToLLVMConversionPatterns(typeConverter, patterns);
     ub::populateUBToLLVMConversionPatterns(typeConverter, patterns);
+    populateVectorToLLVMConversionPatterns(typeConverter, patterns);
 
     patterns.insert<AllocOpLowering, DeallocOpLowering, LowerRetainOp,
                     LowerWrapAllocPointerOp, LowerGetAllocToken,
@@ -1801,6 +1829,7 @@ static void populateLowerToLlvmPipeline(mlir::OpPassManager &pm) {
   pm.addNestedPass<mlir::func::FuncOp>(mlir::createLowerAffinePass());
   pm.addNestedPass<mlir::func::FuncOp>(mlir::arith::createArithExpandOpsPass());
   pm.addNestedPass<mlir::func::FuncOp>(mlir::createConvertMathToLLVMPass());
+  pm.addNestedPass<mlir::func::FuncOp>(std::make_unique<LowerVectorOps>());
   pm.addPass(mlir::createConvertMathToLibmPass());
   pm.addPass(numba::createUtilToLLVMPass(&getLLVMOptions));
   pm.addPass(std::make_unique<LLVMLoweringPass>());

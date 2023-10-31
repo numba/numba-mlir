@@ -64,6 +64,10 @@ llvm::StringRef numba::util::attributes::getShapeRangeName() {
   return "numba.shape_range";
 }
 
+llvm::StringRef numba::util::attributes::getVectorLengthName() {
+  return "numba.vector_length";
+}
+
 namespace numba {
 namespace util {
 

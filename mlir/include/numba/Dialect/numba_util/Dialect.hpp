@@ -35,6 +35,7 @@ llvm::StringRef getMaxConcurrencyName();
 llvm::StringRef getForceInlineName();
 llvm::StringRef getOptLevelName();
 llvm::StringRef getShapeRangeName();
+llvm::StringRef getVectorLengthName();
 } // namespace attributes
 } // namespace util
 } // namespace numba

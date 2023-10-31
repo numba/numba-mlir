@@ -18,3 +18,4 @@ DEBUG_TYPE = list(filter(None, readenv("NUMBA_MLIR_DEBUG_TYPE", str, "").split("
 MKL_AVAILABLE = is_mkl_supported()
 SYCL_MKL_AVAILABLE = is_sycl_mkl_supported()
 OPT_LEVEL = readenv("NUMBA_MLIR_OPT_LEVEL", int, 3)
+DISABLE_VECTORIZE = readenv("NUMBA_MLIR_DISABLE_VECTORIZE", int, 0)

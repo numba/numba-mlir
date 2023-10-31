@@ -238,6 +238,8 @@ class MlirBackendBase(FunctionPass):
             flags, "gpu_use_64bit_index", True
         )
 
+        func_attrs["numba.vector_length"] = _get_flag(flags, "mlir_vectorize", 0)
+
         ctx["func_attrs"] = func_attrs
         return ctx
 
