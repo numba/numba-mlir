@@ -4,11 +4,14 @@
 
 #include <pybind11/pybind11.h>
 
+#include <llvm/ADT/StringMap.h>
+#include <llvm/TargetParser/Host.h>
+
 #include "PyModule.hpp"
 
 #include "Lowering.hpp"
 
-static bool is_mkl_supported() {
+static bool isMKLSupported() {
 #ifdef NUMBA_MLIR_USE_MKL
   return true;
 #else
@@ -16,12 +19,31 @@ static bool is_mkl_supported() {
 #endif
 }
 
-static bool is_sycl_mkl_supported() {
+static bool isSyclMKLSupported() {
 #ifdef NUMBA_MLIR_USE_SYCL_MKL
   return true;
 #else
   return false;
 #endif
+}
+
+static unsigned getVectorLength() {
+  llvm::StringMap<bool, llvm::MallocAllocator> features;
+  if (!llvm::sys::getHostCPUFeatures(features))
+    return 128;
+
+  auto checkFlag = [&](llvm::StringRef name) -> bool {
+    auto it = features.find(name);
+    return it != features.end() && it->second;
+  };
+
+  if (checkFlag("avx512f"))
+    return 512;
+
+  if (checkFlag("avx2"))
+    return 256;
+
+  return 128;
 }
 
 PYBIND11_MODULE(mlir_compiler, m) {
@@ -34,6 +56,7 @@ PYBIND11_MODULE(mlir_compiler, m) {
   m.def("get_function_pointer", &getFunctionPointer, "No docs");
   m.def("release_module", &releaseModule, "No docs");
   m.def("module_str", &moduleStr, "No docs");
-  m.def("is_mkl_supported", &is_mkl_supported, "No docs");
-  m.def("is_sycl_mkl_supported", &is_sycl_mkl_supported, "No docs");
+  m.def("is_mkl_supported", &isMKLSupported, "No docs");
+  m.def("is_sycl_mkl_supported", &isSyclMKLSupported, "No docs");
+  m.def("get_vector_length", &getVectorLength, "No docs");
 }
