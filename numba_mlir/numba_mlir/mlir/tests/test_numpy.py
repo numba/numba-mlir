@@ -995,6 +995,34 @@ def test_array_vectorize(arr):
         assert ir.count("vector.store") > 0, ir
 
 
+@pytest.mark.parametrize(
+    "arr",
+    [
+        np.arange(1, 1 + 2, dtype=np.int32),
+        np.arange(1, 1 + 2 * 3, dtype=np.int32).reshape(2, 3),
+        np.arange(1, 1 + 2 * 2 * 2, dtype=np.int32).reshape(2, 2, 2),
+        np.arange(1, 1 + 2, dtype=np.float32),
+        np.arange(1, 1 + 2 * 3, dtype=np.float32).reshape(2, 3),
+        np.arange(1, 1 + 2 * 2 * 2, dtype=np.float32).reshape(2, 2, 2),
+    ],
+)
+@parametrize_function_variants(
+    "py_func",
+    [
+        "lambda a: a.sum()",
+        "lambda a: np.sum(a)",
+        "lambda a: np.prod(a)",
+    ],
+)
+def test_array_reduction_vectorize(py_func, arr):
+    with print_pass_ir([], ["SCFVectorizePass"]):
+        jit_func = njit(py_func)
+        assert_allclose(py_func(arr), jit_func(arr))
+        ir = get_print_buffer()
+        assert ir.count("vector.load") > 0, ir
+        assert ir.count("vector.reduction") > 0, ir
+
+
 def test_prange_vectorize_1d():
     def py_func(a):
         b = np.zeros_like(a)

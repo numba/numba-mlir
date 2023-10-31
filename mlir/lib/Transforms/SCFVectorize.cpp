@@ -146,6 +146,44 @@ numba::getLoopVectorizeInfo(mlir::scf::ParallelOp loop, unsigned dim,
   return SCFVectorizeInfo{dim, factor, count};
 }
 
+template <typename T> static bool isOp(mlir::Operation &op) {
+  return mlir::isa<T>(op);
+}
+
+static std::optional<mlir::vector::CombiningKind>
+getReductionKind(mlir::scf::ReduceOp op) {
+  mlir::Block &body = op.getReductionOperator().front();
+  if (!llvm::hasSingleElement(body.without_terminator()))
+    return std::nullopt;
+
+  mlir::Operation &redOp = body.front();
+
+  using fptr_t = bool (*)(mlir::Operation &);
+  using CC = mlir::vector::CombiningKind;
+  const std::pair<fptr_t, CC> handlers[] = {
+      // clang-format off
+    {&isOp<mlir::arith::AddIOp>, CC::ADD},
+    {&isOp<mlir::arith::AddFOp>, CC::ADD},
+    {&isOp<mlir::arith::MulIOp>, CC::MUL},
+    {&isOp<mlir::arith::MulFOp>, CC::MUL},
+      // clang-format on
+  };
+
+  for (auto &&[handler, cc] : handlers) {
+    if (handler(redOp))
+      return cc;
+  }
+
+  return std::nullopt;
+}
+
+static mlir::arith::FastMathFlags getFMF(mlir::Operation &op) {
+  if (auto fmf = mlir::dyn_cast<mlir::arith::ArithFastMathInterface>(op))
+    return fmf.getFastMathFlagsAttr().getValue();
+
+  return mlir::arith::FastMathFlags::none;
+}
+
 mlir::LogicalResult
 numba::vectorizeLoop(mlir::OpBuilder &builder, mlir::scf::ParallelOp loop,
                      const numba::SCFVectorizeParams &params) {
@@ -344,22 +382,30 @@ numba::vectorizeLoop(mlir::OpBuilder &builder, mlir::scf::ParallelOp loop,
     if (auto reduceOp = mlir::dyn_cast<mlir::scf::ReduceOp>(op)) {
       scalarMapping.clear();
       auto &reduceBody = reduceOp.getReductionOperator().front();
-      auto reduceTerm =
-          mlir::cast<mlir::scf::ReduceReturnOp>(reduceBody.getTerminator());
       assert(reduceBody.getNumArguments() == 2);
-      auto lhs = reduceBody.getArgument(0);
-      auto rhs = reduceBody.getArgument(1);
-      auto unpacked = getUnpackedVals(reduceOp.getOperand());
-      assert(unpacked.size() == factor);
-      mlir::Value reduceVal = unpacked.front();
-      for (auto i : llvm::seq(1u, factor)) {
-        mlir::Value val = unpacked[i];
-        scalarMapping.map(lhs, reduceVal);
-        scalarMapping.map(rhs, val);
-        for (auto &redOp : reduceBody.without_terminator())
-          builder.clone(redOp, scalarMapping);
 
-        reduceVal = scalarMapping.lookupOrDefault(reduceTerm.getResult());
+      mlir::Value reduceVal;
+      if (auto redKind = getReductionKind(reduceOp)) {
+        auto fmf = getFMF(reduceBody.front());
+        reduceVal = builder.create<mlir::vector::ReductionOp>(
+            loc, *redKind, getVecVal(reduceOp.getOperand()), fmf);
+      } else {
+        auto reduceTerm =
+            mlir::cast<mlir::scf::ReduceReturnOp>(reduceBody.getTerminator());
+        auto lhs = reduceBody.getArgument(0);
+        auto rhs = reduceBody.getArgument(1);
+        auto unpacked = getUnpackedVals(reduceOp.getOperand());
+        assert(unpacked.size() == factor);
+        reduceVal = unpacked.front();
+        for (auto i : llvm::seq(1u, factor)) {
+          mlir::Value val = unpacked[i];
+          scalarMapping.map(lhs, reduceVal);
+          scalarMapping.map(rhs, val);
+          for (auto &redOp : reduceBody.without_terminator())
+            builder.clone(redOp, scalarMapping);
+
+          reduceVal = scalarMapping.lookupOrDefault(reduceTerm.getResult());
+        }
       }
       scalarMapping.clear();
       scalarMapping.map(reduceOp.getOperand(), reduceVal);
