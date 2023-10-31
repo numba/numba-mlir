@@ -162,10 +162,10 @@ getReductionKind(mlir::scf::ReduceOp op) {
   using CC = mlir::vector::CombiningKind;
   const std::pair<fptr_t, CC> handlers[] = {
       // clang-format off
-    {&isOp<mlir::arith::AddIOp>, CC::ADD},
-    {&isOp<mlir::arith::AddFOp>, CC::ADD},
-    {&isOp<mlir::arith::MulIOp>, CC::MUL},
-    {&isOp<mlir::arith::MulFOp>, CC::MUL},
+      {&isOp<mlir::arith::AddIOp>, CC::ADD},
+      {&isOp<mlir::arith::AddFOp>, CC::ADD},
+      {&isOp<mlir::arith::MulIOp>, CC::MUL},
+      {&isOp<mlir::arith::MulFOp>, CC::MUL},
       // clang-format on
   };
 
