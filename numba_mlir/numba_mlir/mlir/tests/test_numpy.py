@@ -975,6 +975,26 @@ def test_loop_fusion3():
         assert ir.count("memref.load") == 2, ir
 
 
+@pytest.mark.parametrize(
+    "arr",
+    [
+        np.arange(3, dtype=np.int32),
+        np.arange(3 * 4, dtype=np.int32).reshape(3, 4),
+        np.arange(3 * 4 * 5, dtype=np.int32).reshape(3, 4, 5),
+    ],
+)
+def test_array_vectorize(arr):
+    def py_func(arr):
+        return arr + 2 * 3
+
+    with print_pass_ir([], ["SCFVectorizePass"]):
+        jit_func = njit(py_func)
+        assert_allclose(py_func(arr), jit_func(arr))
+        ir = get_print_buffer()
+        assert ir.count("vector.load") > 0, ir
+        assert ir.count("vector.store") > 0, ir
+
+
 def test_copy_fusion():
     def py_func(a, b):
         a = a + 1
