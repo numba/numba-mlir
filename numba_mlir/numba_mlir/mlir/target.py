@@ -142,6 +142,11 @@ def _map_f64truncate(val):
 
 
 def _get_host_vec_length():
+    from .settings import DISABLE_VECTORIZE
+
+    if DISABLE_VECTORIZE:
+        return 0
+
     from ..mlir_compiler import get_vector_length
 
     return get_vector_length()
