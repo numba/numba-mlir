@@ -10,7 +10,10 @@
 #include <mlir/Dialect/UB/IR/UBOps.h>
 #include <mlir/Dialect/Vector/IR/VectorOps.h>
 #include <mlir/IR/IRMapping.h>
+#include <mlir/Interfaces/FunctionInterfaces.h>
 #include <mlir/Pass/Pass.h>
+
+#include "numba/Dialect/numba_util/Dialect.hpp"
 
 static unsigned getTypeBitWidth(mlir::Type type) {
   if (mlir::isa<mlir::IndexType>(type))
@@ -503,6 +506,23 @@ numba::vectorizeLoop(mlir::OpBuilder &builder, mlir::scf::ParallelOp loop,
   return mlir::success();
 }
 
+static std::optional<unsigned> getVectorLength(mlir::Operation *op) {
+  auto func = op->getParentOfType<mlir::FunctionOpInterface>();
+  if (!func)
+    return std::nullopt;
+
+  auto attr = func->getAttrOfType<mlir::IntegerAttr>(
+      numba::util::attributes::getVectorLengthName());
+  if (!attr)
+    return std::nullopt;
+
+  auto val = attr.getInt();
+  if (val <= 0 || val > std::numeric_limits<unsigned>::max())
+    return std::nullopt;
+
+  return static_cast<unsigned>(val);
+}
+
 namespace {
 struct SCFVectorizePass
     : public mlir::PassWrapper<SCFVectorizePass, mlir::OperationPass<>> {
@@ -526,9 +546,13 @@ struct SCFVectorizePass
     };
 
     getOperation()->walk([&](mlir::scf::ParallelOp loop) {
+      auto len = getVectorLength(loop);
+      if (!len)
+        return;
+
       std::optional<numba::SCFVectorizeInfo> best;
       for (auto dim : llvm::seq(0u, loop.getNumLoops())) {
-        auto info = numba::getLoopVectorizeInfo(loop, dim, 256);
+        auto info = numba::getLoopVectorizeInfo(loop, dim, *len);
         if (!info)
           continue;
 
