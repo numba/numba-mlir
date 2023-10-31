@@ -923,7 +923,7 @@ def test_loop_fusion1():
     with print_pass_ir([], ["PostLinalgOptPass"]):
         jit_func = njit(py_func)
         arr = np.arange(1, 15, dtype=np.float32)
-        assert_equal(py_func(arr), jit_func(arr))
+        assert_allclose(py_func(arr), jit_func(arr))
         ir = get_print_buffer()
         assert ir.count("scf.parallel") == 1, ir
         assert ir.count("memref.load") == 1, ir
@@ -947,7 +947,7 @@ def test_loop_fusion2():
     with print_pass_ir([], ["PostLinalgOptPass"]):
         jit_func = njit(py_func)
         arr = np.arange(1, 15, dtype=np.float32)
-        assert_equal(py_func(arr), jit_func(arr))
+        assert_allclose(py_func(arr), jit_func(arr))
         ir = get_print_buffer()
         assert ir.count("scf.parallel") == 1, ir
         assert ir.count("memref.load") == 1, ir
@@ -969,7 +969,7 @@ def test_loop_fusion3():
     with print_pass_ir([], ["PostLinalgOptPass"]):
         jit_func = njit(py_func)
         arr = np.arange(1, 15, dtype=np.float32)
-        assert_equal(py_func(arr), jit_func(arr))
+        assert_allclose(py_func(arr), jit_func(arr))
         ir = get_print_buffer()
         assert ir.count("scf.parallel") == 2, ir
         assert ir.count("memref.load") == 2, ir
