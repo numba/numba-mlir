@@ -174,7 +174,7 @@ def convert_results(raw_results):
     return ret
 
 
-def results_to_csv(results):
+def results_to_csv(results, human):
     from asv.util import human_value
 
     frameworks = {}
@@ -189,7 +189,10 @@ def results_to_csv(results):
         if bench not in res:
             res[bench] = [""] * count
 
-        value = human_value(value, "seconds", err).replace("n/a", "skipped")
+        if human:
+            value = human_value(value, "seconds", err).replace("n/a", "skipped")
+        else:
+            value = str(value)
 
         res[bench][frameworks[framework]] = value
 
@@ -265,7 +268,7 @@ def run_bench(params):
     machine = get_machine_name()
     results = load_results(commit, machine)
     results = convert_results(results)
-    results = results_to_csv(results)
+    results = results_to_csv(results, human=False)
     print("csv report:")
     print(results)
 
