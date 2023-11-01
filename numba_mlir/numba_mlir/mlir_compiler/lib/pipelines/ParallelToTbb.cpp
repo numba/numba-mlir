@@ -393,6 +393,7 @@ static void populateParallelToTbbPipeline(mlir::OpPassManager &pm) {
       std::make_unique<HoistBufferAllocsPass>());
   pm.addNestedPass<mlir::func::FuncOp>(mlir::createCanonicalizerPass());
   pm.addNestedPass<mlir::func::FuncOp>(numba::createSCFVectorizePass());
+  pm.addNestedPass<mlir::func::FuncOp>(mlir::createCSEPass());
   pm.addNestedPass<mlir::func::FuncOp>(mlir::createCanonicalizerPass());
 }
 } // namespace
