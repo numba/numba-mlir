@@ -3135,6 +3135,9 @@ static const constexpr llvm::StringLiteral
 
 static bool defaultControlFusionFn(mlir::OpOperand *fusedOperand) {
   assert(fusedOperand);
+  if (llvm::hasNItemsOrMore(fusedOperand->get().getUses(), 2))
+    return false;
+
   if (auto generic =
           mlir::dyn_cast<mlir::linalg::GenericOp>(fusedOperand->getOwner())) {
     // Mixed generics fusion
