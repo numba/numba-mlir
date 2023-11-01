@@ -991,8 +991,8 @@ def test_array_vectorize(arr):
         jit_func = njit(py_func)
         assert_allclose(py_func(arr), jit_func(arr))
         ir = get_print_buffer()
-        assert ir.count("vector.load") > 0, ir
-        assert ir.count("vector.store") > 0, ir
+        assert ir.count("vector.maskedload") > 0, ir
+        assert ir.count("vector.maskedstore") > 0, ir
 
 
 @pytest.mark.parametrize(
@@ -1019,7 +1019,7 @@ def test_array_reduction_vectorize(py_func, arr):
         jit_func = njit(py_func)
         assert_allclose(py_func(arr), jit_func(arr))
         ir = get_print_buffer()
-        assert ir.count("vector.load") > 0, ir
+        assert ir.count("vector.maskedload") > 0, ir
         assert ir.count("vector.reduction") > 0, ir
 
 
@@ -1035,8 +1035,8 @@ def test_prange_vectorize_1d():
         jit_func = njit(py_func)
         assert_allclose(py_func(arr), jit_func(arr))
         ir = get_print_buffer()
-        assert ir.count("vector.load") > 0, ir
-        assert ir.count("vector.store") > 0, ir
+        assert ir.count("vector.maskedload") > 0, ir
+        assert ir.count("vector.maskedstore") > 0, ir
 
 
 @pytest.mark.xfail
@@ -1053,8 +1053,8 @@ def test_prange_vectorize_2d():
         jit_func = njit(py_func)
         assert_allclose(py_func(arr), jit_func(arr))
         ir = get_print_buffer()
-        assert ir.count("vector.load") > 0, ir
-        assert ir.count("vector.store") > 0, ir
+        assert ir.count("vector.maskedload") > 0, ir
+        assert ir.count("vector.maskedstore") > 0, ir
 
 
 def test_copy_fusion():
