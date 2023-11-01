@@ -32,6 +32,7 @@
 #include <mlir/Dialect/UB/IR/UBOps.h>
 #include <mlir/Dialect/Vector/IR/VectorOps.h>
 #include <mlir/Dialect/Vector/Transforms/LoweringPatterns.h>
+#include <mlir/Dialect/Vector/Transforms/VectorRewritePatterns.h>
 #include <mlir/Dialect/Vector/Transforms/VectorTransforms.h>
 #include <mlir/IR/Builders.h>
 #include <mlir/IR/IRMapping.h>
@@ -1795,7 +1796,14 @@ struct LLVMLoweringPass
     arith::populateArithToLLVMConversionPatterns(typeConverter, patterns);
     populateComplexToLLVMConversionPatterns(typeConverter, patterns);
     ub::populateUBToLLVMConversionPatterns(typeConverter, patterns);
-    populateVectorToLLVMConversionPatterns(typeConverter, patterns);
+
+    bool force32BitVectorIndices = false;
+    bool reassociateFPReductions = false;
+    vector::populateVectorMaskMaterializationPatterns(patterns,
+                                                      force32BitVectorIndices);
+    populateVectorToLLVMConversionPatterns(typeConverter, patterns,
+                                           reassociateFPReductions,
+                                           force32BitVectorIndices);
 
     patterns.insert<AllocOpLowering, DeallocOpLowering, LowerRetainOp,
                     LowerWrapAllocPointerOp, LowerGetAllocToken,

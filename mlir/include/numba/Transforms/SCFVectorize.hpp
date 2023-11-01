@@ -21,6 +21,7 @@ struct SCFVectorizeInfo {
   unsigned dim = 0;
   unsigned factor = 0;
   unsigned count = 0;
+  bool masked = false;
 };
 
 std::optional<SCFVectorizeInfo> getLoopVectorizeInfo(mlir::scf::ParallelOp loop,
@@ -30,6 +31,7 @@ std::optional<SCFVectorizeInfo> getLoopVectorizeInfo(mlir::scf::ParallelOp loop,
 struct SCFVectorizeParams {
   unsigned dim = 0;
   unsigned factor = 0;
+  bool masked = false;
 };
 
 mlir::LogicalResult vectorizeLoop(mlir::OpBuilder &builder,

@@ -97,58 +97,6 @@ cavTriviallyVectorizeMemOp(mlir::scf::ParallelOp loop, unsigned dim,
   return std::nullopt;
 }
 
-std::optional<numba::SCFVectorizeInfo>
-numba::getLoopVectorizeInfo(mlir::scf::ParallelOp loop, unsigned dim,
-                            unsigned vectorBitwidth) {
-  assert(dim < loop.getStep().size());
-  assert(vectorBitwidth > 0);
-  unsigned factor = vectorBitwidth / 8;
-  if (factor <= 1)
-    return std::nullopt;
-
-  if (!mlir::isConstantIntValue(loop.getStep()[dim], 1))
-    return std::nullopt;
-
-  unsigned count = 0;
-
-  for (mlir::Operation &op : loop.getBody()->without_terminator()) {
-    if (mlir::isa<mlir::scf::ReduceOp>(op))
-      continue;
-
-    if (op.getNumRegions() > 0)
-      return std::nullopt;
-
-    if (auto w = cavTriviallyVectorizeMemOp(loop, dim, op)) {
-      auto newFactor = vectorBitwidth / *w;
-      if (newFactor > 1) {
-        factor = std::min(factor, newFactor);
-        ++count;
-      }
-      continue;
-    }
-
-    if (!isSupportedVectorOp(op))
-      continue;
-
-    auto width = getArgsTypeWidth(op);
-    if (width == 0)
-      return std::nullopt;
-
-    auto newFactor = vectorBitwidth / width;
-    if (newFactor <= 1)
-      continue;
-
-    factor = std::min(factor, newFactor);
-
-    ++count;
-  }
-
-  if (count == 0)
-    return std::nullopt;
-
-  return SCFVectorizeInfo{dim, factor, count};
-}
-
 template <typename T> static bool isOp(mlir::Operation &op) {
   return mlir::isa<T>(op);
 }
@@ -180,6 +128,65 @@ getReductionKind(mlir::scf::ReduceOp op) {
   return std::nullopt;
 }
 
+std::optional<numba::SCFVectorizeInfo>
+numba::getLoopVectorizeInfo(mlir::scf::ParallelOp loop, unsigned dim,
+                            unsigned vectorBitwidth) {
+  assert(dim < loop.getStep().size());
+  assert(vectorBitwidth > 0);
+  unsigned factor = vectorBitwidth / 8;
+  if (factor <= 1)
+    return std::nullopt;
+
+  if (!mlir::isConstantIntValue(loop.getStep()[dim], 1))
+    return std::nullopt;
+
+  unsigned count = 0;
+  bool masked = true;
+
+  for (mlir::Operation &op : loop.getBody()->without_terminator()) {
+    if (auto reduce = mlir::dyn_cast<mlir::scf::ReduceOp>(op)) {
+      if (!getReductionKind(reduce))
+        masked = false;
+
+      continue;
+    }
+
+    if (op.getNumRegions() > 0)
+      return std::nullopt;
+
+    if (auto w = cavTriviallyVectorizeMemOp(loop, dim, op)) {
+      auto newFactor = vectorBitwidth / *w;
+      if (newFactor > 1) {
+        factor = std::min(factor, newFactor);
+        ++count;
+      }
+      continue;
+    }
+
+    if (!isSupportedVectorOp(op)) {
+      masked = false;
+      continue;
+    }
+
+    auto width = getArgsTypeWidth(op);
+    if (width == 0)
+      return std::nullopt;
+
+    auto newFactor = vectorBitwidth / width;
+    if (newFactor <= 1)
+      continue;
+
+    factor = std::min(factor, newFactor);
+
+    ++count;
+  }
+
+  if (count == 0)
+    return std::nullopt;
+
+  return SCFVectorizeInfo{dim, factor, count, masked};
+}
+
 static mlir::arith::FastMathFlags getFMF(mlir::Operation &op) {
   if (auto fmf = mlir::dyn_cast<mlir::arith::ArithFastMathInterface>(op))
     return fmf.getFastMathFlagsAttr().getValue();
@@ -192,6 +199,7 @@ numba::vectorizeLoop(mlir::OpBuilder &builder, mlir::scf::ParallelOp loop,
                      const numba::SCFVectorizeParams &params) {
   auto dim = params.dim;
   auto factor = params.factor;
+  auto masked = params.masked;
   assert(dim < loop.getStep().size());
   assert(factor > 1);
   assert(mlir::isConstantIntValue(loop.getStep()[dim], 1));
@@ -214,8 +222,16 @@ numba::vectorizeLoop(mlir::OpBuilder &builder, mlir::scf::ParallelOp loop,
   auto origUpper = upper[dim];
   mlir::Value count =
       builder.create<mlir::arith::SubIOp>(loc, origUpper, origLower);
-  mlir::Value newCount =
-      builder.create<mlir::arith::DivSIOp>(loc, count, factorVal);
+  mlir::Value newCount;
+  if (masked) {
+    mlir::Value incCount =
+        builder.create<mlir::arith::AddIOp>(loc, count, factorVal);
+    mlir::Value one = builder.create<mlir::arith::ConstantIndexOp>(loc, 1);
+    incCount = builder.create<mlir::arith::SubIOp>(loc, incCount, one);
+    newCount = builder.create<mlir::arith::DivSIOp>(loc, incCount, factorVal);
+  } else {
+    newCount = builder.create<mlir::arith::DivSIOp>(loc, count, factorVal);
+  }
 
   mlir::Value zero = builder.create<mlir::arith::ConstantIndexOp>(loc, 0);
   lower[dim] = zero;
@@ -325,9 +341,18 @@ numba::vectorizeLoop(mlir::OpBuilder &builder, mlir::scf::ParallelOp loop,
     if (mask)
       return mask;
 
+    mlir::OpFoldResult maskSize;
+    if (masked) {
+      mlir::Value size =
+          builder.create<mlir::arith::MulIOp>(loc, factorVal, newIndexVar);
+      maskSize =
+          builder.create<mlir::arith::SubIOp>(loc, count, size).getResult();
+    } else {
+      maskSize = builder.getIndexAttr(factor);
+    }
     auto vecType = toVectorType(builder.getI1Type());
-    mlir::OpFoldResult attr = builder.getIndexAttr(factor);
-    mask = builder.create<mlir::vector::CreateMaskOp>(loc, vecType, attr);
+    mask = builder.create<mlir::vector::CreateMaskOp>(loc, vecType, maskSize);
+
     return mask;
   };
 
@@ -366,11 +391,42 @@ numba::vectorizeLoop(mlir::OpBuilder &builder, mlir::scf::ParallelOp loop,
            memrefType.getLayout().isIdentity();
   };
 
+  auto genLoad = [&](auto loadOp) {
+    auto indices = getMemrefVecIndices(loadOp.getIndices());
+    auto resType = toVectorType(loadOp.getResult().getType());
+    auto memref = loadOp.getMemRef();
+    mlir::Value vecLoad;
+    if (masked) {
+      auto mask = getMask();
+      auto init = createPosionVec(resType);
+      vecLoad = builder.create<mlir::vector::MaskedLoadOp>(loc, resType, memref,
+                                                           indices, mask, init);
+    } else {
+      vecLoad =
+          builder.create<mlir::vector::LoadOp>(loc, resType, memref, indices);
+    }
+    mapping.map(loadOp.getResult(), vecLoad);
+  };
+
+  auto genStore = [&](auto storeOp) {
+    auto indices = getMemrefVecIndices(storeOp.getIndices());
+    auto value = getVecVal(storeOp.getValueToStore());
+    auto memref = storeOp.getMemRef();
+    if (masked) {
+      auto mask = getMask();
+      builder.create<mlir::vector::MaskedStoreOp>(loc, memref, indices, mask,
+                                                  value);
+    } else {
+      builder.create<mlir::vector::StoreOp>(loc, value, memref, indices);
+    }
+  };
+
   llvm::SmallVector<mlir::Value> duplicatedArgs;
   llvm::SmallVector<mlir::Value> duplicatedResults;
 
   builder.setInsertionPointToStart(newLoop.getBody());
   for (mlir::Operation &op : loop.getBody()->without_terminator()) {
+    loc = op.getLoc();
     if (isSupportedVectorOp(op)) {
       for (auto arg : op.getOperands())
         getVecVal(arg); // init mapper for op args
@@ -389,10 +445,26 @@ numba::vectorizeLoop(mlir::OpBuilder &builder, mlir::scf::ParallelOp loop,
 
       mlir::Value reduceVal;
       if (auto redKind = getReductionKind(reduceOp)) {
+        mlir::Value redArg = getVecVal(reduceOp.getOperand());
+        if (redArg) {
+          auto neutral = mlir::arith::getNeutralElement(&reduceBody.front());
+          assert(neutral);
+          mlir::Value neutralVal =
+              builder.create<mlir::arith::ConstantOp>(loc, *neutral);
+          mlir::Value neutralVec = builder.create<mlir::vector::SplatOp>(
+              loc, neutralVal, redArg.getType());
+          auto mask = getMask();
+          redArg = builder.create<mlir::arith::SelectOp>(loc, mask, redArg,
+                                                         neutralVec);
+        }
+
         auto fmf = getFMF(reduceBody.front());
-        reduceVal = builder.create<mlir::vector::ReductionOp>(
-            loc, *redKind, getVecVal(reduceOp.getOperand()), fmf);
+        reduceVal = builder.create<mlir::vector::ReductionOp>(loc, *redKind,
+                                                              redArg, fmf);
       } else {
+        if (masked)
+          return op.emitError("Cannot vectorize op in masked mode");
+
         auto reduceTerm =
             mlir::cast<mlir::scf::ReduceReturnOp>(reduceBody.getTerminator());
         auto lhs = reduceBody.getArgument(0);
@@ -418,12 +490,7 @@ numba::vectorizeLoop(mlir::OpBuilder &builder, mlir::scf::ParallelOp loop,
 
     if (auto loadOp = mlir::dyn_cast<mlir::memref::LoadOp>(op)) {
       if (canTriviallyVectorizeMemOp(loadOp)) {
-        auto indices = getMemrefVecIndices(loadOp.getIndices());
-        auto resType = toVectorType(loadOp.getResult().getType());
-        auto memref = loadOp.getMemRef();
-        auto vecLoad = builder.create<mlir::vector::LoadOp>(
-            op.getLoc(), resType, memref, indices);
-        mapping.map(loadOp.getResult(), vecLoad.getResult());
+        genLoad(loadOp);
         continue;
       }
       if (canGatherScatter(loadOp)) {
@@ -434,7 +501,7 @@ numba::vectorizeLoop(mlir::OpBuilder &builder, mlir::scf::ParallelOp loop,
         auto init = createPosionVec(resType);
 
         auto gather = builder.create<mlir::vector::GatherOp>(
-            op.getLoc(), resType, memref, zero, indexVec, mask, init);
+            loc, resType, memref, zero, indexVec, mask, init);
         mapping.map(loadOp.getResult(), gather.getResult());
         continue;
       }
@@ -442,11 +509,7 @@ numba::vectorizeLoop(mlir::OpBuilder &builder, mlir::scf::ParallelOp loop,
 
     if (auto storeOp = mlir::dyn_cast<mlir::memref::StoreOp>(op)) {
       if (canTriviallyVectorizeMemOp(storeOp)) {
-        auto indices = getMemrefVecIndices(storeOp.getIndices());
-        auto value = getVecVal(storeOp.getValueToStore());
-        auto memref = storeOp.getMemRef();
-        builder.create<mlir::vector::StoreOp>(op.getLoc(), value, memref,
-                                              indices);
+        genStore(storeOp);
         continue;
       }
       if (canGatherScatter(storeOp)) {
@@ -455,12 +518,15 @@ numba::vectorizeLoop(mlir::OpBuilder &builder, mlir::scf::ParallelOp loop,
         auto mask = getMask();
         auto indexVec = getVecVal(storeOp.getIndices()[0]);
 
-        builder.create<mlir::vector::ScatterOp>(op.getLoc(), memref, zero,
-                                                indexVec, mask, value);
+        builder.create<mlir::vector::ScatterOp>(loc, memref, zero, indexVec,
+                                                mask, value);
       }
     }
 
     // Fallback: Failed to vectorize op, just duplicate it `factor` times
+    if (masked)
+      return op.emitError("Cannot vectorize op in masked mode");
+
     scalarMapping.clear();
 
     auto numArgs = op.getNumOperands();
@@ -494,15 +560,21 @@ numba::vectorizeLoop(mlir::OpBuilder &builder, mlir::scf::ParallelOp loop,
     }
   }
 
-  builder.setInsertionPoint(loop);
-  mlir::Value newLower =
-      builder.create<mlir::arith::MulIOp>(loc, newCount, factorVal);
-  newLower = builder.create<mlir::arith::AddIOp>(loc, origLower, newLower);
+  if (masked) {
+    loop->replaceAllUsesWith(newLoop.getResults());
+    loop->erase();
+  } else {
+    builder.setInsertionPoint(loop);
+    mlir::Value newLower =
+        builder.create<mlir::arith::MulIOp>(loc, newCount, factorVal);
+    newLower = builder.create<mlir::arith::AddIOp>(loc, origLower, newLower);
 
-  auto lowerCopy = llvm::to_vector(loop.getLowerBound());
-  lowerCopy[dim] = newLower;
-  loop.getLowerBoundMutable().assign(lowerCopy);
-  loop.getInitValsMutable().assign(newLoop.getResults());
+    auto lowerCopy = llvm::to_vector(loop.getLowerBound());
+    lowerCopy[dim] = newLower;
+    loop.getLowerBoundMutable().assign(lowerCopy);
+    loop.getInitValsMutable().assign(newLoop.getResults());
+  }
+
   return mlir::success();
 }
 
@@ -542,7 +614,7 @@ struct SCFVectorizePass
         toVectorize;
 
     auto getBenefit = [](const numba::SCFVectorizeInfo &info) {
-      return info.factor * info.count;
+      return info.factor * info.count * (int(info.masked) + 1);
     };
 
     getOperation()->walk([&](mlir::scf::ParallelOp loop) {
@@ -569,7 +641,8 @@ struct SCFVectorizePass
         return;
 
       toVectorize.emplace_back(
-          loop, numba::SCFVectorizeParams{best->dim, best->factor});
+          loop,
+          numba::SCFVectorizeParams{best->dim, best->factor, best->masked});
     });
 
     if (toVectorize.empty())
