@@ -3327,9 +3327,55 @@ struct FuseAdjacentGenerics
   }
 };
 
+static bool hasTensorPrevTo(mlir::Operation &op) {
+  auto it = mlir::Block::iterator(op);
+  auto block = op.getBlock();
+  auto begin = block->begin();
+  if (it == begin)
+    return false;
+  auto &prevOp = *std::prev(it);
+  return mlir::isa<numba::ntensor::ToTensorOp>(prevOp);
+}
+
+struct MoveToTensor
+    : public mlir::OpRewritePattern<numba::ntensor::ToTensorOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(numba::ntensor::ToTensorOp op,
+                  mlir::PatternRewriter &rewriter) const override {
+    if (hasTensorPrevTo(*op))
+      return mlir::failure();
+
+    auto src = op.getArray();
+    if (auto defOp = src.getDefiningOp()) {
+      auto it1 = mlir::Block::iterator(defOp);
+      auto it2 = mlir::Block::iterator(op);
+      if (std::next(it1) == it2)
+        return mlir::failure();
+
+      rewriter.updateRootInPlace(op, [&]() { op->moveAfter(defOp); });
+      return mlir::success();
+    }
+
+    auto block = mlir::cast<mlir::BlockArgument>(src).getParentBlock();
+    auto begin = block->begin();
+    auto it = mlir::Block::iterator(op);
+    if (it == begin)
+      return mlir::failure();
+
+    auto &prevOp = *std::prev(it);
+    if (prevOp.hasTrait<mlir::OpTrait::ConstantLike>())
+      return mlir::failure();
+
+    rewriter.updateRootInPlace(op, [&]() { op->moveBefore(&(*begin)); });
+    return mlir::success();
+  }
+};
+
 struct FuseAdjacentGenericsPass
     : public numba::RewriteWrapperPass<FuseAdjacentGenericsPass, void, void,
-                                       FuseAdjacentGenerics> {};
+                                       FuseAdjacentGenerics, MoveToTensor> {};
 
 template <typename F>
 static bool mayAliasImpl(mlir::Value src, F &&mayAliasCheck) {
