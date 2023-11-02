@@ -3185,6 +3185,152 @@ void LinalgOptInnerPass::runOnOperation() {
     return signalPassFailure();
 }
 
+struct FuseAdjacentGenerics
+    : public mlir::OpRewritePattern<mlir::linalg::GenericOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(mlir::linalg::GenericOp op,
+                  mlir::PatternRewriter &rewriter) const override {
+    if (!op.hasTensorSemantics())
+      return mlir::failure();
+
+    llvm::SmallDenseMap<mlir::Value, mlir::Attribute> origArgs;
+    auto block = op->getBlock();
+    auto begin = std::next(mlir::Block::iterator(op));
+    auto end = mlir::Block::iterator(block->getTerminator());
+
+    mlir::DominanceInfo dom;
+    for (auto &nextOp : llvm::make_range(begin, end)) {
+      auto other = mlir::dyn_cast<mlir::linalg::GenericOp>(nextOp);
+      if (!other || other.getIteratorTypes() != op.getIteratorTypes() ||
+          !other.hasTensorSemantics())
+        continue;
+
+      auto dominates = [&]() -> bool {
+        for (auto arg : other.getOperands())
+          if (!dom.properlyDominates(arg, op))
+            return false;
+
+        return true;
+      }();
+      if (!dominates)
+        continue;
+
+      if (origArgs.empty()) {
+        for (auto &&[arg, map] :
+             llvm::zip(op.getOperands(), op.getIndexingMaps()))
+          origArgs.insert({arg, map});
+      }
+
+      auto hasSameArg = [&]() -> bool {
+        for (auto &&[arg, map] :
+             llvm::zip(other.getOperands(), other.getIndexingMaps())) {
+          auto it = origArgs.find(arg);
+          if (it != origArgs.end() && it->second == map)
+            return true;
+        }
+        return false;
+      }();
+
+      if (!hasSameArg)
+        continue;
+
+      auto concat = [](auto &&range1, auto &&range2) {
+        auto ret = llvm::to_vector(range1);
+        ret.append(range2.begin(), range2.end());
+        return ret;
+      };
+
+      auto numArgs1 = op.getInputs().size();
+      auto numArgs2 = other.getInputs().size();
+      auto numRes1 = op.getOutputs().size();
+      auto numRes2 = other.getOutputs().size();
+
+      auto newInputs = concat(op.getInputs(), other.getInputs());
+      auto newOutputs = concat(op.getOutputs(), other.getOutputs());
+
+      auto getMaps = [](auto c) {
+        return llvm::map_range(c, [](auto a) {
+          return mlir::cast<mlir::AffineMapAttr>(a).getValue();
+        });
+      };
+      llvm::SmallVector<mlir::AffineMap> newMaps;
+      llvm::append_range(
+          newMaps,
+          getMaps(op.getIndexingMaps().getValue().take_front(numArgs1)));
+      llvm::append_range(
+          newMaps,
+          getMaps(other.getIndexingMaps().getValue().take_front(numArgs2)));
+      llvm::append_range(
+          newMaps,
+          getMaps(op.getIndexingMaps().getValue().drop_front(numArgs1)));
+      llvm::append_range(
+          newMaps,
+          getMaps(other.getIndexingMaps().getValue().drop_front(numArgs2)));
+
+      auto newResTypes = concat(op.getResultTypes(), other.getResultTypes());
+
+      auto iterators = op.getIteratorTypesArray();
+
+      auto loc = op.getLoc();
+
+      auto bodyBuilder = [](mlir::OpBuilder &, mlir::Location,
+                            mlir::ValueRange) {};
+      auto newGeneric = rewriter.create<mlir::linalg::GenericOp>(
+          loc, newResTypes, newInputs, newOutputs, newMaps, iterators,
+          bodyBuilder);
+
+      auto newBody = newGeneric.getBody();
+
+      auto body1 = op.getBody();
+      auto body2 = other.getBody();
+      auto term1 = mlir::cast<mlir::linalg::YieldOp>(body1->getTerminator());
+      auto term2 = mlir::cast<mlir::linalg::YieldOp>(body2->getTerminator());
+
+      auto newInArgs = newBody->getArguments().take_front(numArgs1 + numArgs2);
+      auto newOutArgs = newBody->getArguments().drop_front(numArgs1 + numArgs2);
+
+      (void)numRes2;
+      assert(newOutArgs.size() == (numRes1 + numRes2));
+
+      llvm::SmallVector<mlir::Value> blockArgs;
+      llvm::append_range(blockArgs, newInArgs.take_front(numArgs1));
+      llvm::append_range(blockArgs, newOutArgs.take_front(numRes1));
+
+      assert(blockArgs.size() == body1->getNumArguments());
+      rewriter.inlineBlockBefore(body1, newBody, newBody->end(), blockArgs);
+
+      blockArgs.clear();
+      llvm::append_range(blockArgs, newInArgs.drop_front(numArgs1));
+      llvm::append_range(blockArgs, newOutArgs.drop_front(numRes1));
+
+      assert(blockArgs.size() == body2->getNumArguments());
+      rewriter.inlineBlockBefore(body2, newBody, newBody->end(), blockArgs);
+
+      auto newYieldArgs = concat(term1.getValues(), term2.getValues());
+
+      rewriter.eraseOp(term1);
+      rewriter.eraseOp(term2);
+
+      mlir::OpBuilder::InsertionGuard g(rewriter);
+      rewriter.setInsertionPointToEnd(newBody);
+      rewriter.create<mlir::linalg::YieldOp>(loc, newYieldArgs);
+
+      auto newResults = newGeneric.getResults();
+      rewriter.replaceOp(op, newResults.take_front(numRes1));
+      rewriter.replaceOp(other, newResults.drop_front(numRes1));
+
+      return mlir::success();
+    }
+    return mlir::failure();
+  }
+};
+
+struct FuseAdjacentGenericsPass
+    : public numba::RewriteWrapperPass<FuseAdjacentGenericsPass, void, void,
+                                       FuseAdjacentGenerics> {};
+
 template <typename F>
 static bool mayAliasImpl(mlir::Value src, F &&mayAliasCheck) {
   llvm::SmallVector<mlir::Value> worklist;
@@ -4248,6 +4394,8 @@ static void populatePlierToLinalgOptPipeline(mlir::OpPassManager &pm) {
             std::make_unique<MixedGenericsAliasAnalysis>());
         p.addNestedPass<mlir::func::FuncOp>(
             std::make_unique<LinalgOptInnerPass>());
+        p.addNestedPass<mlir::func::FuncOp>(
+            std::make_unique<FuseAdjacentGenericsPass>());
         p.addPass(numba::createRemoveUnusedArgsPass());
       }));
 
