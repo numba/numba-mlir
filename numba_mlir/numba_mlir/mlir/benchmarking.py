@@ -164,6 +164,7 @@ def get_dpctl_devices():
 class BenchmarkBase:
     timer = timeit.default_timer
     version = "base"
+    timeout = 120
 
     def __init__(self):
         self.is_validate = VALIDATE
