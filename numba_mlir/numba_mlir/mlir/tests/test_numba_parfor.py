@@ -683,6 +683,60 @@ def test_replace_parfor_prange():
         assert len(ir) > 0  # Check some code was actually generated
 
 
+def test_replace_parfor_2prange():
+    def py_func(a, b, c, d):
+        for i in numba.prange(n):
+            c[i] = a[i] + b[i]
+        for i in numba.prange(n):
+            d[i] = a[i] - b[i]
+        return
+
+    n = 10
+    a = np.arange(n, dtype=np.float32) * 2
+    b = np.arange(n, dtype=np.float32)
+    c1 = np.zeros((n), dtype=np.float32)
+    d1 = np.zeros((n), dtype=np.float32)
+    c2 = np.zeros_like(c1)
+    d2 = np.zeros_like(d1)
+
+    jit_func = njit_replace_parfors(py_func, parallel=True)
+    with print_pass_ir([], ["CFGToSCFPass"]):
+        py_func(a, b, c1, d1)
+        jit_func(a, b, c2, d2)
+        assert_equal(c1, c2)
+        assert_equal(d1, d2)
+        ir = get_print_buffer()
+        assert len(ir) > 0  # Check some code was actually generated
+
+
+def test_replace_parfor_2prange_red():
+    def py_func(a, b, c, d):
+        res = 0
+        for i in numba.prange(n):
+            c[i] = a[i] + b[i]
+        for i in numba.prange(n):
+            d[i] = a[i] - b[i]
+        for i in numba.prange(n):
+            res += a[i] * b[i]
+        return
+
+    n = 10
+    a = np.arange(n, dtype=np.float32) * 2
+    b = np.arange(n, dtype=np.float32)
+    c1 = np.zeros((n), dtype=np.float32)
+    d1 = np.zeros((n), dtype=np.float32)
+    c2 = np.zeros_like(c1)
+    d2 = np.zeros_like(d1)
+
+    jit_func = njit_replace_parfors(py_func, parallel=True)
+    with print_pass_ir([], ["CFGToSCFPass"]):
+        assert_equal(py_func(a, b, c1, d1), jit_func(a, b, c2, d2))
+        assert_equal(c1, c2)
+        assert_equal(d1, d2)
+        ir = get_print_buffer()
+        assert len(ir) > 0  # Check some code was actually generated
+
+
 def test_replace_parfor_prange_nested():
     def py_func(c):
         for i in numba.prange(c.shape[0]):

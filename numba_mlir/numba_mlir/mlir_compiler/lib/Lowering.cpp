@@ -378,7 +378,10 @@ struct PlierLowerer final {
     builder.setInsertionPointToStart(block);
     numba::util::EnvironmentRegionOp regionOp;
     auto redVars = parforInst.attr("redvars");
-    llvm::SmallVector<mlir::Type> reductionTypes(py::len(redVars),
+
+    auto numRets =
+        py::len(redVars) + py::len(compilationContext["parfor_output_arrays"]);
+    llvm::SmallVector<mlir::Type> reductionTypes(numRets,
                                                  builder.getNoneType());
 
     if (env) {
@@ -406,7 +409,7 @@ struct PlierLowerer final {
     if (env) {
       builder.create<numba::util::EnvironmentRegionYieldOp>(loc, results);
       for (auto &&[i, res] : llvm::enumerate(reductionTypes))
-        regionOp->getResult(i).setType(res);
+        regionOp->getResult(i).setType(results[i].getType());
 
       results = regionOp.getResults();
       builder.setInsertionPointToEnd(block);
