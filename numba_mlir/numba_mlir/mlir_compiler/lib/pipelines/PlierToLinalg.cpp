@@ -3197,131 +3197,138 @@ struct FuseAdjacentGenerics
 
     llvm::SmallDenseMap<mlir::Value, mlir::Attribute> origArgs;
     auto block = op->getBlock();
-    auto begin = std::next(mlir::Block::iterator(op));
-    auto end = mlir::Block::iterator(block->getTerminator());
-
     mlir::DominanceInfo dom;
-    for (auto &nextOp : llvm::make_range(begin, end)) {
-      auto other = mlir::dyn_cast<mlir::linalg::GenericOp>(nextOp);
-      if (!other || other.getIteratorTypes() != op.getIteratorTypes() ||
-          !other.hasTensorSemantics())
-        continue;
+    for (auto opArg : op->getOperands()) {
+      for (auto user : opArg.getUsers()) {
+        if (user == op)
+          continue;
 
-      auto dominates = [&]() -> bool {
-        for (auto arg : other.getOperands())
-          if (!dom.properlyDominates(arg, op))
-            return false;
+        if (block != user->getBlock() || !dom.properlyDominates(op, user))
+          continue;
 
-        return true;
-      }();
-      if (!dominates)
-        continue;
+        auto other = mlir::dyn_cast<mlir::linalg::GenericOp>(user);
+        if (!other || other.getIteratorTypes() != op.getIteratorTypes() ||
+            !other.hasTensorSemantics())
+          continue;
 
-      if (origArgs.empty()) {
-        for (auto &&[arg, map] :
-             llvm::zip(op.getOperands(), op.getIndexingMaps()))
-          origArgs.insert({arg, map});
-      }
+        auto dominates = [&]() -> bool {
+          for (auto arg : other.getOperands())
+            if (!dom.properlyDominates(arg, op))
+              return false;
 
-      auto hasSameArg = [&]() -> bool {
-        for (auto &&[arg, map] :
-             llvm::zip(other.getOperands(), other.getIndexingMaps())) {
-          auto it = origArgs.find(arg);
-          if (it != origArgs.end() && it->second == map)
-            return true;
+          return true;
+        }();
+        if (!dominates)
+          continue;
+
+        if (origArgs.empty()) {
+          for (auto &&[arg, map] :
+               llvm::zip(op.getOperands(), op.getIndexingMaps()))
+            origArgs.insert({arg, map});
         }
-        return false;
-      }();
 
-      if (!hasSameArg)
-        continue;
+        auto hasSameArg = [&]() -> bool {
+          for (auto &&[arg, map] :
+               llvm::zip(other.getOperands(), other.getIndexingMaps())) {
+            auto it = origArgs.find(arg);
+            if (it != origArgs.end() && it->second == map)
+              return true;
+          }
+          return false;
+        }();
 
-      auto concat = [](auto &&range1, auto &&range2) {
-        auto ret = llvm::to_vector(range1);
-        ret.append(range2.begin(), range2.end());
-        return ret;
-      };
+        if (!hasSameArg)
+          continue;
 
-      auto numArgs1 = op.getInputs().size();
-      auto numArgs2 = other.getInputs().size();
-      auto numRes1 = op.getOutputs().size();
-      auto numRes2 = other.getOutputs().size();
+        auto concat = [](auto &&range1, auto &&range2) {
+          auto ret = llvm::to_vector(range1);
+          ret.append(range2.begin(), range2.end());
+          return ret;
+        };
 
-      auto newInputs = concat(op.getInputs(), other.getInputs());
-      auto newOutputs = concat(op.getOutputs(), other.getOutputs());
+        auto numArgs1 = op.getInputs().size();
+        auto numArgs2 = other.getInputs().size();
+        auto numRes1 = op.getOutputs().size();
+        auto numRes2 = other.getOutputs().size();
 
-      auto getMaps = [](auto c) {
-        return llvm::map_range(c, [](auto a) {
-          return mlir::cast<mlir::AffineMapAttr>(a).getValue();
-        });
-      };
-      llvm::SmallVector<mlir::AffineMap> newMaps;
-      llvm::append_range(
-          newMaps,
-          getMaps(op.getIndexingMaps().getValue().take_front(numArgs1)));
-      llvm::append_range(
-          newMaps,
-          getMaps(other.getIndexingMaps().getValue().take_front(numArgs2)));
-      llvm::append_range(
-          newMaps,
-          getMaps(op.getIndexingMaps().getValue().drop_front(numArgs1)));
-      llvm::append_range(
-          newMaps,
-          getMaps(other.getIndexingMaps().getValue().drop_front(numArgs2)));
+        auto newInputs = concat(op.getInputs(), other.getInputs());
+        auto newOutputs = concat(op.getOutputs(), other.getOutputs());
 
-      auto newResTypes = concat(op.getResultTypes(), other.getResultTypes());
+        auto getMaps = [](auto c) {
+          return llvm::map_range(c, [](auto a) {
+            return mlir::cast<mlir::AffineMapAttr>(a).getValue();
+          });
+        };
+        llvm::SmallVector<mlir::AffineMap> newMaps;
+        llvm::append_range(
+            newMaps,
+            getMaps(op.getIndexingMaps().getValue().take_front(numArgs1)));
+        llvm::append_range(
+            newMaps,
+            getMaps(other.getIndexingMaps().getValue().take_front(numArgs2)));
+        llvm::append_range(
+            newMaps,
+            getMaps(op.getIndexingMaps().getValue().drop_front(numArgs1)));
+        llvm::append_range(
+            newMaps,
+            getMaps(other.getIndexingMaps().getValue().drop_front(numArgs2)));
 
-      auto iterators = op.getIteratorTypesArray();
+        auto newResTypes = concat(op.getResultTypes(), other.getResultTypes());
 
-      auto loc = op.getLoc();
+        auto iterators = op.getIteratorTypesArray();
 
-      auto bodyBuilder = [](mlir::OpBuilder &, mlir::Location,
-                            mlir::ValueRange) {};
-      auto newGeneric = rewriter.create<mlir::linalg::GenericOp>(
-          loc, newResTypes, newInputs, newOutputs, newMaps, iterators,
-          bodyBuilder);
+        auto loc = op.getLoc();
 
-      auto newBody = newGeneric.getBody();
+        auto bodyBuilder = [](mlir::OpBuilder &, mlir::Location,
+                              mlir::ValueRange) {};
+        auto newGeneric = rewriter.create<mlir::linalg::GenericOp>(
+            loc, newResTypes, newInputs, newOutputs, newMaps, iterators,
+            bodyBuilder);
 
-      auto body1 = op.getBody();
-      auto body2 = other.getBody();
-      auto term1 = mlir::cast<mlir::linalg::YieldOp>(body1->getTerminator());
-      auto term2 = mlir::cast<mlir::linalg::YieldOp>(body2->getTerminator());
+        auto newBody = newGeneric.getBody();
 
-      auto newInArgs = newBody->getArguments().take_front(numArgs1 + numArgs2);
-      auto newOutArgs = newBody->getArguments().drop_front(numArgs1 + numArgs2);
+        auto body1 = op.getBody();
+        auto body2 = other.getBody();
+        auto term1 = mlir::cast<mlir::linalg::YieldOp>(body1->getTerminator());
+        auto term2 = mlir::cast<mlir::linalg::YieldOp>(body2->getTerminator());
 
-      (void)numRes2;
-      assert(newOutArgs.size() == (numRes1 + numRes2));
+        auto newInArgs =
+            newBody->getArguments().take_front(numArgs1 + numArgs2);
+        auto newOutArgs =
+            newBody->getArguments().drop_front(numArgs1 + numArgs2);
 
-      llvm::SmallVector<mlir::Value> blockArgs;
-      llvm::append_range(blockArgs, newInArgs.take_front(numArgs1));
-      llvm::append_range(blockArgs, newOutArgs.take_front(numRes1));
+        (void)numRes2;
+        assert(newOutArgs.size() == (numRes1 + numRes2));
 
-      assert(blockArgs.size() == body1->getNumArguments());
-      rewriter.inlineBlockBefore(body1, newBody, newBody->end(), blockArgs);
+        llvm::SmallVector<mlir::Value> blockArgs;
+        llvm::append_range(blockArgs, newInArgs.take_front(numArgs1));
+        llvm::append_range(blockArgs, newOutArgs.take_front(numRes1));
 
-      blockArgs.clear();
-      llvm::append_range(blockArgs, newInArgs.drop_front(numArgs1));
-      llvm::append_range(blockArgs, newOutArgs.drop_front(numRes1));
+        assert(blockArgs.size() == body1->getNumArguments());
+        rewriter.inlineBlockBefore(body1, newBody, newBody->end(), blockArgs);
 
-      assert(blockArgs.size() == body2->getNumArguments());
-      rewriter.inlineBlockBefore(body2, newBody, newBody->end(), blockArgs);
+        blockArgs.clear();
+        llvm::append_range(blockArgs, newInArgs.drop_front(numArgs1));
+        llvm::append_range(blockArgs, newOutArgs.drop_front(numRes1));
 
-      auto newYieldArgs = concat(term1.getValues(), term2.getValues());
+        assert(blockArgs.size() == body2->getNumArguments());
+        rewriter.inlineBlockBefore(body2, newBody, newBody->end(), blockArgs);
 
-      rewriter.eraseOp(term1);
-      rewriter.eraseOp(term2);
+        auto newYieldArgs = concat(term1.getValues(), term2.getValues());
 
-      mlir::OpBuilder::InsertionGuard g(rewriter);
-      rewriter.setInsertionPointToEnd(newBody);
-      rewriter.create<mlir::linalg::YieldOp>(loc, newYieldArgs);
+        rewriter.eraseOp(term1);
+        rewriter.eraseOp(term2);
 
-      auto newResults = newGeneric.getResults();
-      rewriter.replaceOp(op, newResults.take_front(numRes1));
-      rewriter.replaceOp(other, newResults.drop_front(numRes1));
+        mlir::OpBuilder::InsertionGuard g(rewriter);
+        rewriter.setInsertionPointToEnd(newBody);
+        rewriter.create<mlir::linalg::YieldOp>(loc, newYieldArgs);
 
-      return mlir::success();
+        auto newResults = newGeneric.getResults();
+        rewriter.replaceOp(op, newResults.take_front(numRes1));
+        rewriter.replaceOp(other, newResults.drop_front(numRes1));
+
+        return mlir::success();
+      }
     }
     return mlir::failure();
   }
