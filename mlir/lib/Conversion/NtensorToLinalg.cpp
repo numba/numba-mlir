@@ -243,6 +243,9 @@ struct ConvertCastOp : public mlir::OpRewritePattern<numba::ntensor::CastOp> {
   mlir::LogicalResult
   matchAndRewrite(numba::ntensor::CastOp op,
                   mlir::PatternRewriter &rewriter) const override {
+    if (!op->hasAttr(kReadonly))
+      return mlir::failure();
+
     auto src = op.getSource();
     auto srcType = getNTensorType(src);
     if (!srcType)
@@ -711,6 +714,9 @@ struct NtensorAliasAnalysisPass
 
       if (auto create = mlir::dyn_cast<numba::ntensor::CreateArrayOp>(op))
         return create.getResult();
+
+      if (auto cast = mlir::dyn_cast<numba::ntensor::CastOp>(op))
+        return cast.getDest();
 
       return {};
     };
