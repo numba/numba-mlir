@@ -3327,14 +3327,16 @@ struct FuseAdjacentGenerics
   }
 };
 
-static bool hasTensorPrevTo(mlir::Operation &op) {
+static bool checkToTensorPrevOp(mlir::Operation &op) {
   auto it = mlir::Block::iterator(op);
   auto block = op.getBlock();
   auto begin = block->begin();
   if (it == begin)
     return false;
+
   auto &prevOp = *std::prev(it);
-  return mlir::isa<numba::ntensor::ToTensorOp>(prevOp);
+  return mlir::isa<numba::ntensor::ToTensorOp>(prevOp) ||
+         prevOp.hasTrait<mlir::OpTrait::ConstantLike>();
 }
 
 struct MoveToTensor
@@ -3344,7 +3346,7 @@ struct MoveToTensor
   mlir::LogicalResult
   matchAndRewrite(numba::ntensor::ToTensorOp op,
                   mlir::PatternRewriter &rewriter) const override {
-    if (hasTensorPrevTo(*op))
+    if (checkToTensorPrevOp(*op))
       return mlir::failure();
 
     auto src = op.getArray();
@@ -3362,10 +3364,6 @@ struct MoveToTensor
     auto begin = block->begin();
     auto it = mlir::Block::iterator(op);
     if (it == begin)
-      return mlir::failure();
-
-    auto &prevOp = *std::prev(it);
-    if (prevOp.hasTrait<mlir::OpTrait::ConstantLike>())
       return mlir::failure();
 
     rewriter.updateRootInPlace(op, [&]() { op->moveBefore(&(*begin)); });
