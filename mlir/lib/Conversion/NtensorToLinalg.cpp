@@ -4,11 +4,11 @@
 
 #include "numba/Conversion/NtensorToLinalg.hpp"
 
+#include "numba/Analysis/AliasAnalysis.hpp"
 #include "numba/Dialect/ntensor/IR/NTensorOps.hpp"
 #include "numba/Dialect/numba_util/Dialect.hpp"
 #include "numba/Dialect/numba_util/Utils.hpp"
 
-#include <mlir/Analysis/AliasAnalysis.h>
 #include <mlir/Dialect/Arith/IR/Arith.h>
 #include <mlir/Dialect/Linalg/IR/Linalg.h>
 #include <mlir/Dialect/MemRef/IR/MemRef.h>
@@ -707,7 +707,7 @@ struct NtensorAliasAnalysisPass
       if (!hasWriters)
         return nullptr;
 
-      return &getAnalysis<mlir::AliasAnalysis>();
+      return &getAnalysis<numba::AliasAnalysis>();
     }();
 
     auto getTensor = [](mlir::Operation *op) -> mlir::Value {
