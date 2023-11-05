@@ -88,6 +88,18 @@ llvm::StringRef numba::getRestrictArgName() { return "numba.restrict"; }
 
 bool numba::isWriter(mlir::Operation &op,
                      llvm::SmallVectorImpl<mlir::Value> &args) {
+  // TODO: unhardcode:
+  if (auto generic = mlir::dyn_cast<mlir::linalg::GenericOp>(op)) {
+    bool hasWrite = false;
+    for (auto out : generic.getOutputs()) {
+      if (mlir::isa<mlir::MemRefType>(out.getType())) {
+        args.emplace_back(out);
+        hasWrite = true;
+      }
+    }
+    return hasWrite;
+  }
+
   if (auto func = mlir::dyn_cast<mlir::CallOpInterface>(op)) {
     llvm::append_range(args, func.getArgOperands());
     return true;

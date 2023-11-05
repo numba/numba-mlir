@@ -3360,11 +3360,15 @@ static bool checkToTensorPrevOp(mlir::Operation &op) {
 
 struct MoveToTensor
     : public mlir::OpRewritePattern<numba::ntensor::ToTensorOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using CheckFuncT = std::function<bool(mlir::Operation *, mlir::Operation *)>;
+  MoveToTensor(mlir::MLIRContext *ctx, CheckFuncT func)
+      : mlir::OpRewritePattern<numba::ntensor::ToTensorOp>(ctx),
+        checkWrites(std::move(func)) {}
 
   mlir::LogicalResult
   matchAndRewrite(numba::ntensor::ToTensorOp op,
                   mlir::PatternRewriter &rewriter) const override {
+    assert(checkWrites);
     if (checkToTensorPrevOp(*op))
       return mlir::failure();
 
@@ -3373,6 +3377,9 @@ struct MoveToTensor
       auto it1 = mlir::Block::iterator(defOp);
       auto it2 = mlir::Block::iterator(op);
       if (std::next(it1) == it2)
+        return mlir::failure();
+
+      if (!checkWrites(op, defOp))
         return mlir::failure();
 
       rewriter.updateRootInPlace(op, [&]() { op->moveAfter(defOp); });
@@ -3385,9 +3392,16 @@ struct MoveToTensor
     if (it == begin)
       return mlir::failure();
 
-    rewriter.updateRootInPlace(op, [&]() { op->moveBefore(&(*begin)); });
+    auto *prevOp = &(*begin);
+    if (!checkWrites(op, prevOp))
+      return mlir::failure();
+
+    rewriter.updateRootInPlace(op, [&]() { op->moveBefore(prevOp); });
     return mlir::success();
   }
+
+private:
+  CheckFuncT checkWrites;
 };
 
 struct FuseAdjacentGenericsPass
@@ -3444,11 +3458,32 @@ struct FuseAdjacentGenericsPass
       return true;
     };
 
+    auto checkWrites = [&](mlir::Operation *toTensor, mlir::Operation *other) {
+      assert(toTensor);
+      assert(other);
+      if (!AA)
+        return true;
+
+      for (auto arg : toTensor->getOperands()) {
+        for (auto &&[writerArg, writers] : writers) {
+          if (AA->alias(arg, writerArg).isNo())
+            continue;
+
+          for (auto &&writer : writers) {
+
+            if (!checkDom(toTensor, other, writer))
+              return false;
+          }
+        }
+      }
+      return true;
+    };
+
     auto *context = &getContext();
     mlir::RewritePatternSet patterns(context);
 
     patterns.insert<FuseAdjacentGenerics>(context, canFuse);
-    patterns.insert<MoveToTensor>(context);
+    patterns.insert<MoveToTensor>(context, checkWrites);
 
     if (mlir::failed(mlir::applyPatternsAndFoldGreedily(getOperation(),
                                                         std::move(patterns))))
