@@ -2615,6 +2615,21 @@ def test_batchnorm():
     assert_allclose(py_func(input), jit_func(input), rtol=1e-4, atol=1e-7)
 
 
+def test_generic_write():
+    def py_func(a, b):
+        e = b[1:]
+        c = a + b
+        e[:] = c[1:]
+        d = a - b
+        return c, d
+
+    jit_func = njit(py_func)
+
+    a = np.arange(12)
+    b = np.arange(1, 13)
+    assert_equal(py_func(a.copy(), b.copy()), jit_func(a.copy(), b.copy()))
+
+
 def test_black_scholes_opt():
     # Black-scholes should be optimized into single loop
     def initialize(nopt, seed):
