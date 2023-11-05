@@ -642,7 +642,7 @@ def CreateArrayOp : NTensor_OpBase<"create", [AttrSizedOperandSegments, Pure]> {
 }
 
 def FromTensorOp : NTensor_OpBase<"from_tensor",
-    [Pure, SameOperandsShape, SameOperandsElementType]> {
+    [Pure, SameOperandsShape, SameOperandsElementType, ViewLikeOpInterface]> {
   let summary = "converts tensor to ntensor array.";
   let description = [{
     Converts from tensor to ntensor array. Shape and element type must match.
@@ -655,10 +655,14 @@ def FromTensorOp : NTensor_OpBase<"from_tensor",
 
   let hasFolder = 1;
   let hasCanonicalizer = 1;
+
+  let extraClassDeclaration = [{
+      ::mlir::Value getViewSource() { return getTensor(); }
+  }];
 }
 
 def ToTensorOp : NTensor_OpBase<"to_tensor",
-    [SameOperandsShape, SameOperandsElementType]> {
+    [SameOperandsShape, SameOperandsElementType, ViewLikeOpInterface]> {
   let summary = "converts ntensor array to tensor.";
   let description = [{
     Converts from ntensor array to tensor. Shape and element type must match.
@@ -671,6 +675,10 @@ def ToTensorOp : NTensor_OpBase<"to_tensor",
   let assemblyFormat = "$array attr-dict `:` qualified(type($array)) `to` type($result)";
 
   let hasFolder = 1;
+
+  let extraClassDeclaration = [{
+      ::mlir::Value getViewSource() { return getArray(); }
+  }];
 }
 
 def FromMemrefOp : NTensor_OpBase<"from_memref",

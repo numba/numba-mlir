@@ -4,11 +4,11 @@
 
 #include "numba/Conversion/NtensorToLinalg.hpp"
 
+#include "numba/Analysis/AliasAnalysis.hpp"
 #include "numba/Dialect/ntensor/IR/NTensorOps.hpp"
 #include "numba/Dialect/numba_util/Dialect.hpp"
 #include "numba/Dialect/numba_util/Utils.hpp"
 
-#include <mlir/Analysis/AliasAnalysis.h>
 #include <mlir/Dialect/Arith/IR/Arith.h>
 #include <mlir/Dialect/Linalg/IR/Linalg.h>
 #include <mlir/Dialect/MemRef/IR/MemRef.h>
@@ -243,6 +243,9 @@ struct ConvertCastOp : public mlir::OpRewritePattern<numba::ntensor::CastOp> {
   mlir::LogicalResult
   matchAndRewrite(numba::ntensor::CastOp op,
                   mlir::PatternRewriter &rewriter) const override {
+    if (!op->hasAttr(kReadonly))
+      return mlir::failure();
+
     auto src = op.getSource();
     auto srcType = getNTensorType(src);
     if (!srcType)
@@ -364,6 +367,9 @@ struct ConvertLoadOp : public mlir::OpRewritePattern<numba::ntensor::LoadOp> {
   mlir::LogicalResult
   matchAndRewrite(numba::ntensor::LoadOp op,
                   mlir::PatternRewriter &rewriter) const override {
+    if (!op->hasAttr(kReadonly))
+      return mlir::failure();
+
     auto src = op.getArray();
     auto srcType = getNTensorType(src);
     if (!srcType || op.getType() != srcType.getElementType())
@@ -701,7 +707,7 @@ struct NtensorAliasAnalysisPass
       if (!hasWriters)
         return nullptr;
 
-      return &getAnalysis<mlir::AliasAnalysis>();
+      return &getAnalysis<numba::AliasAnalysis>();
     }();
 
     auto getTensor = [](mlir::Operation *op) -> mlir::Value {
@@ -711,6 +717,12 @@ struct NtensorAliasAnalysisPass
 
       if (auto create = mlir::dyn_cast<numba::ntensor::CreateArrayOp>(op))
         return create.getResult();
+
+      if (auto cast = mlir::dyn_cast<numba::ntensor::CastOp>(op))
+        return cast.getDest();
+
+      if (auto load = mlir::dyn_cast<numba::ntensor::LoadOp>(op))
+        return load.getArray();
 
       return {};
     };

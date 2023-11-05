@@ -2613,3 +2613,106 @@ def test_batchnorm():
     N, W, H, C = 8, 14, 14, 32
     input = rng.random((N, H, W, C), dtype=np.float32)
     assert_allclose(py_func(input), jit_func(input), rtol=1e-4, atol=1e-7)
+
+
+def test_generic_write1():
+    def py_func(a, b):
+        e = b[1:]
+        c = a + b
+        e[:] = c[1:]
+        d = a - b
+        return c, d
+
+    jit_func = njit(py_func)
+
+    a = np.arange(12)
+    b = np.arange(1, 13)
+    assert_equal(py_func(a.copy(), b.copy()), jit_func(a.copy(), b.copy()))
+
+
+def test_generic_write2():
+    def py_func(a, b):
+        e = b[1:]
+        c = a + b
+        e[:] = c[1:]
+        d = a + b
+        return c, d
+
+    jit_func = njit(py_func)
+
+    a = np.arange(12)
+    b = np.arange(1, 13)
+    assert_equal(py_func(a.copy(), b.copy()), jit_func(a.copy(), b.copy()))
+
+
+def test_black_scholes_opt():
+    # Black-scholes should be optimized into single loop
+    def initialize(nopt, seed):
+        import numpy as np
+        import numpy.random as default_rng
+
+        dtype: np.dtype = np.float32
+        S0L = dtype(10.0)
+        S0H = dtype(50.0)
+        XL = dtype(10.0)
+        XH = dtype(50.0)
+        TL = dtype(1.0)
+        TH = dtype(2.0)
+        RISK_FREE = dtype(0.1)
+        VOLATILITY = dtype(0.2)
+
+        default_rng.seed(seed)
+        price = default_rng.uniform(S0L, S0H, nopt).astype(dtype)
+        strike = default_rng.uniform(XL, XH, nopt).astype(dtype)
+        t = default_rng.uniform(TL, TH, nopt).astype(dtype)
+        rate = RISK_FREE
+        volatility = VOLATILITY
+        call = np.zeros(nopt, dtype=dtype)
+        put = -np.ones(nopt, dtype=dtype)
+
+        return (price, strike, t, rate, volatility, call, put)
+
+    @vectorize(nopython=True)
+    def _nberf(x):
+        return math.erf(x)
+
+    def black_scholes(price, strike, t, rate, volatility, call, put):
+        mr = -rate
+        sig_sig_two = volatility * volatility * 2
+
+        P = price
+        S = strike
+        T = t
+
+        a = np.log(P / S)
+        b = T * mr
+
+        z = T * sig_sig_two
+        c = 0.25 * z
+        y = 1.0 / np.sqrt(z)
+
+        w1 = (a - b + c) * y
+        w2 = (a - b - c) * y
+
+        d1 = 0.5 + 0.5 * _nberf(w1)
+        d2 = 0.5 + 0.5 * _nberf(w2)
+
+        Se = np.exp(b) * S
+
+        r = P * d1 - Se * d2
+        call[:] = r  # temporary `r` is necessary for faster `put` computation
+        put[:] = r - P + Se
+
+    black_scholes_jit = njit(black_scholes)
+
+    args1 = initialize(524288, 777777)
+    args2 = initialize(524288, 777777)
+    black_scholes(*args1)
+
+    with print_pass_ir([], ["PostLinalgOptPass"]):
+        black_scholes_jit(*args2)
+        assert_allclose(args1[-1], args2[-1], atol=0.001)
+        assert_allclose(args1[-2], args2[-2], atol=0.001)
+
+        ir = get_print_buffer()
+        assert ir.count("scf.parallel") == 1, ir

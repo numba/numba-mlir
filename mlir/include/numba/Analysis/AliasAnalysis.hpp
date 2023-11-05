@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include <mlir/Analysis/AliasAnalysis.h>
 #include <mlir/Analysis/AliasAnalysis/LocalAliasAnalysis.h>
 
 namespace mlir {
@@ -25,5 +26,12 @@ protected:
   mlir::AliasResult aliasImpl(mlir::Value lhs, mlir::Value rhs) override;
 };
 
+class AliasAnalysis : public mlir::AliasAnalysis {
+public:
+  AliasAnalysis(mlir::Operation *op);
+};
+
 mlir::StringRef getRestrictArgName();
+
+bool isWriter(mlir::Operation &op, llvm::SmallVectorImpl<mlir::Value> &args);
 } // namespace numba
