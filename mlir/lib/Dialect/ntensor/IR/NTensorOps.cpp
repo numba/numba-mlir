@@ -445,9 +445,31 @@ mlir::OpFoldResult numba::ntensor::DimOp::fold(FoldAdaptor) {
   };
 
   mlir::Value src = getSource();
-  auto shape = src.getType().cast<mlir::ShapedType>().getShape();
+  auto shape = mlir::cast<mlir::ShapedType>(src.getType()).getShape();
   if (idx < shape.size() && !mlir::ShapedType::isDynamic(shape[idx]))
     return getIndexVal(shape[idx]);
+
+  if (auto create = src.getDefiningOp<numba::ntensor::CreateArrayOp>()) {
+    auto sizes = create.getMixedSizes();
+    if (idx >= sizes.size())
+      return nullptr;
+
+    return sizes[idx];
+  }
+
+  if (auto subview = src.getDefiningOp<numba::ntensor::SubviewOp>()) {
+    llvm::SmallVector<mlir::OpFoldResult> sizes;
+    auto dropped = subview.getDroppedDims();
+    for (auto &&[i, s] : llvm::enumerate(subview.getMixedSizes())) {
+      if (!dropped[i])
+        sizes.emplace_back(s);
+    }
+
+    if (idx >= sizes.size())
+      return nullptr;
+
+    return sizes[idx];
+  }
 
   if (auto cast = src.getDefiningOp<numba::ntensor::CastOp>()) {
     getSourceMutable().assign(cast.getSource());
@@ -768,7 +790,20 @@ void numba::ntensor::FromTensorOp::getCanonicalizationPatterns(
 }
 
 mlir::OpFoldResult numba::ntensor::ToTensorOp::fold(FoldAdaptor) {
-  if (auto from = getArray().getDefiningOp<numba::ntensor::FromTensorOp>()) {
+  auto arr = getArray();
+  if (auto cast = arr.getDefiningOp<numba::ntensor::CastOp>()) {
+    auto src = cast.getSource();
+    auto srcType = mlir::cast<numba::ntensor::NTensorType>(src.getType());
+    auto dstType = mlir::cast<numba::ntensor::NTensorType>(arr.getType());
+    if (srcType.getShape() != dstType.getShape() ||
+        srcType.getElementType() != dstType.getElementType() ||
+        srcType.getEnvironment() != dstType.getEnvironment())
+      return nullptr;
+
+    this->setOperand(src);
+    return this->getResult();
+  }
+  if (auto from = arr.getDefiningOp<numba::ntensor::FromTensorOp>()) {
     auto val = from.getTensor();
     auto haveOnlySafeUses = [](mlir::Operation *op) -> bool {
       // Fold if we are the only user.

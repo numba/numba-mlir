@@ -348,7 +348,59 @@ func.func @test(%t: !ntensor.ntensor<?x2xf32>) -> !ntensor.ntensor<?x2xf32> {
 // CHECK-LABEL: func @test
 //   CHECK-NOT:   ntensor.copy
 //       CHECK:   return
-func.func @test(%arg1: !ntensor.ntensor<?x?xf32>){
+func.func @test(%arg1: !ntensor.ntensor<?x?xf32>) {
   ntensor.copy %arg1, %arg1 : !ntensor.ntensor<?x?xf32> to !ntensor.ntensor<?x?xf32>
   return
+}
+
+// -----
+
+// CHECK-LABEL: func @test
+//  CHECK-SAME:   (%[[ARG:.*]]: !ntensor.ntensor<?xf32>)
+//       CHECK:   %[[RES:.*]] = ntensor.to_tensor %[[ARG]] : !ntensor.ntensor<?xf32> to tensor<?xf32>
+//       CHECK:   return %[[RES]]
+func.func @test(%arg1: !ntensor.ntensor<?xf32>) -> tensor<?xf32> {
+  %0 = ntensor.cast %arg1 : !ntensor.ntensor<?xf32> to !ntensor.ntensor<?xf32 : "C">
+  %1 = ntensor.to_tensor %0 : !ntensor.ntensor<?xf32 : "C"> to tensor<?xf32>
+  return %1 : tensor<?xf32>
+}
+
+// -----
+
+// CHECK-LABEL: func @test
+//  CHECK-SAME:   (%{{.*}}: !ntensor.ntensor<?xf32>, %[[SZ:.*]]: index)
+//       CHECK:   return %[[SZ]]
+func.func @test(%arg1: !ntensor.ntensor<?xf32>, %arg2: index) -> index {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+
+  %0 = ntensor.subview %arg1[%c0][%arg2][%c1] : !ntensor.ntensor<?xf32> to !ntensor.ntensor<?xf32>
+  %1 = ntensor.dim %0, %c0 : !ntensor.ntensor<?xf32>
+  return %1 : index
+}
+
+// -----
+
+// CHECK-LABEL: func @test
+//       CHECK:   %[[SZ:.*]] = arith.constant 2 : index
+//       CHECK:   return %[[SZ]]
+func.func @test(%arg1: !ntensor.ntensor<?xf32>) -> index {
+  %c0 = arith.constant 0 : index
+
+  %0 = ntensor.subview %arg1[0][2][1] : !ntensor.ntensor<?xf32> to !ntensor.ntensor<?xf32>
+  %1 = ntensor.dim %0, %c0 : !ntensor.ntensor<?xf32>
+  return %1 : index
+}
+
+// -----
+
+// CHECK-LABEL: func @test
+//  CHECK-SAME:   (%[[ARG:.*]]: index)
+//       CHECK:   return %[[ARG]]
+func.func @test(%arg1: index) -> index {
+  %c0 = arith.constant 0 : index
+
+  %0 = ntensor.create(%arg1) : !ntensor.ntensor<?xf32>
+  %1 = ntensor.dim %0, %c0 : !ntensor.ntensor<?xf32>
+  return %1 : index
 }
