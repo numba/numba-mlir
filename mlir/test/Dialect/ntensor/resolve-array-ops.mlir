@@ -114,8 +114,7 @@ func.func @test(%arg1: !ntensor.ntensor<?xf32>, %arg2: !ntensor.slice, %arg3: f3
 //  CHECK-NEXT:   %[[DIM:.*]] = ntensor.dim %[[ARG1]], %[[C0]] : !ntensor.ntensor<?xf32>
 //  CHECK-NEXT:   %[[BEGIN:.*]], %[[END:.*]], %[[STEP:.*]], %[[COUNT:.*]] = ntensor.resolve_slice %[[ARG2]], %[[DIM]]
 //  CHECK-NEXT:   %[[RES:.*]] = ntensor.subview %[[ARG1]][%[[BEGIN]]] [%[[COUNT]]] [%[[STEP]]] : !ntensor.ntensor<?xf32> to !ntensor.ntensor<?xf32>
-//  CHECK-NEXT:   %[[DIM2:.*]] = ntensor.dim %[[RES]], %[[C0]] : !ntensor.ntensor<?xf32>
-//  CHECK-NEXT:   %[[RES2:.*]] = ntensor.create(%[[DIM2]]) = (%[[ARG3]] : f32) : !ntensor.ntensor<?xf32>
+//  CHECK-NEXT:   %[[RES2:.*]] = ntensor.create(%[[COUNT]]) = (%[[ARG3]] : f32) : !ntensor.ntensor<?xf32>
 //  CHECK-NEXT:   %[[BC:.*]]:2 = ntensor.broadcast(%[[RES2]], %[[RES]]) : !ntensor.ntensor<?xf32>, !ntensor.ntensor<?xf32> -> !ntensor.ntensor<?xf32>, !ntensor.ntensor<?xf32>
 //  CHECK-NEXT:   ntensor.copy %[[BC]]#0, %[[RES]] : !ntensor.ntensor<?xf32> to !ntensor.ntensor<?xf32>
 //  CHECK-NEXT:   return
@@ -249,9 +248,8 @@ func.func @test(%arg1: !ntensor.ntensor<?xf64>, %arg2: !ntensor.slice, %arg3: f3
 //  CHECK-NEXT:   %[[DIM:.*]] = ntensor.dim %[[ARG1]], %[[C0]] : !ntensor.ntensor<?xf64>
 //  CHECK-NEXT:   %[[BEGIN:.*]], %[[END:.*]], %[[STEP:.*]], %[[COUNT:.*]] = ntensor.resolve_slice %[[ARG2]], %[[DIM]]
 //  CHECK-NEXT:   %[[RES:.*]] = ntensor.subview %[[ARG1]][%[[BEGIN]]] [%[[COUNT]]] [%[[STEP]]] : !ntensor.ntensor<?xf64> to !ntensor.ntensor<?xf64>
-//  CHECK-NEXT:   %[[DIM2:.*]] = ntensor.dim %[[RES]], %[[C0]] : !ntensor.ntensor<?xf64>
 //  CHECK-NEXT:   %[[CONV:.*]] = arith.extf %[[ARG3]] : f32 to f64
-//  CHECK-NEXT:   %[[RES2:.*]] = ntensor.create(%[[DIM2]]) = (%[[CONV]] : f64) : !ntensor.ntensor<?xf64>
+//  CHECK-NEXT:   %[[RES2:.*]] = ntensor.create(%[[COUNT]]) = (%[[CONV]] : f64) : !ntensor.ntensor<?xf64>
 //  CHECK-NEXT:   %[[BC:.*]]:2 = ntensor.broadcast(%[[RES2]], %[[RES]]) : !ntensor.ntensor<?xf64>, !ntensor.ntensor<?xf64> -> !ntensor.ntensor<?xf64>, !ntensor.ntensor<?xf64>
 //  CHECK-NEXT:   ntensor.copy %[[BC]]#0, %[[RES]] : !ntensor.ntensor<?xf64> to !ntensor.ntensor<?xf64>
 //  CHECK-NEXT:   return

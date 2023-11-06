@@ -445,9 +445,17 @@ mlir::OpFoldResult numba::ntensor::DimOp::fold(FoldAdaptor) {
   };
 
   mlir::Value src = getSource();
-  auto shape = src.getType().cast<mlir::ShapedType>().getShape();
+  auto shape = mlir::cast<mlir::ShapedType>(src.getType()).getShape();
   if (idx < shape.size() && !mlir::ShapedType::isDynamic(shape[idx]))
     return getIndexVal(shape[idx]);
+
+  if (auto subview = src.getDefiningOp<numba::ntensor::SubviewOp>()) {
+    auto sizes = subview.getMixedSizes();
+    if (idx >= sizes.size())
+      return nullptr;
+
+    return sizes[idx];
+  }
 
   if (auto cast = src.getDefiningOp<numba::ntensor::CastOp>()) {
     getSourceMutable().assign(cast.getSource());

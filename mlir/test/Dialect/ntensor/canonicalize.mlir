@@ -364,3 +364,30 @@ func.func @test(%arg1: !ntensor.ntensor<?xf32>) -> tensor<?xf32> {
   %1 = ntensor.to_tensor %0 : !ntensor.ntensor<?xf32 : "C"> to tensor<?xf32>
   return %1 : tensor<?xf32>
 }
+
+// -----
+
+// CHECK-LABEL: func @test
+//  CHECK-SAME:   (%{{.*}}: !ntensor.ntensor<?xf32>, %[[SZ:.*]]: index)
+//       CHECK:   return %[[SZ]]
+func.func @test(%arg1: !ntensor.ntensor<?xf32>, %arg2: index) -> index {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+
+  %0 = ntensor.subview %arg1[%c0][%arg2][%c1] : !ntensor.ntensor<?xf32> to !ntensor.ntensor<?xf32>
+  %1 = ntensor.dim %0, %c0 : !ntensor.ntensor<?xf32>
+  return %1 : index
+}
+
+// -----
+
+// CHECK-LABEL: func @test
+//       CHECK:   %[[SZ:.*]] = arith.constant 2 : index
+//       CHECK:   return %[[SZ]]
+func.func @test(%arg1: !ntensor.ntensor<?xf32>) -> index {
+  %c0 = arith.constant 0 : index
+
+  %0 = ntensor.subview %arg1[0][2][1] : !ntensor.ntensor<?xf32> to !ntensor.ntensor<?xf32>
+  %1 = ntensor.dim %0, %c0 : !ntensor.ntensor<?xf32>
+  return %1 : index
+}
