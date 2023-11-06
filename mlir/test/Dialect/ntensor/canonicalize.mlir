@@ -391,3 +391,16 @@ func.func @test(%arg1: !ntensor.ntensor<?xf32>) -> index {
   %1 = ntensor.dim %0, %c0 : !ntensor.ntensor<?xf32>
   return %1 : index
 }
+
+// -----
+
+// CHECK-LABEL: func @test
+//  CHECK-SAME:   (%[[ARG:.*]]: index)
+//       CHECK:   return %[[ARG]]
+func.func @test(%arg1: index) -> index {
+  %c0 = arith.constant 0 : index
+
+  %0 = ntensor.create(%arg1) : !ntensor.ntensor<?xf32>
+  %1 = ntensor.dim %0, %c0 : !ntensor.ntensor<?xf32>
+  return %1 : index
+}
