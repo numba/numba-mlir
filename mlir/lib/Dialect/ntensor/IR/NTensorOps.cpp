@@ -458,7 +458,13 @@ mlir::OpFoldResult numba::ntensor::DimOp::fold(FoldAdaptor) {
   }
 
   if (auto subview = src.getDefiningOp<numba::ntensor::SubviewOp>()) {
-    auto sizes = subview.getMixedSizes();
+    llvm::SmallVector<mlir::OpFoldResult> sizes;
+    auto dropped = subview.getDroppedDims();
+    for (auto &&[i, s] : llvm::enumerate(subview.getMixedSizes())) {
+      if (!dropped[i])
+        sizes.emplace_back(s);
+    }
+
     if (idx >= sizes.size())
       return nullptr;
 
