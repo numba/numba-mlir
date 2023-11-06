@@ -768,7 +768,20 @@ void numba::ntensor::FromTensorOp::getCanonicalizationPatterns(
 }
 
 mlir::OpFoldResult numba::ntensor::ToTensorOp::fold(FoldAdaptor) {
-  if (auto from = getArray().getDefiningOp<numba::ntensor::FromTensorOp>()) {
+  auto arr = getArray();
+  if (auto cast = arr.getDefiningOp<numba::ntensor::CastOp>()) {
+    auto src = cast.getSource();
+    auto srcType = mlir::cast<numba::ntensor::NTensorType>(src.getType());
+    auto dstType = mlir::cast<numba::ntensor::NTensorType>(arr.getType());
+    if (srcType.getShape() != dstType.getShape() ||
+        srcType.getElementType() != dstType.getElementType() ||
+        srcType.getEnvironment() != dstType.getEnvironment())
+      return nullptr;
+
+    this->setOperand(src);
+    return this->getResult();
+  }
+  if (auto from = arr.getDefiningOp<numba::ntensor::FromTensorOp>()) {
     auto val = from.getTensor();
     auto haveOnlySafeUses = [](mlir::Operation *op) -> bool {
       // Fold if we are the only user.
