@@ -685,6 +685,9 @@ llvm::SmallBitVector numba::ntensor::SubviewOp::getDroppedDims() {
   mlir::ArrayRef<int64_t> resultShape = getType().getShape();
   mlir::SmallVector<mlir::OpFoldResult> mixedSizes = getMixedSizes();
   llvm::SmallBitVector droppedDims(mixedSizes.size());
+  if (resultShape.size() == mixedSizes.size())
+    return droppedDims;
+
   unsigned shapePos = 0;
   for (const auto &size : enumerate(mixedSizes)) {
     std::optional<int64_t> sizeVal = getConstantIntValue(size.value());
