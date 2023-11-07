@@ -311,14 +311,11 @@ static constexpr const auto cl_be = sycl::backend::opencl;
 struct GPUModule {
   sycl::queue *queue = nullptr;
   sycl::kernel_bundle<sycl::bundle_state::executable> kernelBundle;
-  ZeModule zeModule;
-  ClProgram clProgram;
 };
 
 struct GPUKernel {
+  sycl::queue *queue = nullptr;
   sycl::kernel syclKernel;
-  ZeKernel zeKernel;
-  ClKernel clKernel;
   uint32_t maxWgSize = 0;
 };
 
@@ -364,9 +361,8 @@ GPUModule *createGPUModule(sycl::queue &queue, const void *data,
 
     auto kernelBundle =
         sycl::make_kernel_bundle<ze_be, sycl::bundle_state::executable>(
-            {zeModule.get()}, ctx);
-    return new GPUModule{&queue, std::move(kernelBundle), std::move(zeModule),
-                         nullptr};
+            {zeModule.release()}, ctx);
+    return new GPUModule{&queue, std::move(kernelBundle)};
   }
   if (backend == cl_be) {
     auto &loader = getClLoader();
@@ -402,9 +398,8 @@ GPUModule *createGPUModule(sycl::queue &queue, const void *data,
 
     auto kernelBundle =
         sycl::make_kernel_bundle<cl_be, sycl::bundle_state::executable>(
-            program.get(), ctx);
-    return new GPUModule{&queue, std::move(kernelBundle), nullptr,
-                         std::move(program)};
+            program.release(), ctx);
+    return new GPUModule{&queue, std::move(kernelBundle)};
   }
 
   reportError("Backend is not supported: " +
@@ -417,12 +412,13 @@ GPUKernel *getGPUKernel(GPUModule *mod, const char *name) {
   auto queue = mod->queue;
   assert(queue);
   auto ctx = queue->get_context();
+  auto backend = ctx.get_platform().get_backend();
 
   auto maxWgSize = static_cast<uint32_t>(
       queue->get_device().get_info<sycl::info::device::max_work_group_size>());
-  if (mod->zeModule) {
+  if (backend == ze_be) {
     auto &loader = getZeLoader();
-    auto zeModule = mod->zeModule.get();
+    auto zeModule = sycl::get_native<ze_be>(mod->kernelBundle).front();
 
     ze_kernel_desc_t desc = {};
     desc.stype = ZE_STRUCTURE_TYPE_KERNEL_DESC;
@@ -433,21 +429,19 @@ GPUKernel *getGPUKernel(GPUModule *mod, const char *name) {
     ZeKernel zeKernel(kernelHandle);
 
     auto syclKernel =
-        sycl::make_kernel<ze_be>({mod->kernelBundle, zeKernel.get()}, ctx);
-    return new GPUKernel{std::move(syclKernel), std::move(zeKernel), nullptr,
-                         maxWgSize};
+        sycl::make_kernel<ze_be>({mod->kernelBundle, zeKernel.release()}, ctx);
+    return new GPUKernel{queue, std::move(syclKernel), maxWgSize};
   }
-  if (mod->clProgram) {
+  if (backend == cl_be) {
     auto &loader = getClLoader();
+    auto clProgram = sycl::get_native<cl_be>(mod->kernelBundle).front();
 
     cl_int errCode = CL_SUCCESS;
-    ClKernel clKernel(
-        loader.clCreateKernel(mod->clProgram.get(), name, &errCode));
+    ClKernel clKernel(loader.clCreateKernel(clProgram, name, &errCode));
     checkClResult("clCreateKernel", errCode);
 
-    auto syclKernel = sycl::make_kernel<cl_be>(clKernel.get(), ctx);
-    return new GPUKernel{std::move(syclKernel), nullptr, std::move(clKernel),
-                         maxWgSize};
+    auto syclKernel = sycl::make_kernel<cl_be>(clKernel.release(), ctx);
+    return new GPUKernel{queue, std::move(syclKernel), maxWgSize};
   }
   reportError("Invalid module");
 }
@@ -481,8 +475,14 @@ static uint32_t upPow2(uint32_t x) {
 void suggestGPUBlockSize(GPUKernel *kernel, const uint32_t *gridSize,
                          uint32_t *blockSize, size_t numDims) {
   assert(numDims > 0 && numDims <= 3);
-  if (kernel->zeKernel) {
-    auto zeKernel = kernel->zeKernel.get();
+
+  auto queue = kernel->queue;
+  assert(queue);
+  auto ctx = queue->get_context();
+  auto backend = ctx.get_platform().get_backend();
+
+  if (backend == ze_be) {
+    auto zeKernel = sycl::get_native<ze_be>(kernel->syclKernel);
     uint32_t gSize[3] = {};
     uint32_t *bSize[3] = {};
     for (size_t i = 0; i < numDims; ++i) {
