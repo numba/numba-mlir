@@ -496,7 +496,7 @@ getFromMemrefConversionFunc(mlir::ModuleOp module, mlir::OpBuilder &builder,
   auto ptr = builder.create<mllvm::GEPOp>(loc, origPtr.getType(), elemType,
                                           origPtr, offset);
   mlir::Value res = builder.create<mllvm::UndefOp>(loc, dstType);
-  auto null = builder.create<mllvm::NullOp>(loc, i8ptrType);
+  auto null = builder.create<mllvm::ZeroOp>(loc, i8ptrType);
   mlir::Value nitems = builder.create<mllvm::ConstantOp>(
       loc, i64Type, builder.getI64IntegerAttr(1));
   for (int64_t i = 0; i < rank; ++i) {
@@ -671,7 +671,7 @@ struct ReturnOpLowering : public mlir::OpRewritePattern<mlir::func::ReturnOp> {
         return {};
 
       if (origType.isa<mlir::NoneType>())
-        return rewriter.create<mlir::LLVM::NullOp>(loc, llRetType);
+        return rewriter.create<mlir::LLVM::ZeroOp>(loc, llRetType);
 
       val = doCast(rewriter, loc, val, llRetType);
       if (auto memrefType = origType.dyn_cast<mlir::MemRefType>()) {
@@ -693,7 +693,7 @@ struct ReturnOpLowering : public mlir::OpRewritePattern<mlir::func::ReturnOp> {
     if (op.getNumOperands() == 0) {
       auto addrType = addr.getType();
       assert(addrType.isa<mlir::LLVM::LLVMPointerType>());
-      auto llVal = rewriter.create<mlir::LLVM::NullOp>(loc, addrType);
+      auto llVal = rewriter.create<mlir::LLVM::ZeroOp>(loc, addrType);
       rewriter.create<mlir::LLVM::StoreOp>(loc, llVal, addr);
     } else if (op.getNumOperands() == 1) {
       mlir::Value val = convertVal(op.getOperand(0));

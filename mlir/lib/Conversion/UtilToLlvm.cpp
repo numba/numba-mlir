@@ -304,7 +304,7 @@ struct LowerTakeContextOp
       initFuncPtr = rewriter.create<mlir::LLVM::AddressOfOp>(
           loc, funcPtr, initFunc.getSymName());
     } else {
-      initFuncPtr = rewriter.create<mlir::LLVM::NullOp>(loc, wrapperPtrType);
+      initFuncPtr = rewriter.create<mlir::LLVM::ZeroOp>(loc, wrapperPtrType);
     }
 
     mlir::Value deinitFuncPtr;
@@ -355,7 +355,7 @@ struct LowerTakeContextOp
       deinitFuncPtr = rewriter.create<mlir::LLVM::AddressOfOp>(
           loc, funcPtr, deinitFunc.getSymName());
     } else {
-      deinitFuncPtr = rewriter.create<mlir::LLVM::NullOp>(loc, wrapperPtrType);
+      deinitFuncPtr = rewriter.create<mlir::LLVM::ZeroOp>(loc, wrapperPtrType);
     }
 
     auto takeCtxFunc = [&]() -> mlir::LLVM::LLVMFuncOp {
