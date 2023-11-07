@@ -285,7 +285,6 @@ class MlirBackend(MlirBackendBase):
                 ctx, module, state.func_ir
             )
 
-            # TODO: properly handle returned module ownership
             compiled_mod = mlir_compiler.compile_module(
                 global_compiler_context, ctx, module
             )
@@ -297,7 +296,16 @@ class MlirBackend(MlirBackendBase):
             _mlir_active_module = old_module
         state.metadata["mlir_func_ptr"] = func_ptr
         state.metadata["mlir_func_name"] = func_name
+        state.metadata["mlir_module_finalizer"] = self._make_mlir_module_finalizer(
+            compiled_mod
+        )
         return True
+
+    def _make_mlir_module_finalizer(self, module):
+        def func():
+            mlir_compiler.release_module(global_compiler_context, module)
+
+        return func
 
 
 @register_pass(mutates_CFG=True, analysis_only=False)

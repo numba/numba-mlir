@@ -6,6 +6,8 @@
 Define lowering and related passes.
 """
 
+import weakref
+
 from .passes import MlirDumpPlier, MlirBackend
 from .settings import USE_MLIR
 
@@ -51,12 +53,17 @@ class mlir_lower(orig_Lower):
             context = self.context
 
             fnty = self.call_conv.get_function_type(fndesc.restype, fndesc.argtypes)
+
             func_ptr = self.metadata.pop("mlir_func_ptr")
             func_ptr = context.get_constant(types.uintp, func_ptr)
             func_ptr = builder.inttoptr(func_ptr, ir.PointerType(fnty))
 
             ret = builder.call(func_ptr, self.function.args)
             builder.ret(ret)
+
+            finalizer = self.metadata.pop("mlir_module_finalizer")
+            if finalizer:
+                weakref.finalize(self.library, finalizer)
         else:
             super().lower_normal_function(self, desc)
 
@@ -72,4 +79,5 @@ class mlir_NativeLowering(orig_NativeLowering):
 class dummy_NativeLowering(mlir_NativeLowering):
     def run_pass(self, state):
         state.metadata["mlir_func_ptr"] = 1
+        state.metadata["mlir_module_finalizer"] = None
         return super().run_pass(state)
