@@ -355,7 +355,7 @@ void numba::ExecutionEngine::releaseModule(ModuleHandle handle) {
   assert(handle);
   auto dylib = static_cast<llvm::orc::JITDylib *>(handle);
   llvm::cantFail(jit->deinitialize(*dylib));
-  dylib->Release();
+  llvm::cantFail(jit->getExecutionSession().removeJITDylib(*dylib));
 }
 
 llvm::Expected<void *>
