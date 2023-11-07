@@ -305,6 +305,31 @@ struct CmpOfArithConst : public mlir::OpRewritePattern<mlir::arith::CmpIOp> {
 };
 
 // TODO: upstream
+struct CanonConstSubI : public mlir::OpRewritePattern<mlir::arith::SubIOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(mlir::arith::SubIOp op,
+                  mlir::PatternRewriter &rewriter) const override {
+    auto val = mlir::getConstantIntValue(op.getRhs());
+    if (!val)
+      return mlir::failure();
+
+    mlir::Value newVal;
+    auto loc = op.getLoc();
+    if (auto intType = mlir::dyn_cast<mlir::IntegerType>(op.getType())) {
+      newVal = rewriter.create<mlir::arith::ConstantIntOp>(loc, -*val,
+                                                           intType.getWidth());
+    } else {
+      assert(mlir::isa<mlir::IndexType>(op.getType()));
+      newVal = rewriter.create<mlir::arith::ConstantIndexOp>(loc, -*val);
+    }
+    rewriter.replaceOpWithNewOp<mlir::arith::AddIOp>(op, op.getLhs(), newVal);
+    return mlir::success();
+  }
+};
+
+// TODO: upstream
 struct ExtractStridedMetadataUnused
     : public mlir::OpRewritePattern<mlir::memref::ExtractStridedMetadataOp> {
   using OpRewritePattern::OpRewritePattern;
@@ -1379,6 +1404,7 @@ void numba::populateCommonOptsPatterns(mlir::RewritePatternSet &patterns) {
       AndConflictSimplify,
       XorOfCmpF,
       CmpOfArithConst,
+      CanonConstSubI,
       ExtractStridedMetadataUnused,
       ExtractStridedMetadataConstStrides,
       ExtractStridedMetadataCast,
