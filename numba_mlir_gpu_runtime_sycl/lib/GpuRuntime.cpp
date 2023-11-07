@@ -136,7 +136,6 @@ public:
     assert(module);
     assert(name);
     return getGPUKernel(module, name);
-    ;
   }
 
   static void destroyKernel(GPUKernel *kernel) {
