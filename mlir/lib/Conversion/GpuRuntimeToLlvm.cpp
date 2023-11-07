@@ -204,7 +204,7 @@ protected:
       depsArray = rewriter.create<mlir::LLVM::InsertValueOp>(loc, depsArray,
                                                              deps[i], i);
     }
-    auto nullPtr = rewriter.create<mlir::LLVM::NullOp>(loc, llvmPointerType);
+    auto nullPtr = rewriter.create<mlir::LLVM::ZeroOp>(loc, llvmPointerType);
     depsArray = rewriter.create<mlir::LLVM::InsertValueOp>(
         loc, depsArray, nullPtr, depsArraySize);
 
@@ -250,10 +250,10 @@ private:
       name.push_back('\0');
 
       auto varName = numba::getUniqueLLVMGlobalName(mod, "device_name");
-      data = mlir::LLVM::createGlobalString(
-          loc, rewriter, varName, name, mlir::LLVM::Linkage::Internal, true);
+      data = mlir::LLVM::createGlobalString(loc, rewriter, varName, name,
+                                            mlir::LLVM::Linkage::Internal);
     } else {
-      data = rewriter.create<mlir::LLVM::NullOp>(loc, llvmPointerType);
+      data = rewriter.create<mlir::LLVM::ZeroOp>(loc, llvmPointerType);
     }
 
     auto res = streamCreateCallBuilder.create(loc, rewriter, data);
@@ -311,8 +311,8 @@ private:
 
     auto loc = op.getLoc();
     auto name = numba::getUniqueLLVMGlobalName(mod, "gpu_blob");
-    auto data = mlir::LLVM::createGlobalString(
-        loc, rewriter, name, blob, mlir::LLVM::Linkage::Internal, true);
+    auto data = mlir::LLVM::createGlobalString(loc, rewriter, name, blob,
+                                               mlir::LLVM::Linkage::Internal);
     auto size = rewriter.create<mlir::LLVM::ConstantOp>(
         loc, llvmIndexType,
         mlir::IntegerAttr::get(llvmIndexType,
@@ -365,8 +365,8 @@ private:
     name.push_back('\0');
 
     auto varName = numba::getUniqueLLVMGlobalName(mod, "kernel_name");
-    auto data = mlir::LLVM::createGlobalString(
-        loc, rewriter, varName, name, mlir::LLVM::Linkage::Internal, true);
+    auto data = mlir::LLVM::createGlobalString(loc, rewriter, varName, name,
+                                               mlir::LLVM::Linkage::Internal);
     auto res =
         kernelGetCallBuilder.create(loc, rewriter, {adaptor.getModule(), data});
     rewriter.replaceOp(op, res.getResults());
@@ -497,7 +497,7 @@ private:
       // %Size = getelementptr %T* null, int 1
       // %SizeI = ptrtoint %T* %Size to i32
       auto ptrType = getLLVMPointerType(type);
-      auto nullPtr = rewriter.create<mlir::LLVM::NullOp>(loc, ptrType);
+      auto nullPtr = rewriter.create<mlir::LLVM::ZeroOp>(loc, ptrType);
       auto gep =
           rewriter.create<mlir::LLVM::GEPOp>(loc, ptrType, type, nullPtr, one);
       return rewriter.create<mlir::LLVM::PtrToIntOp>(loc, llvmInt32Type, gep);
@@ -549,7 +549,7 @@ private:
       auto param = getKernelParam(i);
       mlir::Value ptr;
       if (!param.second) {
-        ptr = rewriter.create<mlir::LLVM::NullOp>(loc, llvmPointerType);
+        ptr = rewriter.create<mlir::LLVM::ZeroOp>(loc, llvmPointerType);
       } else {
         rewriter.create<mlir::LLVM::StoreOp>(loc, param.second,
                                              paramsStorage[i]);
@@ -573,7 +573,7 @@ private:
                                                                range, i);
     }
 
-    auto nullPtr = rewriter.create<mlir::LLVM::NullOp>(loc, llvmPointerType);
+    auto nullPtr = rewriter.create<mlir::LLVM::ZeroOp>(loc, llvmPointerType);
     auto nullRange = [&]() {
       auto zero = rewriter.create<mlir::LLVM::ConstantOp>(
           loc, rewriter.getIntegerAttr(llvmInt32Type, 0));
