@@ -204,6 +204,106 @@ struct XorOfCmpF : public mlir::OpRewritePattern<mlir::arith::XOrIOp> {
   }
 };
 
+static std::optional<std::pair<bool, int64_t>>
+getCmpArgArithConst(mlir::arith::CmpIOp op) {
+  for (auto reverse : {false, true}) {
+    auto getOptionalPair = [&](const std::optional<int64_t> &val2)
+        -> std::optional<std::pair<bool, int64_t>> {
+      if (!val2)
+        return std::nullopt;
+
+      return std::pair(reverse, *val2);
+    };
+    auto getOptionalPairInv = [&](const std::optional<int64_t> &val2)
+        -> std::optional<std::pair<bool, int64_t>> {
+      if (!val2)
+        return std::nullopt;
+
+      return std::pair(reverse, -*val2);
+    };
+
+    auto val1 = (reverse ? op.getRhs() : op.getLhs());
+    auto val2 = (reverse ? op.getLhs() : op.getRhs());
+    if (auto add = val1.getDefiningOp<mlir::arith::AddIOp>()) {
+      if (val2 == add.getLhs())
+        return getOptionalPair(mlir::getConstantIntValue(add.getRhs()));
+
+      if (val2 == add.getRhs())
+        return getOptionalPair(mlir::getConstantIntValue(add.getRhs()));
+
+      return std::nullopt;
+    }
+    if (auto sub = val1.getDefiningOp<mlir::arith::SubIOp>()) {
+      if (val2 == sub.getLhs())
+        return getOptionalPairInv(mlir::getConstantIntValue(sub.getRhs()));
+
+      return std::nullopt;
+    }
+  }
+  return std::nullopt;
+}
+
+static mlir::arith::CmpIPredicate
+reversePredicate(mlir::arith::CmpIPredicate pred) {
+  using namespace mlir;
+  switch (pred) {
+  case arith::CmpIPredicate::eq:
+    return arith::CmpIPredicate::eq;
+  case arith::CmpIPredicate::ne:
+    return arith::CmpIPredicate::ne;
+  case arith::CmpIPredicate::slt:
+    return arith::CmpIPredicate::sgt;
+  case arith::CmpIPredicate::sle:
+    return arith::CmpIPredicate::sge;
+  case arith::CmpIPredicate::sgt:
+    return arith::CmpIPredicate::slt;
+  case arith::CmpIPredicate::sge:
+    return arith::CmpIPredicate::sle;
+  case arith::CmpIPredicate::ult:
+    return arith::CmpIPredicate::ugt;
+  case arith::CmpIPredicate::ule:
+    return arith::CmpIPredicate::uge;
+  case arith::CmpIPredicate::ugt:
+    return arith::CmpIPredicate::ult;
+  case arith::CmpIPredicate::uge:
+    return arith::CmpIPredicate::ule;
+  }
+  llvm_unreachable("unknown cmpi predicate kind");
+}
+
+// TODO: upstream
+struct CmpOfArithConst : public mlir::OpRewritePattern<mlir::arith::CmpIOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(mlir::arith::CmpIOp op,
+                  mlir::PatternRewriter &rewriter) const override {
+    auto v = getCmpArgArithConst(op);
+    if (!v)
+      return mlir::failure();
+
+    auto &&[inv, val] = *v;
+
+    // TODO: ignore overflow for now
+    using Pred = mlir::arith::CmpIPredicate;
+    auto pred = op.getPredicate();
+    if (inv)
+      pred = reversePredicate(pred);
+
+    auto replaceWithConst = [&](bool flag) {
+      rewriter.replaceOpWithNewOp<mlir::arith::ConstantIntOp>(op, int64_t(flag),
+                                                              1);
+    };
+
+    if (pred == Pred::sge && val < 0) {
+      replaceWithConst(false);
+      return mlir::success();
+    }
+
+    return mlir::failure();
+  }
+};
+
 // TODO: upstream
 struct ExtractStridedMetadataUnused
     : public mlir::OpRewritePattern<mlir::memref::ExtractStridedMetadataOp> {
@@ -1278,6 +1378,7 @@ void numba::populateCommonOptsPatterns(mlir::RewritePatternSet &patterns) {
       PowSimplify,
       AndConflictSimplify,
       XorOfCmpF,
+      CmpOfArithConst,
       ExtractStridedMetadataUnused,
       ExtractStridedMetadataConstStrides,
       ExtractStridedMetadataCast,

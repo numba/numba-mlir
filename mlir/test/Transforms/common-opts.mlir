@@ -25,3 +25,40 @@ func.func @test() -> (i64, f32, i32) {
   }
   return %3#0, %3#1, %3#2 : i64, f32, i32
 }
+
+// -----
+
+// CHECK-LABEL: func @test
+//       CHECK:   %[[FALSE:.*]] = arith.constant false
+//       CHECK:   return %[[FALSE]]
+func.func @test(%arg1: i64) -> i1 {
+  %c-1 = arith.constant -1 : i64
+  %1 = arith.addi %arg1, %c-1 : i64
+  %2 = arith.cmpi sge, %1, %arg1 : i64
+  return %2 : i1
+}
+
+// -----
+
+// CHECK-LABEL: func @test
+//       CHECK:   %[[FALSE:.*]] = arith.constant false
+//       CHECK:   return %[[FALSE]]
+func.func @test(%arg1: index) -> i1 {
+  %c-1 = arith.constant -1 : index
+  %1 = arith.addi %arg1, %c-1 : index
+  %2 = arith.cmpi sge, %1, %arg1 : index
+  return %2 : i1
+}
+
+
+// -----
+
+// CHECK-LABEL: func @test
+//       CHECK:   %[[FALSE:.*]] = arith.constant false
+//       CHECK:   return %[[FALSE]]
+func.func @test(%arg1: i64) -> i1 {
+  %c1 = arith.constant 1 : i64
+  %1 = arith.subi %arg1, %c1 : i64
+  %2 = arith.cmpi sge, %1, %arg1 : i64
+  return %2 : i1
+}
