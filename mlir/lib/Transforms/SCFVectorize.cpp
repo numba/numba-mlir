@@ -250,12 +250,7 @@ numba::vectorizeLoop(mlir::OpBuilder &builder, mlir::scf::ParallelOp loop,
   mlir::IRMapping scalarMapping;
 
   auto createPosionVec = [&](mlir::VectorType vecType) -> mlir::Value {
-    // TODO: crash in insertelement folding
-    // return builder.create<mlir::ub::PoisonOp>(loc, vecType, nullptr);
-    auto elemType = vecType.getElementType();
-    mlir::Value poison =
-        builder.create<mlir::ub::PoisonOp>(loc, elemType, nullptr);
-    return builder.create<mlir::vector::SplatOp>(loc, poison, vecType);
+    return builder.create<mlir::ub::PoisonOp>(loc, vecType, nullptr);
   };
 
   auto getVecVal = [&](mlir::Value orig) -> mlir::Value {
