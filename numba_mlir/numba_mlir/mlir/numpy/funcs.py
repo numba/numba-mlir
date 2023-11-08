@@ -521,7 +521,7 @@ del _gen_binary_ops
 
 
 @register_func("numpy.clip", numpy.clip, out="out")
-def empty_impl(builder, a, a_min, a_max):
+def clip_impl(builder, a, a_min, a_max):
     init_type = _select_float_type(builder, a, a_min, a_max)
 
     def body(a, a_min, a_max, _):
