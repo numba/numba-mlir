@@ -3268,6 +3268,7 @@ struct FuseAdjacentGenerics
             return mlir::cast<mlir::AffineMapAttr>(a).getValue();
           });
         };
+
         llvm::SmallVector<mlir::AffineMap> newMaps;
         llvm::append_range(
             newMaps,
@@ -3414,16 +3415,28 @@ struct FuseAdjacentGenericsPass
     llvm::MapVector<mlir::Value, llvm::SmallVector<mlir::Operation *>> writers;
 
     llvm::SmallVector<mlir::Value> temp;
-    getOperation()->walk([&](mlir::Operation *innerOp) {
-      temp.clear();
-      if (numba::isWriter(*innerOp, temp)) {
-        for (auto arg : temp)
-          writers[arg].emplace_back(innerOp);
-      }
-    });
+    auto populateWriters = [&]() {
+      writers.clear();
+      getOperation()->walk([&](mlir::Operation *innerOp) {
+        temp.clear();
+        if (numba::isWriter(*innerOp, temp)) {
+          for (auto arg : temp)
+            writers[arg].emplace_back(innerOp);
+        }
+      });
+    };
+    populateWriters();
 
-    auto *AA =
-        !writers.empty() ? &getAnalysis<numba::AliasAnalysis>() : nullptr;
+    mlir::OperationFingerPrint fp(getOperation());
+    auto updateWriters = [&]() {
+      mlir::OperationFingerPrint newFp(getOperation());
+      if (newFp != fp) {
+        populateWriters();
+        fp = newFp;
+      }
+    };
+
+    auto &AA = getAnalysis<numba::AliasAnalysis>();
 
     mlir::DominanceInfo dom;
     auto checkDom = [&](mlir::Operation *op1, mlir::Operation *op2,
@@ -3436,13 +3449,14 @@ struct FuseAdjacentGenericsPass
 
     auto canFuse = [&](mlir::linalg::GenericOp op1,
                        mlir::linalg::GenericOp op2) -> bool {
-      if (!AA)
+      updateWriters();
+      if (writers.empty())
         return true;
 
       for (auto &args : {op1->getOperands(), op2->getOperands()}) {
         for (auto arg : args) {
           for (auto &&[writerArg, writers] : writers) {
-            if (AA->alias(arg, writerArg).isNo())
+            if (AA.alias(arg, writerArg).isNo())
               continue;
 
             for (auto &&writer : writers) {
@@ -3461,12 +3475,13 @@ struct FuseAdjacentGenericsPass
     auto checkWrites = [&](mlir::Operation *toTensor, mlir::Operation *other) {
       assert(toTensor);
       assert(other);
-      if (!AA)
+      updateWriters();
+      if (writers.empty())
         return true;
 
       for (auto arg : toTensor->getOperands()) {
         for (auto &&[writerArg, writers] : writers) {
-          if (AA->alias(arg, writerArg).isNo())
+          if (AA.alias(arg, writerArg).isNo())
             continue;
 
           for (auto &&writer : writers) {
