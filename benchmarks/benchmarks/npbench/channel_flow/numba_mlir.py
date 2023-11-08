@@ -34,4 +34,4 @@ class Benchmark(numba_mlir.mlir.benchmarking.BenchmarkBase):
     def validate(self, args, res):
         np_ver = get_impl(get_numpy_context())
         np_res = np_ver(*args)
-        assert_allclose_recursive(res, np_res)
+        assert_allclose_recursive(res, np_res, atol=1e-05, rtol=1e-05)

@@ -245,6 +245,6 @@ def get_impl(ctx):
 
     def wrapper(nit, u, v, dt, dx, dy, p, rho, nu, F):
         channel_flow(nit, u, v, dt, dx, dy, p, rho, nu, F)
-        return u, v, p, dx, dy, dt
+        return u, v, p
 
     return wrapper

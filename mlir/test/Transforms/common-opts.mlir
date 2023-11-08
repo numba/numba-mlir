@@ -25,3 +25,66 @@ func.func @test() -> (i64, f32, i32) {
   }
   return %3#0, %3#1, %3#2 : i64, f32, i32
 }
+
+// -----
+
+// CHECK-LABEL: func @test
+//       CHECK:   %[[FALSE:.*]] = arith.constant false
+//       CHECK:   return %[[FALSE]]
+func.func @test(%arg1: i64) -> i1 {
+  %c-1 = arith.constant -1 : i64
+  %1 = arith.addi %arg1, %c-1 : i64
+  %2 = arith.cmpi sge, %1, %arg1 : i64
+  return %2 : i1
+}
+
+// -----
+
+// CHECK-LABEL: func @test
+//       CHECK:   %[[FALSE:.*]] = arith.constant false
+//       CHECK:   return %[[FALSE]]
+func.func @test(%arg1: index) -> i1 {
+  %c-1 = arith.constant -1 : index
+  %1 = arith.addi %arg1, %c-1 : index
+  %2 = arith.cmpi sge, %1, %arg1 : index
+  return %2 : i1
+}
+
+
+// -----
+
+// CHECK-LABEL: func @test
+//       CHECK:   %[[FALSE:.*]] = arith.constant false
+//       CHECK:   return %[[FALSE]]
+func.func @test(%arg1: i64) -> i1 {
+  %c1 = arith.constant 1 : i64
+  %1 = arith.subi %arg1, %c1 : i64
+  %2 = arith.cmpi sge, %1, %arg1 : i64
+  return %2 : i1
+}
+
+// -----
+
+// CHECK-LABEL: func @test
+//  CHECK-SAME: (%[[ARG:.*]]: i64)
+//       CHECK:   %[[C:.*]] = arith.constant -1 : i64
+//       CHECK:   %[[RES:.*]] = arith.addi %[[ARG]], %[[C]] : i64
+//       CHECK:   return %[[RES]]
+func.func @test(%arg1: i64) -> i64 {
+  %c1 = arith.constant 1 : i64
+  %1 = arith.subi %arg1, %c1 : i64
+  return %1 : i64
+}
+
+// -----
+
+// CHECK-LABEL: func @test
+//  CHECK-SAME: (%[[ARG:.*]]: index)
+//       CHECK:   %[[C:.*]] = arith.constant -1 : index
+//       CHECK:   %[[RES:.*]] = arith.addi %[[ARG]], %[[C]] : index
+//       CHECK:   return %[[RES]]
+func.func @test(%arg1: index) -> index {
+  %c1 = arith.constant 1 : index
+  %1 = arith.subi %arg1, %c1 : index
+  return %1 : index
+}
