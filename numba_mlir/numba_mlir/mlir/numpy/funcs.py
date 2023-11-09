@@ -324,7 +324,15 @@ def mean_impl(builder, arg, dtype=None, axis=None, keepdims=False):
     return res
 
 
+def _remove_numpy_prefix(name):
+    return name.split(".")[-1]
+
+
 def _gen_unary_ops():
+    import sys
+
+    current_mod = sys.modules[__name__]
+
     def f64_type(builder, t):
         if is_float(t, builder) or is_complex(t, builder):
             return t
@@ -343,7 +351,7 @@ def _gen_unary_ops():
         return builder.bool
 
     def reg_func(name, func=None):
-        return register_func(name, func, out="out")
+        return register_func(name, func, out="out"), name
 
     unary_ops = [
         (
@@ -376,8 +384,9 @@ def _gen_unary_ops():
 
         return func
 
-    for reg, f64, body in unary_ops:
-        reg(make_func(f64, body))
+    for (reg, name), f64, body in unary_ops:
+        func = reg(make_func(f64, body))
+        setattr(current_mod, _remove_numpy_prefix(name) + "_impl", func)
 
 
 _gen_unary_ops()
