@@ -342,6 +342,8 @@ class MlirReplaceParfors(MlirBackendBase):
             self._usmarray_type = USMNdArray
             self._get_device_caps = _get_device_caps
             self._device_ctor = dpctl.SyclDevice
+            # TODO: Actually parse data models instead of hardcoding index?
+            self._sycl_queue_index = 5
         except ImportError:
             self._usmarray_type = None
 
@@ -392,7 +394,7 @@ class MlirReplaceParfors(MlirBackendBase):
 
                 fn_name = f"parfor_impl{inst.id}"
                 arg_types = self._get_parfor_args_types(typemap, inst)
-                res_type = self._get_parfor_return_type(typemap, inst)
+                res_type, _ = self._get_parfor_return_type(typemap, inst)
                 device_caps = self._get_parfor_device_caps(arg_types)
 
                 ctx = self._get_func_context(state)
@@ -506,30 +508,43 @@ class MlirReplaceParfors(MlirBackendBase):
         return None
 
     def _get_parfor_return_type(self, typemap, parfor):
+        from numba.core.types.npytypes import Array
+
         ret = []
+        orig_types = []
         output_arrays = numba.parfors.parfor.get_parfor_outputs(parfor, parfor.params)
 
+        usmarray_type = self._usmarray_type
+
+        def map_type(t):
+            if usmarray_type and isinstance(t, usmarray_type):
+                return Array(t.dtype, t.ndim, t.layout)
+
+            return t
+
         for out in output_arrays:
-            ret.append(typemap[out])
+            ret.append(map_type(typemap[out]))
+            orig_types.append(typemap[out])
 
         for param in parfor.redvars:
-            ret.append(typemap[param])
+            ret.append(map_type(typemap[param]))
+            orig_types.append(typemap[param])
 
         count = len(ret)
         if count == 0:
-            return types.none
+            return types.none, orig_types
 
         if count == 1:
-            return ret[0]
+            return ret[0], orig_types
 
-        return types.Tuple(ret)
+        return types.Tuple(ret), orig_types
 
     def _lower_parfor(self, func_ptr, lowerer, parfor):
         context = lowerer.context
         builder = lowerer.builder
         typemap = lowerer.fndesc.typemap
 
-        res_type = self._get_parfor_return_type(typemap, parfor)
+        res_type, orig_ret_types = self._get_parfor_return_type(typemap, parfor)
         res_type = context.get_value_type(res_type)
 
         nullptr = context.get_constant_null(types.voidptr)
@@ -572,8 +587,50 @@ class MlirReplaceParfors(MlirBackendBase):
             for i in range(num_rets):
                 ret_vals.append(builder.extract_value(struct, i))
 
-        for ret_val, ret_var in zip(ret_vals, output_arrays + parfor.redvars):
-            lowerer.storevar(ret_val, name=ret_var)
+        def get_arg_packed(v):
+            return [lowerer.loadvar(v)]
+
+        func_args = self._enumerate_parfor_args(parfor, get_arg_packed)
+        func_args_types = self._get_parfor_args_types(typemap, parfor)
+        queue = self._get_queue_from_args(builder, func_args, func_args_types)
+
+        for ret_val, ret_var, orig_type in zip(
+            ret_vals, output_arrays + parfor.redvars, orig_ret_types
+        ):
+            repacked = self._repack_ret(context, builder, queue, ret_val, orig_type)
+            lowerer.storevar(repacked, name=ret_var)
+
+    def _get_queue_from_args(self, builder, args, args_types):
+        usmarray_type = self._usmarray_type
+        if not usmarray_type:
+            return None
+
+        for arg, arg_type in zip(args, args_types):
+            if isinstance(arg_type, usmarray_type):
+                return builder.extract_value(arg, self._sycl_queue_index)
+
+        return None
+
+    def _repack_ret(self, context, builder, queue, val, orig_type):
+        usmarray_type = self._usmarray_type
+        if usmarray_type and isinstance(orig_type, usmarray_type):
+            assert queue, f"Invalid queue: {queue}"
+            typ = val.type
+            assert isinstance(
+                typ, llvmlite.ir.BaseStructType
+            ), f"Not a struct type: {typ}"
+            res_type = context.get_value_type(orig_type)
+
+            ret = res_type(llvmlite.ir.Undefined)
+            ret = builder.insert_value(ret, queue, self._sycl_queue_index)
+            for i in range(len(typ)):
+                j = i + 1 if i >= self._sycl_queue_index else i
+                elem = builder.extract_value(val, i)
+                ret = builder.insert_value(ret, elem, j)
+
+            return ret
+
+        return val
 
     def _repack_arg(self, builder, orig_type, arg):
         ret = []
@@ -584,9 +641,8 @@ class MlirReplaceParfors(MlirBackendBase):
             # USM array data model mostly follows numpy model except additional
             # sycl queue pointer. Queue can be extracted from meminfo, so just
             # skip it.
-            # TODO: Actually parse data models instead of hardcoding index?
             for i in range(len(typ)):
-                if is_usm_array and i == 5:
+                if is_usm_array and i == self._sycl_queue_index:
                     continue
 
                 ret.append(builder.extract_value(arg, i))
