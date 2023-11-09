@@ -52,6 +52,7 @@ if IS_GPU_RUNTIME_AVAILABLE:
             mlir_func_name("get_local_size"),
             mlir_func_name("kernel_barrier"),
             mlir_func_name("kernel_mem_fence"),
+            "gpuxDuplicateQueue",
         ]
 
         from itertools import product

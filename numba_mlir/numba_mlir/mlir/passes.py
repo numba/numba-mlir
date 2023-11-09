@@ -590,15 +590,37 @@ class MlirReplaceParfors(MlirBackendBase):
         def get_arg_packed(v):
             return [lowerer.loadvar(v)]
 
-        func_args = self._enumerate_parfor_args(parfor, get_arg_packed)
-        func_args_types = self._get_parfor_args_types(typemap, parfor)
-        queue = self._get_queue_from_args(builder, func_args, func_args_types)
+        if self._has_array_ret(orig_ret_types):
+            func_args = self._enumerate_parfor_args(parfor, get_arg_packed)
+            func_args_types = self._get_parfor_args_types(typemap, parfor)
+            queue = self._get_queue_from_args(builder, func_args, func_args_types)
+        else:
+            queue = None
 
         for ret_val, ret_var, orig_type in zip(
             ret_vals, output_arrays + parfor.redvars, orig_ret_types
         ):
             repacked = self._repack_ret(context, builder, queue, ret_val, orig_type)
             lowerer.storevar(repacked, name=ret_var)
+
+    def _has_array_ret(self, types):
+        usmarray_type = self._usmarray_type
+        if not usmarray_type:
+            return False
+
+        for t in types:
+            if isinstance(t, usmarray_type):
+                return True
+
+        return False
+
+    def _deplicate_queue(self, builder, queue):
+        assert queue, f"Invalid queue: {queue}"
+        ptr_type = llvmlite.ir.PointerType(llvmlite.ir.IntType(8))
+        fnty = llvmlite.ir.FunctionType(ptr_type, [ptr_type])
+        mod = builder.module
+        fn = cgutils.get_or_insert_function(mod, fnty, "gpuxDuplicateQueue")
+        return builder.call(fn, [queue])
 
     def _get_queue_from_args(self, builder, args, args_types):
         usmarray_type = self._usmarray_type
@@ -607,7 +629,8 @@ class MlirReplaceParfors(MlirBackendBase):
 
         for arg, arg_type in zip(args, args_types):
             if isinstance(arg_type, usmarray_type):
-                return builder.extract_value(arg, self._sycl_queue_index)
+                queue = builder.extract_value(arg, self._sycl_queue_index)
+                return self._deplicate_queue(builder, queue)
 
         return None
 

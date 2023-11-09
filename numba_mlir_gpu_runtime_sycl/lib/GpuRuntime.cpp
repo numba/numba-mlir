@@ -425,3 +425,13 @@ gpuxSuggestBlockSize(void *stream, void *kernel, const uint32_t *gridSize,
                                        gridSize, blockSize, numDims);
   });
 }
+
+// TODO: not sure it belongs here
+extern "C" NUMBA_MLIR_GPU_RUNTIME_SYCL_EXPORT void *
+gpuxDuplicateQueue(void *queue) {
+  LOG_FUNC();
+  return catchAll([&]() {
+    auto *q = static_cast<sycl::queue *>(queue);
+    return new sycl::queue(*q);
+  });
+}
