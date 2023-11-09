@@ -19,4 +19,5 @@ void populateLoopOptsPatterns(mlir::RewritePatternSet &patterns);
 void populateCommonOptsPatterns(mlir::RewritePatternSet &patterns);
 
 std::unique_ptr<mlir::Pass> createCommonOptsPass();
+std::unique_ptr<mlir::Pass> createMoveIntoParallelPass();
 } // namespace numba
