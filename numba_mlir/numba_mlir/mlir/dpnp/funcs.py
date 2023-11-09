@@ -24,4 +24,25 @@ if _dnnp_available:
     ):
         return _init_impl(builder, shape, dtype)
 
-    register_func("dpnp.sin", dpnp.sin)(numpy_funcs.sin_impl)
+    def _gen_unary_ops():
+        ops = [
+            "sqrt",
+            "square",
+            "log",
+            "sin",
+            "cos",
+            "exp",
+            "tanh",
+            "abs",
+            "negative",
+            # "positive",
+        ]
+        for op_name in ops:
+            fn_name = "dpnp." + op_name
+            func = getattr(dpnp, op_name)
+            impl_name = op_name + "_impl"
+            impl = getattr(numpy_funcs, impl_name)
+            register_func(op_name, func)(impl)
+
+    _gen_unary_ops()
+    del _gen_unary_ops
