@@ -1435,3 +1435,76 @@ void numba::populateCommonOptsPatterns(mlir::RewritePatternSet &patterns) {
 std::unique_ptr<mlir::Pass> numba::createCommonOptsPass() {
   return std::make_unique<CommonOptsPass>();
 }
+
+static void moveOpsIntoParallel(mlir::scf::ParallelOp outer, int maxDepth,
+                                int depth = 0) {
+  auto outerBody = outer.getBody();
+  auto parallelIt = llvm::find_if(*outerBody, [](auto &op) {
+    return mlir::isa<mlir::scf::ParallelOp>(op);
+  });
+  if (outerBody->end() == parallelIt)
+    return;
+
+  auto parallelOp = mlir::cast<mlir::scf::ParallelOp>(*parallelIt);
+  auto parallelOpBody = parallelOp.getBody();
+  if (parallelIt != outerBody->begin()) {
+    auto it = std::prev(parallelIt);
+    auto begin = outerBody->begin();
+    while (true) {
+      bool first = (it == begin);
+      auto &op = *it;
+      auto isParallelOpOperand = [&](mlir::Operation &op) -> bool {
+        auto operands = parallelOp->getOperands();
+        for (auto r : op.getResults())
+          if (llvm::is_contained(operands, r))
+            return true;
+
+        return false;
+      };
+
+      auto isUsedOutside = [&](mlir::Operation &op) -> bool {
+        auto &region = parallelOp.getRegion();
+        for (auto user : op.getUsers())
+          if (!region.isAncestor(user->getParentRegion()))
+            return true;
+
+        return false;
+      };
+
+      if (!mlir::isMemoryEffectFree(&op) || isParallelOpOperand(op) ||
+          isUsedOutside(op))
+        break;
+
+      if (first) {
+        op.moveBefore(&parallelOpBody->front());
+        break;
+      }
+
+      --it;
+      op.moveBefore(&parallelOpBody->front());
+    }
+  }
+  depth += outer.getStep().size();
+  if (depth >= maxDepth)
+    return;
+
+  moveOpsIntoParallel(parallelOp, maxDepth, depth);
+}
+
+namespace {
+struct MoveIntoParallel
+    : public mlir::PassWrapper<MoveIntoParallel, mlir::OperationPass<>> {
+  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(MoveIntoParallel)
+
+  void runOnOperation() override {
+    getOperation()->walk([&](mlir::scf::ParallelOp op) -> mlir::WalkResult {
+      moveOpsIntoParallel(op, 3);
+      return mlir::WalkResult::skip();
+    });
+  }
+};
+} // namespace
+
+std::unique_ptr<mlir::Pass> numba::createMoveIntoParallelPass() {
+  return std::make_unique<MoveIntoParallel>();
+}

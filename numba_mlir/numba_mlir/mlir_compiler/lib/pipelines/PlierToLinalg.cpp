@@ -4653,6 +4653,8 @@ static void populatePlierToLinalgOptPipeline(mlir::OpPassManager &pm) {
             numba::createCanonicalizeReductionsPass());
         p.addNestedPass<mlir::func::FuncOp>(
             numba::createPromoteToParallelPass());
+        p.addNestedPass<mlir::func::FuncOp>(
+            numba::createMoveIntoParallelPass());
         // ToDo: This pass also tries to do some simple fusion, whic should be
         // split in separate pass
         p.addNestedPass<mlir::func::FuncOp>(

@@ -1039,7 +1039,6 @@ def test_prange_vectorize_1d():
         assert ir.count("vector.maskedstore") > 0, ir
 
 
-@pytest.mark.xfail
 def test_prange_vectorize_2d():
     def py_func(a):
         b = np.zeros_like(a)
