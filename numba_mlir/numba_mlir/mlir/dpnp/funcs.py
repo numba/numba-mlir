@@ -14,6 +14,14 @@ except ImportError:
 if _dnnp_available:
     from ..numpy import funcs as numpy_funcs
 
+    _init_impl = numpy_funcs._init_impl
+
     register_func = numpy_funcs.register_func
 
-    register_func("dpnp.empty", dpnp.empty)(numpy_funcs.empty_impl)
+    @register_func("dpnp.empty", dpnp.empty)
+    def empty_impl(
+        builder, shape, dtype=None, layout="C", device=None, usm_type="device"
+    ):
+        return _init_impl(builder, shape, dtype)
+
+    register_func("dpnp.sin", dpnp.sin)(numpy_funcs.sin_impl)
