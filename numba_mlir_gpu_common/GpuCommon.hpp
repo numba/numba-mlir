@@ -15,9 +15,9 @@ class queue;
 
 namespace numba {
 
-class GPUStreamInterface {
+class GPUQueueInterface {
 public:
-  virtual ~GPUStreamInterface() = default;
+  virtual ~GPUQueueInterface() = default;
 
   /// Returns device name.
   virtual std::string_view getDeviceName() = 0;

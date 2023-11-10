@@ -55,13 +55,13 @@ struct QueueMap {
 
 static std::unique_ptr<QueueMap> qMapPtr;
 
-static cl::sycl::queue getQueue(numba::GPUStreamInterface *streamIface) {
-  assert(streamIface);
-  if (auto queue = streamIface->getQueue())
+static cl::sycl::queue getQueue(numba::GPUQueueInterface *queueIface) {
+  assert(queueIface);
+  if (auto queue = queueIface->getQueue())
     return *queue;
 
   assert(qMapPtr);
-  return qMapPtr->getQueue(std::string(streamIface->getDeviceName()));
+  return qMapPtr->getQueue(std::string(queueIface->getDeviceName()));
 }
 
 template <typename T>
@@ -73,10 +73,10 @@ using GemmFunc = sycl::event (*)(cl::sycl::queue &, oneapi::mkl::transpose,
                                  const std::vector<cl::sycl::event> &);
 
 template <typename T>
-static void deviceGemm(void *stream, const Memref<2, T> *a,
+static void deviceGemm(void *queueObj, const Memref<2, T> *a,
                        const Memref<2, T> *b, Memref<2, T> *c, T alpha,
                        T beta) {
-  auto streamIface = static_cast<numba::GPUStreamInterface *>(stream);
+  auto queueIface = static_cast<numba::GPUQueueInterface *>(queueObj);
 
   auto isContiguous = [](const Memref<2, T> *arr, char arr_name) {
     if (arr->strides[0] != 1 && arr->strides[1] != 1) {
@@ -120,7 +120,7 @@ static void deviceGemm(void *stream, const Memref<2, T> *a,
   auto bData = getMemrefData(b);
   auto cData = getMemrefData(c);
 
-  auto queue = getQueue(streamIface);
+  auto queue = getQueue(queueIface);
 
   Gemm(queue,  /*queue*/
        transA, /*transa*/
@@ -160,9 +160,9 @@ extern "C" {
 #ifdef NUMBA_MLIR_USE_SYCL_MKL
 #define GEMM_VARIANT(T, Suff)                                                  \
   NUMBA_MLIR_MATH_SYCL_RUNTIME_EXPORT void mkl_gemm_##Suff##_device(           \
-      void *stream, const Memref<2, T> *a, const Memref<2, T> *b, T alpha,     \
+      void *queue, const Memref<2, T> *a, const Memref<2, T> *b, T alpha,      \
       T beta, Memref<2, T> *c) {                                               \
-    deviceGemm<T>(stream, a, b, c, alpha, beta);                               \
+    deviceGemm<T>(queue, a, b, c, alpha, beta);                                \
   }
 
 GEMM_VARIANT(float, float32)
