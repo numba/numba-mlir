@@ -118,9 +118,9 @@ static py::object mapType(const py::handle &typesMod, mlir::Type type) {
     return dtypeType(inner);
   }
 
-  if (mlir::isa<plier::SliceType>(type)) {
+  if (mlir::isa<plier::SliceType>(type))
     return typesMod.attr("slice3_type");
-  }
+
   return {};
 }
 } // namespace
