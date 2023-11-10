@@ -1358,9 +1358,12 @@ def test_kernel_slice_arg_dpctl(s):
     N = len(res[s])
 
     sim_res = res.copy()
-    gpu_res = _from_host(res.copy(), buffer="device")
+    gpu_res = res.copy()
+    dgpu_res = _from_host(gpu_res, buffer="device")
     sim_func[N, DEFAULT_LOCAL_SIZE](s, sim_res)
-    gpu_func[N, DEFAULT_LOCAL_SIZE](s, gpu_res)
+    gpu_func[N, DEFAULT_LOCAL_SIZE](s, dgpu_res)
+
+    _to_host(dgpu_res, gpu_res)
     assert_equal(gpu_res, sim_res)
 
 
