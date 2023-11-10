@@ -110,11 +110,11 @@ void CreateGpuQueueOp::getCanonicalizationPatterns(
 
 void LoadGpuModuleOp::build(::mlir::OpBuilder &odsBuilder,
                             ::mlir::OperationState &odsState,
-                            ::mlir::Value stream,
+                            ::mlir::Value queue,
                             ::mlir::gpu::GPUModuleOp module) {
   auto ctx = odsBuilder.getContext();
   LoadGpuModuleOp::build(odsBuilder, odsState,
-                         gpu_runtime::OpaqueType::get(ctx), stream,
+                         gpu_runtime::OpaqueType::get(ctx), queue,
                          mlir::SymbolRefAttr::get(ctx, module.getName()));
 }
 
@@ -158,7 +158,7 @@ void LaunchGpuKernelOp::build(::mlir::OpBuilder &builder,
 
 void GPUSuggestBlockSizeOp::build(::mlir::OpBuilder &odsBuilder,
                                   ::mlir::OperationState &odsState,
-                                  ::std::optional<::mlir::Value> stream,
+                                  ::std::optional<::mlir::Value> queue,
                                   ::mlir::ValueRange gridSize,
                                   ::mlir::Value kernel) {
   auto dimCount = gridSize.size();
@@ -167,13 +167,13 @@ void GPUSuggestBlockSizeOp::build(::mlir::OpBuilder &odsBuilder,
                                             odsBuilder.getIndexType());
 
   GPUSuggestBlockSizeOp::build(odsBuilder, odsState, resTypes,
-                               stream.value_or(mlir::Value{}), kernel,
+                               queue.value_or(mlir::Value{}), kernel,
                                mlir::SymbolRefAttr{}, gridSize);
 }
 
 void GPUSuggestBlockSizeOp::build(::mlir::OpBuilder &odsBuilder,
                                   ::mlir::OperationState &odsState,
-                                  ::std::optional<::mlir::Value> stream,
+                                  ::std::optional<::mlir::Value> queue,
                                   ::mlir::ValueRange gridSize,
                                   ::mlir::SymbolRefAttr kernel) {
   auto dimCount = gridSize.size();
@@ -182,13 +182,13 @@ void GPUSuggestBlockSizeOp::build(::mlir::OpBuilder &odsBuilder,
                                             odsBuilder.getIndexType());
 
   GPUSuggestBlockSizeOp::build(odsBuilder, odsState, resTypes,
-                               stream.value_or(mlir::Value{}), mlir::Value{},
+                               queue.value_or(mlir::Value{}), mlir::Value{},
                                kernel, gridSize);
 }
 
 void GPUSuggestBlockSizeOp::build(::mlir::OpBuilder &odsBuilder,
                                   ::mlir::OperationState &odsState,
-                                  ::std::optional<::mlir::Value> stream,
+                                  ::std::optional<::mlir::Value> queue,
                                   ::mlir::ValueRange gridSize) {
   auto dimCount = gridSize.size();
   assert(dimCount > 0 && dimCount <= 3);
@@ -196,7 +196,7 @@ void GPUSuggestBlockSizeOp::build(::mlir::OpBuilder &odsBuilder,
                                             odsBuilder.getIndexType());
 
   GPUSuggestBlockSizeOp::build(odsBuilder, odsState, resTypes,
-                               stream.value_or(mlir::Value{}), mlir::Value{},
+                               queue.value_or(mlir::Value{}), mlir::Value{},
                                mlir::SymbolRefAttr{}, gridSize);
 }
 

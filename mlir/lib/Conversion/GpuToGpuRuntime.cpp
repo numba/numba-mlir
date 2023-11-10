@@ -545,18 +545,18 @@ static std::optional<mlir::Value> getGpuStream(mlir::OpBuilder &builder,
 
   auto &block = func.getFunctionBody().front();
   auto ops = block.getOps<gpu_runtime::CreateGpuQueueOp>();
-  for (auto streamOp : ops)
-    if (streamOp.getDeviceAttr() == device)
-      return streamOp.getResult();
+  for (auto queueOp : ops)
+    if (queueOp.getDeviceAttr() == device)
+      return queueOp.getResult();
 
   mlir::OpBuilder::InsertionGuard g(builder);
   builder.setInsertionPointToStart(&block);
   auto loc = builder.getUnknownLoc();
-  mlir::Value stream =
+  mlir::Value queue =
       builder.create<gpu_runtime::CreateGpuQueueOp>(loc, device);
   builder.setInsertionPoint(block.getTerminator());
-  builder.create<gpu_runtime::DestroyGpuQueueOp>(loc, stream);
-  return stream;
+  builder.create<gpu_runtime::DestroyGpuQueueOp>(loc, queue);
+  return queue;
 }
 
 template <typename Op>
@@ -1416,16 +1416,16 @@ static mlir::LogicalResult createGpuKernelLoad(mlir::PatternRewriter &builder,
   if (!gpuKernel)
     return mlir::failure();
 
-  auto stream = getGpuStream(builder, op);
-  if (!stream)
+  auto queue = getGpuStream(builder, op);
+  if (!queue)
     return mlir::failure();
 
   auto loc = op.getLoc();
   auto module =
-      builder.create<gpu_runtime::LoadGpuModuleOp>(loc, *stream, gpuMod);
+      builder.create<gpu_runtime::LoadGpuModuleOp>(loc, *queue, gpuMod);
   auto kernel =
       builder.create<gpu_runtime::GetGpuKernelOp>(loc, module, gpuKernel);
-  auto newOp = func(builder, loc, *stream, kernel);
+  auto newOp = func(builder, loc, *queue, kernel);
   builder.replaceOp(op, newOp.getResults());
   return mlir::success();
 }
@@ -1438,10 +1438,10 @@ struct ExpandLaunchOp : public mlir::OpRewritePattern<mlir::gpu::LaunchFuncOp> {
                   mlir::PatternRewriter &rewriter) const override {
     return createGpuKernelLoad(
         rewriter, op,
-        [&](mlir::OpBuilder &builder, mlir::Location loc, mlir::Value stream,
+        [&](mlir::OpBuilder &builder, mlir::Location loc, mlir::Value queue,
             mlir::Value kernel) {
           return builder.create<gpu_runtime::LaunchGpuKernelOp>(
-              loc, stream, kernel, op.getGridSizeOperandValues(),
+              loc, queue, kernel, op.getGridSizeOperandValues(),
               op.getBlockSizeOperandValues(), op.getKernelOperands());
         });
   }
@@ -1453,15 +1453,15 @@ struct ExpandAllocOp : public mlir::OpRewritePattern<mlir::gpu::AllocOp> {
   mlir::LogicalResult
   matchAndRewrite(mlir::gpu::AllocOp op,
                   mlir::PatternRewriter &rewriter) const override {
-    auto stream = getGpuStream(rewriter, op);
-    if (!stream)
+    auto queue = getGpuStream(rewriter, op);
+    if (!queue)
       return mlir::failure();
 
     auto hostShared = op.getHostShared();
     mlir::Type token =
         op.getAsyncToken() ? op.getAsyncToken().getType() : nullptr;
     rewriter.replaceOpWithNewOp<gpu_runtime::GPUAllocOp>(
-        op, op.getType(), token, op.getAsyncDependencies(), *stream,
+        op, op.getType(), token, op.getAsyncDependencies(), *queue,
         op.getDynamicSizes(), op.getSymbolOperands(), hostShared);
 
     return mlir::success();
@@ -1474,13 +1474,13 @@ struct ExpandDeallocOp : public mlir::OpRewritePattern<mlir::gpu::DeallocOp> {
   mlir::LogicalResult
   matchAndRewrite(mlir::gpu::DeallocOp op,
                   mlir::PatternRewriter &rewriter) const override {
-    auto stream = getGpuStream(rewriter, op);
-    if (!stream)
+    auto queue = getGpuStream(rewriter, op);
+    if (!queue)
       return mlir::failure();
 
     rewriter.replaceOpWithNewOp<gpu_runtime::GPUDeallocOp>(
         op, op.getResultTypes(), op.getAsyncDependencies(), op.getMemref(),
-        *stream);
+        *queue);
 
     return mlir::success();
   }
@@ -1498,10 +1498,10 @@ struct ExpandSuggestBlockSizeOp
 
     return createGpuKernelLoad(
         rewriter, op,
-        [&](mlir::OpBuilder &builder, mlir::Location loc, mlir::Value stream,
+        [&](mlir::OpBuilder &builder, mlir::Location loc, mlir::Value queue,
             mlir::Value kernel) {
           return builder.create<gpu_runtime::GPUSuggestBlockSizeOp>(
-              loc, stream, op.getGridSize(), kernel);
+              loc, queue, op.getGridSize(), kernel);
         });
   }
 };
@@ -1689,8 +1689,8 @@ struct ExpandDeviceFuncCallOp
     if (!deviceFuncAttr)
       return mlir::failure();
 
-    auto stream = getGpuStream(rewriter, op);
-    if (!stream)
+    auto queue = getGpuStream(rewriter, op);
+    if (!queue)
       return mlir::failure();
 
     auto deviceFunc = [&]() -> mlir::func::FuncOp {
@@ -1699,7 +1699,7 @@ struct ExpandDeviceFuncCallOp
       if (!func) {
         auto origFuncType = origFunc.getFunctionType();
         llvm::SmallVector<mlir::Type> newInputs;
-        newInputs.emplace_back(stream->getType());
+        newInputs.emplace_back(queue->getType());
         auto inputs = origFuncType.getInputs();
         newInputs.append(inputs.begin(), inputs.end());
 
@@ -1717,7 +1717,7 @@ struct ExpandDeviceFuncCallOp
 
     auto oldArgs = op.getOperands();
     llvm::SmallVector<mlir::Value> newArgs;
-    newArgs.emplace_back(*stream);
+    newArgs.emplace_back(*queue);
     newArgs.append(oldArgs.begin(), oldArgs.end());
 
     rewriter.replaceOpWithNewOp<mlir::func::CallOp>(op, deviceFunc, newArgs);
@@ -1815,10 +1815,10 @@ struct TileParallelOp : public mlir::OpRewritePattern<mlir::scf::ParallelOp> {
     globalSize.fill(one);
     llvm::copy(oldUpperBounds.take_front(numLoops), globalSize.begin());
 
-    std::optional<mlir::Value> stream;
+    std::optional<mlir::Value> queue;
     auto localSize =
         rewriter
-            .create<gpu_runtime::GPUSuggestBlockSizeOp>(loc, stream, globalSize)
+            .create<gpu_runtime::GPUSuggestBlockSizeOp>(loc, queue, globalSize)
             ->getResults();
 
     llvm::SmallVector<mlir::Value> newLowerBounds;

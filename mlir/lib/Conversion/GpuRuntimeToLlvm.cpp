@@ -91,23 +91,23 @@ protected:
       context, {llvmPointerType, llvmPointerType});
   mlir::Type llvmAllocResPtrType = getLLVMPointerType(llvmAllocResType);
 
-  FunctionCallBuilder streamCreateCallBuilder = {
+  FunctionCallBuilder queueCreateCallBuilder = {
       "gpuxStreamCreate",
-      llvmPointerType, // stream
+      llvmPointerType, // queue
       {
           llvmPointerType // device name
       }};
 
-  FunctionCallBuilder streamDestroyCallBuilder = {"gpuxStreamDestroy",
+  FunctionCallBuilder queueDestroyCallBuilder = {"gpuxStreamDestroy",
                                                   llvmVoidType,
                                                   {
-                                                      llvmPointerType // stream
+                                                      llvmPointerType // queue
                                                   }};
 
   FunctionCallBuilder moduleLoadCallBuilder = {"gpuxModuleLoad",
                                                llvmPointerType, // module
                                                {
-                                                   llvmPointerType, // stream
+                                                   llvmPointerType, // queue
                                                    llvmPointerType, // data ptr
                                                    llvmIndexType,   // data size
                                                }};
@@ -135,7 +135,7 @@ protected:
       "gpuxLaunchKernel",
       llvmPointerType, // dep
       {
-          llvmPointerType,         // stream
+          llvmPointerType,         // queue
           llvmPointerType,         // kernel
           llvmIndexType,           // gridXDim
           llvmIndexType,           // gridyDim
@@ -150,14 +150,14 @@ protected:
   FunctionCallBuilder waitEventCallBuilder = {"gpuxWait",
                                               llvmVoidType,
                                               {
-                                                  llvmPointerType, // stream
+                                                  llvmPointerType, // queue
                                                   llvmPointerType, // dep
                                               }};
 
   FunctionCallBuilder destroyEventCallBuilder = {"gpuxDestroyEvent",
                                                  llvmVoidType,
                                                  {
-                                                     llvmPointerType, // stream
+                                                     llvmPointerType, // queue
                                                      llvmPointerType, // dep
                                                  }};
 
@@ -165,7 +165,7 @@ protected:
       "gpuxAlloc",
       llvmVoidType,
       {
-          llvmPointerType,        // stream
+          llvmPointerType,        // queue
           llvmIndexType,          // size
           llvmIndexType,          // alignment
           llvmInt32Type,          // shared
@@ -177,7 +177,7 @@ protected:
       "gpuxDeAlloc",
       llvmVoidType,
       {
-          llvmPointerType, // stream
+          llvmPointerType, // queue
           llvmPointerType, // memory pointer
       }};
 
@@ -185,7 +185,7 @@ protected:
       "gpuxSuggestBlockSize",
       llvmVoidType,
       {
-          llvmPointerType, // stream
+          llvmPointerType, // queue
           llvmPointerType, // kernel
           llvmI32PtrType,  // grid sizes
           llvmI32PtrType,  // ret block sizes
@@ -256,7 +256,7 @@ private:
       data = rewriter.create<mlir::LLVM::ZeroOp>(loc, llvmPointerType);
     }
 
-    auto res = streamCreateCallBuilder.create(loc, rewriter, data);
+    auto res = queueCreateCallBuilder.create(loc, rewriter, data);
     rewriter.replaceOp(op, res.getResults());
     return mlir::success();
   }
@@ -276,7 +276,7 @@ private:
                   mlir::ConversionPatternRewriter &rewriter) const override {
     auto loc = op.getLoc();
     auto res =
-        streamDestroyCallBuilder.create(loc, rewriter, adaptor.getSource());
+        queueDestroyCallBuilder.create(loc, rewriter, adaptor.getSource());
     rewriter.replaceOp(op, res.getResults());
     return mlir::success();
   }
@@ -598,10 +598,10 @@ private:
 
     auto paramsArrayVoidPtr = rewriter.create<mlir::LLVM::BitcastOp>(
         loc, llvmGpuParamPointerType, paramsArrayPtr);
-    auto stream = adaptor.getQueue();
+    auto queue = adaptor.getQueue();
     mlir::Value params[] = {
         // clang-format off
-        stream,
+        queue,
         adaptor.getKernel(),
         adaptor.getGridSizeX(),
         adaptor.getGridSizeY(),
@@ -616,8 +616,8 @@ private:
     auto event =
         launchKernelCallBuilder.create(loc, rewriter, params)->getResult(0);
     if (op.getNumResults() == 0) {
-      waitEventCallBuilder.create(loc, rewriter, {stream, event});
-      destroyEventCallBuilder.create(loc, rewriter, {stream, event});
+      waitEventCallBuilder.create(loc, rewriter, {queue, event});
+      destroyEventCallBuilder.create(loc, rewriter, {queue, event});
       rewriter.eraseOp(op);
     } else {
       rewriter.replaceOp(op, event);
@@ -692,10 +692,10 @@ private:
                                                    llvmAllocResType, size, 0);
     });
 
-    auto stream = adaptor.getQueue();
+    auto queue = adaptor.getQueue();
     mlir::Value params[] = {
         // clang-format off
-        stream,
+        queue,
         sizeBytes,
         alignmentVar,
         typeVar,
@@ -714,7 +714,7 @@ private:
     auto deallocFunc = deallocCallBuilder.createFunc(loc, rewriter);
     auto dtor = mlir::SymbolRefAttr::get(deallocFunc);
     mlir::Value meminfo = rewriter.create<numba::util::WrapAllocatedPointer>(
-        loc, llvmPointerType, dataPtr, dtor, stream);
+        loc, llvmPointerType, dataPtr, dtor, queue);
 
     auto memrefDesc = mlir::MemRefDescriptor::undef(rewriter, loc, dstType);
     auto elemPtrTye = memrefDesc.getElementPtrType();
@@ -736,8 +736,8 @@ private:
 
     mlir::Value resMemref = memrefDesc;
     if (op.getNumResults() == 1) {
-      waitEventCallBuilder.create(loc, rewriter, {stream, event});
-      destroyEventCallBuilder.create(loc, rewriter, {stream, event});
+      waitEventCallBuilder.create(loc, rewriter, {queue, event});
+      destroyEventCallBuilder.create(loc, rewriter, {queue, event});
       rewriter.replaceOp(op, resMemref);
     } else {
       mlir::Value vals[] = {
