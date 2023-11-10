@@ -99,10 +99,10 @@ protected:
       }};
 
   FunctionCallBuilder queueDestroyCallBuilder = {"gpuxQueueDestroy",
-                                                  llvmVoidType,
-                                                  {
-                                                      llvmPointerType // queue
-                                                  }};
+                                                 llvmVoidType,
+                                                 {
+                                                     llvmPointerType // queue
+                                                 }};
 
   FunctionCallBuilder moduleLoadCallBuilder = {"gpuxModuleLoad",
                                                llvmPointerType, // module

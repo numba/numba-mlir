@@ -530,7 +530,7 @@ struct ConvertGPUDeallocsPass
 };
 
 static std::optional<mlir::Value> getGpuQueue(mlir::OpBuilder &builder,
-                                               mlir::Operation *op) {
+                                              mlir::Operation *op) {
   assert(op);
   auto func = op->getParentOfType<mlir::FunctionOpInterface>();
   if (!func)
