@@ -10,7 +10,7 @@
 #include <mlir/IR/TypeRange.h>
 
 #include "numba/Dialect/numba_util/Dialect.hpp"
-#include "numba/Dialect/plier/Dialect.hpp"
+#include "numba/Dialect/plier/Dialect.hpp" // TODO: for slice slice type
 
 namespace py = pybind11;
 
