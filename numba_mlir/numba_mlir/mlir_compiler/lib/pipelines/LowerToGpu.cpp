@@ -49,6 +49,7 @@
 #include "numba/Dialect/gpu_runtime/Transforms/MakeBarriersUniform.hpp"
 #include "numba/Dialect/ntensor/IR/NTensorOps.hpp"
 #include "numba/Dialect/numba_util/Dialect.hpp"
+#include "numba/Dialect/plier/Dialect.hpp" // TODO: for slice slice type
 #include "numba/Transforms/CallLowering.hpp"
 #include "numba/Transforms/CastUtils.hpp"
 #include "numba/Transforms/CommonOpts.hpp"
@@ -1045,6 +1046,11 @@ static void visitTypeRecursive(mlir::Type type, F &&visitor) {
   if (auto tupleType = type.dyn_cast<mlir::TupleType>()) {
     for (auto t : tupleType.getTypes())
       visitTypeRecursive(t, std::forward<F>(visitor));
+  } else if (mlir::isa<plier::SliceType>(type)) {
+    auto index = mlir::IndexType::get(type.getContext());
+    visitor(index);
+    visitor(index);
+    visitor(index);
   } else {
     visitor(type);
   }
