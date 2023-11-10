@@ -10,6 +10,7 @@
 #include <mlir/IR/TypeRange.h>
 
 #include "numba/Dialect/numba_util/Dialect.hpp"
+#include "numba/Dialect/plier/Dialect.hpp"
 
 namespace py = pybind11;
 
@@ -115,6 +116,10 @@ static py::object mapType(const py::handle &typesMod, mlir::Type type) {
 
     auto dtypeType = typesMod.attr("DType");
     return dtypeType(inner);
+  }
+
+  if (mlir::isa<plier::SliceType>(type)) {
+    return typesMod.attr("slice3_type");
   }
   return {};
 }
