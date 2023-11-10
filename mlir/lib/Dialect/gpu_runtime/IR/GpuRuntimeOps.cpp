@@ -94,17 +94,17 @@ struct RemoveUnusedOp : public mlir::OpRewritePattern<Op> {
 };
 } // namespace
 
-void CreateGpuStreamOp::build(mlir::OpBuilder &odsBuilder,
+void CreateGpuQueueOp::build(mlir::OpBuilder &odsBuilder,
                               mlir::OperationState &odsState,
                               mlir::Attribute device) {
   auto ctx = odsBuilder.getContext();
-  CreateGpuStreamOp::build(odsBuilder, odsState,
-                           gpu_runtime::StreamType::get(ctx), device);
+  CreateGpuQueueOp::build(odsBuilder, odsState,
+                           gpu_runtime::QueueType::get(ctx), device);
 }
 
-void CreateGpuStreamOp::getCanonicalizationPatterns(
+void CreateGpuQueueOp::getCanonicalizationPatterns(
     ::mlir::RewritePatternSet &results, ::mlir::MLIRContext *context) {
-  results.insert<RemoveUnusedOp<CreateGpuStreamOp, DestroyGpuStreamOp>>(
+  results.insert<RemoveUnusedOp<CreateGpuQueueOp, DestroyGpuQueueOp>>(
       context);
 }
 

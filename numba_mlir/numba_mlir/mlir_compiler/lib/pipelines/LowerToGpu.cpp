@@ -753,8 +753,8 @@ struct OutlineInitPass
     using outline_func_t =
         bool (*)(mlir::Operation &, llvm::SmallVectorImpl<mlir::Operation *> &);
     const outline_func_t outlineHandlers[] = {
-        &outlineOp<gpu_runtime::CreateGpuStreamOp,
-                   gpu_runtime::DestroyGpuStreamOp>,
+        &outlineOp<gpu_runtime::CreateGpuQueueOp,
+                   gpu_runtime::DestroyGpuQueueOp>,
         &outlineOp<gpu_runtime::LoadGpuModuleOp,
                    gpu_runtime::DestroyGpuModuleOp>,
         &outlineOp<gpu_runtime::GetGpuKernelOp,

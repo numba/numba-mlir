@@ -35,7 +35,7 @@ class GpuRuntime_Type<string name, string typeMnemonic, list<Trait> traits = [],
 
 def GpuRuntime_OpaqueType : GpuRuntime_Type<"Opaque", "opaque", [], "::mlir::Type">;
 
-def GpuRuntime_StreamType : GpuRuntime_Type<"Stream", "stream", [], "::mlir::Type">;
+def GpuRuntime_QueueType : GpuRuntime_Type<"Queue", "queue", [], "::mlir::Type">;
 
 class GpuRuntime_Attr<string attrName, string attrMnemonic, list<Trait> traits = []>
     : AttrDef<GpuRuntime_Dialect, attrName, traits> {
@@ -69,9 +69,9 @@ def GPURegionDescAttr
   ];
 }
 
-def CreateGpuStreamOp : GpuRuntime_Op<"create_gpu_stream", [Pure]> {
+def CreateGpuQueueOp : GpuRuntime_Op<"create_gpu_queue", [Pure]> {
   let arguments = (ins OptionalAttr<AnyAttr>:$device);
-  let results = (outs GpuRuntime_StreamType:$result);
+  let results = (outs GpuRuntime_QueueType:$result);
 
   let hasCanonicalizer = 1;
 
@@ -80,20 +80,20 @@ def CreateGpuStreamOp : GpuRuntime_Op<"create_gpu_stream", [Pure]> {
   let assemblyFormat = "attr-dict ( `,` $device^)?";
 }
 
-def DestroyGpuStreamOp : GpuRuntime_Op<"destroy_gpu_stream"> {
-  let arguments = (ins GpuRuntime_StreamType:$source);
+def DestroyGpuQueueOp : GpuRuntime_Op<"destroy_gpu_queue"> {
+  let arguments = (ins GpuRuntime_QueueType:$source);
 
   let assemblyFormat = "attr-dict $source";
 }
 
 def LoadGpuModuleOp : GpuRuntime_Op<"load_gpu_module", [Pure]> {
-  let arguments = (ins GpuRuntime_StreamType:$stream, SymbolRefAttr:$module);
+  let arguments = (ins GpuRuntime_QueueType:$queue, SymbolRefAttr:$module);
   let results = (outs GpuRuntime_OpaqueType:$result);
 
   let hasCanonicalizer = 1;
 
   let builders = [OpBuilder<(ins "::mlir::Value"
-                             : $stream, "::mlir::gpu::GPUModuleOp"
+                             : $queue, "::mlir::gpu::GPUModuleOp"
                              : $module)>];
 }
 
@@ -116,7 +116,7 @@ def LaunchGpuKernelOp
     : GpuRuntime_Op<"launch_gpu_kernel",
                [GPU_AsyncOpInterface, AttrSizedOperandSegments]> {
   let arguments = (ins Variadic<GPU_AsyncToken>:$asyncDependencies,
-                     GpuRuntime_StreamType:$stream,
+                     GpuRuntime_QueueType:$queue,
                      GpuRuntime_OpaqueType:$kernel,
                      Index:$gridSizeX, Index:$gridSizeY, Index:$gridSizeZ,
                      Index:$blockSizeX, Index:$blockSizeY, Index:$blockSizeZ,
@@ -124,7 +124,7 @@ def LaunchGpuKernelOp
   let results = (outs Optional<GPU_AsyncToken> : $asyncToken);
 
   let skipDefaultBuilders = 1;
-  let builders = [OpBuilder<(ins "::mlir::Value" : $stream,
+  let builders = [OpBuilder<(ins "::mlir::Value" : $queue,
                                  "::mlir::Value" : $kernel,
                                  "::mlir::gpu::KernelDim3" : $gridSize,
                                  "::mlir::gpu::KernelDim3" : $blockSize,
@@ -139,7 +139,7 @@ def GPUAllocOp : GpuRuntime_Op<"alloc",
   [GPU_AsyncOpInterface, AttrSizedOperandSegments]> {
 
   let arguments = (ins Variadic<GPU_AsyncToken>:$asyncDependencies,
-                       GpuRuntime_StreamType:$stream,
+                       GpuRuntime_QueueType:$queue,
                        Variadic<Index>:$dynamicSizes,
                        Variadic<Index>:$symbolOperands,
                        UnitAttr:$hostShared);
@@ -150,7 +150,7 @@ def GPUAllocOp : GpuRuntime_Op<"alloc",
     ::mlir::MemRefType getType() { return getMemref().getType().cast<::mlir::MemRefType>(); }
   }];
 
-  let assemblyFormat = [{ $stream
+  let assemblyFormat = [{ $queue
     custom<AsyncDependencies>(type($asyncToken), $asyncDependencies) (` ` `host_shared` $hostShared^)? ` `
     `(` $dynamicSizes `)` (`` `[` $symbolOperands^ `]`)? attr-dict `:` type($memref)
   }];
@@ -159,11 +159,11 @@ def GPUAllocOp : GpuRuntime_Op<"alloc",
 def GPUDeallocOp : GpuRuntime_Op<"dealloc"> {
   let arguments = (ins Variadic<GPU_AsyncToken>:$asyncDependencies,
                   Res<AnyMemRef, "", [MemAlloc]>:$memref,
-                  GpuRuntime_StreamType:$stream);
+                  GpuRuntime_QueueType:$queue);
 
   let results = (outs Optional<GPU_AsyncToken>:$asyncToken);
 
-  let assemblyFormat = [{ $stream
+  let assemblyFormat = [{ $queue
     custom<AsyncDependencies>(type($asyncToken), $asyncDependencies)
     $memref attr-dict `:` type($memref)
   }];
@@ -171,7 +171,7 @@ def GPUDeallocOp : GpuRuntime_Op<"dealloc"> {
 
 def GPUSuggestBlockSizeOp : GpuRuntime_Op<"suggest_block_size",
                                      [AttrSizedOperandSegments, Pure]> {
-  let arguments = (ins Optional<GpuRuntime_StreamType>:$stream,
+  let arguments = (ins Optional<GpuRuntime_QueueType>:$queue,
                        Optional<GpuRuntime_OpaqueType>:$kernel,
                        OptionalAttr<SymbolRefAttr>:$kernelRef,
                        Variadic<Index>:$gridSize);
@@ -180,15 +180,15 @@ def GPUSuggestBlockSizeOp : GpuRuntime_Op<"suggest_block_size",
 
   let builders = [
     OpBuilder<(ins
-      "::std::optional<::mlir::Value>":$stream,
+      "::std::optional<::mlir::Value>":$queue,
       "::mlir::ValueRange":$gridSize,
       "::mlir::Value":$kernel)>,
     OpBuilder<(ins
-      "::std::optional<::mlir::Value>":$stream,
+      "::std::optional<::mlir::Value>":$queue,
       "::mlir::ValueRange":$gridSize,
       "::mlir::SymbolRefAttr":$kernel)>,
     OpBuilder<(ins
-      "::std::optional<::mlir::Value>":$stream,
+      "::std::optional<::mlir::Value>":$queue,
       "::mlir::ValueRange":$gridSize)>
   ];
 
@@ -201,7 +201,7 @@ def GPUSuggestBlockSizeOp : GpuRuntime_Op<"suggest_block_size",
   }];
 
   let assemblyFormat = [{
-    attr-dict (`:` $stream^)? ($kernel^)? ($kernelRef^)? `,` $gridSize `->` type($results)
+    attr-dict (`:` $queue^)? ($kernel^)? ($kernelRef^)? `,` $gridSize `->` type($results)
   }];
 }
 

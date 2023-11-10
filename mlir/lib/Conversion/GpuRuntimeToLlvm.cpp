@@ -225,16 +225,16 @@ protected:
 };
 
 class ConvertGpuStreamCreatePattern
-    : public ConvertOpToGpuRuntimeCallPattern<gpu_runtime::CreateGpuStreamOp> {
+    : public ConvertOpToGpuRuntimeCallPattern<gpu_runtime::CreateGpuQueueOp> {
 public:
   ConvertGpuStreamCreatePattern(mlir::LLVMTypeConverter &converter)
-      : ConvertOpToGpuRuntimeCallPattern<gpu_runtime::CreateGpuStreamOp>(
+      : ConvertOpToGpuRuntimeCallPattern<gpu_runtime::CreateGpuQueueOp>(
             converter) {}
 
 private:
   mlir::LogicalResult
-  matchAndRewrite(gpu_runtime::CreateGpuStreamOp op,
-                  gpu_runtime::CreateGpuStreamOp::Adaptor adaptor,
+  matchAndRewrite(gpu_runtime::CreateGpuQueueOp op,
+                  gpu_runtime::CreateGpuQueueOp::Adaptor adaptor,
                   mlir::ConversionPatternRewriter &rewriter) const override {
     auto mod = op->getParentOfType<mlir::ModuleOp>();
     if (!mod)
@@ -263,16 +263,16 @@ private:
 };
 
 class ConvertGpuStreamDestroyPattern
-    : public ConvertOpToGpuRuntimeCallPattern<gpu_runtime::DestroyGpuStreamOp> {
+    : public ConvertOpToGpuRuntimeCallPattern<gpu_runtime::DestroyGpuQueueOp> {
 public:
   ConvertGpuStreamDestroyPattern(mlir::LLVMTypeConverter &converter)
-      : ConvertOpToGpuRuntimeCallPattern<gpu_runtime::DestroyGpuStreamOp>(
+      : ConvertOpToGpuRuntimeCallPattern<gpu_runtime::DestroyGpuQueueOp>(
             converter) {}
 
 private:
   mlir::LogicalResult
-  matchAndRewrite(gpu_runtime::DestroyGpuStreamOp op,
-                  gpu_runtime::DestroyGpuStreamOp::Adaptor adaptor,
+  matchAndRewrite(gpu_runtime::DestroyGpuQueueOp op,
+                  gpu_runtime::DestroyGpuQueueOp::Adaptor adaptor,
                   mlir::ConversionPatternRewriter &rewriter) const override {
     auto loc = op.getLoc();
     auto res =
@@ -318,7 +318,7 @@ private:
         mlir::IntegerAttr::get(llvmIndexType,
                                static_cast<int64_t>(blob.size())));
     auto res = moduleLoadCallBuilder.create(loc, rewriter,
-                                            {adaptor.getStream(), data, size});
+                                            {adaptor.getQueue(), data, size});
     rewriter.replaceOp(op, res.getResults());
     return mlir::success();
   }
@@ -598,7 +598,7 @@ private:
 
     auto paramsArrayVoidPtr = rewriter.create<mlir::LLVM::BitcastOp>(
         loc, llvmGpuParamPointerType, paramsArrayPtr);
-    auto stream = adaptor.getStream();
+    auto stream = adaptor.getQueue();
     mlir::Value params[] = {
         // clang-format off
         stream,
@@ -692,7 +692,7 @@ private:
                                                    llvmAllocResType, size, 0);
     });
 
-    auto stream = adaptor.getStream();
+    auto stream = adaptor.getQueue();
     mlir::Value params[] = {
         // clang-format off
         stream,
@@ -767,7 +767,7 @@ private:
         mlir::MemRefDescriptor(adaptor.getMemref()).allocatedPtr(rewriter, loc);
     auto casted =
         rewriter.create<mlir::LLVM::BitcastOp>(loc, llvmPointerType, pointer);
-    mlir::Value params[] = {adaptor.getStream(), casted};
+    mlir::Value params[] = {adaptor.getQueue(), casted};
     auto res = deallocCallBuilder.create(loc, rewriter, params);
     rewriter.replaceOp(op, res.getResults());
     return mlir::success();
@@ -828,7 +828,7 @@ private:
 
     mlir::Value params[] = {
         // clang-format off
-        adaptor.getStream(),
+        adaptor.getQueue(),
         adaptor.getKernel(),
         gridArrayPtr,
         blockArrayPtr,
@@ -895,7 +895,7 @@ void gpu_runtime::populateGpuToLLVMPatternsAndLegality(
         return llvmPointerType;
       });
   converter.addConversion(
-      [llvmPointerType](gpu_runtime::StreamType) -> mlir::Type {
+      [llvmPointerType](gpu_runtime::QueueType) -> mlir::Type {
         return llvmPointerType;
       });
 

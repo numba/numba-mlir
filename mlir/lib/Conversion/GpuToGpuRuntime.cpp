@@ -544,7 +544,7 @@ static std::optional<mlir::Value> getGpuStream(mlir::OpBuilder &builder,
     device = env.getDevice();
 
   auto &block = func.getFunctionBody().front();
-  auto ops = block.getOps<gpu_runtime::CreateGpuStreamOp>();
+  auto ops = block.getOps<gpu_runtime::CreateGpuQueueOp>();
   for (auto streamOp : ops)
     if (streamOp.getDeviceAttr() == device)
       return streamOp.getResult();
@@ -553,9 +553,9 @@ static std::optional<mlir::Value> getGpuStream(mlir::OpBuilder &builder,
   builder.setInsertionPointToStart(&block);
   auto loc = builder.getUnknownLoc();
   mlir::Value stream =
-      builder.create<gpu_runtime::CreateGpuStreamOp>(loc, device);
+      builder.create<gpu_runtime::CreateGpuQueueOp>(loc, device);
   builder.setInsertionPoint(block.getTerminator());
-  builder.create<gpu_runtime::DestroyGpuStreamOp>(loc, stream);
+  builder.create<gpu_runtime::DestroyGpuQueueOp>(loc, stream);
   return stream;
 }
 
