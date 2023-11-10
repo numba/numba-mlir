@@ -93,14 +93,14 @@ struct EventStorage {
 };
 static_assert(offsetof(EventStorage, event) == 0, "Event must be first");
 
-class Stream : public numba::GPUStreamInterface {
+class Queue : public numba::GPUQueueInterface {
 public:
-  Stream(const char *devName) : deviceName(devName ? devName : "") {
+  Queue(const char *devName) : deviceName(devName ? devName : "") {
     LOG_FUNC();
     queue = sycl::queue{sycl::device{getDeviceSelector(deviceName)}};
   }
-  Stream(const Stream &) = delete;
-  ~Stream() { LOG_FUNC(); }
+  Queue(const Queue &) = delete;
+  ~Queue() { LOG_FUNC(); }
 
   std::string_view getDeviceName() override { return deviceName; }
 
@@ -114,12 +114,12 @@ public:
   }
 
   struct Releaser {
-    Releaser(Stream *s) : stream(s) { assert(stream); }
+    Releaser(Queue *s) : queue(s) { assert(queue); }
     Releaser(const Releaser &) = delete;
-    ~Releaser() { stream->release(); }
+    ~Releaser() { queue->release(); }
 
   private:
-    Stream *stream;
+    Queue *queue;
   };
 
   GPUModule *loadModule(const void *data, size_t dataSize) {
@@ -323,106 +323,104 @@ private:
   }
 };
 
-static Stream *toStream(void *stream) {
-  assert(stream && "Invalid stream");
-  return static_cast<Stream *>(stream);
+static Queue *toQueue(void *queue) {
+  assert(queue && "Invalid queue");
+  return static_cast<Queue *>(queue);
 }
 
 } // namespace
 
 extern "C" NUMBA_MLIR_GPU_RUNTIME_SYCL_EXPORT void *
-gpuxStreamCreate(const char *deviceName) {
+gpuxQueueCreate(const char *deviceName) {
   LOG_FUNC();
-  return catchAll([&]() { return new Stream(deviceName); });
+  return catchAll([&]() { return new Queue(deviceName); });
 }
 
 extern "C" NUMBA_MLIR_GPU_RUNTIME_SYCL_EXPORT void
-gpuxStreamDestroy(void *stream) {
+gpuxQueueDestroy(void *queue) {
   LOG_FUNC();
-  catchAll([&]() { toStream(stream)->release(); });
+  catchAll([&]() { toQueue(queue)->release(); });
 }
 
 extern "C" NUMBA_MLIR_GPU_RUNTIME_SYCL_EXPORT void *
-gpuxModuleLoad(void *stream, const void *data, size_t dataSize) {
+gpuxModuleLoad(void *queue, const void *data, size_t dataSize) {
   LOG_FUNC();
-  return catchAll(
-      [&]() { return toStream(stream)->loadModule(data, dataSize); });
+  return catchAll([&]() { return toQueue(queue)->loadModule(data, dataSize); });
 }
 
 extern "C" NUMBA_MLIR_GPU_RUNTIME_SYCL_EXPORT void
 gpuxModuleDestroy(void *module) {
   LOG_FUNC();
-  catchAll([&]() { Stream::destroyModule(static_cast<GPUModule *>(module)); });
+  catchAll([&]() { Queue::destroyModule(static_cast<GPUModule *>(module)); });
 }
 
 extern "C" NUMBA_MLIR_GPU_RUNTIME_SYCL_EXPORT void *
 gpuxKernelGet(void *module, const char *name) {
   LOG_FUNC();
   return catchAll([&]() {
-    return Stream::getKernel(static_cast<GPUModule *>(module), name);
+    return Queue::getKernel(static_cast<GPUModule *>(module), name);
   });
 }
 
 extern "C" NUMBA_MLIR_GPU_RUNTIME_SYCL_EXPORT void
 gpuxKernelDestroy(void *kernel) {
   LOG_FUNC();
-  catchAll([&]() { Stream::destroyKernel(static_cast<GPUKernel *>(kernel)); });
+  catchAll([&]() { Queue::destroyKernel(static_cast<GPUKernel *>(kernel)); });
 }
 
 extern "C" NUMBA_MLIR_GPU_RUNTIME_SYCL_EXPORT void *
-gpuxLaunchKernel(void *stream, void *kernel, size_t gridX, size_t gridY,
+gpuxLaunchKernel(void *queue, void *kernel, size_t gridX, size_t gridY,
                  size_t gridZ, size_t blockX, size_t blockY, size_t blockZ,
                  void *events, void *params) {
   LOG_FUNC();
   return catchAll([&]() {
-    return toStream(stream)->launchKernel(
+    return toQueue(queue)->launchKernel(
         static_cast<GPUKernel *>(kernel), gridX, gridY, gridZ, blockX, blockY,
         blockZ, static_cast<sycl::event **>(events),
         static_cast<numba::GPUParamDesc *>(params));
   });
 }
 
-extern "C" NUMBA_MLIR_GPU_RUNTIME_SYCL_EXPORT void gpuxWait(void *stream,
+extern "C" NUMBA_MLIR_GPU_RUNTIME_SYCL_EXPORT void gpuxWait(void *queue,
                                                             void *event) {
   LOG_FUNC();
-  catchAll([&]() {
-    toStream(stream)->waitEvent(static_cast<sycl::event *>(event));
-  });
+  catchAll(
+      [&]() { toQueue(queue)->waitEvent(static_cast<sycl::event *>(event)); });
 }
 
 extern "C" NUMBA_MLIR_GPU_RUNTIME_SYCL_EXPORT void
-gpuxDestroyEvent(void *stream, void *event) {
+gpuxDestroyEvent(void *queue, void *event) {
   LOG_FUNC();
   catchAll([&]() {
-    toStream(stream)->destroyEvent(static_cast<sycl::event *>(event));
+    toQueue(queue)->destroyEvent(static_cast<sycl::event *>(event));
   });
 }
 
 extern "C" NUMBA_MLIR_GPU_RUNTIME_SYCL_EXPORT void
-gpuxAlloc(void *stream, size_t size, size_t alignment, int type, void *events,
+gpuxAlloc(void *queue, size_t size, size_t alignment, int type, void *events,
           numba::GPUAllocResult *ret) {
   LOG_FUNC();
   catchAll([&]() {
-    auto res = toStream(stream)->allocBuffer(
+    auto res = toQueue(queue)->allocBuffer(
         size, alignment, static_cast<numba::GpuAllocType>(type),
         static_cast<sycl::event **>(events));
     *ret = {std::get<0>(res), std::get<1>(res)};
   });
 }
 
-extern "C" NUMBA_MLIR_GPU_RUNTIME_SYCL_EXPORT void gpuxDeAlloc(void *stream,
+extern "C" NUMBA_MLIR_GPU_RUNTIME_SYCL_EXPORT void gpuxDeAlloc(void *queue,
                                                                void *ptr) {
   LOG_FUNC();
-  catchAll([&]() { toStream(stream)->deallocBuffer(ptr); });
+  catchAll([&]() { toQueue(queue)->deallocBuffer(ptr); });
 }
 
 extern "C" NUMBA_MLIR_GPU_RUNTIME_SYCL_EXPORT void
-gpuxSuggestBlockSize(void *stream, void *kernel, const uint32_t *gridSize,
+gpuxSuggestBlockSize(void *queue, void *kernel, const uint32_t *gridSize,
                      uint32_t *blockSize, size_t numDims) {
   LOG_FUNC();
   catchAll([&]() {
-    toStream(stream)->suggestBlockSize(static_cast<GPUKernel *>(kernel),
-                                       gridSize, blockSize, numDims);
+    toQueue(queue)->suggestBlockSize(static_cast<GPUKernel *>(kernel), gridSize,
+                                     blockSize, numDims);
   });
 }
 

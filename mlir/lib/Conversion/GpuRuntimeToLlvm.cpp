@@ -91,23 +91,23 @@ protected:
       context, {llvmPointerType, llvmPointerType});
   mlir::Type llvmAllocResPtrType = getLLVMPointerType(llvmAllocResType);
 
-  FunctionCallBuilder streamCreateCallBuilder = {
-      "gpuxStreamCreate",
-      llvmPointerType, // stream
+  FunctionCallBuilder queueCreateCallBuilder = {
+      "gpuxQueueCreate",
+      llvmPointerType, // queue
       {
           llvmPointerType // device name
       }};
 
-  FunctionCallBuilder streamDestroyCallBuilder = {"gpuxStreamDestroy",
-                                                  llvmVoidType,
-                                                  {
-                                                      llvmPointerType // stream
-                                                  }};
+  FunctionCallBuilder queueDestroyCallBuilder = {"gpuxQueueDestroy",
+                                                 llvmVoidType,
+                                                 {
+                                                     llvmPointerType // queue
+                                                 }};
 
   FunctionCallBuilder moduleLoadCallBuilder = {"gpuxModuleLoad",
                                                llvmPointerType, // module
                                                {
-                                                   llvmPointerType, // stream
+                                                   llvmPointerType, // queue
                                                    llvmPointerType, // data ptr
                                                    llvmIndexType,   // data size
                                                }};
@@ -135,7 +135,7 @@ protected:
       "gpuxLaunchKernel",
       llvmPointerType, // dep
       {
-          llvmPointerType,         // stream
+          llvmPointerType,         // queue
           llvmPointerType,         // kernel
           llvmIndexType,           // gridXDim
           llvmIndexType,           // gridyDim
@@ -150,14 +150,14 @@ protected:
   FunctionCallBuilder waitEventCallBuilder = {"gpuxWait",
                                               llvmVoidType,
                                               {
-                                                  llvmPointerType, // stream
+                                                  llvmPointerType, // queue
                                                   llvmPointerType, // dep
                                               }};
 
   FunctionCallBuilder destroyEventCallBuilder = {"gpuxDestroyEvent",
                                                  llvmVoidType,
                                                  {
-                                                     llvmPointerType, // stream
+                                                     llvmPointerType, // queue
                                                      llvmPointerType, // dep
                                                  }};
 
@@ -165,7 +165,7 @@ protected:
       "gpuxAlloc",
       llvmVoidType,
       {
-          llvmPointerType,        // stream
+          llvmPointerType,        // queue
           llvmIndexType,          // size
           llvmIndexType,          // alignment
           llvmInt32Type,          // shared
@@ -177,7 +177,7 @@ protected:
       "gpuxDeAlloc",
       llvmVoidType,
       {
-          llvmPointerType, // stream
+          llvmPointerType, // queue
           llvmPointerType, // memory pointer
       }};
 
@@ -185,7 +185,7 @@ protected:
       "gpuxSuggestBlockSize",
       llvmVoidType,
       {
-          llvmPointerType, // stream
+          llvmPointerType, // queue
           llvmPointerType, // kernel
           llvmI32PtrType,  // grid sizes
           llvmI32PtrType,  // ret block sizes
@@ -224,17 +224,17 @@ protected:
   }
 };
 
-class ConvertGpuStreamCreatePattern
-    : public ConvertOpToGpuRuntimeCallPattern<gpu_runtime::CreateGpuStreamOp> {
+class ConvertGpuQueueCreatePattern
+    : public ConvertOpToGpuRuntimeCallPattern<gpu_runtime::CreateGpuQueueOp> {
 public:
-  ConvertGpuStreamCreatePattern(mlir::LLVMTypeConverter &converter)
-      : ConvertOpToGpuRuntimeCallPattern<gpu_runtime::CreateGpuStreamOp>(
+  ConvertGpuQueueCreatePattern(mlir::LLVMTypeConverter &converter)
+      : ConvertOpToGpuRuntimeCallPattern<gpu_runtime::CreateGpuQueueOp>(
             converter) {}
 
 private:
   mlir::LogicalResult
-  matchAndRewrite(gpu_runtime::CreateGpuStreamOp op,
-                  gpu_runtime::CreateGpuStreamOp::Adaptor adaptor,
+  matchAndRewrite(gpu_runtime::CreateGpuQueueOp op,
+                  gpu_runtime::CreateGpuQueueOp::Adaptor adaptor,
                   mlir::ConversionPatternRewriter &rewriter) const override {
     auto mod = op->getParentOfType<mlir::ModuleOp>();
     if (!mod)
@@ -256,27 +256,27 @@ private:
       data = rewriter.create<mlir::LLVM::ZeroOp>(loc, llvmPointerType);
     }
 
-    auto res = streamCreateCallBuilder.create(loc, rewriter, data);
+    auto res = queueCreateCallBuilder.create(loc, rewriter, data);
     rewriter.replaceOp(op, res.getResults());
     return mlir::success();
   }
 };
 
-class ConvertGpuStreamDestroyPattern
-    : public ConvertOpToGpuRuntimeCallPattern<gpu_runtime::DestroyGpuStreamOp> {
+class ConvertGpuQueueDestroyPattern
+    : public ConvertOpToGpuRuntimeCallPattern<gpu_runtime::DestroyGpuQueueOp> {
 public:
-  ConvertGpuStreamDestroyPattern(mlir::LLVMTypeConverter &converter)
-      : ConvertOpToGpuRuntimeCallPattern<gpu_runtime::DestroyGpuStreamOp>(
+  ConvertGpuQueueDestroyPattern(mlir::LLVMTypeConverter &converter)
+      : ConvertOpToGpuRuntimeCallPattern<gpu_runtime::DestroyGpuQueueOp>(
             converter) {}
 
 private:
   mlir::LogicalResult
-  matchAndRewrite(gpu_runtime::DestroyGpuStreamOp op,
-                  gpu_runtime::DestroyGpuStreamOp::Adaptor adaptor,
+  matchAndRewrite(gpu_runtime::DestroyGpuQueueOp op,
+                  gpu_runtime::DestroyGpuQueueOp::Adaptor adaptor,
                   mlir::ConversionPatternRewriter &rewriter) const override {
     auto loc = op.getLoc();
     auto res =
-        streamDestroyCallBuilder.create(loc, rewriter, adaptor.getSource());
+        queueDestroyCallBuilder.create(loc, rewriter, adaptor.getSource());
     rewriter.replaceOp(op, res.getResults());
     return mlir::success();
   }
@@ -318,7 +318,7 @@ private:
         mlir::IntegerAttr::get(llvmIndexType,
                                static_cast<int64_t>(blob.size())));
     auto res = moduleLoadCallBuilder.create(loc, rewriter,
-                                            {adaptor.getStream(), data, size});
+                                            {adaptor.getQueue(), data, size});
     rewriter.replaceOp(op, res.getResults());
     return mlir::success();
   }
@@ -598,10 +598,10 @@ private:
 
     auto paramsArrayVoidPtr = rewriter.create<mlir::LLVM::BitcastOp>(
         loc, llvmGpuParamPointerType, paramsArrayPtr);
-    auto stream = adaptor.getStream();
+    auto queue = adaptor.getQueue();
     mlir::Value params[] = {
         // clang-format off
-        stream,
+        queue,
         adaptor.getKernel(),
         adaptor.getGridSizeX(),
         adaptor.getGridSizeY(),
@@ -616,8 +616,8 @@ private:
     auto event =
         launchKernelCallBuilder.create(loc, rewriter, params)->getResult(0);
     if (op.getNumResults() == 0) {
-      waitEventCallBuilder.create(loc, rewriter, {stream, event});
-      destroyEventCallBuilder.create(loc, rewriter, {stream, event});
+      waitEventCallBuilder.create(loc, rewriter, {queue, event});
+      destroyEventCallBuilder.create(loc, rewriter, {queue, event});
       rewriter.eraseOp(op);
     } else {
       rewriter.replaceOp(op, event);
@@ -692,10 +692,10 @@ private:
                                                    llvmAllocResType, size, 0);
     });
 
-    auto stream = adaptor.getStream();
+    auto queue = adaptor.getQueue();
     mlir::Value params[] = {
         // clang-format off
-        stream,
+        queue,
         sizeBytes,
         alignmentVar,
         typeVar,
@@ -714,7 +714,7 @@ private:
     auto deallocFunc = deallocCallBuilder.createFunc(loc, rewriter);
     auto dtor = mlir::SymbolRefAttr::get(deallocFunc);
     mlir::Value meminfo = rewriter.create<numba::util::WrapAllocatedPointer>(
-        loc, llvmPointerType, dataPtr, dtor, stream);
+        loc, llvmPointerType, dataPtr, dtor, queue);
 
     auto memrefDesc = mlir::MemRefDescriptor::undef(rewriter, loc, dstType);
     auto elemPtrTye = memrefDesc.getElementPtrType();
@@ -736,8 +736,8 @@ private:
 
     mlir::Value resMemref = memrefDesc;
     if (op.getNumResults() == 1) {
-      waitEventCallBuilder.create(loc, rewriter, {stream, event});
-      destroyEventCallBuilder.create(loc, rewriter, {stream, event});
+      waitEventCallBuilder.create(loc, rewriter, {queue, event});
+      destroyEventCallBuilder.create(loc, rewriter, {queue, event});
       rewriter.replaceOp(op, resMemref);
     } else {
       mlir::Value vals[] = {
@@ -767,7 +767,7 @@ private:
         mlir::MemRefDescriptor(adaptor.getMemref()).allocatedPtr(rewriter, loc);
     auto casted =
         rewriter.create<mlir::LLVM::BitcastOp>(loc, llvmPointerType, pointer);
-    mlir::Value params[] = {adaptor.getStream(), casted};
+    mlir::Value params[] = {adaptor.getQueue(), casted};
     auto res = deallocCallBuilder.create(loc, rewriter, params);
     rewriter.replaceOp(op, res.getResults());
     return mlir::success();
@@ -828,7 +828,7 @@ private:
 
     mlir::Value params[] = {
         // clang-format off
-        adaptor.getStream(),
+        adaptor.getQueue(),
         adaptor.getKernel(),
         gridArrayPtr,
         blockArrayPtr,
@@ -895,7 +895,7 @@ void gpu_runtime::populateGpuToLLVMPatternsAndLegality(
         return llvmPointerType;
       });
   converter.addConversion(
-      [llvmPointerType](gpu_runtime::StreamType) -> mlir::Type {
+      [llvmPointerType](gpu_runtime::QueueType) -> mlir::Type {
         return llvmPointerType;
       });
 
@@ -908,8 +908,8 @@ void gpu_runtime::populateGpuToLLVMPatternsAndLegality(
 
   patterns.insert<
       // clang-format off
-      ConvertGpuStreamCreatePattern,
-      ConvertGpuStreamDestroyPattern,
+      ConvertGpuQueueCreatePattern,
+      ConvertGpuQueueDestroyPattern,
       ConvertGpuModuleLoadPattern,
       ConvertGpuModuleDestroyPattern,
       ConvertGpuKernelGetPattern,

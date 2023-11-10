@@ -435,7 +435,7 @@ struct GPULowerDefaultLocalSize
         auto launch = launchOps.front();
         builder.setInsertionPoint(op);
         auto newOp = builder.create<gpu_runtime::GPUSuggestBlockSizeOp>(
-            loc, /*stream*/ std::nullopt, op.getGridSize(), launch.getKernel());
+            loc, /*queue*/ std::nullopt, op.getGridSize(), launch.getKernel());
         op->replaceAllUsesWith(newOp.getResults());
         op.erase();
         return;
@@ -446,7 +446,7 @@ struct GPULowerDefaultLocalSize
 
         builder.setInsertionPoint(op);
         auto newOp = builder.create<gpu_runtime::GPUSuggestBlockSizeOp>(
-            loc, /*stream*/ std::nullopt, op.getGridSize(), launch.getKernel());
+            loc, /*queue*/ std::nullopt, op.getGridSize(), launch.getKernel());
 
         mapping.map(op.getResults(), newOp.getResults());
         copySuggestBlockTree(op, builder, mapping);
@@ -753,8 +753,8 @@ struct OutlineInitPass
     using outline_func_t =
         bool (*)(mlir::Operation &, llvm::SmallVectorImpl<mlir::Operation *> &);
     const outline_func_t outlineHandlers[] = {
-        &outlineOp<gpu_runtime::CreateGpuStreamOp,
-                   gpu_runtime::DestroyGpuStreamOp>,
+        &outlineOp<gpu_runtime::CreateGpuQueueOp,
+                   gpu_runtime::DestroyGpuQueueOp>,
         &outlineOp<gpu_runtime::LoadGpuModuleOp,
                    gpu_runtime::DestroyGpuModuleOp>,
         &outlineOp<gpu_runtime::GetGpuKernelOp,
