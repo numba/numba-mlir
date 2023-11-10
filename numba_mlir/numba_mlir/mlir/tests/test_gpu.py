@@ -1341,6 +1341,29 @@ def _check_filter_string(array, ir):
     ), ir
 
 
+@require_gpu
+@require_dpctl
+@pytest.mark.parametrize(
+    "s", [slice(1, None, 3), slice(1, None, -2), slice(1, 8, None)]
+)
+def test_kernel_slice_arg_dpctl(s):
+    def func(s, res):
+        i = get_global_id(0)
+        res[s][i] = i
+
+    sim_func = kernel_sim(func)
+    gpu_func = kernel_cached(func)
+
+    res = np.zeros(100, dtype=np.int32)
+    N = len(res[s])
+
+    sim_res = res.copy()
+    gpu_res = _from_host(res.copy(), buffer="device")
+    sim_func[N, DEFAULT_LOCAL_SIZE](s, sim_res)
+    gpu_func[N, DEFAULT_LOCAL_SIZE](s, gpu_res)
+    assert_equal(gpu_res, sim_res)
+
+
 @pytest.mark.smoke
 @require_dpctl
 @pytest.mark.parametrize("size", [1, 13, 127, 1024])
