@@ -529,7 +529,7 @@ struct ConvertGPUDeallocsPass
   }
 };
 
-static std::optional<mlir::Value> getGpuStream(mlir::OpBuilder &builder,
+static std::optional<mlir::Value> getGpuQueue(mlir::OpBuilder &builder,
                                                mlir::Operation *op) {
   assert(op);
   auto func = op->getParentOfType<mlir::FunctionOpInterface>();
@@ -1416,7 +1416,7 @@ static mlir::LogicalResult createGpuKernelLoad(mlir::PatternRewriter &builder,
   if (!gpuKernel)
     return mlir::failure();
 
-  auto queue = getGpuStream(builder, op);
+  auto queue = getGpuQueue(builder, op);
   if (!queue)
     return mlir::failure();
 
@@ -1453,7 +1453,7 @@ struct ExpandAllocOp : public mlir::OpRewritePattern<mlir::gpu::AllocOp> {
   mlir::LogicalResult
   matchAndRewrite(mlir::gpu::AllocOp op,
                   mlir::PatternRewriter &rewriter) const override {
-    auto queue = getGpuStream(rewriter, op);
+    auto queue = getGpuQueue(rewriter, op);
     if (!queue)
       return mlir::failure();
 
@@ -1474,7 +1474,7 @@ struct ExpandDeallocOp : public mlir::OpRewritePattern<mlir::gpu::DeallocOp> {
   mlir::LogicalResult
   matchAndRewrite(mlir::gpu::DeallocOp op,
                   mlir::PatternRewriter &rewriter) const override {
-    auto queue = getGpuStream(rewriter, op);
+    auto queue = getGpuQueue(rewriter, op);
     if (!queue)
       return mlir::failure();
 
@@ -1689,7 +1689,7 @@ struct ExpandDeviceFuncCallOp
     if (!deviceFuncAttr)
       return mlir::failure();
 
-    auto queue = getGpuStream(rewriter, op);
+    auto queue = getGpuQueue(rewriter, op);
     if (!queue)
       return mlir::failure();
 

@@ -92,13 +92,13 @@ protected:
   mlir::Type llvmAllocResPtrType = getLLVMPointerType(llvmAllocResType);
 
   FunctionCallBuilder queueCreateCallBuilder = {
-      "gpuxStreamCreate",
+      "gpuxQueueCreate",
       llvmPointerType, // queue
       {
           llvmPointerType // device name
       }};
 
-  FunctionCallBuilder queueDestroyCallBuilder = {"gpuxStreamDestroy",
+  FunctionCallBuilder queueDestroyCallBuilder = {"gpuxQueueDestroy",
                                                   llvmVoidType,
                                                   {
                                                       llvmPointerType // queue
@@ -224,10 +224,10 @@ protected:
   }
 };
 
-class ConvertGpuStreamCreatePattern
+class ConvertGpuQueueCreatePattern
     : public ConvertOpToGpuRuntimeCallPattern<gpu_runtime::CreateGpuQueueOp> {
 public:
-  ConvertGpuStreamCreatePattern(mlir::LLVMTypeConverter &converter)
+  ConvertGpuQueueCreatePattern(mlir::LLVMTypeConverter &converter)
       : ConvertOpToGpuRuntimeCallPattern<gpu_runtime::CreateGpuQueueOp>(
             converter) {}
 
@@ -262,10 +262,10 @@ private:
   }
 };
 
-class ConvertGpuStreamDestroyPattern
+class ConvertGpuQueueDestroyPattern
     : public ConvertOpToGpuRuntimeCallPattern<gpu_runtime::DestroyGpuQueueOp> {
 public:
-  ConvertGpuStreamDestroyPattern(mlir::LLVMTypeConverter &converter)
+  ConvertGpuQueueDestroyPattern(mlir::LLVMTypeConverter &converter)
       : ConvertOpToGpuRuntimeCallPattern<gpu_runtime::DestroyGpuQueueOp>(
             converter) {}
 
@@ -908,8 +908,8 @@ void gpu_runtime::populateGpuToLLVMPatternsAndLegality(
 
   patterns.insert<
       // clang-format off
-      ConvertGpuStreamCreatePattern,
-      ConvertGpuStreamDestroyPattern,
+      ConvertGpuQueueCreatePattern,
+      ConvertGpuQueueDestroyPattern,
       ConvertGpuModuleLoadPattern,
       ConvertGpuModuleDestroyPattern,
       ConvertGpuKernelGetPattern,

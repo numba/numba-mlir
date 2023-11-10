@@ -140,11 +140,11 @@ void GetGpuKernelOp::getCanonicalizationPatterns(
 
 void LaunchGpuKernelOp::build(::mlir::OpBuilder &builder,
                               ::mlir::OperationState &result,
-                              ::mlir::Value stream, ::mlir::Value kernel,
+                              ::mlir::Value queue, ::mlir::Value kernel,
                               ::mlir::gpu::KernelDim3 gridSize,
                               ::mlir::gpu::KernelDim3 blockSize,
                               ::mlir::ValueRange kernelOperands) {
-  result.addOperands(stream);
+  result.addOperands(queue);
   result.addOperands(kernel);
   result.addOperands({gridSize.x, gridSize.y, gridSize.z, blockSize.x,
                       blockSize.y, blockSize.z});

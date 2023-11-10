@@ -435,7 +435,7 @@ struct GPULowerDefaultLocalSize
         auto launch = launchOps.front();
         builder.setInsertionPoint(op);
         auto newOp = builder.create<gpu_runtime::GPUSuggestBlockSizeOp>(
-            loc, /*stream*/ std::nullopt, op.getGridSize(), launch.getKernel());
+            loc, /*queue*/ std::nullopt, op.getGridSize(), launch.getKernel());
         op->replaceAllUsesWith(newOp.getResults());
         op.erase();
         return;
@@ -446,7 +446,7 @@ struct GPULowerDefaultLocalSize
 
         builder.setInsertionPoint(op);
         auto newOp = builder.create<gpu_runtime::GPUSuggestBlockSizeOp>(
-            loc, /*stream*/ std::nullopt, op.getGridSize(), launch.getKernel());
+            loc, /*queue*/ std::nullopt, op.getGridSize(), launch.getKernel());
 
         mapping.map(op.getResults(), newOp.getResults());
         copySuggestBlockTree(op, builder, mapping);
