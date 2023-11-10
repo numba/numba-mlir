@@ -10,13 +10,14 @@
 #include <mlir/IR/TypeRange.h>
 
 #include "numba/Dialect/numba_util/Dialect.hpp"
+#include "numba/Dialect/plier/Dialect.hpp" // TODO: for slice slice type
 
 namespace py = pybind11;
 
 namespace {
 template <unsigned Width, mlir::IntegerType::SignednessSemantics Signed>
 static bool isInt(mlir::Type type) {
-  if (auto t = type.dyn_cast<mlir::IntegerType>())
+  if (auto t = mlir::dyn_cast<mlir::IntegerType>(type))
     if (t.getWidth() == Width && t.getSignedness() == Signed)
       return true;
 
@@ -24,7 +25,7 @@ static bool isInt(mlir::Type type) {
 }
 
 template <unsigned Width> bool isFloat(mlir::Type type) {
-  if (auto f = type.dyn_cast<mlir::FloatType>())
+  if (auto f = mlir::dyn_cast<mlir::FloatType>(type))
     if (f.getWidth() == Width)
       return true;
 
@@ -32,8 +33,8 @@ template <unsigned Width> bool isFloat(mlir::Type type) {
 }
 
 template <unsigned Width> static bool isFloatComplex(mlir::Type type) {
-  if (auto c = type.dyn_cast<mlir::ComplexType>()) {
-    auto f = c.getElementType().dyn_cast<mlir::FloatType>();
+  if (auto c = mlir::dyn_cast<mlir::ComplexType>(type)) {
+    auto f = mlir::dyn_cast<mlir::FloatType>(c.getElementType());
     if (!f)
       return false;
 
@@ -44,7 +45,7 @@ template <unsigned Width> static bool isFloatComplex(mlir::Type type) {
   return false;
 }
 
-static bool isNone(mlir::Type type) { return type.isa<mlir::NoneType>(); }
+static bool isNone(mlir::Type type) { return mlir::isa<mlir::NoneType>(type); }
 
 static py::object mapType(const py::handle &typesMod, mlir::Type type) {
   using fptr_t = bool (*)(mlir::Type);
@@ -85,7 +86,7 @@ static py::object mapType(const py::handle &typesMod, mlir::Type type) {
     }
   }
 
-  if (auto m = type.dyn_cast<mlir::ShapedType>()) {
+  if (auto m = mlir::dyn_cast<mlir::ShapedType>(type)) {
     auto elemType = mapType(typesMod, m.getElementType());
     if (!elemType)
       return {};
@@ -95,7 +96,7 @@ static py::object mapType(const py::handle &typesMod, mlir::Type type) {
     return arrayType(elemType, ndims, py::str("C"));
   }
 
-  if (auto t = type.dyn_cast<mlir::TupleType>()) {
+  if (auto t = mlir::dyn_cast<mlir::TupleType>(type)) {
     py::tuple types(t.size());
     for (auto &&[i, val] : llvm::enumerate(t.getTypes())) {
       auto inner = mapType(typesMod, val);
@@ -108,7 +109,7 @@ static py::object mapType(const py::handle &typesMod, mlir::Type type) {
     return tupleType(types);
   }
 
-  if (auto dtype = type.dyn_cast<numba::util::TypeVarType>()) {
+  if (auto dtype = mlir::dyn_cast<numba::util::TypeVarType>(type)) {
     auto inner = mapType(typesMod, dtype.getType());
     if (!inner)
       return {};
@@ -116,6 +117,10 @@ static py::object mapType(const py::handle &typesMod, mlir::Type type) {
     auto dtypeType = typesMod.attr("DType");
     return dtypeType(inner);
   }
+
+  if (mlir::isa<plier::SliceType>(type))
+    return typesMod.attr("slice3_type");
+
   return {};
 }
 } // namespace
