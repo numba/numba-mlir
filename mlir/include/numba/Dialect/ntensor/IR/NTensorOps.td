@@ -687,6 +687,20 @@ def ToTensorOp : NTensor_OpBase<"to_tensor",
   }];
 }
 
+def ToTensorCopyOp : NTensor_OpBase<"to_tensor_copy",
+    [SameOperandsShape, SameOperandsElementType]> {
+  let summary = "converts ntensor array to tensor.";
+  let description = [{
+    Copy array into newly allocated tensor. Shape and element type must match.
+  }];
+
+  let arguments = (ins Arg<NTensor_Tensor,
+                       "the reference to load from", [MemRead]>:$array);
+  let results = (outs Res<Variadic<AnyRankedTensor>, "", [MemAlloc<DefaultResource>]>:$result);
+
+  let assemblyFormat = "$array attr-dict `:` qualified(type($array)) `to` type($result)";
+}
+
 def FromMemrefOp : NTensor_OpBase<"from_memref",
     [Pure, SameOperandsShape, SameOperandsElementType, ViewLikeOpInterface]> {
   let summary = "converts memref to ntensor array.";
