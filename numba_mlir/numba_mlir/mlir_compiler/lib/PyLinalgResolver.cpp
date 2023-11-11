@@ -710,11 +710,11 @@ static py::object broadcastImpl(py::capsule context, py::tuple args,
 
   py::tuple ret(results.size());
   for (auto &&[i, res] : llvm::enumerate(results)) {
-    auto srcType = res.getType().cast<mlir::ShapedType>();
-    auto dstType = mlir::RankedTensorType::get(srcType.getShape(),
-                                               srcType.getElementType());
     if (rank >= 0) {
-      res = builder.create<numba::ntensor::ToTensorOp>(loc, dstType, res);
+      auto srcType = mlir::cast<mlir::ShapedType>(res.getType());
+      auto dstType = mlir::RankedTensorType::get(srcType.getShape(),
+                                                 srcType.getElementType());
+      res = doCast(builder, loc, res, dstType);
     } else {
       res = builder.create<numba::ntensor::LoadOp>(loc, res);
     }
