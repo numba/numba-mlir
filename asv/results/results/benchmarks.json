@@ -429,7 +429,7 @@
         "warmup_time": -1
     },
     "npbench.channel_flow.numba.Benchmark.time_benchmark": {
-        "code": "def wrapper(nit, u, v, dt, dx, dy, p, rho, nu, F):\n    channel_flow(nit, u, v, dt, dx, dy, p, rho, nu, F)\n    return u, v, p, dx, dy, dt\n\n\ndef initialize(self, preset):\n    if self.is_validate:\n        raise SkipNotImplemented(\"too slow\")\n    preset = parameters[preset]\n    return initialize(**preset)",
+        "code": "def wrapper(nit, u, v, dt, dx, dy, p, rho, nu, F):\n    channel_flow(nit, u, v, dt, dx, dy, p, rho, nu, F)\n    return u, v, p\n\n\ndef initialize(self, preset):\n    if self.is_validate:\n        raise SkipNotImplemented(\"too slow\")\n    preset = parameters[preset]\n    return initialize(**preset)",
         "min_run_count": 2,
         "name": "npbench.channel_flow.numba.Benchmark.time_benchmark",
         "number": 0,
@@ -453,7 +453,7 @@
         "warmup_time": -1
     },
     "npbench.channel_flow.numba_mlir.Benchmark.time_benchmark": {
-        "code": "def wrapper(nit, u, v, dt, dx, dy, p, rho, nu, F):\n    channel_flow(nit, u, v, dt, dx, dy, p, rho, nu, F)\n    return u, v, p, dx, dy, dt\n\n\ndef initialize(self, preset):\n    preset = parameters[preset]\n    return initialize(**preset)",
+        "code": "def wrapper(nit, u, v, dt, dx, dy, p, rho, nu, F):\n    channel_flow(nit, u, v, dt, dx, dy, p, rho, nu, F)\n    return u, v, p\n\n\ndef initialize(self, preset):\n    preset = parameters[preset]\n    return initialize(**preset)",
         "min_run_count": 2,
         "name": "npbench.channel_flow.numba_mlir.Benchmark.time_benchmark",
         "number": 0,
@@ -477,7 +477,7 @@
         "warmup_time": -1
     },
     "npbench.channel_flow.numba_replace_parfor.Benchmark.time_benchmark": {
-        "code": "def wrapper(nit, u, v, dt, dx, dy, p, rho, nu, F):\n    channel_flow(nit, u, v, dt, dx, dy, p, rho, nu, F)\n    return u, v, p, dx, dy, dt\n\n\ndef initialize(self, preset):\n    if self.is_validate:\n        raise SkipNotImplemented(\"too slow\")\n    self.is_expected_failure = True\n    preset = parameters[preset]\n    return initialize(**preset)",
+        "code": "def wrapper(nit, u, v, dt, dx, dy, p, rho, nu, F):\n    channel_flow(nit, u, v, dt, dx, dy, p, rho, nu, F)\n    return u, v, p\n\n\ndef initialize(self, preset):\n    if self.is_validate:\n        raise SkipNotImplemented(\"too slow\")\n    self.is_expected_failure = True\n    preset = parameters[preset]\n    return initialize(**preset)",
         "min_run_count": 2,
         "name": "npbench.channel_flow.numba_replace_parfor.Benchmark.time_benchmark",
         "number": 0,
@@ -501,7 +501,7 @@
         "warmup_time": -1
     },
     "npbench.channel_flow.numpy.Benchmark.time_benchmark": {
-        "code": "def wrapper(nit, u, v, dt, dx, dy, p, rho, nu, F):\n    channel_flow(nit, u, v, dt, dx, dy, p, rho, nu, F)\n    return u, v, p, dx, dy, dt\n\n\ndef initialize(self, preset):\n    preset = parameters[preset]\n    return initialize(**preset)",
+        "code": "def wrapper(nit, u, v, dt, dx, dy, p, rho, nu, F):\n    channel_flow(nit, u, v, dt, dx, dy, p, rho, nu, F)\n    return u, v, p\n\n\ndef initialize(self, preset):\n    preset = parameters[preset]\n    return initialize(**preset)",
         "min_run_count": 2,
         "name": "npbench.channel_flow.numpy.Benchmark.time_benchmark",
         "number": 0,
