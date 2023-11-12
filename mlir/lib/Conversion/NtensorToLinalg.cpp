@@ -98,8 +98,9 @@ struct ConvertCopyOp : public mlir::OpRewritePattern<numba::ntensor::CopyOp> {
           auto rank = static_cast<unsigned>(srcType.getRank());
 
           auto srcTensorType = toTensorType(srcType);
-          mlir::Value srcTensor = builder.create<numba::ntensor::ToTensorOp>(
-              loc, srcTensorType, src);
+          mlir::Value srcTensor =
+              builder.create<numba::ntensor::ToTensorCopyOp>(loc, srcTensorType,
+                                                             src);
 
           auto dstMemrefType = mlir::MemRefType::get(dstType.getShape(),
                                                      dstType.getElementType());
@@ -172,7 +173,7 @@ struct ConvertElementwiseOp
           for (auto &&[i, arg] : llvm::enumerate(src)) {
             auto srcTensorType =
                 toTensorType(arg.getType().cast<numba::ntensor::NTensorType>());
-            inputs[i] = builder.create<numba::ntensor::ToTensorOp>(
+            inputs[i] = builder.create<numba::ntensor::ToTensorCopyOp>(
                 loc, srcTensorType, arg);
           }
 
@@ -267,7 +268,7 @@ struct ConvertCastOp : public mlir::OpRewritePattern<numba::ntensor::CastOp> {
     auto results = numba::util::wrapEnvRegion(
         rewriter, op->getLoc(), dstType.getEnvironment(), dstType,
         [&](mlir::PatternRewriter &builder, mlir::Location loc) {
-          auto srcTensor = builder.create<numba::ntensor::ToTensorOp>(
+          auto srcTensor = builder.create<numba::ntensor::ToTensorCopyOp>(
               loc, srcTensorType, src);
           auto cast = builder.create<mlir::tensor::CastOp>(loc, dstTensorType,
                                                            srcTensor);
@@ -421,8 +422,9 @@ struct ConvertLoadOp : public mlir::OpRewritePattern<numba::ntensor::LoadOp> {
         srcType.getElementType(),
         [&](mlir::PatternRewriter &builder, mlir::Location loc) {
           auto srcTensorType = toTensorType(srcType);
-          mlir::Value srcTensor = builder.create<numba::ntensor::ToTensorOp>(
-              loc, srcTensorType, src);
+          mlir::Value srcTensor =
+              builder.create<numba::ntensor::ToTensorCopyOp>(loc, srcTensorType,
+                                                             src);
 
           mlir::Value result = builder.create<mlir::tensor::ExtractOp>(
               loc, srcTensor, op.getIndices());
@@ -609,7 +611,7 @@ struct ConvertBroadcastOp
           for (auto &&[i, input] : llvm::enumerate(inputs)) {
             auto tensorType = toTensorType(
                 input.getType().cast<numba::ntensor::NTensorType>());
-            tensorInputs[i] = rewriter.create<numba::ntensor::ToTensorOp>(
+            tensorInputs[i] = rewriter.create<numba::ntensor::ToTensorCopyOp>(
                 loc, tensorType, input);
           }
 

@@ -1322,7 +1322,8 @@ static std::optional<mlir::Value> doCast(mlir::OpBuilder &builder,
     } else if (dstShapedType.isa<mlir::RankedTensorType>()) {
       auto dstTensorType = mlir::RankedTensorType::get(
           srcArrayType.getShape(), dstShapedType.getElementType());
-      res = builder.create<numba::ntensor::ToTensorOp>(loc, dstTensorType, res);
+      res = builder.create<numba::ntensor::ToTensorCopyOp>(loc, dstTensorType,
+                                                           res);
     }
 
     return castType(builder, loc, res, dstShapedType);
