@@ -696,7 +696,7 @@ def ToTensorCopyOp : NTensor_OpBase<"to_tensor_copy",
 
   let arguments = (ins Arg<NTensor_Tensor,
                        "the reference to load from", [MemRead]>:$array);
-  let results = (outs Res<Variadic<AnyRankedTensor>, "", [MemAlloc<DefaultResource>]>:$result);
+  let results = (outs Res<AnyRankedTensor, "", [MemAlloc<DefaultResource>]>:$result);
 
   let assemblyFormat = "$array attr-dict `:` qualified(type($array)) `to` type($result)";
 }
