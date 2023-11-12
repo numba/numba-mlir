@@ -20,4 +20,6 @@ std::unique_ptr<mlir::Pass> createNtensorAliasAnalysisPass();
 
 /// Creates a pass to convert ntensor array ops to linalg.
 std::unique_ptr<mlir::Pass> createNtensorToLinalgPass();
+
+std::unique_ptr<mlir::Pass> createNtensorLowerToTensorCopyPass();
 } // namespace numba

@@ -823,6 +823,76 @@ struct NtensorToLinalgPass
       return signalPassFailure();
   }
 };
+
+struct NtensorLowerToTensorCopyPass
+    : public mlir::PassWrapper<NtensorLowerToTensorCopyPass,
+                               mlir::OperationPass<void>> {
+  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(NtensorLowerToTensorCopyPass)
+
+  void runOnOperation() override {
+    llvm::SmallVector<numba::ntensor::ToTensorCopyOp> toProcess;
+    llvm::SmallSetVector<mlir::Value, 8> writers;
+
+    llvm::SmallVector<mlir::Value> tmp;
+    getOperation()->walk([&](mlir::Operation *op) {
+      if (auto toTensor = mlir::dyn_cast<numba::ntensor::ToTensorCopyOp>(op)) {
+        toProcess.emplace_back(toTensor);
+        return;
+      }
+
+      tmp.clear();
+      if (numba::isWriter(*op, tmp))
+        writers.insert(tmp.begin(), tmp.end());
+    });
+
+    if (toProcess.empty())
+      return markAllAnalysesPreserved();
+
+    auto &&AA = getAnalysis<numba::AliasAnalysis>();
+    auto hasWrite = [&](mlir::Value val) -> bool {
+      for (auto &&writer : writers)
+        if (!AA.alias(val, writer).isNo())
+          return true;
+
+      return false;
+    };
+
+    mlir::OpBuilder builder(&getContext());
+    for (auto toTensor : toProcess) {
+      auto loc = toTensor.getLoc();
+      auto resType = mlir::cast<mlir::TensorType>(toTensor.getType());
+      auto src = toTensor.getArray();
+
+      builder.setInsertionPoint(toTensor);
+      if (hasWrite(toTensor.getArray())) {
+        auto dstShape = resType.getShape();
+        tmp.clear();
+        for (auto &&[i, s] : llvm::enumerate(dstShape)) {
+          if (!mlir::ShapedType::isDynamic(s))
+            tmp.emplace_back(
+                builder.create<numba::ntensor::DimOp>(loc, src, i));
+        }
+
+        auto srcType = mlir::cast<mlir::ShapedType>(src.getType());
+        auto tmpType = srcType.clone(dstShape);
+        mlir::Value tmpArray = builder.create<numba::ntensor::CreateArrayOp>(
+            loc, tmpType, tmp, /*init*/ nullptr);
+        builder.create<numba::ntensor::CopyOp>(loc, src, tmpArray);
+        writers.insert(tmpArray);
+
+        auto res =
+            builder.create<numba::ntensor::ToTensorOp>(loc, resType, tmpArray);
+        toTensor->replaceAllUsesWith(res->getResults());
+
+      } else {
+        auto res =
+            builder.create<numba::ntensor::ToTensorOp>(loc, resType, src);
+        toTensor->replaceAllUsesWith(res->getResults());
+      }
+      toTensor->erase();
+    }
+  }
+};
 } // namespace
 
 std::unique_ptr<mlir::Pass> numba::createNtensorAliasAnalysisPass() {
@@ -831,4 +901,8 @@ std::unique_ptr<mlir::Pass> numba::createNtensorAliasAnalysisPass() {
 
 std::unique_ptr<mlir::Pass> numba::createNtensorToLinalgPass() {
   return std::make_unique<NtensorToLinalgPass>();
+}
+
+std::unique_ptr<mlir::Pass> numba::createNtensorLowerToTensorCopyPass() {
+  return std::make_unique<NtensorLowerToTensorCopyPass>();
 }
