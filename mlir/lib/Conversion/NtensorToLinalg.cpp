@@ -409,9 +409,6 @@ struct ConvertLoadOp : public mlir::OpRewritePattern<numba::ntensor::LoadOp> {
   mlir::LogicalResult
   matchAndRewrite(numba::ntensor::LoadOp op,
                   mlir::PatternRewriter &rewriter) const override {
-    if (!op->hasAttr(kReadonly))
-      return mlir::failure();
-
     auto src = op.getArray();
     auto srcType = getNTensorType(src);
     if (!srcType || op.getType() != srcType.getElementType())
@@ -763,9 +760,6 @@ struct NtensorAliasAnalysisPass
 
       if (auto cast = mlir::dyn_cast<numba::ntensor::CastOp>(op))
         return cast.getDest();
-
-      if (auto load = mlir::dyn_cast<numba::ntensor::LoadOp>(op))
-        return load.getArray();
 
       if (auto reshape = mlir::dyn_cast<numba::util::ReshapeOp>(op))
         return reshape.getSource();
