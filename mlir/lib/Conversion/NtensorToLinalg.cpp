@@ -868,7 +868,7 @@ struct NtensorLowerToTensorCopyPass
         auto dstShape = resType.getShape();
         tmp.clear();
         for (auto &&[i, s] : llvm::enumerate(dstShape)) {
-          if (!mlir::ShapedType::isDynamic(s))
+          if (mlir::ShapedType::isDynamic(s))
             tmp.emplace_back(
                 builder.create<numba::ntensor::DimOp>(loc, src, i));
         }
