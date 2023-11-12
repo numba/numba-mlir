@@ -239,7 +239,8 @@ static mlir::Value doCast(mlir::OpBuilder &builder, mlir::Location loc,
 
   if (srcType.isa<numba::ntensor::NTensorType>() &&
       dstType.isa<mlir::RankedTensorType>())
-    return builder.createOrFold<numba::ntensor::ToTensorOp>(loc, dstType, val);
+    return builder.createOrFold<numba::ntensor::ToTensorCopyOp>(loc, dstType,
+                                                                val);
 
   if (srcType.isa<numba::ntensor::NTensorType>() &&
       dstType.isa<numba::ntensor::NTensorType>())
@@ -457,7 +458,7 @@ static mlir::Value toTensor(mlir::Location loc, mlir::OpBuilder &builder,
   if (auto ntensorType = srcType.dyn_cast<numba::ntensor::NTensorType>()) {
     auto tensorType = mlir::RankedTensorType::get(ntensorType.getShape(),
                                                   ntensorType.getElementType());
-    return builder.create<numba::ntensor::ToTensorOp>(loc, tensorType, val);
+    return builder.create<numba::ntensor::ToTensorCopyOp>(loc, tensorType, val);
   }
 
   return val;
