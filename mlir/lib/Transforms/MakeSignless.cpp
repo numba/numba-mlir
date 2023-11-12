@@ -169,6 +169,18 @@ struct ConvertSubview
   }
 };
 
+struct ConvertCopy : public mlir::OpConversionPattern<mlir::memref::CopyOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(mlir::memref::CopyOp op, OpAdaptor adaptor,
+                  mlir::ConversionPatternRewriter &rewriter) const override {
+    rewriter.replaceOpWithNewOp<mlir::memref::CopyOp>(op, adaptor.getSource(),
+                                                      adaptor.getTarget());
+    return mlir::success();
+  }
+};
+
 struct ConvertExtractMetadata
     : public mlir::OpConversionPattern<mlir::memref::ExtractStridedMetadataOp> {
   using OpConversionPattern::OpConversionPattern;
@@ -450,7 +462,7 @@ void numba::populateMakeSignlessRewritesAndTarget(
       numba::util::ChangeLayoutOp, mlir::bufferization::ToMemrefOp,
       mlir::bufferization::ToTensorOp, mlir::memref::AllocOp,
       mlir::memref::AllocaOp, mlir::memref::DeallocOp, mlir::memref::CastOp,
-      mlir::memref::SubViewOp, mlir::tensor::EmptyOp,
+      mlir::memref::SubViewOp, mlir::memref::CopyOp, mlir::tensor::EmptyOp,
       mlir::memref::ExtractStridedMetadataOp, mlir::tensor::FromElementsOp,
       mlir::tensor::ExpandShapeOp, mlir::tensor::ReshapeOp,
       mlir::tensor::ExtractSliceOp, mlir::tensor::InsertSliceOp,
@@ -461,11 +473,11 @@ void numba::populateMakeSignlessRewritesAndTarget(
   patterns.insert<
       ConvertChangeLayout, ConvertToMemref, ConvertToTensor,
       ConvertAlloc<mlir::memref::AllocOp>, ConvertAlloc<mlir::memref::AllocaOp>,
-      ConvertDealloc, ConvertCastOp, ConvertSubview, ConvertExtractMetadata,
-      ConvertTensorEmpty, ConvertTensorFromElements, ConvertTensorExpandShape,
-      ConvertTensorReshape, ConvertTensorExtractSlice, ConvertTensorInserSlice,
-      ConvertLinalgFill, ConvertLinalgGeneric, ConvertLinalgYield,
-      ConvertUtilReshape>(converter, patterns.getContext());
+      ConvertDealloc, ConvertCastOp, ConvertSubview, ConvertCopy,
+      ConvertExtractMetadata, ConvertTensorEmpty, ConvertTensorFromElements,
+      ConvertTensorExpandShape, ConvertTensorReshape, ConvertTensorExtractSlice,
+      ConvertTensorInserSlice, ConvertLinalgFill, ConvertLinalgGeneric,
+      ConvertLinalgYield, ConvertUtilReshape>(converter, patterns.getContext());
 }
 
 namespace {
