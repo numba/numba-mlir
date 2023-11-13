@@ -51,7 +51,7 @@ struct ConvertCreateOp
       return mlir::failure();
 
     auto results = numba::util::wrapEnvRegion(
-        rewriter, op->getLoc(), dstType.getEnvironment(), dstType,
+        rewriter, op.getLoc(), dstType.getEnvironment(), dstType,
         [&](mlir::OpBuilder &builder, mlir::Location loc) {
           auto tensorType = toTensorType(dstType);
           mlir::Value result = builder.create<mlir::tensor::EmptyOp>(
