@@ -710,11 +710,11 @@ static py::object broadcastImpl(py::capsule context, py::tuple args,
 
   py::tuple ret(results.size());
   for (auto &&[i, res] : llvm::enumerate(results)) {
-    auto srcType = res.getType().cast<mlir::ShapedType>();
-    auto dstType = mlir::RankedTensorType::get(srcType.getShape(),
-                                               srcType.getElementType());
     if (rank >= 0) {
-      res = builder.create<numba::ntensor::ToTensorOp>(loc, dstType, res);
+      auto srcType = mlir::cast<mlir::ShapedType>(res.getType());
+      auto dstType = mlir::RankedTensorType::get(srcType.getShape(),
+                                                 srcType.getElementType());
+      res = doCast(builder, loc, res, dstType);
     } else {
       res = builder.create<numba::ntensor::LoadOp>(loc, res);
     }
@@ -1295,11 +1295,11 @@ static py::object subviewImpl(py::capsule context, py::handle src,
   auto loc = ctx.loc;
 
   auto unwrapVal = [&](py::handle obj) {
-    return toTensor(loc, builder, ctx.context.unwrapVal(loc, builder, obj));
+    return toNTensor(loc, builder, ctx.context.unwrapVal(loc, builder, obj));
   };
 
   auto srcVal = unwrapVal(src);
-  auto srcType = srcVal.getType().cast<mlir::RankedTensorType>();
+  auto srcType = mlir::cast<numba::ntensor::NTensorType>(srcVal.getType());
 
   auto indexType = builder.getIndexType();
   auto indexCast = [&](mlir::Value val) -> mlir::OpFoldResult {
@@ -1325,7 +1325,7 @@ static py::object subviewImpl(py::capsule context, py::handle src,
 
     auto val = input.front().get<mlir::Value>();
     ValsArray ret;
-    if (auto tupleType = val.getType().dyn_cast<mlir::TupleType>()) {
+    if (auto tupleType = mlir::dyn_cast<mlir::TupleType>(val.getType())) {
       ret.resize(tupleType.size());
       for (auto i : llvm::seq(size_t(0), tupleType.size())) {
         auto ind = builder.create<mlir::arith::ConstantIndexOp>(loc, i);
@@ -1344,7 +1344,7 @@ static py::object subviewImpl(py::capsule context, py::handle src,
     if (sizes.is_none()) {
       ValsArray ret(offsetVals.size());
       for (auto i : llvm::seq(size_t(0), ret.size())) {
-        auto dim = builder.createOrFold<mlir::tensor::DimOp>(
+        auto dim = builder.createOrFold<numba::ntensor::DimOp>(
             loc, srcVal, static_cast<int64_t>(i));
         auto offset = [&]() -> mlir::Value {
           auto off = offsetVals[i];
@@ -1372,25 +1372,25 @@ static py::object subviewImpl(py::capsule context, py::handle src,
       return unpackValues(strides);
     }
   }();
-  auto viewType = [&]() -> mlir::RankedTensorType {
+  auto viewType = [&]() -> numba::ntensor::NTensorType {
     if (rank.is_none()) {
-      return mlir::tensor::ExtractSliceOp::inferResultType(srcType, offsetVals,
-                                                           sizeVals, strideVals)
-          .cast<mlir::RankedTensorType>();
+      return mlir::cast<numba::ntensor::NTensorType>(
+          numba::ntensor::SubviewOp::inferResultType(srcType, offsetVals,
+                                                     sizeVals, strideVals));
     } else {
       auto rankVal = rank.cast<unsigned>();
-      return mlir::tensor::ExtractSliceOp::inferCanonicalRankReducedResultType(
-                 rankVal, srcType, offsetVals, sizeVals, strideVals)
-          .cast<mlir::RankedTensorType>();
+      return mlir::cast<numba::ntensor::NTensorType>(
+          numba::ntensor::SubviewOp::inferRankReducedResultType(
+              rankVal, srcType, offsetVals, sizeVals, strideVals));
     }
   }();
-  auto view = builder.createOrFold<mlir::tensor::ExtractSliceOp>(
+  auto view = builder.createOrFold<numba::ntensor::SubviewOp>(
       loc, viewType, srcVal, offsetVals, sizeVals, strideVals);
 
-  auto resType = view.getType().cast<mlir::ShapedType>();
+  auto resType = mlir::cast<mlir::ShapedType>(view.getType());
   auto resDynamicType = resType.clone(getDynShape(resType.getRank()));
   if (resDynamicType != resType)
-    view = builder.create<mlir::tensor::CastOp>(loc, resDynamicType, view);
+    view = builder.create<numba::ntensor::CastOp>(loc, resDynamicType, view);
   return ctx.context.createVar(context, view);
 }
 

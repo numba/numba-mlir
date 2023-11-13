@@ -5,6 +5,7 @@
 #include "numba/Dialect/ntensor/IR/NTensorOps.hpp"
 
 #include <mlir/Dialect/Arith/IR/Arith.h>
+#include <mlir/Dialect/Arith/Utils/Utils.h>
 #include <mlir/Dialect/Linalg/IR/Linalg.h>
 #include <mlir/Dialect/MemRef/IR/MemRef.h>
 #include <mlir/Dialect/Tensor/IR/Tensor.h>
@@ -526,6 +527,46 @@ numba::ntensor::NTensorType numba::ntensor::SubviewOp::inferResultType(
   dispatchIndexOpFoldResults(strides, dynamicStrides, staticStrides);
   return SubviewOp::inferResultType(sourceShapedTensorType, staticOffsets,
                                     staticSizes, staticStrides);
+}
+
+numba::ntensor::NTensorType
+numba::ntensor::SubviewOp::inferRankReducedResultType(
+    unsigned resultRank, numba::ntensor::NTensorType sourceType,
+    mlir::ArrayRef<int64_t> offsets, mlir::ArrayRef<int64_t> sizes,
+    mlir::ArrayRef<int64_t> strides) {
+  // Type inferred in the absence of rank-reducing behavior.
+  auto inferredType = mlir::cast<NTensorType>(
+      inferResultType(sourceType, offsets, sizes, strides));
+  int rankDiff = inferredType.getRank() - resultRank;
+  if (rankDiff > 0) {
+    auto shape = inferredType.getShape();
+    llvm::SmallBitVector dimsToProject =
+        mlir::getPositionsOfShapeOne(rankDiff, shape);
+    llvm::SmallVector<int64_t> projectedShape;
+    // Best effort rank-reducing: drop 1s in order.
+    for (auto pos : llvm::seq<size_t>(0, shape.size()))
+      if (!dimsToProject.test(pos))
+        projectedShape.push_back(shape[pos]);
+
+    inferredType = mlir::cast<NTensorType>(
+        mlir::cast<mlir::ShapedType>(inferredType).clone(projectedShape));
+  }
+  return inferredType;
+}
+
+numba::ntensor::NTensorType
+numba::ntensor::SubviewOp::inferRankReducedResultType(
+    unsigned resultRank, numba::ntensor::NTensorType sourceType,
+    mlir::ArrayRef<mlir::OpFoldResult> offsets,
+    mlir::ArrayRef<mlir::OpFoldResult> sizes,
+    mlir::ArrayRef<mlir::OpFoldResult> strides) {
+  mlir::SmallVector<int64_t> staticOffsets, staticSizes, staticStrides;
+  mlir::SmallVector<mlir::Value> dynamicOffsets, dynamicSizes, dynamicStrides;
+  dispatchIndexOpFoldResults(offsets, dynamicOffsets, staticOffsets);
+  dispatchIndexOpFoldResults(sizes, dynamicSizes, staticSizes);
+  dispatchIndexOpFoldResults(strides, dynamicStrides, staticStrides);
+  return SubviewOp::inferRankReducedResultType(
+      resultRank, sourceType, staticOffsets, staticSizes, staticStrides);
 }
 
 numba::ntensor::NTensorType
