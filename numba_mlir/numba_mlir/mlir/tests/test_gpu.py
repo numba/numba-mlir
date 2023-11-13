@@ -294,7 +294,9 @@ def test_scalar(val, dtype):
 
 @require_gpu
 @pytest.mark.parametrize("val", _test_values)
-@pytest.mark.parametrize("dtype", [np.int32, np.int64, np.float32, np.float64])
+@pytest.mark.parametrize(
+    "dtype", skip_fp64_args([np.int32, np.int64, np.float32, np.float64])
+)
 def test_scalar_cature(val, dtype):
     get_id = get_global_id
 
@@ -498,7 +500,7 @@ def _test_binary(func, dtype, ir_pass, ir_check):
 
 @require_gpu
 @pytest.mark.parametrize("op", ["sqrt", "log", "sin", "cos", "floor"])
-@pytest.mark.parametrize("dtype", [np.float32, np.float64])
+@pytest.mark.parametrize("dtype", skip_fp64_args([np.float32, np.float64]))
 def test_math_funcs_unary(op, dtype):
     f = eval(f"math.{op}")
 
@@ -511,7 +513,7 @@ def test_math_funcs_unary(op, dtype):
 
 @require_gpu
 @pytest.mark.parametrize("op", ["+", "-", "*", "/", "//", "%", "**"])
-@pytest.mark.parametrize("dtype", [np.int32, np.float32, np.float64])
+@pytest.mark.parametrize("dtype", skip_fp64_args([np.int32, np.float32, np.float64]))
 def test_gpu_ops_binary(op, dtype):
     f = eval(f"lambda a, b: a {op} b")
     inner = kernel_func(f)
@@ -764,7 +766,7 @@ def test_get_local_size(shape, lsize):
     assert_equal(gpu_res, sim_res)
 
 
-_atomic_dtypes = ["int32", "int64", "float32"]
+_atomic_dtypes = skip_fp64_args(["int32", "int64", "float32"])
 _atomic_funcs = [atomic.add, atomic.sub]
 
 
