@@ -12,6 +12,7 @@ import itertools
 import re
 
 from numba_mlir.mlir.dpctl_interop import get_default_device
+from numba_mlir.mlir.kernel_impl import Kernel
 from numba_mlir.mlir.utils import readenv
 from numba_mlir.kernel import *
 from numba_mlir.mlir.passes import (
@@ -22,6 +23,66 @@ from numba_mlir.mlir.passes import (
 
 from .utils import JitfuncCache, parametrize_function_variants
 from numba_mlir import njit as njit_orig
+
+_def_device = get_default_device().filter_string
+
+
+def _to_device_kernel_args(args):
+    import dpctl.tensor as dpt
+
+    if isinstance(args, tuple):
+        return tuple(_to_device_kernel_args(a) for a in args)
+
+    elif isinstance(args, np.ndarray):
+        if args.flags["C_CONTIGUOUS"]:
+            order = "C"
+        elif args.flags["F_CONTIGUOUS"]:
+            order = "F"
+        else:
+            order = "K"
+        return dpt.asarray(
+            obj=args,
+            dtype=args.dtype,
+            device=_def_device,
+            copy=None,
+            usm_type=None,
+            sycl_queue=None,
+            order=order,
+        )
+
+    return args
+
+
+def _from_device_kernel_args(orig_args, args):
+    import dpctl.tensor as dpt
+
+    if isinstance(orig_args, tuple):
+        assert isinstance(args, tuple)
+        for a, b in zip(orig_args, args):
+            _from_device_kernel_args(a, b)
+
+    elif isinstance(orig_args, np.ndarray):
+        np.copyto(orig_args, dpt.asnumpy(args))
+
+
+class LegacyNumpyKernel(Kernel):
+    def __call__(self, *args, **kwargs):
+        res = self.check_call_args(args, kwargs)
+        new_args = _to_device_kernel_args(args)
+        res = super().__call__(*new_args, **kwargs)
+        _from_device_kernel_args(args, new_args)
+        return res
+
+
+def kernel(func=None, **kwargs):
+    if func is None:
+
+        def wrapper(f):
+            return LegacyNumpyKernel(f, kwargs)
+
+        return wrapper
+    return LegacyNumpyKernel(func, kwargs)
+
 
 FP64_TRUNCATE = readenv("NUMBA_MLIR_TESTS_FP64_TRUNCATE", str, "")
 
@@ -76,8 +137,6 @@ def require_dpctl(func):
         not DPCTL_TESTS_ENABLED, reason="DPCTL interop tests disabled"
     )(func)
 
-
-_def_device = get_default_device().filter_string
 
 _test_values = [
     True,
