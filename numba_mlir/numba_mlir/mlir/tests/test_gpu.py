@@ -25,6 +25,26 @@ from .utils import JitfuncCache, parametrize_function_variants
 from numba_mlir import njit as njit_orig
 
 _def_device = get_default_device().filter_string
+_has_fp64 = get_default_device().has_fp64
+_fp64_dtypes = {np.float64, np.complex128}
+
+
+def skip_fp64_arg(arg):
+    if _has_fp64:
+        return arg
+
+    mark = lambda a: pytest.param(
+        a, marks=pytest.mark.skip(reason="fp64 doesn't supported")
+    )
+    if arg in _fp64_dtypes or (hasattr(arg, "dtype") and arg.dtype in _fp64_dtypes):
+        return mark(arg)
+
+    return arg
+
+
+def skip_fp64_args(args):
+    assert isinstance(args, list)
+    return [skip_fp64_arg(a) for a in args]
 
 
 def _to_device_kernel_args(args):
@@ -244,7 +264,9 @@ def test_simple3():
 
 @require_gpu
 @pytest.mark.parametrize("val", _test_values)
-@pytest.mark.parametrize("dtype", [np.int32, np.int64, np.float32, np.float64])
+@pytest.mark.parametrize(
+    "dtype", skip_fp64_args([np.int32, np.int64, np.float32, np.float64])
+)
 def test_scalar(val, dtype):
     get_id = get_global_id
 
