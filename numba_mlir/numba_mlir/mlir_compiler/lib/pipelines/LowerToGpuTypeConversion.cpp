@@ -20,12 +20,13 @@ namespace {
 struct Conversion {
   Conversion(PyTypeConverter &conv) : converter(conv) {
     py::object mod = py::module::import("numba_mlir.mlir.dpctl_interop");
-    usmArrayType = mod.attr("USMNdArrayType");
+    usmArrayTypes[0] = mod.attr("USMNdArrayType");
+    usmArrayTypes[1] = mod.attr("OtherUSMNdArray");
   }
 
   std::optional<mlir::Type> operator()(mlir::MLIRContext &context,
                                        py::handle obj) {
-    if (usmArrayType.is_none() || !py::isinstance(obj, usmArrayType))
+    if (!checkArrayType(obj))
       return std::nullopt;
 
     auto elemType = converter.convertType(context, obj.attr("dtype"));
@@ -36,17 +37,16 @@ struct Conversion {
 
     auto ndim = obj.attr("ndim").cast<size_t>();
 
-    auto fixedDims = obj.attr("fixed_dims").cast<py::tuple>();
-    if (fixedDims.size() != ndim)
-      return std::nullopt;
+    llvm::SmallVector<int64_t> shape(ndim, mlir::ShapedType::kDynamic);
 
-    llvm::SmallVector<int64_t> shape(ndim);
-    for (auto &&[i, dim] : llvm::enumerate(fixedDims)) {
-      if (dim.is_none()) {
-        shape[i] = mlir::ShapedType::kDynamic;
-      } else {
-        shape[i] = dim.cast<int64_t>();
-      }
+    if (py::hasattr(obj, "fixed_dims")) {
+      auto fixedDims = obj.attr("fixed_dims").cast<py::tuple>();
+      if (fixedDims.size() != ndim)
+        return std::nullopt;
+
+      for (auto &&[i, dim] : llvm::enumerate(fixedDims))
+        if (!dim.is_none())
+          shape[i] = dim.cast<int64_t>();
     }
 
     auto caps = obj.attr("get_device_caps")();
@@ -70,7 +70,15 @@ struct Conversion {
 private:
   PyTypeConverter &converter;
 
-  py::object usmArrayType;
+  py::object usmArrayTypes[2];
+
+  bool checkArrayType(py::handle obj) const {
+    for (auto &&type : usmArrayTypes)
+      if (!type.is_none() && py::isinstance(obj, type))
+        return true;
+
+    return false;
+  }
 };
 } // namespace
 

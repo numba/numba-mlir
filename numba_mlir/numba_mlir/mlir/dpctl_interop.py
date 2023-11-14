@@ -44,6 +44,27 @@ if _is_dpctl_available:
     from .target import typeof_impl
     from . import array_type
 
+    try:
+        from numba_dpex.core.types.usm_ndarray_type import USMNdArray as OtherUSMNdArray
+
+        # TODO: add to numba-dpex USMNdArray
+        def array_get_device_caps(obj):
+            if hasattr(obj, "_caps"):
+                return obj._caps
+
+            device = obj.device
+            if not device:
+                return None
+
+            caps = _get_device_caps(dpctl.SyclDevice(device))
+            setattr(obj, "_caps", caps)
+
+            return caps
+
+        setattr(OtherUSMNdArray, "get_device_caps", array_get_device_caps)
+    except ImportError:
+        OtherUSMNdArray = None
+
     def _get_device_caps(device):
         return DeviceCaps(
             filter_string=device.filter_string,
