@@ -428,35 +428,15 @@ struct PlierLowerer final {
       result = builder.create<numba::util::BuildTupleOp>(loc, resType, results);
     }
 
+    auto origFuncType = func.getFunctionType();
+    assert(origFuncType.getNumResults() == 1);
+    auto funcsResultType = origFuncType.getResults().front();
+    if (result.getType() != funcsResultType)
+      result = builder.create<plier::CastOp>(loc, funcsResultType, result);
+
     builder.create<mlir::func::ReturnOp>(loc, result);
 
     fixupPhis();
-
-    if (env) {
-      builder.setInsertionPointToStart(block);
-
-      llvm::SmallVector<mlir::Type> newArgsTypes;
-      for (auto arg : block->getArguments()) {
-        auto argType = arg.getType();
-        newArgsTypes.emplace_back(argType);
-        auto origType = argType.dyn_cast<numba::ntensor::NTensorType>();
-        if (!origType || origType.getEnvironment())
-          continue;
-
-        auto newType = numba::ntensor::NTensorType::get(
-            builder.getContext(), origType.getShape(),
-            origType.getElementType(), env, origType.getLayout());
-        arg.setType(newType);
-        auto cast = builder.create<numba::ntensor::CastOp>(getCurrentLoc(),
-                                                           origType, arg);
-        arg.replaceAllUsesExcept(cast.getResult(), cast);
-        newArgsTypes.back() = newType;
-      }
-      auto origFuncType = func.getFunctionType();
-      auto newFuncType =
-          origFuncType.clone(newArgsTypes, origFuncType.getResults());
-      func.setFunctionType(newFuncType);
-    }
     return newFunc;
   }
 
