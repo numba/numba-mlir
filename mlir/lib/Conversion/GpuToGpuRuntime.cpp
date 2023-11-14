@@ -4,6 +4,8 @@
 
 #include "numba/Conversion/GpuToGpuRuntime.hpp"
 
+#include "GpuCommon.hpp"
+
 #include "numba/Dialect/gpu_runtime/IR/GpuRuntimeOps.hpp"
 #include "numba/Dialect/numba_util/Dialect.hpp"
 #include "numba/Dialect/numba_util/Utils.hpp"
@@ -2841,6 +2843,67 @@ struct SortParallelLoosForGPU
       return signalPassFailure();
   }
 };
+
+static mlir::gpu::AllocOp convertToGPUAloc(mlir::OpBuilder &builder,
+                                           mlir::memref::AllocOp op,
+                                           numba::GpuAllocType allocType) {
+  bool hostShared = (allocType == numba::GpuAllocType::Shared);
+  auto type = op.getType();
+  auto ret = builder.create<mlir::gpu::AllocOp>(
+      op.getLoc(), type, /*asyncToken*/ nullptr, /*asyncDeps*/ std::nullopt,
+      op.getDynamicSizes(), op.getSymbolOperands(), hostShared);
+  mlir::ValueRange results(ret.getMemref());
+  op.getResult().replaceAllUsesWith(ret.getMemref());
+  op->erase();
+  return ret;
+}
+
+struct CreateGPUAllocPass
+    : public mlir::PassWrapper<CreateGPUAllocPass, mlir::OperationPass<void>> {
+  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(CreateGPUAllocPass)
+
+  virtual void
+  getDependentDialects(mlir::DialectRegistry &registry) const override {
+    registry.insert<mlir::gpu::GPUDialect>();
+    registry.insert<mlir::memref::MemRefDialect>();
+  }
+
+  void runOnOperation() override {
+    llvm::SmallVector<mlir::memref::AllocOp> allocs;
+    getOperation()->walk([&](mlir::memref::AllocOp alloc) {
+      if (!isInsideGPURegion(alloc))
+        return;
+
+      allocs.emplace_back(alloc);
+    });
+
+    if (allocs.empty())
+      return markAllAnalysesPreserved();
+
+    mlir::OpBuilder builder(&getContext());
+    auto deviceAttr = builder.getStringAttr("device");
+    auto sharedAttr = builder.getStringAttr("shared");
+    auto hostAttr = builder.getStringAttr("host");
+    for (auto &&alloc : allocs) {
+      llvm::errs() << alloc << "\n";
+      auto env = getGpuRegionEnv(alloc);
+      assert(env);
+
+      builder.setInsertionPoint(alloc);
+      auto usmType = env.getUsmType();
+      if (usmType == deviceAttr) {
+        convertToGPUAloc(builder, alloc, numba::GpuAllocType::Device);
+      } else if (usmType == sharedAttr) {
+        convertToGPUAloc(builder, alloc, numba::GpuAllocType::Shared);
+      } else if (usmType == hostAttr) {
+        convertToGPUAloc(builder, alloc, numba::GpuAllocType::Shared);
+      } else {
+        alloc->emitError("Unknown usm_type value: ") << usmType;
+        return signalPassFailure();
+      }
+    }
+  }
+};
 } // namespace
 
 // Expose the passes to the outside world
@@ -2903,4 +2966,8 @@ std::unique_ptr<mlir::Pass> gpu_runtime::createLowerGPUGlobalReducePass() {
 
 std::unique_ptr<mlir::Pass> gpu_runtime::createSortParallelLoopsForGPU() {
   return std::make_unique<SortParallelLoosForGPU>();
+}
+
+std::unique_ptr<Pass> gpu_runtime::createCreateGPUAllocPass() {
+  return std::make_unique<CreateGPUAllocPass>();
 }
