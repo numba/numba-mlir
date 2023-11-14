@@ -2857,6 +2857,9 @@ static mlir::gpu::AllocOp convertToGPUAloc(mlir::OpBuilder &builder,
   mlir::ValueRange results(ret.getMemref());
   op.getResult().replaceAllUsesWith(ret.getMemref());
   op->erase();
+  if (allocType == numba::GpuAllocType::Host)
+    ret->setAttr(gpu_runtime::getHostAllocAttrName(), builder.getUnitAttr());
+
   return ret;
 }
 
@@ -2887,7 +2890,6 @@ struct CreateGPUAllocPass
     auto sharedAttr = builder.getStringAttr("shared");
     auto hostAttr = builder.getStringAttr("host");
     for (auto &&alloc : allocs) {
-      llvm::errs() << alloc << "\n";
       auto env = getGpuRegionEnv(alloc);
       assert(env);
 
@@ -2898,7 +2900,7 @@ struct CreateGPUAllocPass
       } else if (usmType == sharedAttr) {
         convertToGPUAloc(builder, alloc, numba::GpuAllocType::Shared);
       } else if (usmType == hostAttr) {
-        convertToGPUAloc(builder, alloc, numba::GpuAllocType::Shared);
+        convertToGPUAloc(builder, alloc, numba::GpuAllocType::Host);
       } else {
         alloc->emitError("Unknown usm_type value: ") << usmType;
         return signalPassFailure();
