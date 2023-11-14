@@ -997,21 +997,10 @@ getDeviceDescFromArgs(mlir::MLIRContext *context, mlir::TypeRange argTypes) {
 static mlir::FailureOr<mlir::Attribute>
 getDeviceDescFromFunc(mlir::MLIRContext *context, mlir::TypeRange argTypes) {
   auto res = getDeviceDescFromArgs(context, argTypes);
-  if (mlir::failed(res))
+  if (mlir::failed(res) || !*res)
     return mlir::failure();
 
-  // TODO: remove default device.
-  if (*res)
-    return res;
-
-  if (auto dev = numba::getDefaultDevice()) {
-    auto &&[device, caps] = *dev;
-    return gpu_runtime::GPURegionDescAttr::get(
-        context, device, caps.spirvMajorVersion, caps.spirvMinorVersion,
-        caps.hasFP16, caps.hasFP64);
-  } else {
-    return mlir::failure();
-  }
+  return *res;
 }
 
 static bool isGpuArray(mlir::Type type) {

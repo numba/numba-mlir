@@ -366,13 +366,14 @@ struct PlierLowerer final {
     mlir::Attribute env;
     if (!caps.is_none()) {
       auto device = caps.attr("filter_string").cast<std::string>();
+      auto usmType = "device";
       auto spirvMajor = caps.attr("spirv_major_version").cast<int16_t>();
       auto spirvMinor = caps.attr("spirv_minor_version").cast<int16_t>();
       auto hasFP16 = caps.attr("has_fp16").cast<bool>();
       auto hasFP64 = caps.attr("has_fp64").cast<bool>();
       env = gpu_runtime::GPURegionDescAttr::get(builder.getContext(), device,
-                                                spirvMajor, spirvMinor, hasFP16,
-                                                hasFP64);
+                                                usmType, spirvMajor, spirvMinor,
+                                                hasFP16, hasFP64);
     }
 
     builder.setInsertionPointToStart(block);
