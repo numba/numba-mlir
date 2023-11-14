@@ -27,7 +27,7 @@ public:
   virtual sycl::queue *getQueue() = 0;
 };
 
-enum class GpuAllocType { Device = 0, Shared = 1, Local = 2 };
+enum class GpuAllocType { Device = 0, Shared = 1, Local = 2, Host = 3 };
 
 enum class GpuParamType : int32_t {
   null = 0,

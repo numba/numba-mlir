@@ -211,6 +211,9 @@ public:
       } else if (type == numba::GpuAllocType::Local) {
         // Local allocs are handled specially, do not allocate any pointer on
         // host side.
+      } else if (type == numba::GpuAllocType::Host) {
+        ret = CHECK_ALLOC(sycl::aligned_alloc_host(alignment, size, queue),
+                          shared);
       } else {
         throw std::runtime_error("Invalid allocation type");
       }
