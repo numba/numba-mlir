@@ -223,6 +223,9 @@ mlir::StringRef getUse64BitIndexAttrName() {
 }
 
 mlir::StringRef getDeviceFuncAttrName() { return "gpu_runtime.device_func"; }
+
+llvm::StringRef getHostAllocAttrName() { return "gpu_runtime.host_alloc"; }
+
 } // namespace gpu_runtime
 
 // TODO: unify with upstream
