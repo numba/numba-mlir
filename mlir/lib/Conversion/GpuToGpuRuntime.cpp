@@ -1462,10 +1462,12 @@ struct ExpandAllocOp : public mlir::OpRewritePattern<mlir::gpu::AllocOp> {
     auto hostShared = op.getHostShared();
     mlir::Type token =
         op.getAsyncToken() ? op.getAsyncToken().getType() : nullptr;
-    rewriter.replaceOpWithNewOp<gpu_runtime::GPUAllocOp>(
-        op, op.getType(), token, op.getAsyncDependencies(), *queue,
+    auto newOp = rewriter.create<gpu_runtime::GPUAllocOp>(
+        op.getLoc(), op.getType(), token, op.getAsyncDependencies(), *queue,
         op.getDynamicSizes(), op.getSymbolOperands(), hostShared);
 
+    newOp->setAttrs(op->getDiscardableAttrs());
+    rewriter.replaceOp(op, newOp.getResults());
     return mlir::success();
   }
 };
