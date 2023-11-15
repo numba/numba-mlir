@@ -2415,13 +2415,19 @@ struct InsertGPUGlobalReduce
 
       rewriter.setInsertionPoint(op);
       mlir::Value array =
-          rewriter.create<mlir::memref::AllocOp>(loc, memrefType);
+          rewriter
+              .create<mlir::gpu::AllocOp>(
+                  loc, memrefType, /*asyncToken*/ nullptr,
+                  /*asyncDeps*/ std::nullopt, /*dynSizes*/ std::nullopt,
+                  /*symbols*/ std::nullopt, /*hostShared*/ true)
+              .getMemref();
 
       auto &reduceRegion = reduce.getReductionOperator();
 
       rewriter.setInsertionPointAfter(op);
       mlir::Value res = rewriter.create<mlir::memref::LoadOp>(loc, array);
-      rewriter.create<mlir::memref::DeallocOp>(loc, array);
+      rewriter.create<mlir::gpu::DeallocOp>(loc, /*asyncToken*/ mlir::Type(),
+                                            /*asyncDeps*/ std::nullopt, array);
 
       auto &reduceBlock = reduceRegion.front();
       mapper.clear();
@@ -2549,8 +2555,13 @@ struct LowerGPUGlobalReduce
 
     const int64_t shape[] = {mlir::ShapedType::kDynamic};
     auto arrayType = mlir::MemRefType::get(shape, op.getValue().getType());
-    mlir::Value reduceArray = rewriter.create<mlir::memref::AllocOp>(
-        launchLoc, arrayType, numWorkGroupsExternal);
+    mlir::Value reduceArray =
+        rewriter
+            .create<mlir::gpu::AllocOp>(
+                launchLoc, arrayType, /*asyncToken*/ nullptr,
+                /*asyncDeps*/ std::nullopt, numWorkGroupsExternal,
+                /*symbols*/ std::nullopt, /*hostShared*/ true)
+            .getMemref();
 
     auto loc = op.getLoc();
 
@@ -2627,7 +2638,9 @@ struct LowerGPUGlobalReduce
     rewriter.create<mlir::memref::StoreOp>(launchLoc, loopOp->getResult(0),
                                            resultArray);
 
-    rewriter.create<mlir::memref::DeallocOp>(launchLoc, reduceArray);
+    rewriter.create<mlir::gpu::DeallocOp>(
+        launchLoc, /*asyncToken*/ mlir::Type(), /*asyncDeps*/ std::nullopt,
+        reduceArray);
     rewriter.eraseOp(op);
     return mlir::success();
   }
