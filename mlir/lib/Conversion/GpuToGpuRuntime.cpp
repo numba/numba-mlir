@@ -2887,37 +2887,47 @@ struct CreateGPUAllocPass
   }
 
   void runOnOperation() override {
-    llvm::SmallVector<mlir::memref::AllocOp> allocs;
-    getOperation()->walk([&](mlir::memref::AllocOp alloc) {
-      if (!isInsideGPURegion(alloc))
-        return;
-
-      allocs.emplace_back(alloc);
-    });
-
-    if (allocs.empty())
-      return markAllAnalysesPreserved();
+    llvm::SmallVector<std::pair<mlir::memref::AllocOp, numba::GpuAllocType>>
+        allocs;
 
     mlir::OpBuilder builder(&getContext());
     auto deviceAttr = builder.getStringAttr("device");
     auto sharedAttr = builder.getStringAttr("shared");
     auto hostAttr = builder.getStringAttr("host");
-    for (auto &&alloc : allocs) {
+    auto visitor = [&](mlir::memref::AllocOp alloc) -> mlir::WalkResult {
+      auto env = getGpuRegionEnv(alloc);
+      if (!env)
+        return mlir::WalkResult::advance();
+
+      numba::GpuAllocType type;
+      auto usmType = env.getUsmType();
+      if (usmType == deviceAttr) {
+        type = numba::GpuAllocType::Device;
+      } else if (usmType == sharedAttr) {
+        type = numba::GpuAllocType::Shared;
+      } else if (usmType == hostAttr) {
+        type = numba::GpuAllocType::Host;
+      } else {
+        alloc->emitError("Unknown usm_type value: ") << usmType;
+        mlir::WalkResult::interrupt();
+      }
+
+      allocs.emplace_back(alloc, type);
+      return mlir::WalkResult::advance();
+    };
+
+    if (getOperation()->walk(visitor).wasInterrupted())
+      return signalPassFailure();
+
+    if (allocs.empty())
+      return markAllAnalysesPreserved();
+
+    for (auto &&[alloc, allocType] : allocs) {
       auto env = getGpuRegionEnv(alloc);
       assert(env);
 
       builder.setInsertionPoint(alloc);
-      auto usmType = env.getUsmType();
-      if (usmType == deviceAttr) {
-        convertToGPUAloc(builder, alloc, numba::GpuAllocType::Device);
-      } else if (usmType == sharedAttr) {
-        convertToGPUAloc(builder, alloc, numba::GpuAllocType::Shared);
-      } else if (usmType == hostAttr) {
-        convertToGPUAloc(builder, alloc, numba::GpuAllocType::Host);
-      } else {
-        alloc->emitError("Unknown usm_type value: ") << usmType;
-        return signalPassFailure();
-      }
+      convertToGPUAloc(builder, alloc, allocType);
     }
   }
 };
