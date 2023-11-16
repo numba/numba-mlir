@@ -201,6 +201,10 @@ if _is_dpctl_available:
                 device=self.device,
             )
 
+        @property
+        def key(self):
+            return super().key + (self.usm_type,)
+
     register_model(USMNdArrayType)(USMNdArrayModel)
 
     @typeof_impl.register(usm_ndarray)
