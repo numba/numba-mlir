@@ -28,6 +28,8 @@ _def_device = get_default_device().filter_string
 _has_fp64 = get_default_device().has_fp64
 _fp64_dtypes = {np.float64, np.complex128}
 
+require_f64 = pytest.mark.skipif(not _has_fp64, reason="Need f64 support")
+
 
 def skip_fp64_arg(arg):
     if _has_fp64:
@@ -340,6 +342,7 @@ def test_empty_kernel():
 
 
 @require_gpu
+@require_f64
 def test_f64_truncate():
     def func(a, b, c):
         i = get_global_id(0)
