@@ -1946,7 +1946,7 @@ def test_cfd_reduce2(py_func, shape, dtype, request):
     jit_func = njit(py_func)
     a = np.arange(1, count + 1, dtype=dtype).reshape(shape).copy()
 
-    da = _from_host(a, buffer="device")
+    da = _from_host(a, buffer="shared")
     assert_allclose(jit_func(da), py_func(a), rtol=1e-5)
 
 
