@@ -16,6 +16,8 @@
 
 #include <mlir/Dialect/GPU/IR/GPUDialect.h>
 
+#include "numba/Dialect/numba_util/Dialect.hpp"
+
 #include "numba/Dialect/gpu_runtime/IR/GpuRuntimeOpsDialect.h.inc"
 
 #define GET_TYPEDEF_CLASSES

@@ -73,6 +73,34 @@ GpuRuntimeDialect::materializeConstant(mlir::OpBuilder &builder,
 }
 
 namespace {
+struct CleanupGpuRegion
+    : public mlir::OpRewritePattern<numba::util::EnvironmentRegionOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(numba::util::EnvironmentRegionOp op,
+                  mlir::PatternRewriter &rewriter) const override {
+    auto env = mlir::dyn_cast<GPURegionDescAttr>(op.getEnvironment());
+    if (!env)
+      return mlir::failure();
+
+    if (op->getParentOfType<mlir::gpu::LaunchOp>(),
+        op->getParentOfType<mlir::gpu::GPUFuncOp>()) {
+      numba::util::EnvironmentRegionOp::inlineIntoParent(rewriter, op);
+      return mlir::success();
+    }
+
+    return mlir::failure();
+  }
+};
+} // namespace
+
+void GpuRuntimeDialect::getCanonicalizationPatterns(
+    mlir::RewritePatternSet &results) const {
+  results.add<CleanupGpuRegion>(results.getContext());
+}
+
+namespace {
 template <typename Op, typename DelOp>
 struct RemoveUnusedOp : public mlir::OpRewritePattern<Op> {
   using mlir::OpRewritePattern<Op>::OpRewritePattern;
