@@ -6,6 +6,7 @@
 
 #include "GpuCommon.hpp"
 
+#include "numba/Analysis/AliasAnalysis.hpp"
 #include "numba/Dialect/gpu_runtime/IR/GpuRuntimeOps.hpp"
 #include "numba/Dialect/numba_util/Dialect.hpp"
 #include "numba/Dialect/numba_util/Utils.hpp"
@@ -2887,6 +2888,28 @@ struct CreateGPUAllocPass
   }
 
   void runOnOperation() override {
+    // TODO: mlir memory alloc pipeline can create random allocs all over the
+    // place, including inside gpu regions, conver them to shared allocs for
+    // now. Need to change pipeline to not add new allocs (for perf reasons too)
+    llvm::SmallSetVector<mlir::Value, 8> hostAccesses;
+    getOperation()->walk([&](mlir::Operation *op) {
+      if (!isInsideGPURegion(op) || op->getParentOfType<mlir::gpu::LaunchOp>())
+        return;
+
+      if (auto storeOp = mlir::dyn_cast<mlir::memref::StoreOp>(op)) {
+        hostAccesses.insert(storeOp.getMemRef());
+      } else if (auto loadOp = mlir::dyn_cast<mlir::memref::LoadOp>(op)) {
+        hostAccesses.insert(loadOp.getMemRef());
+      } else if (auto callOp = mlir::dyn_cast<mlir::func::CallOp>(op)) {
+        if (callOp.getCallee() == "dealloc_helper") {
+          auto args = callOp.getOperands();
+          hostAccesses.insert(args.begin(), args.end());
+        }
+      }
+    });
+
+    auto &&AA = getAnalysis<numba::AliasAnalysis>();
+
     llvm::SmallVector<std::pair<mlir::memref::AllocOp, numba::GpuAllocType>>
         allocs;
 
@@ -2909,7 +2932,16 @@ struct CreateGPUAllocPass
         type = numba::GpuAllocType::Host;
       } else {
         alloc->emitError("Unknown usm_type value: ") << usmType;
-        mlir::WalkResult::interrupt();
+        return mlir::WalkResult::interrupt();
+      }
+
+      if (type != numba::GpuAllocType::Shared) {
+        for (auto access : hostAccesses) {
+          if (!AA.alias(alloc.getMemref(), access).isNo()) {
+            type = numba::GpuAllocType::Shared;
+            break;
+          }
+        }
       }
 
       allocs.emplace_back(alloc, type);
