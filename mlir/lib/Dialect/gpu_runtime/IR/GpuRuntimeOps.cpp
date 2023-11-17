@@ -277,10 +277,6 @@ mlir::StringAttr GPUSuggestBlockSizeOp::getKernelName() {
   return getKernelRef()->getLeafReference();
 }
 
-mlir::StringRef getGpuAccessibleAttrName() {
-  return "gpu_runtime.gpu_accessible";
-}
-
 mlir::StringRef getFenceFlagsAttrName() { return "gpu_runtime.fence_flags"; }
 mlir::StringRef getFp64TruncateAttrName() {
   return "gpu_runtime.fp64_truncate";

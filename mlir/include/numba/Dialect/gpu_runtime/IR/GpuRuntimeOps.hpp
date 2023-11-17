@@ -30,7 +30,6 @@
 #include "numba/Dialect/gpu_runtime/IR/GpuRuntimeOps.h.inc"
 
 namespace gpu_runtime {
-mlir::StringRef getGpuAccessibleAttrName();
 mlir::StringRef getFenceFlagsAttrName();
 mlir::StringRef getFp64TruncateAttrName();
 mlir::StringRef getUse64BitIndexAttrName();

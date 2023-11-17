@@ -58,8 +58,8 @@ static LogicalResult runMLIRPasses(mlir::Operation *op,
       createGpuMapParallelLoopsPass());
   passManager.addNestedPass<mlir::func::FuncOp>(createParallelLoopToGpuPass());
 
-  passManager.addNestedPass<mlir::func::FuncOp>(
-      gpu_runtime::createInsertGPUAllocsPass());
+  //  passManager.addNestedPass<mlir::func::FuncOp>(
+  //      gpu_runtime::createInsertGPUAllocsPass());Z
   passManager.addPass(mlir::createCanonicalizerPass());
   passManager.addNestedPass<mlir::func::FuncOp>(
       mlir::createGpuDecomposeMemrefsPass());
