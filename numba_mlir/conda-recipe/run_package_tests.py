@@ -26,7 +26,6 @@ def run_tests(params):
 
     if "gpu" in params:
         os.environ["NUMBA_MLIR_ENABLE_GPU_TESTS"] = "1"
-        os.environ["NUMBA_MLIR_ENABLE_DPCTL_TESTS"] = "1"
         args += ["-m", "test_gpu"]
 
     if "verbose" in params:

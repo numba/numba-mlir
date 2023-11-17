@@ -141,9 +141,8 @@ njit_cache = JitfuncCache(njit_wrapper)
 njit = njit_cache.cached_decorator
 
 GPU_TESTS_ENABLED = readenv("NUMBA_MLIR_ENABLE_GPU_TESTS", int, 0)
-DPCTL_TESTS_ENABLED = readenv("NUMBA_MLIR_ENABLE_DPCTL_TESTS", int, 0)
 
-if DPCTL_TESTS_ENABLED:
+if GPU_TESTS_ENABLED:
     import dpctl
     import dpctl.tensor as dpt
 
@@ -1429,7 +1428,6 @@ def _check_filter_string(array, ir):
 
 
 @require_gpu
-@require_dpctl
 @pytest.mark.parametrize(
     "s", [slice(1, None, 3), slice(1, None, -2), slice(1, 8, None)]
 )
@@ -1455,7 +1453,7 @@ def test_kernel_slice_arg_dpctl(s):
 
 
 @pytest.mark.smoke
-@require_dpctl
+@require_gpu
 @pytest.mark.parametrize("size", [1, 13, 127, 1024])
 def test_dpctl_simple1(size):
     def func(a, b, c):
@@ -1488,7 +1486,7 @@ def test_dpctl_simple1(size):
 
 
 @pytest.mark.smoke
-@require_dpctl
+@require_gpu
 def test_parfor_simple1():
     def py_func(a, b, c):
         for i in numba.prange(len(a)):
@@ -1518,7 +1516,7 @@ def test_parfor_simple1():
     assert_equal(gpu_res, sim_res)
 
 
-@require_dpctl
+@require_gpu
 @pytest.mark.parametrize("val", _test_values)
 def test_parfor_scalar(val):
     def py_func(a, b, c, d):
@@ -1549,7 +1547,7 @@ def test_parfor_scalar(val):
     assert_equal(gpu_res, sim_res)
 
 
-@require_dpctl
+@require_gpu
 @pytest.mark.parametrize("val", _test_values)
 def test_parfor_scalar_capture(val):
     def py_func(a, b, c):
@@ -1581,7 +1579,7 @@ def test_parfor_scalar_capture(val):
 
 
 @pytest.mark.smoke
-@require_dpctl
+@require_gpu
 def test_cfd_simple1():
     def py_func(a, b):
         b[:] = a * 2
@@ -1609,7 +1607,7 @@ def test_cfd_simple1():
 
 
 @pytest.mark.smoke
-@require_dpctl
+@require_gpu
 def test_cfd_simple2():
     def py_func(a, b, c):
         c[:] = a + b
@@ -1638,7 +1636,7 @@ def test_cfd_simple2():
     assert_equal(gpu_res, sim_res)
 
 
-@require_dpctl
+@require_gpu
 def test_cfd_indirect():
     def py_func1(a, b):
         b[:] = a * 2
@@ -1670,7 +1668,7 @@ def test_cfd_indirect():
     assert_equal(gpu_res, sim_res)
 
 
-@require_dpctl
+@require_gpu
 def test_cfd_f64_truncate():
     def py_func(a, b, c):
         c[:] = a + b
@@ -1708,7 +1706,7 @@ def test_cfd_f64_truncate():
     assert_equal(gpu_res, sim_res)
 
 
-@require_dpctl
+@require_gpu
 def test_cfd_f64_truncate_indirect():
     def py_func_inner(a, b, c):
         c[:] = a + b
@@ -1751,7 +1749,7 @@ def test_cfd_f64_truncate_indirect():
     assert_equal(gpu_res, sim_res)
 
 
-@require_dpctl
+@require_gpu
 def test_cfd_use_64bit_index_prange_default():
     def py_func(a):
         ah, aw = a.shape
@@ -1788,7 +1786,7 @@ def test_cfd_use_64bit_index_prange_default():
     assert_equal(da_default_host, da64_host)
 
 
-@require_dpctl
+@require_gpu
 def test_cfd_use_64bit_index_prange():
     def py_func(a):
         ah, aw = a.shape
@@ -1825,7 +1823,7 @@ def test_cfd_use_64bit_index_prange():
     assert_equal(da64_host, da32_host)
 
 
-@require_dpctl
+@require_gpu
 def test_cfd_use_64bit_index_kernel():
     def py_func(a):
         aw = a.shape[1]
@@ -1863,7 +1861,7 @@ def test_cfd_use_64bit_index_kernel():
     assert_equal(da64_host, da32_host)
 
 
-@require_dpctl
+@require_gpu
 def test_cfd_reshape():
     def py_func1(a):
         b = a.reshape(17, 23, 56)
@@ -1896,7 +1894,7 @@ def test_cfd_reshape():
 
 
 @pytest.mark.smoke
-@require_dpctl
+@require_gpu
 @pytest.mark.parametrize("size", [1, 7, 16, 64, 65, 256, 512, 1024 * 1024])
 def test_cfd_reduce1(size):
     if size == 1:
@@ -1920,7 +1918,7 @@ def test_cfd_reduce1(size):
 _shapes = (1, 7, 16, 25, 64, 65)
 
 
-@require_dpctl
+@require_gpu
 @parametrize_function_variants(
     "py_func",
     [
@@ -1953,7 +1951,7 @@ def test_cfd_reduce2(py_func, shape, dtype, request):
     assert_allclose(jit_func(da), py_func(a), rtol=1e-5)
 
 
-@require_dpctl
+@require_gpu
 @pytest.mark.parametrize(
     "a,b",
     [
@@ -2007,7 +2005,7 @@ gemm_array_t = [a.T for a in gemm_array]
 alpha_beta = [0, 1, 0.5]
 
 
-@require_dpctl
+@require_gpu
 @pytest.mark.parametrize(
     "a,b,c,alpha,beta",
     list(
@@ -2049,7 +2047,7 @@ def test_internal_gemm(a, b, c, alpha, beta):
 
 
 @pytest.mark.smoke
-@require_dpctl
+@require_gpu
 def test_l2_norm():
     def py_func(a, d):
         sq = np.square(a)
@@ -2078,7 +2076,7 @@ def test_l2_norm():
     assert_allclose(res, gpu_res, rtol=1e-5)
 
 
-@require_dpctl
+@require_gpu
 def test_pairwise2():
     def py_func(X1, X2, D):
         X1_rows = X1.shape[0]
