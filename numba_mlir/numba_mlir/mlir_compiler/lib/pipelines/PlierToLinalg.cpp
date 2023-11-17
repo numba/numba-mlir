@@ -2366,10 +2366,14 @@ struct WrapParforRegionsPass
 
         if (!env) {
           env = *opEnv;
-        } else if (*env != *opEnv) {
+          return mlir::WalkResult::advance();
+        }
+        auto res = numba::util::mergeEnvAttrs(*env, *opEnv);
+        if (!res) {
           forOp->emitError("Incompatible envs: ") << *env << " and " << *opEnv;
           return mlir::WalkResult::interrupt();
         }
+        env = *res;
         return mlir::WalkResult::advance();
       };
       if (forOp->walk(innerVisitor).wasInterrupted())
