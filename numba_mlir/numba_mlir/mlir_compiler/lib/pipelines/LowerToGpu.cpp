@@ -1015,64 +1015,6 @@ static bool isGpuArray(mlir::Type type) {
   return env.isa<gpu_runtime::GPURegionDescAttr>();
 }
 
-struct MarkGpuArraysInputs
-    : public mlir::PassWrapper<MarkGpuArraysInputs,
-                               mlir::OperationPass<mlir::func::FuncOp>> {
-  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(MarkGpuArraysInputs)
-
-  virtual void
-  getDependentDialects(mlir::DialectRegistry &registry) const override {
-    registry.insert<gpu_runtime::GpuRuntimeDialect>();
-    registry.insert<numba::ntensor::NTensorDialect>();
-    registry.insert<mlir::func::FuncDialect>();
-  }
-
-  void runOnOperation() override;
-};
-
-template <typename F>
-static void visitTypeRecursive(mlir::Type type, F &&visitor) {
-  if (auto tupleType = type.dyn_cast<mlir::TupleType>()) {
-    for (auto t : tupleType.getTypes())
-      visitTypeRecursive(t, std::forward<F>(visitor));
-  } else if (mlir::isa<plier::SliceType>(type)) {
-    auto index = mlir::IndexType::get(type.getContext());
-    visitor(index);
-    visitor(index);
-    visitor(index);
-  } else {
-    visitor(type);
-  }
-}
-
-void MarkGpuArraysInputs::runOnOperation() {
-  auto func = getOperation();
-  auto funcType = func.getFunctionType();
-
-  mlir::OpBuilder builder(&getContext());
-  auto attrStr = builder.getStringAttr(gpu_runtime::getGpuAccessibleAttrName());
-  if (func->hasAttr(attrStr))
-    return markAllAnalysesPreserved();
-
-  bool needAttr = false;
-  llvm::SmallVector<bool> result;
-  result.reserve(funcType.getNumInputs());
-
-  auto visitor = [&](mlir::Type type) {
-    auto res = isGpuArray(type);
-    result.emplace_back(res);
-    needAttr = needAttr || res;
-  };
-
-  for (auto type : func.getFunctionType().getInputs())
-    visitTypeRecursive(type, visitor);
-
-  if (needAttr)
-    func->setAttr(attrStr, builder.getBoolArrayAttr(result));
-
-  markAllAnalysesPreserved();
-}
-
 struct InsertGpuRegionPass
     : public mlir::PassWrapper<InsertGpuRegionPass, mlir::OperationPass<void>> {
   MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(InsertGpuRegionPass)
@@ -2220,7 +2162,6 @@ static void populateLowerToGPUPipelineRegion(mlir::OpPassManager &pm) {
 }
 
 static void populateLowerToGPUPipelineHigh(mlir::OpPassManager &pm) {
-  //  pm.addNestedPass<mlir::func::FuncOp>(std::make_unique<MarkGpuArraysInputs>());
   pm.addPass(std::make_unique<LowerGpuBuiltinsPass>());
   commonOptPasses(pm);
   pm.addPass(mlir::createSymbolDCEPass());
@@ -2241,7 +2182,6 @@ static void populateLowerToGPUPipelineMed(mlir::OpPassManager &pm) {
   funcPM.addPass(mlir::createCanonicalizerPass());
   funcPM.addPass(gpu_runtime::createLowerGPUGlobalReducePass());
   commonOptPasses(funcPM);
-  //  funcPM.addPass(gpu_runtime::createInsertGPUAllocsPass());
   funcPM.addPass(gpu_runtime::createCreateGPUAllocPass());
   funcPM.addPass(mlir::createCanonicalizerPass());
   funcPM.addPass(std::make_unique<LowerGpuBuiltins2Pass>());

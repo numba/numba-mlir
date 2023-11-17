@@ -42,13 +42,6 @@ static mlir::PassPipelineRegistration<>
                       });
 
 static mlir::PassPipelineRegistration<>
-    InsertGpuAlloc("insert-gpu-alloc", "Converts memref alloc to gpu alloc",
-                   [](mlir::OpPassManager &pm) {
-                     pm.addNestedPass<mlir::func::FuncOp>(
-                         gpu_runtime::createInsertGPUAllocsPass());
-                   });
-
-static mlir::PassPipelineRegistration<>
     UnstrideMemrefPass("unstride-memref", "Used to flatten 2D to 1D",
                        [](mlir::OpPassManager &pm) {
                          pm.addNestedPass<mlir::func::FuncOp>(
