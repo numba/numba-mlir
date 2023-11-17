@@ -642,6 +642,8 @@ def CreateArrayOp : NTensor_OpBase<"create", [AttrSizedOperandSegments, Pure]> {
     // Asserts that the shape is dynamic at that `idx`.
     ::mlir::Value getDynamicSize(unsigned idx);
   }];
+
+  let hasCanonicalizer = 1;
 }
 
 def FromTensorOp : NTensor_OpBase<"from_tensor",

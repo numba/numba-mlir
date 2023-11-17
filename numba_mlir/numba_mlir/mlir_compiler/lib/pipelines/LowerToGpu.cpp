@@ -997,21 +997,10 @@ getDeviceDescFromArgs(mlir::MLIRContext *context, mlir::TypeRange argTypes) {
 static mlir::FailureOr<mlir::Attribute>
 getDeviceDescFromFunc(mlir::MLIRContext *context, mlir::TypeRange argTypes) {
   auto res = getDeviceDescFromArgs(context, argTypes);
-  if (mlir::failed(res))
+  if (mlir::failed(res) || !*res)
     return mlir::failure();
 
-  // TODO: remove default device.
-  if (*res)
-    return res;
-
-  if (auto dev = numba::getDefaultDevice()) {
-    auto &&[device, caps] = *dev;
-    return gpu_runtime::GPURegionDescAttr::get(
-        context, device, caps.spirvMajorVersion, caps.spirvMinorVersion,
-        caps.hasFP16, caps.hasFP64);
-  } else {
-    return mlir::failure();
-  }
+  return *res;
 }
 
 static bool isGpuArray(mlir::Type type) {
@@ -2231,7 +2220,7 @@ static void populateLowerToGPUPipelineRegion(mlir::OpPassManager &pm) {
 }
 
 static void populateLowerToGPUPipelineHigh(mlir::OpPassManager &pm) {
-  pm.addNestedPass<mlir::func::FuncOp>(std::make_unique<MarkGpuArraysInputs>());
+  //  pm.addNestedPass<mlir::func::FuncOp>(std::make_unique<MarkGpuArraysInputs>());
   pm.addPass(std::make_unique<LowerGpuBuiltinsPass>());
   commonOptPasses(pm);
   pm.addPass(mlir::createSymbolDCEPass());
@@ -2252,7 +2241,8 @@ static void populateLowerToGPUPipelineMed(mlir::OpPassManager &pm) {
   funcPM.addPass(mlir::createCanonicalizerPass());
   funcPM.addPass(gpu_runtime::createLowerGPUGlobalReducePass());
   commonOptPasses(funcPM);
-  funcPM.addPass(gpu_runtime::createInsertGPUAllocsPass());
+  //  funcPM.addPass(gpu_runtime::createInsertGPUAllocsPass());
+  funcPM.addPass(gpu_runtime::createCreateGPUAllocPass());
   funcPM.addPass(mlir::createCanonicalizerPass());
   funcPM.addPass(std::make_unique<LowerGpuBuiltins2Pass>());
   funcPM.addPass(gpu_runtime::createGpuDecomposeMemrefsPass());

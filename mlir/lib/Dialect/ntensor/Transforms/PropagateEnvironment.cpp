@@ -5,6 +5,7 @@
 #include "numba/Dialect/ntensor/Transforms/PropagateEnvironment.hpp"
 
 #include "numba/Dialect/ntensor/IR/NTensorOps.hpp"
+#include "numba/Dialect/numba_util/Dialect.hpp"
 
 #include <llvm/Support/Debug.h>
 #include <mlir/Analysis/DataFlow/ConstantPropagationAnalysis.h>
@@ -93,7 +94,8 @@ public:
     if (!rhs.getEnv())
       return lhs;
 
-    return lhs.env == rhs.env ? lhs : getInvalid(lhs.env, rhs.env);
+    auto res = numba::util::mergeEnvAttrs(lhs.getEnv(), rhs.getEnv());
+    return res ? EnvValue(*res) : getInvalid(lhs.env, rhs.env);
   }
 
   bool operator==(const EnvValue &rhs) const { return env == rhs.env; }

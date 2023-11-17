@@ -675,6 +675,8 @@ private:
       memType = numba::GpuAllocType::Shared;
     } else if (isLocal) {
       memType = numba::GpuAllocType::Local;
+    } else if (op->hasAttr(gpu_runtime::getHostAllocAttrName())) {
+      memType = numba::GpuAllocType::Host;
     }
 
     auto typeVar = rewriter.create<mlir::LLVM::ConstantOp>(

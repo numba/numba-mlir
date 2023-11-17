@@ -1156,6 +1156,40 @@ numba::ntensor::CreateArrayOp::getMixedSizes() {
   return result;
 }
 
+namespace {
+struct FoldCreateCast
+    : public mlir::OpRewritePattern<numba::ntensor::CreateArrayOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(numba::ntensor::CreateArrayOp op,
+                  mlir::PatternRewriter &rewriter) const override {
+    if (!llvm::hasSingleElement(op->getUses()))
+      return mlir::failure();
+
+    auto cast = mlir::dyn_cast<mlir::CastOpInterface>(*op->getUsers().begin());
+    if (!cast || cast->getNumResults() != 1)
+      return mlir::failure();
+
+    auto thisType = op.getType();
+    auto resType = mlir::dyn_cast<numba::ntensor::NTensorType>(
+        cast->getResult(0).getType());
+    if (!resType || resType.getShape() != thisType.getShape() ||
+        resType.getElementType() != thisType.getElementType())
+      return mlir::failure();
+
+    rewriter.updateRootInPlace(op, [&]() { op.getResult().setType(resType); });
+    rewriter.replaceOp(cast, op);
+    return mlir::success();
+  }
+};
+} // namespace
+
+void numba::ntensor::CreateArrayOp::getCanonicalizationPatterns(
+    ::mlir::RewritePatternSet &results, ::mlir::MLIRContext *context) {
+  results.insert<FoldCreateCast>(context);
+}
+
 static mlir::LogicalResult parseShape(mlir::AsmParser &parser,
                                       llvm::SmallVector<int64_t> &shape,
                                       mlir::Type &type) {

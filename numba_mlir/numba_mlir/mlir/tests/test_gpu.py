@@ -12,6 +12,7 @@ import itertools
 import re
 
 from numba_mlir.mlir.dpctl_interop import get_default_device
+from numba_mlir.mlir.kernel_impl import Kernel
 from numba_mlir.mlir.utils import readenv
 from numba_mlir.kernel import *
 from numba_mlir.mlir.passes import (
@@ -22,6 +23,88 @@ from numba_mlir.mlir.passes import (
 
 from .utils import JitfuncCache, parametrize_function_variants
 from numba_mlir import njit as njit_orig
+
+_def_device = get_default_device().filter_string
+_has_fp64 = get_default_device().has_fp64
+_fp64_dtypes = {np.float64, np.complex128}
+
+require_f64 = pytest.mark.skipif(not _has_fp64, reason="Need f64 support")
+
+
+def skip_fp64_arg(arg):
+    if _has_fp64:
+        return arg
+
+    mark = lambda a: pytest.param(
+        a, marks=pytest.mark.skip(reason="fp64 doesn't supported")
+    )
+    if arg in _fp64_dtypes or (hasattr(arg, "dtype") and arg.dtype in _fp64_dtypes):
+        return mark(arg)
+
+    return arg
+
+
+def skip_fp64_args(args):
+    assert isinstance(args, list)
+    return [skip_fp64_arg(a) for a in args]
+
+
+def _to_device_kernel_args(args):
+    import dpctl.tensor as dpt
+
+    if isinstance(args, tuple):
+        return tuple(_to_device_kernel_args(a) for a in args)
+
+    elif isinstance(args, np.ndarray):
+        if args.flags["C_CONTIGUOUS"]:
+            order = "C"
+        elif args.flags["F_CONTIGUOUS"]:
+            order = "F"
+        else:
+            order = "K"
+        return dpt.asarray(
+            obj=args,
+            dtype=args.dtype,
+            device=_def_device,
+            copy=None,
+            usm_type=None,
+            sycl_queue=None,
+            order=order,
+        )
+
+    return args
+
+
+def _from_device_kernel_args(orig_args, args):
+    import dpctl.tensor as dpt
+
+    if isinstance(orig_args, tuple):
+        assert isinstance(args, tuple)
+        for a, b in zip(orig_args, args):
+            _from_device_kernel_args(a, b)
+
+    elif isinstance(orig_args, np.ndarray):
+        np.copyto(orig_args, dpt.asnumpy(args))
+
+
+class LegacyNumpyKernel(Kernel):
+    def __call__(self, *args, **kwargs):
+        res = self.check_call_args(args, kwargs)
+        new_args = _to_device_kernel_args(args)
+        res = super().__call__(*new_args, **kwargs)
+        _from_device_kernel_args(args, new_args)
+        return res
+
+
+def kernel(func=None, **kwargs):
+    if func is None:
+
+        def wrapper(f):
+            return LegacyNumpyKernel(f, kwargs)
+
+        return wrapper
+    return LegacyNumpyKernel(func, kwargs)
+
 
 FP64_TRUNCATE = readenv("NUMBA_MLIR_TESTS_FP64_TRUNCATE", str, "")
 
@@ -76,8 +159,6 @@ def require_dpctl(func):
         not DPCTL_TESTS_ENABLED, reason="DPCTL interop tests disabled"
     )(func)
 
-
-_def_device = get_default_device().filter_string
 
 _test_values = [
     True,
@@ -185,7 +266,9 @@ def test_simple3():
 
 @require_gpu
 @pytest.mark.parametrize("val", _test_values)
-@pytest.mark.parametrize("dtype", [np.int32, np.int64, np.float32, np.float64])
+@pytest.mark.parametrize(
+    "dtype", skip_fp64_args([np.int32, np.int64, np.float32, np.float64])
+)
 def test_scalar(val, dtype):
     get_id = get_global_id
 
@@ -213,7 +296,9 @@ def test_scalar(val, dtype):
 
 @require_gpu
 @pytest.mark.parametrize("val", _test_values)
-@pytest.mark.parametrize("dtype", [np.int32, np.int64, np.float32, np.float64])
+@pytest.mark.parametrize(
+    "dtype", skip_fp64_args([np.int32, np.int64, np.float32, np.float64])
+)
 def test_scalar_cature(val, dtype):
     get_id = get_global_id
 
@@ -257,6 +342,7 @@ def test_empty_kernel():
 
 
 @require_gpu
+@require_f64
 def test_f64_truncate():
     def func(a, b, c):
         i = get_global_id(0)
@@ -417,7 +503,7 @@ def _test_binary(func, dtype, ir_pass, ir_check):
 
 @require_gpu
 @pytest.mark.parametrize("op", ["sqrt", "log", "sin", "cos", "floor"])
-@pytest.mark.parametrize("dtype", [np.float32, np.float64])
+@pytest.mark.parametrize("dtype", skip_fp64_args([np.float32, np.float64]))
 def test_math_funcs_unary(op, dtype):
     f = eval(f"math.{op}")
 
@@ -430,7 +516,7 @@ def test_math_funcs_unary(op, dtype):
 
 @require_gpu
 @pytest.mark.parametrize("op", ["+", "-", "*", "/", "//", "%", "**"])
-@pytest.mark.parametrize("dtype", [np.int32, np.float32, np.float64])
+@pytest.mark.parametrize("dtype", skip_fp64_args([np.int32, np.float32, np.float64]))
 def test_gpu_ops_binary(op, dtype):
     f = eval(f"lambda a, b: a {op} b")
     inner = kernel_func(f)
@@ -683,7 +769,7 @@ def test_get_local_size(shape, lsize):
     assert_equal(gpu_res, sim_res)
 
 
-_atomic_dtypes = ["int32", "int64", "float32"]
+_atomic_dtypes = skip_fp64_args(["int32", "int64", "float32"])
 _atomic_funcs = [atomic.add, atomic.sub]
 
 
@@ -1863,7 +1949,7 @@ def test_cfd_reduce2(py_func, shape, dtype, request):
     jit_func = njit(py_func)
     a = np.arange(1, count + 1, dtype=dtype).reshape(shape).copy()
 
-    da = _from_host(a, buffer="device")
+    da = _from_host(a, buffer="shared")
     assert_allclose(jit_func(da), py_func(a), rtol=1e-5)
 
 

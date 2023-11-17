@@ -28,6 +28,18 @@
 
 namespace numba {
 namespace util {
+class DialectEnvInterface
+    : public mlir::DialectInterface::Base<DialectEnvInterface> {
+public:
+  DialectEnvInterface(mlir::Dialect *dialect) : Base(dialect) {}
+
+  virtual std::optional<mlir::Attribute>
+  mergeEnvAttrs(mlir::Attribute env1, mlir::Attribute env2) = 0;
+};
+
+std::optional<mlir::Attribute> mergeEnvAttrs(mlir::Attribute env1,
+                                             mlir::Attribute env2);
+
 namespace attributes {
 llvm::StringRef getFastmathName();
 llvm::StringRef getJumpMarkersName();

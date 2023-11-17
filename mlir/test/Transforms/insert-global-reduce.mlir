@@ -22,7 +22,7 @@ func.func @test(%lb: index, %ub: index, %s: index) {
 // CHECK-LABEL: @test
 //  CHECK-SAME: (%[[LB:.*]]: index, %[[UB:.*]]: index, %[[S:.*]]: index)
 //       CHECK: %[[INIT:.*]] = "test.init"() : () -> f32
-//       CHECK: %[[ARRAY:.*]] = memref.alloc() : memref<f32>
+//       CHECK: %[[ARRAY:.*]] = gpu.alloc host_shared () : memref<f32>
 //       CHECK: scf.parallel (%[[ARG1:.*]], %[[ARG2:.*]], %[[ARG3:.*]]) = (%[[LB]], %[[LB]], %[[LB]]) to (%[[UB]], %[[UB]], %[[UB]]) step (%[[S]], %[[S]], %[[S]]) {
 //       CHECK: %[[PROD:.*]] = "test.produce"() : () -> f32
 //       CHECK: gpu_runtime.global_reduce %[[PROD]], %[[ARRAY]] : memref<f32> {
@@ -33,7 +33,7 @@ func.func @test(%lb: index, %ub: index, %s: index) {
 //       CHECK: scf.yield
 //       CHECK: }
 //       CHECK: %[[RES1:.*]] = memref.load %[[ARRAY]][] : memref<f32>
-//       CHECK: memref.dealloc %[[ARRAY]] : memref<f32>
+//       CHECK: gpu.dealloc %[[ARRAY]] : memref<f32>
 //       CHECK: %[[RES2:.*]] = "test.transform"(%[[RES1]], %[[INIT]]) : (f32, f32) -> f32
 //       CHECK: "test.consume"(%[[RES2]]) : (f32) -> ()
 //       CHECK: return

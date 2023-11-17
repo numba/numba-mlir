@@ -16,6 +16,8 @@
 
 #include <mlir/Dialect/GPU/IR/GPUDialect.h>
 
+#include "numba/Dialect/numba_util/Dialect.hpp"
+
 #include "numba/Dialect/gpu_runtime/IR/GpuRuntimeOpsDialect.h.inc"
 
 #define GET_TYPEDEF_CLASSES
@@ -33,6 +35,7 @@ mlir::StringRef getFenceFlagsAttrName();
 mlir::StringRef getFp64TruncateAttrName();
 mlir::StringRef getUse64BitIndexAttrName();
 mlir::StringRef getDeviceFuncAttrName();
+mlir::StringRef getHostAllocAttrName();
 
 enum class FenceFlags : int64_t {
   local = 1,
