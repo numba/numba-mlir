@@ -2570,6 +2570,29 @@ void GetAllocTokenOp::getCanonicalizationPatterns(
     mlir::RewritePatternSet &results, mlir::MLIRContext *context) {
   results.insert<PropagateAllocTokenCasts>(context);
 }
+
+std::optional<mlir::Attribute> mergeEnvAttrs(mlir::Attribute env1,
+                                             mlir::Attribute env2) {
+  if (env1 == env2)
+    return env1;
+
+  if (!env1 || !env2)
+    return std::nullopt;
+
+  if (&env1.getDialect() != &env2.getDialect())
+    return std::nullopt;
+
+  auto *mergeInterface =
+      mlir::dyn_cast<DialectEnvInterface>(&env1.getDialect());
+  if (!mergeInterface)
+    return std::nullopt;
+
+  auto res = mergeInterface->mergeEnvAttrs(env1, env2);
+  assert(res == mergeInterface->mergeEnvAttrs(env2, env1) &&
+         "mergeEnvAttrs must be symmetrical");
+  return res;
+}
+
 } // namespace util
 } // namespace numba
 
