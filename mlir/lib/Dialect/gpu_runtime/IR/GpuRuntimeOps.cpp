@@ -35,6 +35,46 @@ struct GpuRuntimeInlinerInterface : public mlir::DialectInlinerInterface {
     return true;
   }
 };
+
+struct GpuRuntimeMergeEnvInterface : public numba::util::DialectEnvInterface {
+  using DialectEnvInterface::DialectEnvInterface;
+
+  virtual std::optional<mlir::Attribute>
+  mergeEnvAttrs(mlir::Attribute env1, mlir::Attribute env2) override {
+    auto gpuEnv1 = mlir::dyn_cast<gpu_runtime::GPURegionDescAttr>(env1);
+    if (!gpuEnv1)
+      return std::nullopt;
+
+    auto gpuEnv2 = mlir::dyn_cast<gpu_runtime::GPURegionDescAttr>(env2);
+    if (!gpuEnv2)
+      return std::nullopt;
+
+    // TODO: keep in sync with definition
+    if (gpuEnv1.getDevice() != gpuEnv2.getDevice() ||
+        gpuEnv1.getSpirvMajorVersion() != gpuEnv2.getSpirvMajorVersion() ||
+        gpuEnv1.getSpirvMinorVersion() != gpuEnv2.getSpirvMinorVersion() ||
+        gpuEnv1.getHasFp16() != gpuEnv2.getHasFp16() ||
+        gpuEnv1.getHasFp64() != gpuEnv2.getHasFp64())
+      return std::nullopt;
+
+    auto ctx = env1.getContext();
+    auto device = mlir::StringAttr::get(ctx, "device");
+    if (gpuEnv1.getUsmType() == device)
+      return gpuEnv1;
+
+    if (gpuEnv2.getUsmType() == device)
+      return gpuEnv2;
+
+    auto shared = mlir::StringAttr::get(ctx, "shared");
+    if (gpuEnv1.getUsmType() == shared)
+      return gpuEnv1;
+
+    if (gpuEnv2.getUsmType() == shared)
+      return gpuEnv2;
+
+    return std::nullopt;
+  }
+};
 } // namespace
 
 namespace gpu_runtime {
@@ -54,7 +94,7 @@ void GpuRuntimeDialect::initialize() {
 #include "numba/Dialect/gpu_runtime/IR/GpuRuntimeOpsAttributes.cpp.inc"
       >();
 
-  addInterfaces<GpuRuntimeInlinerInterface>();
+  addInterfaces<GpuRuntimeInlinerInterface, GpuRuntimeMergeEnvInterface>();
 }
 
 mlir::Operation *
