@@ -284,6 +284,7 @@ if _is_dpctl_available:
 
 else:  # _is_dpctl_available
     USMNdArrayType = None  # dummy
+    OtherUSMNdArray = None  # dummy
 
     def check_usm_ndarray_args(args):
         # dpctl is not loaded, nothing to do
