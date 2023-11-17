@@ -233,7 +233,7 @@ jobs:
         run: |
           cd numba_mlir
           conda activate test-env
-          conda install greenlet dpctl -c intel -c conda-forge
+          conda install greenlet "dpctl>=0.15" -c dppy/label/dev -c intel -c conda-forge
           conda list
           $env:NUMBA_MLIR_DEFAULT_DEVICE="opencl:cpu:0"
           python "$env:GITHUB_WORKSPACE/numba_mlir/conda-recipe/run_package_tests.py" verbose gpu
@@ -583,7 +583,7 @@ jobs:
         run: |
           cd numba_mlir
           source $CONDA/bin/activate test-env
-          conda install greenlet dpctl -c intel -c conda-forge
+          conda install greenlet "dpctl>=0.15" -c dppy/label/dev -c intel -c conda-forge
           conda list
           export NUMBA_MLIR_DEFAULT_DEVICE=opencl:cpu:0
           python $GITHUB_WORKSPACE/numba_mlir/conda-recipe/run_package_tests.py verbose gpu
