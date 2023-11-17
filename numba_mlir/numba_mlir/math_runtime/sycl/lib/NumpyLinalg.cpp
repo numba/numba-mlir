@@ -65,14 +65,6 @@ static cl::sycl::queue getQueue(numba::GPUQueueInterface *queueIface) {
 }
 
 template <typename T>
-using GemmFunc = sycl::event (*)(cl::sycl::queue &, oneapi::mkl::transpose,
-                                 oneapi::mkl::transpose, std::int64_t,
-                                 std::int64_t, std::int64_t, T, const T *,
-                                 std::int64_t, const T *, std::int64_t, T, T *,
-                                 std::int64_t,
-                                 const std::vector<cl::sycl::event> &);
-
-template <typename T>
 static void deviceGemm(void *queueObj, const Memref<2, T> *a,
                        const Memref<2, T> *b, Memref<2, T> *c, T alpha,
                        T beta) {
@@ -92,14 +84,7 @@ static void deviceGemm(void *queueObj, const Memref<2, T> *a,
   isContiguous(b, 'b');
   isContiguous(c, 'c');
 
-  constexpr auto colmGemm =
-      static_cast<GemmFunc<T>>(oneapi::mkl::blas::column_major::gemm);
-  constexpr auto rowmGemm =
-      static_cast<GemmFunc<T>>(oneapi::mkl::blas::row_major::gemm);
-
   auto isRowm = [](const Memref<2, T> *arr) { return arr->strides[1] == 1; };
-
-  auto Gemm = isRowm(c) ? rowmGemm : colmGemm;
   auto transA = isRowm(a) == isRowm(c) ? oneapi::mkl::transpose::N
                                        : oneapi::mkl::transpose::T;
   auto transB = isRowm(b) == isRowm(c) ? oneapi::mkl::transpose::N
@@ -122,23 +107,43 @@ static void deviceGemm(void *queueObj, const Memref<2, T> *a,
 
   auto queue = getQueue(queueIface);
 
-  Gemm(queue,  /*queue*/
-       transA, /*transa*/
-       transB, /*transb*/
-       m,      /*m*/
-       n,      /*n*/
-       k,      /*k*/
-       alpha,  /*alpha*/
-       aData,  /*a*/
-       lda,    /*lda*/
-       bData,  /*b*/
-       ldb,    /*ldb*/
-       beta,   /*beta*/
-       cData,  /*c*/
-       ldc,    /*ldc*/
-       {}      /*dependencies*/
-       )
-      .wait();
+  if (isRowm(c)) {
+    oneapi::mkl::blas::row_major::gemm(queue,  /*queue*/
+                                       transA, /*transa*/
+                                       transB, /*transb*/
+                                       m,      /*m*/
+                                       n,      /*n*/
+                                       k,      /*k*/
+                                       alpha,  /*alpha*/
+                                       aData,  /*a*/
+                                       lda,    /*lda*/
+                                       bData,  /*b*/
+                                       ldb,    /*ldb*/
+                                       beta,   /*beta*/
+                                       cData,  /*c*/
+                                       ldc,    /*ldc*/
+                                       {}      /*dependencies*/
+                                       )
+        .wait();
+  } else {
+    oneapi::mkl::blas::column_major::gemm(queue,  /*queue*/
+                                          transA, /*transa*/
+                                          transB, /*transb*/
+                                          m,      /*m*/
+                                          n,      /*n*/
+                                          k,      /*k*/
+                                          alpha,  /*alpha*/
+                                          aData,  /*a*/
+                                          lda,    /*lda*/
+                                          bData,  /*b*/
+                                          ldb,    /*ldb*/
+                                          beta,   /*beta*/
+                                          cData,  /*c*/
+                                          ldc,    /*ldc*/
+                                          {}      /*dependencies*/
+                                          )
+        .wait();
+  }
 }
 #endif
 
