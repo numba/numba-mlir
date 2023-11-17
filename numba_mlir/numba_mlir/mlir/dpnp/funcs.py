@@ -36,6 +36,7 @@ if _dnnp_available:
             "abs",
             "negative",
             # "positive",
+            "logical_not",
         ]
         for op_name in ops:
             fn_name = "dpnp." + op_name
@@ -46,3 +47,19 @@ if _dnnp_available:
 
     _gen_unary_ops()
     del _gen_unary_ops
+
+    def _gen_binary_ops():
+        ops = [
+            "logical_and",
+            "logical_or",
+            "logical_xor",
+        ]
+        for op_name in ops:
+            fn_name = "dpnp." + op_name
+            func = getattr(dpnp, op_name)
+            impl_name = op_name + "_impl"
+            impl = getattr(numpy_funcs, impl_name)
+            register_func(op_name, func)(impl)
+
+    _gen_binary_ops()
+    del _gen_binary_ops

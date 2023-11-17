@@ -414,6 +414,10 @@ def _select_float_type(builder, *args):
 
 
 def _gen_binary_ops():
+    import sys
+
+    current_mod = sys.modules[__name__]
+
     def bool_type(builder, a, b):
         return builder.bool
 
@@ -434,7 +438,7 @@ def _gen_binary_ops():
         return builder.float64
 
     def reg_func(name, func=None):
-        return register_func(name, func, out="out")
+        return register_func(name, func, out="out"), name
 
     binary_ops = [
         (
@@ -521,8 +525,9 @@ def _gen_binary_ops():
 
         return func
 
-    for reg, init, body in binary_ops:
-        reg(make_func(init, body))
+    for (reg, name), init, body in binary_ops:
+        func = reg(make_func(init, body))
+        setattr(current_mod, _remove_numpy_prefix(name) + "_impl", func)
 
 
 _gen_binary_ops()
