@@ -722,6 +722,11 @@ jobs:
         python: ["3.9", "3.10", "3.11"]
     runs-on: ${{ matrix.os }}
     steps:
+      - name: Powershell Policy
+        if: matrix.os == 'windows-latest'
+        shell: cmd
+        run: powershell -Command "Set-ExecutionPolicy RemoteSigned -Scope CurrentUser"
+
       - name: Download artifact
         uses: actions/download-artifact@v2
         with:
