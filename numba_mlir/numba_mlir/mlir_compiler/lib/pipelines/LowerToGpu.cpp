@@ -1003,18 +1003,6 @@ getDeviceDescFromFunc(mlir::MLIRContext *context, mlir::TypeRange argTypes) {
   return *res;
 }
 
-static bool isGpuArray(mlir::Type type) {
-  auto tensor = type.dyn_cast<numba::ntensor::NTensorType>();
-  if (!tensor)
-    return false;
-
-  auto env = tensor.getEnvironment();
-  if (!env)
-    return false;
-
-  return env.isa<gpu_runtime::GPURegionDescAttr>();
-}
-
 struct InsertGpuRegionPass
     : public mlir::PassWrapper<InsertGpuRegionPass, mlir::OperationPass<void>> {
   MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(InsertGpuRegionPass)
