@@ -7,7 +7,7 @@ try:
     import dpnp
 
     _dnnp_available = True
-except ImportError:
+except:
     _dnnp_available = False
 
 

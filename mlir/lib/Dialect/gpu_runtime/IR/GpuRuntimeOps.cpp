@@ -112,6 +112,17 @@ GpuRuntimeDialect::materializeConstant(mlir::OpBuilder &builder,
   return nullptr;
 }
 
+static bool hasSameEnvRegion(mlir::Operation *op, mlir::Attribute env) {
+  while (auto parent =
+             op->getParentOfType<numba::util::EnvironmentRegionOp>()) {
+    if (parent.getEnvironment() == env)
+      return true;
+
+    op = parent;
+  }
+  return false;
+}
+
 namespace {
 struct CleanupGpuRegion
     : public mlir::OpRewritePattern<numba::util::EnvironmentRegionOp> {
@@ -124,8 +135,9 @@ struct CleanupGpuRegion
     if (!env)
       return mlir::failure();
 
-    if (op->getParentOfType<mlir::gpu::LaunchOp>(),
-        op->getParentOfType<mlir::gpu::GPUFuncOp>()) {
+    if (op->getParentOfType<mlir::gpu::LaunchOp>() ||
+        op->getParentOfType<mlir::gpu::GPUFuncOp>() ||
+        hasSameEnvRegion(op, env)) {
       numba::util::EnvironmentRegionOp::inlineIntoParent(rewriter, op);
       return mlir::success();
     }
