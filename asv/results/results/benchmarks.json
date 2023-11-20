@@ -96,11 +96,7 @@
                 "6",
                 "12"
             ],
-            [
-                "'opencl:gpu:0'",
-                "'opencl:cpu:0'",
-                "'level_zero:gpu:0'"
-            ]
+            []
         ],
         "repeat": 0,
         "rounds": 2,
@@ -126,11 +122,7 @@
                 "6",
                 "12"
             ],
-            [
-                "'opencl:gpu:0'",
-                "'opencl:cpu:0'",
-                "'level_zero:gpu:0'"
-            ]
+            []
         ],
         "repeat": 0,
         "rounds": 2,
