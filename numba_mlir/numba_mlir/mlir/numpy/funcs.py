@@ -214,6 +214,13 @@ def _array_reduce(builder, arg, dtype, axis, keepdims, body, get_init_value):
         return builder.linalg_generic(arg, init, iterators, maps, body)
 
 
+@register_func("numpy.dtype", numpy.dtype)
+def range_impl(builder, arg):
+    # Return a dummy val, it will be unrealize_caste'd to appropriate dtype by
+    # the type inference end then removed after numpy lowering
+    return 1
+
+
 @register_func("array.sum")
 @register_func("numpy.sum", numpy.sum)
 def sum_impl(builder, arg, dtype=None, axis=None, keepdims=False):

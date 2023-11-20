@@ -44,6 +44,22 @@ _arr_dtypes = [
     np.complex128,
 ]
 
+_arr_dtypes_str = [
+    "bool",
+    "int8",
+    "uint8",
+    "int16",
+    "uint16",
+    "int32",
+    "uint32",
+    "int64",
+    "uint64",
+    "float32",
+    "float64",
+    "complex64",
+    "complex128",
+]
+
 _arr_1d_bool = np.array([True, False, True, True, False, True, True, True])
 _arr_1d_int32 = np.array([1, 2, 3, 4, 5, 6, 7, 8], dtype=np.int32)
 _arr_1d_int64 = np.array([1, 2, 3, 4, 5, 6, 7, 8], dtype=np.int64)
@@ -416,20 +432,20 @@ def test_np_const(py_func):
     assert_equal(py_func(), jit_func())
 
 
-@pytest.mark.parametrize(
-    "a",
-    [
-        # -2.5, double->int64 cast mismatch
-        -1,
-        -0.0,
-        0,
-        0.0,
-        2,
-        3.5,
-        # -1 + 2j, TODO: complex casts
-        # 2.3 - 3.4j,
-    ],
-)
+_dtype_cast_params = [
+    # -2.5, double->int64 cast mismatch
+    -1,
+    -0.0,
+    0,
+    0.0,
+    2,
+    3.5,
+    # -1 + 2j, TODO: complex casts
+    # 2.3 - 3.4j,
+]
+
+
+@pytest.mark.parametrize("a", _dtype_cast_params)
 @pytest.mark.parametrize("dtype", _arr_dtypes)
 def test_dtype_cast(a, dtype):
     def py_func(val):
@@ -437,6 +453,16 @@ def test_dtype_cast(a, dtype):
 
     jit_func = njit(py_func)
     assert_equal(py_func(a), jit_func(a))
+
+
+@pytest.mark.parametrize("dtype", _arr_dtypes_str)
+def test_array_dtype_str(dtype):
+    def py_func():
+        dt = np.dtype(dtype)
+        return np.ones(10, dtype=dt)
+
+    jit_func = njit(py_func)
+    assert_equal(py_func(), jit_func())
 
 
 @pytest.mark.parametrize(
