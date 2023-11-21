@@ -856,6 +856,7 @@ struct OptimizeStridedLayoutPass
   }
 };
 
+
 struct FinalizeStridedLayoutPass
     : public mlir::PassWrapper<FinalizeStridedLayoutPass,
                                mlir::OperationPass<>> {
@@ -880,7 +881,6 @@ void FinalizeStridedLayoutPass::runOnOperation() {
     signalPassFailure();
   });
 }
-
 static mlir::Value convertScalarType(mlir::OpBuilder &builder,
                                      mlir::Location loc, mlir::Value val,
                                      mlir::Type dstType) {
@@ -4511,6 +4511,143 @@ static void populateCommonOptPass(mlir::OpPassManager &pm) {
       }));
 }
 
+struct RemoveExtraCopyForOut: public mlir::OpRewritePattern<mlir::func::CallOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(mlir::func::CallOp op,
+                  mlir::PatternRewriter &rewriter) const override {
+    using mlir::linalg::GenericOp;
+    using mlir::linalg::YieldOp;
+    using mlir::dyn_cast_or_null;
+    using mlir::memref::AllocOp;
+    using mlir::memref::AllocaOp;
+
+    if (op.getOperands().empty())
+      return mlir::failure();
+
+    auto hasIdentityMaps = [](GenericOp& Op) {
+      auto maps = Op.getIndexingMaps();
+      if (maps.size() != 2)
+        return false;
+
+      bool trivialAffineMaps = true;
+      for (auto&& map : maps)
+        trivialAffineMaps &= map.cast<mlir::AffineMapAttr>().getValue().isIdentity();
+
+      return trivialAffineMaps;
+    };
+
+    auto hasCopyBody = [](GenericOp& Op) {
+      auto* body = Op.getBody();
+      if (llvm::hasSingleElement(*body)) {
+        if (auto yield = dyn_cast_or_null<YieldOp>(body->front())) {
+          auto operands = yield.getOperands();
+          if (operands[0] == body->getArgument(0))
+            return true;
+        }
+      }
+
+      return false;
+    };
+
+    auto hasOnlyCopyUser = [hasIdentityMaps, hasCopyBody](mlir::Value& operand) -> GenericOp {
+      if (!llvm::hasNItems(operand.getUsers(), 2))
+        return {};
+
+      for (auto&& user : operand.getUsers()) {
+        if (auto linGen = dyn_cast_or_null<GenericOp>(*user)) {
+          if (hasIdentityMaps(linGen) && hasCopyBody(linGen))
+            return linGen;
+        }
+      }
+
+      return {};
+    };
+
+    auto potentiallyDominates = [](auto op, auto another) {
+      auto dinfo = mlir::DominanceInfo();
+
+      if (dinfo.properlyDominates(op, another))
+        return true;
+
+      if (dinfo.properlyDominates(another, op)) {
+        bool operands_dominates = true;
+        for (auto&& oper : op->getOperands())
+          operands_dominates &= dinfo.properlyDominates(oper, another);
+
+        return operands_dominates;
+      }
+
+      return false;
+    };
+
+    llvm::SmallVector<mlir::Operation*> OpsToMove;
+    llvm::SmallVector<std::tuple<mlir::Value, mlir::Value, GenericOp>> ValsToReplace;
+
+    for (auto&& operand : op.getOperands()) {
+      auto opDefOp = operand.getDefiningOp();
+      if (!mlir::isa_and_nonnull<AllocOp, AllocaOp>(opDefOp))
+        continue;
+
+      auto linGen = hasOnlyCopyUser(operand);
+      if (!linGen)
+        continue;
+
+      if (!mlir::DominanceInfo().properlyDominates(op, linGen))
+        continue;
+
+      auto outVal = linGen.getOutputs()[0];
+      if (mlir::DominanceInfo().properlyDominates(outVal, op)) {
+        ValsToReplace.push_back(std::make_tuple(operand, outVal, linGen));
+      } else {
+        auto defOp = outVal.getDefiningOp();
+        if (mlir::isa_and_nonnull<AllocOp, AllocaOp>(defOp)) {
+          if (potentiallyDominates(defOp, op)) {
+            OpsToMove.push_back(defOp);
+            ValsToReplace.push_back(std::make_tuple(operand, outVal, linGen));
+          }
+        }
+      }
+    }
+
+    for (auto&& alloc: OpsToMove)
+      rewriter.updateRootInPlace(alloc, [&]() { alloc->moveBefore(op); });
+
+    for (auto&& replaceTuple: ValsToReplace) {
+      auto&& [operand, newVal, linGen] = replaceTuple;
+      rewriter.eraseOp(linGen);
+      rewriter.replaceAllUsesWith(operand, newVal);
+      auto defOp = operand.getDefiningOp();
+      assert(defOp);
+      rewriter.eraseOp(defOp);
+    }
+
+    return mlir::success(ValsToReplace.size() > 0);
+  }
+};
+
+struct RemoveExtraCopyForOutPass
+    : public mlir::PassWrapper<RemoveExtraCopyForOutPass,
+                               mlir::OperationPass<mlir::func::FuncOp>> {
+  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(RemoveExtraCopyForOutPass)
+
+  void runOnOperation() override;
+};
+
+void RemoveExtraCopyForOutPass::runOnOperation() {
+  auto *context = &getContext();
+  auto op = getOperation();
+  mlir::RewritePatternSet patterns(context);
+
+  patterns.insert<RemoveExtraCopyForOut>(
+      context);
+
+  if (mlir::failed(mlir::applyPatternsAndFoldGreedily(op, std::move(patterns))))
+    return signalPassFailure();
+}
+
+
 static void populateDeallocationPipeline(mlir::OpPassManager &pm) {
   mlir::bufferization::BufferDeallocationPipelineOptions deallocOpts;
 
@@ -4624,6 +4761,7 @@ static void populatePlierToLinalgOptPipeline(mlir::OpPassManager &pm) {
   pm.addNestedPass<mlir::func::FuncOp>(
       std::make_unique<MakeGenericReduceInnermostPass>());
   pm.addNestedPass<mlir::func::FuncOp>(std::make_unique<LowerCopyOpsPass>());
+  pm.addNestedPass<mlir::func::FuncOp>(std::make_unique<RemoveExtraCopyForOutPass>());
   pm.addNestedPass<mlir::func::FuncOp>(
       mlir::createConvertLinalgToParallelLoopsPass());
   pm.addNestedPass<mlir::func::FuncOp>(
