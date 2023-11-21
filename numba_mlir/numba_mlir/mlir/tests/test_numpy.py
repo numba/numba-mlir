@@ -1638,7 +1638,6 @@ def test_init2(func, dtype):
 
 
 @pytest.mark.parametrize("func", [np.zeros, np.ones], ids=["zeros", "ones"])
-@pytest.mark.xfail
 def test_init3(func):
     def py_func(d):
         return func(d, dtype=np.dtype("int64"))
