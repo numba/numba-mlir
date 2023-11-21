@@ -261,6 +261,10 @@ static py::object printTypeCapsule(py::capsule t) {
 static void setupPyVar(py::handle var);
 } // namespace
 
+static PyBuilderContext &getPyContext(py::capsule &ctx) {
+  return *static_cast<PyBuilderContext *>(ctx);
+}
+
 struct PyLinalgResolver::Context {
   py::object var;
   py::object type;
@@ -419,6 +423,20 @@ private:
       return ret;
     }
 
+    if (auto tupleType = mlir::dyn_cast<mlir::TupleType>(val.getType())) {
+      auto count = static_cast<unsigned>(tupleType.size());
+      py::tuple ret(count);
+      auto &ctx = getPyContext(context);
+      auto loc = ctx.loc;
+      auto &builder = ctx.builder;
+      for (auto i : llvm::seq(0u, count)) {
+        mlir::Value res =
+            builder.create<numba::util::TupleExtractOp>(loc, val, i);
+        ret[i] = createVar(context, res);
+      }
+      return ret;
+    }
+
     if (auto cast = val.getDefiningOp<numba::util::SignCastOp>())
       val = cast.getSource();
 
@@ -560,10 +578,6 @@ getArgs(py::handle inspect, py::handle func,
     ret[i] = std::move(val);
 
   return std::move(ret);
-}
-
-static PyBuilderContext &getPyContext(py::capsule &ctx) {
-  return *static_cast<PyBuilderContext *>(ctx);
 }
 
 static auto

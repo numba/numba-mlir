@@ -362,7 +362,6 @@ def _gen_replace_parfor_tests():
         "test_issue6102",
         "test_no_state_change_in_gufunc_lowering_on_error",
         "test_issue5001",
-        "test_function_replacement",
         "test_parfor_options",
         "test_parfor_slice22",
         "test_issue5065",

@@ -145,7 +145,9 @@ struct ExpandTuplePass
       if (auto elem = tupleToElem(builder, loc, type, inputs))
         return *elem;
 
-      return std::nullopt;
+      auto cast =
+          builder.create<mlir::UnrealizedConversionCastOp>(loc, type, inputs);
+      return cast.getResult(0);
     };
     typeConverter.addArgumentMaterialization(materializeTupleCast);
     typeConverter.addSourceMaterialization(materializeTupleCast);

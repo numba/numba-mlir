@@ -155,6 +155,9 @@ struct Conversion {
     moduleType = mod.attr("Module");
     numberClassType = mod.attr("NumberClass");
     omittedType = mod.attr("Omitted");
+
+    py::object builtins = py::module::import("numba.core.typing.builtins");
+    indexValueType = builtins.attr("IndexValueType");
   }
 
   std::optional<mlir::Type> operator()(mlir::MLIRContext &context,
@@ -284,6 +287,17 @@ struct Conversion {
       return plier::OmittedType::get(&context, type, attr);
     }
 
+    if (py::isinstance(obj, indexValueType)) {
+      auto type = converter.convertType(context, obj.attr("val_typ"));
+      if (!type)
+        return std::nullopt;
+
+      auto idType =
+          mlir::IntegerType::get(&context, 64, mlir::IntegerType::Signed);
+      const mlir::Type types[] = {idType, type};
+      return mlir::TupleType::get(&context, types);
+    }
+
     return std::nullopt;
   }
 
@@ -306,6 +320,8 @@ private:
   py::object moduleType;
   py::object numberClassType;
   py::object omittedType;
+
+  py::object indexValueType;
 };
 } // namespace
 
