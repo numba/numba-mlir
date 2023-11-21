@@ -256,8 +256,9 @@ static unsigned getBitsCount(mlir::Type type) {
 };
 
 static mlir::Type coerce(mlir::Type type0, mlir::Type type1) {
-  // TODO: proper rules
-  assert(type0 != type1);
+  if (type0 == type1)
+    return type0;
+
   auto c0 = isComplex(type0);
   auto c1 = isComplex(type1);
   if (c0 && !c1)
@@ -451,16 +452,13 @@ struct BinOpLowering : public mlir::OpConversionPattern<plier::BinOp> {
 
     std::array<mlir::Value, 2> convertedOperands = {
         literalCast(operands[0], type0), literalCast(operands[1], type1)};
-    mlir::Type finalType;
-    if (type0 != type1) {
-      finalType = coerce(type0, type1);
-      convertedOperands = {
-          numba::doConvert(rewriter, loc, convertedOperands[0], finalType),
-          numba::doConvert(rewriter, loc, convertedOperands[1], finalType)};
-    } else {
-      finalType = type0;
-    }
+    auto finalType = coerce(coerce(type0, type1), resType);
     assert(finalType);
+
+    convertedOperands = {
+        numba::doConvert(rewriter, loc, convertedOperands[0], finalType),
+        numba::doConvert(rewriter, loc, convertedOperands[1], finalType)};
+
     assert(convertedOperands[0]);
     assert(convertedOperands[1]);
 
@@ -522,10 +520,10 @@ struct BinOpLowering : public mlir::OpConversionPattern<plier::BinOp> {
     auto callHandler = [&](membptr_t mem) {
       for (auto &h : handlers) {
         if (h.type == op.getOp()) {
-          auto res = (h.*mem)(rewriter, loc, convertedOperands, resType);
+          auto res = (h.*mem)(rewriter, loc, convertedOperands, finalType);
           if (res.getType() != resType)
-            res = rewriter.createOrFold<numba::util::SignCastOp>(loc, resType,
-                                                                 res);
+            res = numba::doConvert(rewriter, loc, res, resType);
+
           rewriter.replaceOp(op, res);
           return mlir::success();
         }
