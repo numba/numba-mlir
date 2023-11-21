@@ -16,22 +16,6 @@
 #include <mlir/Transforms/DialectConversion.h>
 
 namespace {
-class ConvertSelectOp
-    : public mlir::OpConversionPattern<mlir::arith::SelectOp> {
-public:
-  using OpConversionPattern::OpConversionPattern;
-
-  mlir::LogicalResult
-  matchAndRewrite(mlir::arith::SelectOp op,
-                  mlir::arith::SelectOp::Adaptor adaptor,
-                  mlir::ConversionPatternRewriter &rewriter) const override {
-    rewriter.replaceOpWithNewOp<mlir::arith::SelectOp>(
-        op, adaptor.getCondition(), adaptor.getTrueValue(),
-        adaptor.getFalseValue());
-    return mlir::success();
-  }
-};
-
 static void
 unpackUnrealizedConversionCast(mlir::Value v,
                                mlir::SmallVectorImpl<mlir::Value> &unpacked);
@@ -82,6 +66,51 @@ packResults(mlir::OpBuilder &rewriter, mlir::Location loc,
 
   return packedRets;
 }
+
+class ConvertSelectOp
+    : public mlir::OpConversionPattern<mlir::arith::SelectOp> {
+public:
+  using OpConversionPattern::OpConversionPattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(mlir::arith::SelectOp op,
+                  mlir::arith::SelectOp::Adaptor adaptor,
+                  mlir::ConversionPatternRewriter &rewriter) const override {
+    llvm::SmallVector<mlir::Type> retTypes;
+    if (mlir::failed(getTypeConverter()->convertTypes(op.getType(), retTypes)))
+      return mlir::failure();
+
+    if (retTypes.size() == 1) {
+      rewriter.replaceOpWithNewOp<mlir::arith::SelectOp>(
+          op, adaptor.getCondition(), adaptor.getTrueValue(),
+          adaptor.getFalseValue());
+      return mlir::success();
+    }
+
+    auto trueVals = unpackUnrealizedConversionCast(adaptor.getTrueValue());
+    auto falseVals = unpackUnrealizedConversionCast(adaptor.getFalseValue());
+
+    if (trueVals.size() != falseVals.size())
+      return mlir::failure();
+
+    auto loc = op.getLoc();
+    auto cond = adaptor.getCondition();
+    mlir::SmallVector<mlir::Value> results;
+    for (auto &&[trueVal, falseVal] : llvm::zip(trueVals, falseVals)) {
+      mlir::Value res =
+          rewriter.create<mlir::arith::SelectOp>(loc, cond, trueVal, falseVal);
+      results.emplace_back(res);
+    }
+
+    auto newResults =
+        packResults(rewriter, loc, *typeConverter, op.getType(), results);
+    if (!newResults)
+      return mlir::failure();
+
+    rewriter.replaceOp(op, *newResults);
+    return mlir::success();
+  }
+};
 
 class ConvertEnvRegionYield
     : public mlir::OpConversionPattern<numba::util::EnvironmentRegionYieldOp> {

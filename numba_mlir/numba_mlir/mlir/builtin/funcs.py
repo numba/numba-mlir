@@ -14,6 +14,7 @@ from ..func_registry import add_func
 from . import helper_funcs
 
 import math
+from numba.core.typing.builtins import IndexValue
 from numba.cpython.builtins import get_type_min_value, get_type_max_value
 from numba.parfors.array_analysis import wrap_index, assert_equiv
 from numba.parfors.parfor import (
@@ -119,9 +120,23 @@ def min_impl(builder, *args):
     if len(args) > 2:
         rhs = min_impl(builder, *args[1:])
     else:
-        rhs = args[1]
+        rhs = literal(args[1])
 
-    lhs = args[0]
+    lhs = literal(args[0])
+    if isinstance(lhs, tuple):
+        # special case for argmin/max parfor lowering
+        assert isinstance(rhs, tuple)
+
+        idx1 = lhs[0]
+        idx2 = rhs[0]
+        val1 = lhs[1]
+        val2 = rhs[1]
+        idx_less = idx1 < idx2
+        val_eq = val1 == val2
+        val_less = val1 < val2
+        cond = val_less.or_op(val_eq.and_op(idx_less))
+        return builder.select(cond, lhs, rhs)
+
     res_type = broadcast_type(
         builder, (_get_type(builder, lhs), _get_type(builder, rhs))
     )
@@ -136,9 +151,23 @@ def max_impl(builder, *args):
     if len(args) > 2:
         rhs = max_impl(builder, *args[1:])
     else:
-        rhs = args[1]
+        rhs = literal(args[1])
 
-    lhs = args[0]
+    lhs = literal(args[0])
+    if isinstance(lhs, tuple):
+        # special case for argmin/max parfor lowering
+        assert isinstance(rhs, tuple)
+
+        idx1 = lhs[0]
+        idx2 = rhs[0]
+        val1 = lhs[1]
+        val2 = rhs[1]
+        idx_great = idx1 > idx2
+        val_eq = val1 == val2
+        val_great = val1 > val2
+        cond = val_great.or_op(val_eq.and_op(idx_great))
+        return builder.select(cond, lhs, rhs)
+
     res_type = broadcast_type(
         builder, (_get_type(builder, lhs), _get_type(builder, rhs))
     )
@@ -267,6 +296,11 @@ def exp_impl(builder, arg):
 @register_func("mlir.helper_funcs.cos", helper_funcs.cos)
 def sqrt_impl(builder, arg):
     return _build_math_func(builder, arg, "cos")
+
+
+@register_func("IndexValue", IndexValue)
+def sqrt_impl(builder, ind, val):
+    return (ind, val)
 
 
 def _get_min_max_values(builder, dtype):
