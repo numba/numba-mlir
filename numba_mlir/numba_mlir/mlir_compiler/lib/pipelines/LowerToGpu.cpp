@@ -1866,11 +1866,11 @@ public:
   }
 };
 
-class GpuPropagateKerrelFlagsPass
-    : public mlir::PassWrapper<GpuPropagateKerrelFlagsPass,
+class GpuPropagateKernelFlagsPass
+    : public mlir::PassWrapper<GpuPropagateKernelFlagsPass,
                                mlir::OperationPass<mlir::gpu::GPUModuleOp>> {
 public:
-  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(GpuPropagateKerrelFlagsPass)
+  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(GpuPropagateKernelFlagsPass)
 
   virtual void
   getDependentDialects(mlir::DialectRegistry &registry) const override {
@@ -2184,7 +2184,7 @@ static void populateLowerToGPUPipelineMed(mlir::OpPassManager &pm) {
   funcPM.addPass(std::make_unique<GpuLaunchSinkOpsPass>());
   pm.addPass(mlir::createGpuKernelOutliningPass());
   pm.addNestedPass<mlir::gpu::GPUModuleOp>(
-      std::make_unique<GpuPropagateKerrelFlagsPass>());
+      std::make_unique<GpuPropagateKernelFlagsPass>());
   pm.addPass(std::make_unique<NameGpuModulesPass>());
   pm.addPass(mlir::createSymbolDCEPass());
 
