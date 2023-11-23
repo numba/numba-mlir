@@ -20,11 +20,11 @@
 #include "numba/Conversion/NtensorToMemref.hpp"
 #include "numba/Conversion/SCFToAffine/SCFToAffine.h"
 #include "numba/Dialect/gpu_runtime/Transforms/MakeBarriersUniform.hpp"
-#include "numba/Dialect/ntensor/Transforms/CopyRemoval.hpp"
 #include "numba/Dialect/ntensor/Transforms/PropagateEnvironment.hpp"
 #include "numba/Dialect/ntensor/Transforms/ResolveArrayOps.hpp"
 #include "numba/Transforms/CanonicalizeReductions.hpp"
 #include "numba/Transforms/CommonOpts.hpp"
+#include "numba/Transforms/CopyRemoval.hpp"
 #include "numba/Transforms/ExpandTuple.hpp"
 #include "numba/Transforms/FuncTransforms.hpp"
 #include "numba/Transforms/MakeSignless.hpp"
@@ -116,10 +116,10 @@ static mlir::PassPipelineRegistration<> ntensorPropagateEnv(
     });
 
 static mlir::PassPipelineRegistration<>
-    ntensorCopyRemoval("ntensor-copy-removal",
+    ntensorCopyRemoval("copy-removal",
                        "This pass tries to remove redundant `ntensor.copy` ops",
                        [](mlir::OpPassManager &pm) {
-                         pm.addPass(numba::ntensor::createCopyRemovalPass());
+                         pm.addPass(numba::createCopyRemovalPass());
                        });
 
 static mlir::PassPipelineRegistration<>

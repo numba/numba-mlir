@@ -624,7 +624,7 @@ def CreateArrayOp : NTensor_OpBase<"create", [AttrSizedOperandSegments, Pure]> {
 
     Follows memref.alloc conventions.
 
-    If `initValue` is provided resulting array wull be initialized with it,
+    If `initValue` is provided resulting array will be initialized with it,
     otherwise it contents is undefined.
   }];
 

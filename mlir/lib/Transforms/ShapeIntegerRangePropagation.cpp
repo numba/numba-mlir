@@ -130,7 +130,7 @@ struct ShapeValueLattice : public mlir::dataflow::Lattice<ShapeValue> {
   MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(ShapeValueLattice)
   using Lattice::Lattice;
 
-  void onUpdate(mlir::DataFlowSolver *solver) const {
+  void onUpdate(mlir::DataFlowSolver *solver) const override {
     Lattice::onUpdate(solver);
 
     auto value = point.get<mlir::Value>();

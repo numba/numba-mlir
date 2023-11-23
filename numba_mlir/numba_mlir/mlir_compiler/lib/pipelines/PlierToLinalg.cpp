@@ -47,7 +47,6 @@
 #include "numba/Conversion/NtensorToMemref.hpp"
 #include "numba/Dialect/gpu_runtime/IR/GpuRuntimeOps.hpp"
 #include "numba/Dialect/ntensor/IR/NTensorOps.hpp"
-#include "numba/Dialect/ntensor/Transforms/CopyRemoval.hpp"
 #include "numba/Dialect/ntensor/Transforms/PropagateEnvironment.hpp"
 #include "numba/Dialect/ntensor/Transforms/ResolveArrayOps.hpp"
 #include "numba/Dialect/numba_util/Dialect.hpp"
@@ -56,6 +55,7 @@
 #include "numba/Transforms/CastUtils.hpp"
 #include "numba/Transforms/CommonOpts.hpp"
 #include "numba/Transforms/CompositePass.hpp"
+#include "numba/Transforms/CopyRemoval.hpp"
 #include "numba/Transforms/ExpandTuple.hpp"
 #include "numba/Transforms/FuncTransforms.hpp"
 #include "numba/Transforms/InlineUtils.hpp"
@@ -2197,7 +2197,7 @@ struct NumpyCallsResolver
     auto loc = op.getLoc();
     llvm::SmallVector<mlir::Value> args;
     llvm::SmallVector<mlir::Value> outResults;
-    PrimitiveType primitive_type;
+    PrimitiveType primitive_type = PrimitiveType::Default;
     if (mlir::failed(resolver.resolveFuncArgs(
             rewriter, loc, funcName, op.getArgs(), op.getArgsNames(), args,
             outResults, primitive_type)))
@@ -2231,6 +2231,9 @@ struct NumpyCallsResolver
                                                    args, funcName)
             .getResults();
       }
+      std::string err =
+          "Invalid primitive type " + std::to_string(int(primitive_type));
+      llvm_unreachable(err.c_str());
     }();
 
     if (primitive_type != PrimitiveType::SideEffect)
@@ -4540,7 +4543,7 @@ static void populatePlierToLinalgGenPipeline(mlir::OpPassManager &pm) {
   pm.addNestedPass<mlir::func::FuncOp>(mlir::createCanonicalizerPass());
   pm.addPass(std::make_unique<ResolveNumpyFuncsPass>());
   pm.addNestedPass<mlir::func::FuncOp>(mlir::createCanonicalizerPass());
-  pm.addNestedPass<mlir::func::FuncOp>(numba::ntensor::createCopyRemovalPass());
+  pm.addNestedPass<mlir::func::FuncOp>(numba::createCopyRemovalPass());
   populateCommonOptPass(pm);
   pm.addPass(numba::createPromoteWhilePass());
   pm.addPass(mlir::createCanonicalizerPass());
@@ -4624,6 +4627,7 @@ static void populatePlierToLinalgOptPipeline(mlir::OpPassManager &pm) {
   pm.addNestedPass<mlir::func::FuncOp>(
       std::make_unique<MakeGenericReduceInnermostPass>());
   pm.addNestedPass<mlir::func::FuncOp>(std::make_unique<LowerCopyOpsPass>());
+  pm.addNestedPass<mlir::func::FuncOp>(numba::createCopyRemovalPass());
   pm.addNestedPass<mlir::func::FuncOp>(
       mlir::createConvertLinalgToParallelLoopsPass());
   pm.addNestedPass<mlir::func::FuncOp>(
