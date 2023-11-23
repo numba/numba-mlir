@@ -883,14 +883,16 @@ struct GPUToSpirvPass
     auto *context = &getContext();
     auto module = getOperation();
 
+    llvm::SmallDenseMap<mlir::StringAttr, mlir::gpu::GPUModuleOp> oldModuleMap;
     llvm::SmallVector<mlir::Operation *, 1> kernelModules;
     mlir::OpBuilder builder(context);
-    module.walk([&builder, &kernelModules](mlir::gpu::GPUModuleOp moduleOp) {
+    module.walk([&](mlir::gpu::GPUModuleOp moduleOp) {
       // For each kernel module (should be only 1 for now, but that is not a
       // requirement here), clone the module for conversion because the
       // gpu.launch function still needs the kernel module.
       builder.setInsertionPoint(moduleOp.getOperation());
       kernelModules.push_back(builder.clone(*moduleOp.getOperation()));
+      oldModuleMap[moduleOp.getNameAttr()] = moduleOp;
     });
 
     for (auto kernelModule : kernelModules) {
@@ -974,6 +976,39 @@ struct GPUToSpirvPass
               applyFullConversion(kernelModule, *target, std::move(patterns))))
         return signalPassFailure();
     }
+
+    auto spvModVisitor = [&](mlir::spirv::ModuleOp spvMod) -> mlir::WalkResult {
+      auto name = spvMod.getName();
+      if (!name) {
+        spvMod->emitError("SPIR-V module has no name");
+        return mlir::WalkResult::interrupt();
+      }
+      mlir::StringRef str = *name;
+
+      auto modPrefix = "__spv__";
+      if (!str.consume_front(modPrefix)) {
+        spvMod->emitError("Invalid SPIR-V module name");
+        return mlir::WalkResult::interrupt();
+      }
+
+      auto it = oldModuleMap.find(builder.getStringAttr(str));
+      if (oldModuleMap.end() == it) {
+        spvMod->emitError("GPU module not found");
+        return mlir::WalkResult::interrupt();
+      }
+
+      for (auto &&attr : it->second->getDiscardableAttrs()) {
+        if (attr.getName() == "sym_name")
+          continue;
+
+        spvMod->setAttr(attr.getName(), attr.getValue());
+      }
+
+      return mlir::WalkResult::advance();
+    };
+
+    if (module->walk(spvModVisitor).wasInterrupted())
+      return signalPassFailure();
   }
 };
 
@@ -2594,6 +2629,41 @@ struct CreateGPUAllocPass
     }
   }
 };
+
+struct ApplySPIRVFastmathFlags
+    : public mlir::PassWrapper<ApplySPIRVFastmathFlags,
+                               mlir::OperationPass<void>> {
+
+  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(ApplySPIRVFastmathFlags)
+
+  void runOnOperation() override {
+    getOperation()->walk([](mlir::Operation *op) {
+      namespace spv = mlir::spirv;
+      auto func = op->getParentOfType<spv::ModuleOp>();
+      if (!func || !func->hasAttr(numba::util::attributes::getFastmathName()))
+        return;
+
+      if (mlir::isa<spv::FAddOp, spv::FSubOp, spv::FMulOp, spv::FDivOp,
+                    spv::FRemOp, spv::FOrdEqualOp, spv::FOrdGreaterThanOp,
+                    spv::FOrdGreaterThanEqualOp, spv::FOrdLessThanOp,
+                    spv::FOrdLessThanEqualOp, spv::FOrdNotEqualOp,
+                    spv::FUnordEqualOp, spv::FUnordGreaterThanOp,
+                    spv::FUnordGreaterThanEqualOp, spv::FUnordLessThanOp,
+                    spv::FUnordLessThanEqualOp, spv::FUnordNotEqualOp,
+                    spv::CLFmaOp>(op)) {
+        auto attr = spv::FPFastMathModeAttr::get(op->getContext(),
+                                                 spv::FPFastMathMode::Fast);
+        op->setAttr("fp_fast_math_mode", attr);
+        return;
+      }
+      if (mlir::isa<spv::IAddOp, spv::ISubOp, spv::IMulOp>(op)) {
+        auto unit = mlir::UnitAttr::get(op->getContext());
+        op->setAttr("no_signed_wrap", unit);
+        op->setAttr("no_unsigned_wrap", unit);
+      }
+    });
+  }
+};
 } // namespace
 
 // Expose the passes to the outside world
@@ -2656,4 +2726,8 @@ std::unique_ptr<mlir::Pass> gpu_runtime::createSortParallelLoopsForGPU() {
 
 std::unique_ptr<Pass> gpu_runtime::createCreateGPUAllocPass() {
   return std::make_unique<CreateGPUAllocPass>();
+}
+
+std::unique_ptr<Pass> gpu_runtime::createApplySPIRVFastmathFlags() {
+  return std::make_unique<ApplySPIRVFastmathFlags>();
 }

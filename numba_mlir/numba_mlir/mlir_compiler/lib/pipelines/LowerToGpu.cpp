@@ -1003,18 +1003,6 @@ getDeviceDescFromFunc(mlir::MLIRContext *context, mlir::TypeRange argTypes) {
   return *res;
 }
 
-static bool isGpuArray(mlir::Type type) {
-  auto tensor = type.dyn_cast<numba::ntensor::NTensorType>();
-  if (!tensor)
-    return false;
-
-  auto env = tensor.getEnvironment();
-  if (!env)
-    return false;
-
-  return env.isa<gpu_runtime::GPURegionDescAttr>();
-}
-
 struct InsertGpuRegionPass
     : public mlir::PassWrapper<InsertGpuRegionPass, mlir::OperationPass<void>> {
   MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(InsertGpuRegionPass)
@@ -1878,11 +1866,11 @@ public:
   }
 };
 
-class GpuPropagateFp64truncFlagPass
-    : public mlir::PassWrapper<GpuPropagateFp64truncFlagPass,
+class GpuPropagateKernelFlagsPass
+    : public mlir::PassWrapper<GpuPropagateKernelFlagsPass,
                                mlir::OperationPass<mlir::gpu::GPUModuleOp>> {
 public:
-  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(GpuPropagateFp64truncFlagPass)
+  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(GpuPropagateKernelFlagsPass)
 
   virtual void
   getDependentDialects(mlir::DialectRegistry &registry) const override {
@@ -1924,17 +1912,8 @@ public:
       return signalPassFailure();
     }
 
-    auto attrName = mlir::StringAttr::get(
-        &getContext(), gpu_runtime::getFp64TruncateAttrName());
-    auto attr = parent->getAttr(attrName);
-    if (attr)
-      gpuMod->setAttr(attrName, attr);
-
-    attrName = mlir::StringAttr::get(&getContext(),
-                                     gpu_runtime::getUse64BitIndexAttrName());
-    attr = parent->getAttr(attrName);
-    if (attr)
-      gpuMod->setAttr(attrName, attr);
+    for (auto &&attr : parent->getDiscardableAttrs())
+      gpuMod->setAttr(attr.getName(), attr.getValue());
   }
 };
 
@@ -2196,7 +2175,7 @@ static void populateLowerToGPUPipelineMed(mlir::OpPassManager &pm) {
   funcPM.addPass(std::make_unique<GpuLaunchSinkOpsPass>());
   pm.addPass(mlir::createGpuKernelOutliningPass());
   pm.addNestedPass<mlir::gpu::GPUModuleOp>(
-      std::make_unique<GpuPropagateFp64truncFlagPass>());
+      std::make_unique<GpuPropagateKernelFlagsPass>());
   pm.addPass(std::make_unique<NameGpuModulesPass>());
   pm.addPass(mlir::createSymbolDCEPass());
 
@@ -2221,6 +2200,8 @@ static void populateLowerToGPUPipelineMed(mlir::OpPassManager &pm) {
   commonOptPasses(pm);
 
   auto &modulePM = pm.nest<mlir::spirv::ModuleOp>();
+  modulePM.addNestedPass<mlir::spirv::FuncOp>(
+      gpu_runtime::createApplySPIRVFastmathFlags());
   modulePM.addPass(mlir::spirv::createSPIRVLowerABIAttributesPass());
   modulePM.addPass(mlir::spirv::createSPIRVUpdateVCEPass());
   pm.addPass(gpu_runtime::createSerializeSPIRVPass());
