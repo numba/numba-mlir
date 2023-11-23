@@ -1912,17 +1912,8 @@ public:
       return signalPassFailure();
     }
 
-    auto attrName = mlir::StringAttr::get(
-        &getContext(), gpu_runtime::getFp64TruncateAttrName());
-    auto attr = parent->getAttr(attrName);
-    if (attr)
-      gpuMod->setAttr(attrName, attr);
-
-    attrName = mlir::StringAttr::get(&getContext(),
-                                     gpu_runtime::getUse64BitIndexAttrName());
-    attr = parent->getAttr(attrName);
-    if (attr)
-      gpuMod->setAttr(attrName, attr);
+    for (auto &&attr : parent->getDiscardableAttrs())
+      gpuMod->setAttr(attr.getName(), attr.getValue());
   }
 };
 
