@@ -2200,6 +2200,8 @@ static void populateLowerToGPUPipelineMed(mlir::OpPassManager &pm) {
   commonOptPasses(pm);
 
   auto &modulePM = pm.nest<mlir::spirv::ModuleOp>();
+  modulePM.addNestedPass<mlir::spirv::FuncOp>(
+      gpu_runtime::createApplySPIRVFastmathFlags());
   modulePM.addPass(mlir::spirv::createSPIRVLowerABIAttributesPass());
   modulePM.addPass(mlir::spirv::createSPIRVUpdateVCEPass());
   pm.addPass(gpu_runtime::createSerializeSPIRVPass());

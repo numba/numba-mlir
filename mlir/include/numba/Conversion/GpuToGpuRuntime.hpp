@@ -58,4 +58,6 @@ std::unique_ptr<mlir::Pass> createGpuDecomposeMemrefsPass();
 
 std::unique_ptr<mlir::Pass> createCreateGPUAllocPass();
 
+std::unique_ptr<mlir::Pass> createApplySPIRVFastmathFlags();
+
 } // namespace gpu_runtime
