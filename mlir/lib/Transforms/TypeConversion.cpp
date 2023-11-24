@@ -399,7 +399,10 @@ public:
 
 class ConvertYieldOpTypes : public OpConversionPattern<scf::YieldOp> {
 public:
-  using OpConversionPattern::OpConversionPattern;
+  ConvertYieldOpTypes(TypeConverter &typeConverter, MLIRContext *context)
+      : OpConversionPattern<scf::YieldOp>(typeConverter, context,
+                                          /*benefit*/ 10) {}
+
   LogicalResult
   matchAndRewrite(scf::YieldOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
