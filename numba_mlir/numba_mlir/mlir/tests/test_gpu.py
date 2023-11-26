@@ -258,6 +258,7 @@ def test_simple3():
 
 @pytest.mark.smoke
 @require_gpu
+@pytest.mark.skip(reason="Crashes SYCL OpenCL backend")
 @pytest.mark.parametrize("dtype", skip_fp64_args([np.complex64, np.complex128]))
 def test_complex(dtype):
     def func(c):
