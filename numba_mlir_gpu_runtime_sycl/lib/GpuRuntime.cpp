@@ -9,9 +9,11 @@
 #include <algorithm>
 #include <atomic>
 #include <cassert>
+#include <chrono>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
+#include <fstream>
 #include <tuple>
 
 #include "numba-mlir-gpu-runtime-sycl_export.h"
@@ -24,7 +26,7 @@
 #include <CL/sycl.hpp>
 
 namespace {
-static bool islogFunctionsEnabled() {
+static bool isLogFunctionsEnabled() {
   static bool enable = []() -> bool {
     auto env = std::getenv("NUMBA_MLIR_LOG_GPU_RUNTIME_CALLS");
     return env && std::atoi(env) != 0;
@@ -32,9 +34,33 @@ static bool islogFunctionsEnabled() {
   return enable;
 }
 
+static bool isKernelDumpEnabled() {
+  static bool enable = []() -> bool {
+    auto env = std::getenv("NUMBA_MLIR_DUMP_KERNEL_BLOB");
+    return env && std::atoi(env) != 0;
+  }();
+  return enable;
+}
+
+static void dumpKernelBlob(const void *data, size_t size) {
+  assert(data);
+  if (!isKernelDumpEnabled())
+    return;
+
+  using namespace std::chrono;
+  uint64_t ms =
+      duration_cast<milliseconds>(system_clock::now().time_since_epoch())
+          .count();
+  auto name = "kernel_dump_" + std::to_string(ms);
+  std::fstream file(name, std::ios::in | std::ios::out | std::ios::binary |
+                              std::ios::trunc);
+  file.write(static_cast<const char *>(data), size);
+  file.flush();
+}
+
 struct FuncScope {
   FuncScope(const char *funcName)
-      : name(funcName), enable(islogFunctionsEnabled()) {
+      : name(funcName), enable(isLogFunctionsEnabled()) {
     if (enable) {
       fprintf(stdout, "%s enter\n", name);
       fflush(stdout);
@@ -124,6 +150,7 @@ public:
 
   GPUModule *loadModule(const void *data, size_t dataSize) {
     assert(data);
+    dumpKernelBlob(data, dataSize);
     return createGPUModule(queue, data, dataSize);
   }
 
