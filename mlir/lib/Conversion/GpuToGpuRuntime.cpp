@@ -9,12 +9,13 @@
 #include "numba/Analysis/AliasAnalysis.hpp"
 #include "numba/Dialect/gpu_runtime/IR/GpuRuntimeOps.hpp"
 #include "numba/Dialect/numba_util/Dialect.hpp"
-#include "numba/Dialect/numba_util/Utils.hpp"
+#include "numba/Transforms/CastUtils.hpp"
 #include "numba/Transforms/FuncUtils.hpp"
 #include "numba/Transforms/ScalarOpsConversion.hpp"
 #include "numba/Transforms/TypeConversion.hpp"
 
 #include <mlir/Conversion/ArithToSPIRV/ArithToSPIRV.h>
+#include <mlir/Conversion/ComplexToSPIRV/ComplexToSPIRV.h>
 #include <mlir/Conversion/ControlFlowToSPIRV/ControlFlowToSPIRV.h>
 #include <mlir/Conversion/FuncToSPIRV/FuncToSPIRV.h>
 #include <mlir/Conversion/GPUToSPIRV/GPUToSPIRV.h>
@@ -916,8 +917,8 @@ struct GPUToSpirvPass
       typeConverter.addConversion(
           [&typeConverter](mlir::MemRefType type) -> std::optional<mlir::Type> {
             auto srcElemType = type.getElementType();
-            if (!srcElemType.isIntOrFloat() &&
-                !mlir::isa<mlir::VectorType>(srcElemType))
+            if (!mlir::isa<mlir::VectorType, mlir::ComplexType,
+                           mlir::IntegerType, mlir::FloatType>(srcElemType))
               return mlir::Type(nullptr);
 
             auto elemType = typeConverter.convertType(srcElemType);
@@ -949,6 +950,7 @@ struct GPUToSpirvPass
       mlir::populateMathToSPIRVPatterns(typeConverter, patterns);
       mlir::populateMemRefToSPIRVPatterns(typeConverter, patterns);
       mlir::ub::populateUBToSPIRVConversionPatterns(typeConverter, patterns);
+      mlir::populateComplexToSPIRVPatterns(typeConverter, patterns);
 
       patterns.insert<
           ConvertBitcastOp<numba::util::BitcastOp>,
@@ -1889,6 +1891,15 @@ struct TruncateF64ForGPUPass
     });
 
     converter.addConversion(
+        [&converter](mlir::ComplexType type) -> std::optional<mlir::Type> {
+          auto elemType = converter.convertType(type.getElementType());
+          if (!elemType)
+            return std::nullopt;
+
+          return mlir::ComplexType::get(elemType);
+        });
+
+    converter.addConversion(
         [](mlir::MemRefType type) -> std::optional<mlir::Type> {
           if (!type.getElementType().isF64())
             return std::nullopt;
@@ -1907,13 +1918,9 @@ struct TruncateF64ForGPUPass
 
       auto src = inputs.front();
       auto srcType = src.getType();
-      if (srcType.isF32() && dstType.isF64())
-        return builder.create<mlir::arith::ExtFOp>(loc, dstType, src)
-            .getResult();
-
-      if (srcType.isF64() && dstType.isF32())
-        return builder.create<mlir::arith::TruncFOp>(loc, dstType, src)
-            .getResult();
+      if (mlir::isa<mlir::FloatType, mlir::ComplexType>(srcType) &&
+          mlir::isa<mlir::FloatType, mlir::ComplexType>(dstType))
+        return numba::doConvert(builder, loc, src, dstType);
 
       if (mlir::isa<mlir::MemRefType>(srcType) &&
           mlir::isa<mlir::MemRefType>(dstType))
@@ -1931,6 +1938,9 @@ struct TruncateF64ForGPUPass
     numba::populateArithConversionRewritesAndTarget(converter, patterns,
                                                     target);
     numba::populateMathConversionRewritesAndTarget(converter, patterns, target);
+    numba::populateComplexConversionRewritesAndTarget(converter, patterns,
+                                                      target);
+
     numba::populateControlFlowTypeConversionRewritesAndTarget(converter,
                                                               patterns, target);
     numba::populateTupleTypeConversionRewritesAndTarget(converter, patterns,

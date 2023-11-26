@@ -152,13 +152,6 @@ def require_gpu(func):
     return pytest.mark.skipif(not GPU_TESTS_ENABLED, reason="GPU tests disabled")(func)
 
 
-def require_dpctl(func):
-    func = pytest.mark.test_gpu(func)
-    return pytest.mark.skipif(
-        not DPCTL_TESTS_ENABLED, reason="DPCTL interop tests disabled"
-    )(func)
-
-
 _test_values = [
     True,
     False,
@@ -257,6 +250,33 @@ def test_simple3():
 
     with print_pass_ir([], ["ConvertParallelLoopToGpu"]):
         gpu_func[a.shape[0], DEFAULT_LOCAL_SIZE](a, gpu_res)
+        ir = get_print_buffer()
+        assert ir.count("gpu.launch blocks") == 1, ir
+
+    assert_equal(gpu_res, sim_res)
+
+
+@pytest.mark.smoke
+@require_gpu
+@pytest.mark.parametrize("dtype", skip_fp64_args([np.complex64, np.complex128]))
+def test_complex(dtype):
+    def func(c):
+        i = get_global_id(0)
+        j = get_global_id(1)
+        c[i, j] = i + 1j * j
+
+    sim_func = kernel_sim(func)
+    gpu_func = kernel_cached(func)
+
+    shape = (17, 27)
+
+    sim_res = np.zeros(shape, dtype)
+    sim_func[shape, DEFAULT_LOCAL_SIZE](sim_res)
+
+    gpu_res = np.zeros(shape, dtype)
+
+    with print_pass_ir([], ["ConvertParallelLoopToGpu"]):
+        gpu_func[shape, DEFAULT_LOCAL_SIZE](gpu_res)
         ir = get_print_buffer()
         assert ir.count("gpu.launch blocks") == 1, ir
 

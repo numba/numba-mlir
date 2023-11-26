@@ -20,4 +20,9 @@ void populateArithConversionRewritesAndTarget(mlir::TypeConverter &converter,
 void populateMathConversionRewritesAndTarget(mlir::TypeConverter &converter,
                                              mlir::RewritePatternSet &patterns,
                                              mlir::ConversionTarget &target);
+
+/// Convert complex ops according to provided type converter.
+void populateComplexConversionRewritesAndTarget(
+    mlir::TypeConverter &converter, mlir::RewritePatternSet &patterns,
+    mlir::ConversionTarget &target);
 } // namespace numba
