@@ -151,6 +151,7 @@ endif()
 unset(__offsetof_flag)
 
 target_link_libraries(${NUMBA_MLIR_LIB} PRIVATE
+    MLIRComplexToSPIRV
     MLIRControlFlowToSCF
     MLIRControlFlowToSPIRV
     MLIRFuncTransforms

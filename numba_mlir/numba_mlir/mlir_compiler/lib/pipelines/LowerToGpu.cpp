@@ -6,6 +6,7 @@
 
 #include <mlir/Conversion/AffineToStandard/AffineToStandard.h>
 #include <mlir/Conversion/AsyncToLLVM/AsyncToLLVM.h>
+#include <mlir/Conversion/ComplexToStandard/ComplexToStandard.h>
 #include <mlir/Conversion/GPUCommon/GPUCommonPass.h>
 #include <mlir/Conversion/LLVMCommon/ConversionTarget.h>
 #include <mlir/Conversion/LLVMCommon/TypeConverter.h>
@@ -13,6 +14,7 @@
 #include <mlir/Dialect/Affine/IR/AffineOps.h>
 #include <mlir/Dialect/Arith/IR/Arith.h>
 #include <mlir/Dialect/Arith/Transforms/Passes.h>
+#include <mlir/Dialect/Complex/IR/Complex.h>
 #include <mlir/Dialect/ControlFlow/IR/ControlFlowOps.h>
 #include <mlir/Dialect/Func/IR/FuncOps.h>
 #include <mlir/Dialect/GPU/Transforms/Passes.h>
@@ -329,8 +331,8 @@ struct KernelMemrefOpsMovementPass
 
 static bool isMathOp(mlir::Operation *op) {
   assert(op);
-  return mlir::isa<mlir::arith::ArithDialect, mlir::math::MathDialect>(
-      op->getDialect());
+  return mlir::isa<mlir::arith::ArithDialect, mlir::math::MathDialect,
+                   mlir::complex::ComplexDialect>(op->getDialect());
 }
 
 template <typename C>
@@ -1849,15 +1851,17 @@ public:
 
     Operation *op = getOperation();
     if (op->walk([](gpu::LaunchOp launch) {
-            auto isSinkingBeneficiary = [](mlir::Operation *op) -> bool {
-              return isa<arith::ConstantOp, func::ConstantOp, arith::SelectOp,
-                         arith::CmpIOp, arith::IndexCastOp, arith::MulIOp,
-                         arith::SubIOp, arith::AddIOp, mlir::ub::PoisonOp>(op);
+            auto isSinkingBenefial = [](mlir::Operation *op) -> bool {
+              if (mlir::isa<mlir::arith::ArithDialect, mlir::math::MathDialect,
+                            mlir::complex::ComplexDialect, mlir::ub::UBDialect>(
+                      op->getDialect()))
+                return true;
+
+              return isa<func::ConstantOp>(op);
             };
 
             // Pull in instructions that can be sunk
-            if (failed(
-                    sinkOperationsIntoLaunchOp(launch, isSinkingBeneficiary)))
+            if (failed(sinkOperationsIntoLaunchOp(launch, isSinkingBenefial)))
               return WalkResult::interrupt();
 
             return WalkResult::advance();
@@ -2186,6 +2190,7 @@ static void populateLowerToGPUPipelineMed(mlir::OpPassManager &pm) {
 
   auto &gpuFuncPM =
       pm.nest<mlir::gpu::GPUModuleOp>().nest<mlir::gpu::GPUFuncOp>();
+  gpuFuncPM.addPass(mlir::createConvertComplexToStandardPass());
   gpuFuncPM.addPass(mlir::arith::createArithExpandOpsPass());
   gpuFuncPM.addPass(std::make_unique<FlattenScfPass>());
   gpuFuncPM.addPass(std::make_unique<LowerGpuBuiltins3Pass>());

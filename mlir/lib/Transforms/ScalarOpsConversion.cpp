@@ -5,6 +5,7 @@
 #include "numba/Transforms/ScalarOpsConversion.hpp"
 
 #include <mlir/Dialect/Arith/IR/Arith.h>
+#include <mlir/Dialect/Complex/IR/Complex.h>
 #include <mlir/Dialect/Math/IR/Math.h>
 #include <mlir/Transforms/DialectConversion.h>
 
@@ -142,8 +143,7 @@ struct ConvertConstantOp
   using OpConversionPattern::OpConversionPattern;
 
   mlir::LogicalResult
-  matchAndRewrite(mlir::arith::ConstantOp op,
-                  mlir::arith::ConstantOp::Adaptor adaptor,
+  matchAndRewrite(mlir::arith::ConstantOp op, OpAdaptor adaptor,
                   mlir::ConversionPatternRewriter &rewriter) const override {
     auto converter = this->getTypeConverter();
     assert(converter && "Invalid type converter");
@@ -163,6 +163,59 @@ struct ConvertConstantOp
     }
 
     rewriter.replaceOpWithNewOp<mlir::arith::ConstantOp>(op, newAttr);
+    return mlir::success();
+  }
+};
+
+struct ConvertComplexConstantOp
+    : public mlir::OpConversionPattern<mlir::complex::ConstantOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(mlir::complex::ConstantOp op, OpAdaptor adaptor,
+                  mlir::ConversionPatternRewriter &rewriter) const override {
+    auto converter = this->getTypeConverter();
+    assert(converter && "Invalid type converter");
+
+    auto resType =
+        converter->convertType<mlir::ComplexType>(op.getResult().getType());
+    if (!resType)
+      return mlir::failure();
+
+    auto elemType = resType.getElementType();
+
+    auto oldAttr = adaptor.getValue();
+    auto getVal = [&](mlir::Attribute attr) -> mlir::Attribute {
+      return rewriter.getFloatAttr(
+          elemType, mlir::cast<mlir::FloatAttr>(attr).getValueAsDouble());
+    };
+
+    mlir::Attribute arr[] = {getVal(oldAttr[0]), getVal(oldAttr[1])};
+    auto arrAttr = rewriter.getArrayAttr(arr);
+
+    rewriter.replaceOpWithNewOp<mlir::complex::ConstantOp>(op, resType,
+                                                           arrAttr);
+    return mlir::success();
+  }
+};
+
+struct ConvertComplexCreateOp
+    : public mlir::OpConversionPattern<mlir::complex::CreateOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(mlir::complex::CreateOp op, OpAdaptor adaptor,
+                  mlir::ConversionPatternRewriter &rewriter) const override {
+    auto converter = this->getTypeConverter();
+    assert(converter && "Invalid type converter");
+
+    auto resType =
+        converter->convertType<mlir::ComplexType>(op.getResult().getType());
+    if (!resType)
+      return mlir::failure();
+
+    rewriter.replaceOpWithNewOp<mlir::complex::CreateOp>(
+        op, resType, adaptor.getReal(), adaptor.getImaginary());
     return mlir::success();
   }
 };
@@ -280,6 +333,51 @@ void numba::populateMathConversionRewritesAndTarget(
       ConvertBinaryOp<mlir::math::PowFOp>,
 
       ConvertTernaryOp<mlir::math::FmaOp>
+      // clang-format on
+      >(converter, patterns.getContext());
+}
+
+void numba::populateComplexConversionRewritesAndTarget(
+    mlir::TypeConverter &converter, mlir::RewritePatternSet &patterns,
+    mlir::ConversionTarget &target) {
+  target.addDynamicallyLegalDialect<mlir::complex::ComplexDialect>(
+      [&converter](mlir::Operation *op) -> std::optional<bool> {
+        if (converter.isLegal(op))
+          return true;
+
+        return std::nullopt;
+      });
+
+  patterns.insert<
+      // clang-format off
+      ConvertUnaryOp<mlir::complex::AbsOp>,
+      ConvertUnaryOp<mlir::complex::AngleOp>,
+      ConvertUnaryOp<mlir::complex::ConjOp>,
+      ConvertUnaryOp<mlir::complex::CosOp>,
+      ConvertUnaryOp<mlir::complex::ExpOp>,
+      ConvertUnaryOp<mlir::complex::Expm1Op>,
+      ConvertUnaryOp<mlir::complex::Log1pOp>,
+      ConvertUnaryOp<mlir::complex::LogOp>,
+      ConvertUnaryOp<mlir::complex::NegOp>,
+      ConvertUnaryOp<mlir::complex::RsqrtOp>,
+      ConvertUnaryOp<mlir::complex::SinOp>,
+      ConvertUnaryOp<mlir::complex::SqrtOp>,
+      ConvertUnaryOp<mlir::complex::TanOp>,
+      ConvertUnaryOp<mlir::complex::TanhOp>,
+
+      ConvertBinaryOp<mlir::complex::AddOp>,
+      ConvertBinaryOp<mlir::complex::Atan2Op>,
+      ConvertBinaryOp<mlir::complex::DivOp>,
+      ConvertBinaryOp<mlir::complex::MulOp>,
+      ConvertBinaryOp<mlir::complex::PowOp>,
+      ConvertBinaryOp<mlir::complex::SubOp>,
+
+      ConvertCastOp<mlir::complex::BitcastOp>,
+      ConvertCastOp<mlir::complex::ImOp>,
+      ConvertCastOp<mlir::complex::ReOp>,
+
+      ConvertComplexConstantOp,
+      ConvertComplexCreateOp
       // clang-format on
       >(converter, patterns.getContext());
 }
