@@ -1045,7 +1045,7 @@
         "warmup_time": -1
     },
     "npbench.deep_learning.mlp.numba_replace_parfor.Benchmark.time_benchmark": {
-        "code": "@jit\ndef mlp(input, w1, b1, w2, b2, w3, b3):\n    x = relu(input @ w1 + b1)\n    x = relu(x @ w2 + b2)\n    x = softmax(x @ w3 + b3)  # Softmax call can be omitted if necessary\n    return x\n\n\ndef initialize(self, preset):\n    self.is_expected_failure = True\n    preset = parameters[preset]\n    return initialize(**preset)",
+        "code": "@jit\ndef mlp(input, w1, b1, w2, b2, w3, b3):\n    x = relu(input @ w1 + b1)\n    x = relu(x @ w2 + b2)\n    x = softmax(x @ w3 + b3)  # Softmax call can be omitted if necessary\n    return x\n\n\ndef initialize(self, preset):\n    preset = parameters[preset]\n    return initialize(**preset)",
         "min_run_count": 2,
         "name": "npbench.deep_learning.mlp.numba_replace_parfor.Benchmark.time_benchmark",
         "number": 0,
