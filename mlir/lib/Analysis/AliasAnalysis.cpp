@@ -41,7 +41,8 @@ static bool isReferenceType(mlir::Value val) {
 
 static std::optional<mlir::AliasResult> checkLinalgImpl(mlir::Value val) {
   auto op = val.getDefiningOp();
-  if (mlir::isa_and_nonnull<mlir::linalg::GenericOp, mlir::tensor::EmptyOp>(op))
+  if (op && mlir::isa<mlir::linalg::LinalgDialect, mlir::tensor::TensorDialect>(
+                op->getDialect()))
     return mlir::AliasResult::NoAlias;
 
   return std::nullopt;
