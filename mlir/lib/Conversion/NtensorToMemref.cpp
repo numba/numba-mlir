@@ -244,27 +244,74 @@ struct ToTensorOpLowering
   using OpConversionPattern::OpConversionPattern;
 
   mlir::LogicalResult
-  matchAndRewrite(numba::ntensor::ToTensorOp op,
-                  numba::ntensor::ToTensorOp::Adaptor adaptor,
+  matchAndRewrite(numba::ntensor::ToTensorOp op, OpAdaptor adaptor,
                   mlir::ConversionPatternRewriter &rewriter) const override {
     auto array = adaptor.getArray();
-    if (!array.getType().isa<mlir::MemRefType>())
+    if (!mlir::isa<mlir::MemRefType>(array.getType()))
       return mlir::failure();
 
     auto *converter = getTypeConverter();
     assert(converter && "Type converter is not set");
 
-    auto retType = converter->convertType(op.getType())
-                       .dyn_cast_or_null<mlir::TensorType>();
+    auto retType = converter->convertType<mlir::TensorType>(op.getType());
     if (!retType)
       return mlir::failure();
 
-    auto origType = op.getArray().getType().cast<numba::ntensor::NTensorType>();
+    auto origType =
+        mlir::cast<numba::ntensor::NTensorType>(op.getArray().getType());
     auto results = numba::util::wrapEnvRegion(
-        rewriter, op->getLoc(), origType.getEnvironment(), retType,
+        rewriter, op.getLoc(), origType.getEnvironment(), retType,
         [&](mlir::OpBuilder &builder, mlir::Location loc) {
           return builder
               .create<mlir::bufferization::ToTensorOp>(loc, retType, array)
+              .getResult();
+        });
+
+    rewriter.replaceOp(op, results);
+    return mlir::success();
+  }
+};
+
+struct ToTensorCopyOpLowering
+    : public mlir::OpConversionPattern<numba::ntensor::ToTensorCopyOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(numba::ntensor::ToTensorCopyOp op, OpAdaptor adaptor,
+                  mlir::ConversionPatternRewriter &rewriter) const override {
+    auto array = adaptor.getArray();
+    auto arrayType = mlir::dyn_cast<mlir::MemRefType>(array.getType());
+    if (!arrayType)
+      return mlir::failure();
+
+    auto *converter = getTypeConverter();
+    assert(converter && "Type converter is not set");
+
+    auto retType = converter->convertType<mlir::TensorType>(op.getType());
+    if (!retType)
+      return mlir::failure();
+
+    auto origType =
+        mlir::cast<numba::ntensor::NTensorType>(op.getArray().getType());
+    auto results = numba::util::wrapEnvRegion(
+        rewriter, op.getLoc(), origType.getEnvironment(), retType,
+        [&](mlir::OpBuilder &builder, mlir::Location loc) {
+          llvm::SmallVector<mlir::Value> shape;
+          for (auto &&[i, s] : llvm::enumerate(arrayType.getShape())) {
+            if (mlir::ShapedType::isDynamic(s))
+              shape.emplace_back(
+                  builder.create<mlir::memref::DimOp>(loc, array, i));
+          }
+
+          auto allocType = mlir::MemRefType::get(
+              arrayType.getShape(), arrayType.getElementType(),
+              mlir::MemRefLayoutAttrInterface{}, arrayType.getMemorySpace());
+          mlir::Value newArray =
+              builder.create<mlir::memref::AllocOp>(loc, allocType, shape);
+          builder.create<mlir::memref::CopyOp>(loc, array, newArray);
+
+          return builder
+              .create<mlir::bufferization::ToTensorOp>(loc, retType, newArray)
               .getResult();
         });
 
@@ -524,15 +571,17 @@ void numba::populateNtensorToMemrefRewritesAndTarget(
   converter.addConversion(
       [tuple3](numba::ntensor::SliceType) -> mlir::Type { return tuple3; });
 
-  patterns.insert<DimOpLowering, CreateOpLowering, SubviewOpLowering,
-                  ReshapeOpLowering, LoadOpLowering, StoreOpLowering,
-                  ToTensorOpLowering, FromTensorOpLowering, ToMemrefOpLowering,
-                  FromMemrefOpLowering, CastOpLowering, CopyOpLowering,
-                  PoisonLowering>(converter, context);
+  patterns
+      .insert<DimOpLowering, CreateOpLowering, SubviewOpLowering,
+              ReshapeOpLowering, LoadOpLowering, StoreOpLowering,
+              ToTensorOpLowering, ToTensorCopyOpLowering, FromTensorOpLowering,
+              ToMemrefOpLowering, FromMemrefOpLowering, CastOpLowering,
+              CopyOpLowering, PoisonLowering>(converter, context);
 
   target.addIllegalOp<numba::ntensor::DimOp, numba::ntensor::CreateArrayOp,
                       numba::ntensor::SubviewOp, numba::ntensor::LoadOp,
                       numba::ntensor::StoreOp, numba::ntensor::ToTensorOp,
+                      numba::ntensor::ToTensorCopyOp,
                       numba::ntensor::FromTensorOp, numba::ntensor::ToMemrefOp,
                       numba::ntensor::FromMemrefOp, numba::ntensor::CastOp,
                       numba::ntensor::CopyOp>();
