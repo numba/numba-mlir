@@ -98,8 +98,7 @@ struct SubviewOpLowering
   using OpConversionPattern::OpConversionPattern;
 
   mlir::LogicalResult
-  matchAndRewrite(numba::ntensor::SubviewOp op,
-                  numba::ntensor::SubviewOp::Adaptor adaptor,
+  matchAndRewrite(numba::ntensor::SubviewOp op, OpAdaptor adaptor,
                   mlir::ConversionPatternRewriter &rewriter) const override {
     auto origType =
         op.getSource().getType().cast<numba::ntensor::NTensorType>();
@@ -111,13 +110,12 @@ struct SubviewOpLowering
     auto *converter = getTypeConverter();
     assert(converter && "Type converter is not set");
 
-    auto dstType = converter->convertType(op.getType())
-                       .dyn_cast_or_null<mlir::MemRefType>();
+    auto dstType = converter->convertType<mlir::MemRefType>(op.getType());
     if (!dstType)
       return mlir::failure();
 
     auto results = numba::util::wrapEnvRegion(
-        rewriter, op->getLoc(), origType.getEnvironment(), dstType,
+        rewriter, op.getLoc(), origType.getEnvironment(), dstType,
         [&](mlir::OpBuilder &builder, mlir::Location loc) {
           auto offsets = mlir::getMixedValues(adaptor.getStaticOffsets(),
                                               adaptor.getOffsets(), rewriter);
@@ -137,6 +135,41 @@ struct SubviewOpLowering
           if (resType != dstType)
             res =
                 builder.create<numba::util::ChangeLayoutOp>(loc, dstType, res);
+
+          return res;
+        });
+
+    rewriter.replaceOp(op, results);
+    return mlir::success();
+  }
+};
+
+struct ReshapeOpLowering
+    : public mlir::OpConversionPattern<numba::util::ReshapeOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(numba::util::ReshapeOp op, OpAdaptor adaptor,
+                  mlir::ConversionPatternRewriter &rewriter) const override {
+    auto origType =
+        op.getSource().getType().cast<numba::ntensor::NTensorType>();
+    auto src = adaptor.getSource();
+    auto srcType = src.getType().dyn_cast<mlir::MemRefType>();
+    if (!srcType)
+      return mlir::failure();
+
+    auto *converter = getTypeConverter();
+    assert(converter && "Type converter is not set");
+
+    auto dstType = converter->convertType<mlir::MemRefType>(op.getType());
+    if (!dstType)
+      return mlir::failure();
+
+    auto results = numba::util::wrapEnvRegion(
+        rewriter, op.getLoc(), origType.getEnvironment(), dstType,
+        [&](mlir::OpBuilder &builder, mlir::Location loc) {
+          mlir::Value res = builder.create<numba::util::ReshapeOp>(
+              loc, dstType, src, adaptor.getShape());
 
           return res;
         });
@@ -491,12 +524,11 @@ void numba::populateNtensorToMemrefRewritesAndTarget(
   converter.addConversion(
       [tuple3](numba::ntensor::SliceType) -> mlir::Type { return tuple3; });
 
-  patterns
-      .insert<DimOpLowering, CreateOpLowering, SubviewOpLowering,
-              LoadOpLowering, StoreOpLowering, ToTensorOpLowering,
-              FromTensorOpLowering, ToMemrefOpLowering, FromMemrefOpLowering,
-              CastOpLowering, CopyOpLowering, PoisonLowering>(converter,
-                                                              context);
+  patterns.insert<DimOpLowering, CreateOpLowering, SubviewOpLowering,
+                  ReshapeOpLowering, LoadOpLowering, StoreOpLowering,
+                  ToTensorOpLowering, FromTensorOpLowering, ToMemrefOpLowering,
+                  FromMemrefOpLowering, CastOpLowering, CopyOpLowering,
+                  PoisonLowering>(converter, context);
 
   target.addIllegalOp<numba::ntensor::DimOp, numba::ntensor::CreateArrayOp,
                       numba::ntensor::SubviewOp, numba::ntensor::LoadOp,
@@ -505,7 +537,7 @@ void numba::populateNtensorToMemrefRewritesAndTarget(
                       numba::ntensor::FromMemrefOp, numba::ntensor::CastOp,
                       numba::ntensor::CopyOp>();
 
-  target.addDynamicallyLegalOp<mlir::ub::PoisonOp>(
+  target.addDynamicallyLegalOp<mlir::ub::PoisonOp, numba::util::ReshapeOp>(
       [&converter](mlir::Operation *op) { return converter.isLegal(op); });
 }
 
