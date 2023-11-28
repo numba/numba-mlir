@@ -2592,6 +2592,11 @@ struct ReshapeExpandShape
       return mlir::isConstantIntValue(v, 1);
     };
 
+    auto srcRank = static_cast<unsigned>(srcType.getRank());
+    auto dstRank = static_cast<unsigned>(dstType.getRank());
+    if (srcRank == dstRank)
+      return mlir::failure();
+
     auto newShape = op.getShape();
     auto unitDimsCount = [&]() {
       unsigned ret = 0;
@@ -2600,9 +2605,6 @@ struct ReshapeExpandShape
           ++ret;
       return ret;
     }();
-
-    auto srcRank = static_cast<unsigned>(srcType.getRank());
-    auto dstRank = static_cast<unsigned>(dstType.getRank());
 
     if (dstRank != (srcRank + unitDimsCount))
       return mlir::failure();
