@@ -37,6 +37,7 @@ if _dnnp_available:
             "negative",
             # "positive",
             "logical_not",
+            "invert",
         ]
         for op_name in ops:
             fn_name = "dpnp." + op_name
@@ -53,6 +54,11 @@ if _dnnp_available:
             "logical_and",
             "logical_or",
             "logical_xor",
+            "bitwise_and",
+            "bitwise_or",
+            "bitwise_xor",
+            "left_shift",
+            "right_shift",
         ]
         for op_name in ops:
             fn_name = "dpnp." + op_name

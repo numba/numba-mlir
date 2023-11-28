@@ -382,6 +382,11 @@ def _gen_unary_ops():
             bool_type,
             lambda a, b: not bool(a),
         ),
+        (
+            reg_func("numpy.invert", numpy.invert),
+            None,
+            lambda a, b: ~a,
+        ),
     ]
 
     def make_func(init, body):
@@ -523,6 +528,31 @@ def _gen_binary_ops():
         (reg_func("operator.ge"), bool_type, lambda a, b, c: a >= b),
         (reg_func("operator.eq"), bool_type, lambda a, b, c: a == b),
         (reg_func("operator.ne"), bool_type, lambda a, b, c: a != b),
+        (
+            reg_func("numpy.bitwise_and", numpy.bitwise_and),
+            None,
+            lambda a, b, c: a & b,
+        ),
+        (
+            reg_func("numpy.bitwise_or", numpy.bitwise_or),
+            None,
+            lambda a, b, c: a | b,
+        ),
+        (
+            reg_func("numpy.bitwise_xor", numpy.bitwise_xor),
+            None,
+            lambda a, b, c: a ^ b,
+        ),
+        (
+            reg_func("numpy.left_shift", numpy.left_shift),
+            None,
+            lambda a, b, c: a << b,
+        ),
+        (
+            reg_func("numpy.right_shift", numpy.right_shift),
+            None,
+            lambda a, b, c: a >> b,
+        ),
     ]
 
     def make_func(init, body):
