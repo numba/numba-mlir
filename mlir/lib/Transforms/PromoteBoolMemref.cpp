@@ -161,18 +161,65 @@ public:
   using OpConversionPattern::OpConversionPattern;
 
   mlir::LogicalResult
-  matchAndRewrite(mlir::memref::SubViewOp op,
-                  mlir::memref::SubViewOp::Adaptor adaptor,
+  matchAndRewrite(mlir::memref::SubViewOp op, OpAdaptor adaptor,
                   mlir::ConversionPatternRewriter &rewriter) const override {
     auto *converter = getTypeConverter();
-    auto resType = converter->convertType(op.getType())
-                       .dyn_cast_or_null<mlir::MemRefType>();
+    auto resType = converter->convertType<mlir::MemRefType>(op.getType());
     if (!resType)
       return mlir::failure();
+
     rewriter.replaceOpWithNewOp<mlir::memref::SubViewOp>(
         op, resType, adaptor.getSource(), adaptor.getOffsets(),
         adaptor.getSizes(), adaptor.getStrides(), adaptor.getStaticOffsets(),
         adaptor.getStaticSizes(), adaptor.getStaticStrides());
+    return mlir::success();
+  }
+};
+
+class ConvertReinterpretOp
+    : public mlir::OpConversionPattern<mlir::memref::ReinterpretCastOp> {
+public:
+  using OpConversionPattern::OpConversionPattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(mlir::memref::ReinterpretCastOp op, OpAdaptor adaptor,
+                  mlir::ConversionPatternRewriter &rewriter) const override {
+    auto *converter = getTypeConverter();
+    auto resType = converter->convertType<mlir::MemRefType>(op.getType());
+    if (!resType)
+      return mlir::failure();
+
+    auto offset = mlir::getMixedValues(adaptor.getStaticOffsets(),
+                                       adaptor.getOffsets(), rewriter);
+    if (offset.size() != 1)
+      return mlir::failure();
+
+    auto sizes = mlir::getMixedValues(adaptor.getStaticSizes(),
+                                      adaptor.getSizes(), rewriter);
+    auto strides = mlir::getMixedValues(adaptor.getStaticStrides(),
+                                        adaptor.getStrides(), rewriter);
+
+    rewriter.replaceOpWithNewOp<mlir::memref::ReinterpretCastOp>(
+        op, resType, adaptor.getSource(), offset.front(), sizes, strides);
+    return mlir::success();
+  }
+};
+
+class ConvertReshapeOp
+    : public mlir::OpConversionPattern<numba::util::ReshapeOp> {
+public:
+  using OpConversionPattern::OpConversionPattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(numba::util::ReshapeOp op, OpAdaptor adaptor,
+                  mlir::ConversionPatternRewriter &rewriter) const override {
+    auto *converter = getTypeConverter();
+    auto resType = converter->convertType<mlir::MemRefType>(op.getType());
+    if (!resType)
+      return mlir::failure();
+
+    rewriter.replaceOpWithNewOp<numba::util::ReshapeOp>(
+        op, resType, adaptor.getSource(), adaptor.getShape());
     return mlir::success();
   }
 };
@@ -213,11 +260,13 @@ void numba::populatePromoteBoolMemrefConversionRewritesAndTarget(
       });
 
   target.addDynamicallyLegalDialect<mlir::memref::MemRefDialect>(&checkOp);
-  target.addDynamicallyLegalOp<numba::util::RetainOp>(&checkOp);
+  target.addDynamicallyLegalOp<numba::util::RetainOp, numba::util::ReshapeOp>(
+      &checkOp);
 
   patterns.insert<ConvertDimOp, ConvertLoadOp, ConvertStoreOp, ConvertAllocOp,
                   ConvertAllocaOp, ConvertDeallocOp, ConvertCastOp,
-                  ConvertSubviewOp, ConvertRetainOp>(typeConverter, context);
+                  ConvertSubviewOp, ConvertReinterpretOp, ConvertReshapeOp,
+                  ConvertRetainOp>(typeConverter, context);
 }
 
 namespace {

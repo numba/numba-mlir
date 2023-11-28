@@ -933,13 +933,9 @@ static py::object reshapeImpl(py::capsule context, py::handle src,
     return ctx.context.unwrapVal(loc, builder, obj, dimType);
   };
 
-  auto srcVal = toTensor(loc, builder, unwrapVal(src));
-  auto srcType = srcVal.getType().dyn_cast<mlir::RankedTensorType>();
-  if (!srcType)
-    numba::reportError(llvm::Twine("invalid reshape argument: ") +
-                       toStr(srcVal.getType()));
+  auto srcVal = toNTensor(loc, builder, unwrapVal(src));
 
-  auto newDimsVals = [&]() {
+  auto newDimsVals = [&]() -> llvm::SmallVector<mlir::OpFoldResult> {
     auto dimCast = [&](mlir::Value val) {
       return doCast(builder, loc, val, dimType);
     };
@@ -969,89 +965,10 @@ static py::object reshapeImpl(py::capsule context, py::handle src,
     return ret;
   }();
 
-  auto srcRank = static_cast<unsigned>(srcType.getRank());
-  auto dstRank = static_cast<unsigned>(newDimsVals.size());
-
-  if (srcRank == 1 && dstRank == 1) {
-    mlir::OpFoldResult offset = builder.getIndexAttr(0);
-    mlir::OpFoldResult size = newDimsVals.front();
-    mlir::OpFoldResult stride = builder.getIndexAttr(1);
-
-    mlir::Value slice = builder.create<mlir::tensor::ExtractSliceOp>(
-        loc, srcVal, offset, size, stride);
-    return ctx.context.createVar(context, slice);
-  }
-
-  auto isUnitDim = [](mlir::OpFoldResult v) {
-    if (auto intVal = mlir::getConstantIntValue(v))
-      return *intVal == 1;
-
-    return false;
-  };
-
-  auto unitDimsCount = [&]() {
-    unsigned ret = 0;
-    for (auto v : newDimsVals)
-      if (isUnitDim(v))
-        ++ret;
-    return ret;
-  }();
-
-  auto shape = getDynShape(dstRank);
-
-  auto resultType = srcType.clone(shape);
-
-  // TODO: Limit to 1D case for now
-  if ((srcRank == 1) && (dstRank == (srcRank + unitDimsCount)) &&
-      (unitDimsCount != 0)) {
-    llvm::SmallVector<mlir::ReassociationIndices> reassoc(srcRank);
-    llvm::SmallVector<int64_t> expandShape = shape;
-    int currInd = -1;
-    for (auto i : llvm::seq(0u, dstRank)) {
-      if (!isUnitDim(newDimsVals[i])) {
-        ++currInd;
-      } else {
-        expandShape[i] = 1;
-      }
-
-      reassoc[std::max(0, currInd)].emplace_back(i);
-    }
-
-    shape.resize(static_cast<unsigned>(srcType.getRank()),
-                 mlir::ShapedType::kDynamic);
-    auto dynShapeType = srcType.clone(shape);
-    if (dynShapeType != srcType)
-      srcVal = builder.create<mlir::tensor::CastOp>(loc, dynShapeType, srcVal);
-
-    auto expandType = resultType.clone(expandShape);
-    mlir::Value res = builder.create<mlir::tensor::ExpandShapeOp>(
-        loc, expandType, srcVal, reassoc);
-    if (expandType != resultType)
-      res = builder.create<mlir::tensor::CastOp>(loc, resultType, res);
-
-    return ctx.context.createVar(context, res);
-  }
-
-  auto toValues = [&](mlir::ArrayRef<mlir::OpFoldResult> src) {
-    auto size = src.size();
-    llvm::SmallVector<mlir::Value> values(size);
-    for (auto i : llvm::seq<size_t>(0, size)) {
-      auto v = src[i];
-      if (auto val = v.dyn_cast<mlir::Value>()) {
-        values[i] = val;
-      } else {
-        auto constVal = v.get<mlir::Attribute>()
-                            .cast<mlir::IntegerAttr>()
-                            .getValue()
-                            .getSExtValue();
-        values[i] = builder.create<mlir::arith::ConstantIndexOp>(loc, constVal);
-      }
-    }
-    return values;
-  };
-
-  mlir::Value reshaped = builder.create<numba::util::ReshapeOp>(
-      loc, resultType, srcVal, toValues(newDimsVals));
+  // TODO: make reshape accept OpFoldResult array
+  auto shape = mlir::getValueOrCreateConstantIndexOp(builder, loc, newDimsVals);
+  mlir::Value reshaped =
+      builder.create<numba::util::ReshapeOp>(loc, srcVal, shape);
 
   return ctx.context.createVar(context, reshaped);
 }

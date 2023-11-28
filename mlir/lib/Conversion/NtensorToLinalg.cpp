@@ -335,7 +335,7 @@ struct ConvertSubviewOp
       return mlir::failure();
 
     auto results = numba::util::wrapEnvRegion(
-        rewriter, op->getLoc(), dstType.getEnvironment(), dstType,
+        rewriter, op.getLoc(), dstType.getEnvironment(), dstType,
         [&](mlir::PatternRewriter &builder, mlir::Location loc) {
           auto srcTensorType = toTensorType(srcType);
           mlir::Value srcTensor = builder.create<numba::ntensor::ToTensorOp>(
@@ -354,6 +354,47 @@ struct ConvertSubviewOp
               loc, viewTensorType, srcTensor, offsets, sizes, strides);
           mlir::Value result =
               builder.create<numba::ntensor::FromTensorOp>(loc, dstType, view);
+          return result;
+        });
+    rewriter.replaceOp(op, results);
+    return mlir::success();
+  }
+};
+
+struct ConvertReshapeOp
+    : public mlir::OpRewritePattern<numba::util::ReshapeOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(numba::util::ReshapeOp op,
+                  mlir::PatternRewriter &rewriter) const override {
+    if (!op->hasAttr(kReadonly))
+      return mlir::failure();
+
+    auto src = op.getSource();
+    auto srcType = getNTensorType(src);
+    if (!srcType)
+      return mlir::failure();
+
+    auto dstType = getNTensorType(op);
+    if (!dstType)
+      return mlir::failure();
+
+    if (srcType.getEnvironment() != dstType.getEnvironment())
+      return mlir::failure();
+
+    auto results = numba::util::wrapEnvRegion(
+        rewriter, op.getLoc(), dstType.getEnvironment(), dstType,
+        [&](mlir::PatternRewriter &builder, mlir::Location loc) {
+          auto srcTensorType = toTensorType(srcType);
+          auto dstTensorType = toTensorType(dstType);
+          mlir::Value srcTensor = builder.create<numba::ntensor::ToTensorOp>(
+              loc, srcTensorType, src);
+
+          mlir::Value reshaped = builder.create<numba::util::ReshapeOp>(
+              loc, dstTensorType, srcTensor, op.getShape());
+          mlir::Value result = builder.create<numba::ntensor::FromTensorOp>(
+              loc, dstType, reshaped);
           return result;
         });
     rewriter.replaceOp(op, results);
@@ -667,8 +708,8 @@ struct ConvertBroadcastOp
 void numba::populateNtensorToLinalgPatterns(mlir::RewritePatternSet &patterns) {
   patterns.insert<ConvertCreateOp, ConvertCopyOp, ConvertElementwiseOp,
                   ConvertCastOp, ConvertFromElementsOp, ConvertSubviewOp,
-                  ConvertLoadOp, ConvertDimOp, ConvertBroadcastOp>(
-      patterns.getContext());
+                  ConvertReshapeOp, ConvertLoadOp, ConvertDimOp,
+                  ConvertBroadcastOp>(patterns.getContext());
 }
 
 namespace {
@@ -723,6 +764,9 @@ struct NtensorAliasAnalysisPass
 
       if (auto load = mlir::dyn_cast<numba::ntensor::LoadOp>(op))
         return load.getArray();
+
+      if (auto reshape = mlir::dyn_cast<numba::util::ReshapeOp>(op))
+        return reshape.getSource();
 
       return {};
     };

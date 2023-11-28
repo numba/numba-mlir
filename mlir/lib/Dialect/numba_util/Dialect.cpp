@@ -2571,6 +2571,14 @@ void GetAllocTokenOp::getCanonicalizationPatterns(
   results.insert<PropagateAllocTokenCasts>(context);
 }
 
+void ReshapeOp::build(mlir::OpBuilder &b, mlir::OperationState &result,
+                      mlir::Value source, mlir::ValueRange shape) {
+  auto shaped = mlir::cast<mlir::ShapedType>(source.getType());
+  llvm::SmallVector<int64_t> resShape(shape.size(), mlir::ShapedType::kDynamic);
+  auto resType = shaped.clone(resShape);
+  build(b, result, resType, source, shape);
+}
+
 std::optional<mlir::Attribute> mergeEnvAttrs(mlir::Attribute env1,
                                              mlir::Attribute env2) {
   if (env1 == env2)
