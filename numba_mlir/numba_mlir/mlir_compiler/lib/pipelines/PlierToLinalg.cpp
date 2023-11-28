@@ -4560,7 +4560,7 @@ static void populatePlierToLinalgGenPipeline(mlir::OpPassManager &pm) {
   pm.addNestedPass<mlir::func::FuncOp>(numba::createNtensorToLinalgPass());
   pm.addNestedPass<mlir::func::FuncOp>(
       numba::createNtensorLowerToTensorCopyPass());
-  pm.addNestedPass<mlir::func::FuncOp>(numba::ntensor::createCopyRemovalPass());
+  pm.addNestedPass<mlir::func::FuncOp>(numba::createCopyRemovalPass());
   pm.addPass(std::make_unique<MarkInputShapesRanges>());
   pm.addPass(numba::createCompositePass(
       "PostPlierToLinalgPass", [](mlir::OpPassManager &p) {
