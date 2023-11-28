@@ -215,3 +215,16 @@ func.func @test(%arg: memref<?xf32>) -> index {
   %res = numba_util.get_alloc_token %0 : memref<3xf32, strided<[1], offset: 1>> -> index
   return %res: index
 }
+
+// -----
+
+// CHECK-LABEL: func @test
+//  CHECK-SAME:   (%[[ARG1:.*]]: tensor<?xf32>, %[[ARG2]]: index)
+//       CHECK:   %[[EXPAND:.*]] = tensor.expand_shape %[[ARG1]] {{\[}}[0, 1, 2]] : tensor<?xf32> into tensor<1x?x1xf32>
+//       CHECK:   %[[RES:.*]] = tensor.cast %[[EXPAND]] : tensor<1x?x1xf32> to tensor<?x?x?xf32>
+//       CHECK:   return %[[RES]]
+func.func @test(%arg0: tensor<?xf32>, %arg1: index) -> tensor<?x?x?xf32> {
+  %c1 = arith.constant 1 : index
+  %0 = numba_util.reshape %arg0(%c1, %arg1, %c1) : (tensor<?xf32>, index, index, index) -> tensor<?x?x?xf32>
+  return %0: tensor<?x?x?xf32>
+}

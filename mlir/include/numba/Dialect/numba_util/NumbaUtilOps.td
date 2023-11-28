@@ -19,7 +19,10 @@ def NumbaUtil_Dialect : Dialect {
   let name = "numba_util";
   let cppNamespace = "::numba::util";
 
-  let dependentDialects = ["::mlir::memref::MemRefDialect"];
+  let dependentDialects = [
+    "::mlir::tensor::TensorDialect",
+    "::mlir::memref::MemRefDialect"
+  ];
 
   let hasCanonicalizer = 1;
   let hasConstantMaterializer = 1;
@@ -419,6 +422,8 @@ def ReshapeOp : NumbaUtil_Op<"reshape", [
   let extraClassDeclaration = [{
       ::mlir::Value getViewSource() { return getSource(); }
   }];
+
+  let hasCanonicalizer = 1;
 
   let assemblyFormat = [{
     $source `(` $shape `)` attr-dict `:` functional-type(operands, results)
