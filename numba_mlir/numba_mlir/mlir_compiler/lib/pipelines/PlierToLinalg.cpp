@@ -3196,16 +3196,11 @@ void LinalgOptInnerPass::runOnOperation() {
 
 struct FuseAdjacentGenerics
     : public mlir::OpRewritePattern<mlir::linalg::GenericOp> {
-  using CheckFuncT =
-      std::function<bool(mlir::linalg::GenericOp, mlir::linalg::GenericOp)>;
-  FuseAdjacentGenerics(mlir::MLIRContext *ctx, CheckFuncT func)
-      : mlir::OpRewritePattern<mlir::linalg::GenericOp>(ctx),
-        canFuse(std::move(func)) {}
+  using OpRewritePattern::OpRewritePattern;
 
   mlir::LogicalResult
   matchAndRewrite(mlir::linalg::GenericOp op,
                   mlir::PatternRewriter &rewriter) const override {
-    assert(canFuse);
     if (!op.hasTensorSemantics())
       return mlir::failure();
 
@@ -3233,9 +3228,6 @@ struct FuseAdjacentGenerics
           return true;
         }();
         if (!dominates)
-          continue;
-
-        if (!canFuse(op, other))
           continue;
 
         if (origArgs.empty()) {
@@ -3350,9 +3342,6 @@ struct FuseAdjacentGenerics
     }
     return mlir::failure();
   }
-
-private:
-  CheckFuncT canFuse;
 };
 
 static bool checkToTensorPrevOp(mlir::Operation &op) {
@@ -3369,15 +3358,11 @@ static bool checkToTensorPrevOp(mlir::Operation &op) {
 
 struct MoveToTensor
     : public mlir::OpRewritePattern<numba::ntensor::ToTensorOp> {
-  using CheckFuncT = std::function<bool(mlir::Operation *, mlir::Operation *)>;
-  MoveToTensor(mlir::MLIRContext *ctx, CheckFuncT func)
-      : mlir::OpRewritePattern<numba::ntensor::ToTensorOp>(ctx),
-        checkWrites(std::move(func)) {}
+  using OpRewritePattern::OpRewritePattern;
 
   mlir::LogicalResult
   matchAndRewrite(numba::ntensor::ToTensorOp op,
                   mlir::PatternRewriter &rewriter) const override {
-    assert(checkWrites);
     if (checkToTensorPrevOp(*op))
       return mlir::failure();
 
@@ -3386,9 +3371,6 @@ struct MoveToTensor
       auto it1 = mlir::Block::iterator(defOp);
       auto it2 = mlir::Block::iterator(op);
       if (std::next(it1) == it2)
-        return mlir::failure();
-
-      if (!checkWrites(op, defOp))
         return mlir::failure();
 
       rewriter.updateRootInPlace(op, [&]() { op->moveAfter(defOp); });
@@ -3402,15 +3384,10 @@ struct MoveToTensor
       return mlir::failure();
 
     auto *prevOp = &(*begin);
-    if (!checkWrites(op, prevOp))
-      return mlir::failure();
 
     rewriter.updateRootInPlace(op, [&]() { op->moveBefore(prevOp); });
     return mlir::success();
   }
-
-private:
-  CheckFuncT checkWrites;
 };
 
 struct FuseAdjacentGenericsPass
@@ -3419,94 +3396,10 @@ struct FuseAdjacentGenericsPass
   MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(FuseAdjacentGenericsPass)
 
   void runOnOperation() override {
-
-    llvm::MapVector<mlir::Value, llvm::SmallVector<mlir::Operation *>> writers;
-
-    llvm::SmallVector<mlir::Value> temp;
-    auto populateWriters = [&]() {
-      writers.clear();
-      getOperation()->walk([&](mlir::Operation *innerOp) {
-        temp.clear();
-        if (numba::isWriter(*innerOp, temp)) {
-          for (auto arg : temp)
-            writers[arg].emplace_back(innerOp);
-        }
-      });
-    };
-    populateWriters();
-
-    mlir::OperationFingerPrint fp(getOperation());
-    auto updateWriters = [&]() {
-      mlir::OperationFingerPrint newFp(getOperation());
-      if (newFp != fp) {
-        populateWriters();
-        fp = newFp;
-      }
-    };
-
-    auto &AA = getAnalysis<numba::AliasAnalysis>();
-
-    mlir::DominanceInfo dom;
-    auto checkDom = [&](mlir::Operation *op1, mlir::Operation *op2,
-                        mlir::Operation *writer) {
-      return (dom.properlyDominates(writer, op1) &&
-              dom.properlyDominates(writer, op2)) ||
-             (dom.properlyDominates(op1, writer) &&
-              dom.properlyDominates(op2, writer));
-    };
-
-    auto canFuse = [&](mlir::linalg::GenericOp op1,
-                       mlir::linalg::GenericOp op2) -> bool {
-      updateWriters();
-      if (writers.empty())
-        return true;
-
-      for (auto &args : {op1->getOperands(), op2->getOperands()}) {
-        for (auto arg : args) {
-          for (auto &&[writerArg, writers] : writers) {
-            if (AA.alias(arg, writerArg).isNo())
-              continue;
-
-            for (auto &&writer : writers) {
-              if (writer == op1 || writer == op2)
-                continue;
-
-              if (!checkDom(op1, op2, writer))
-                return false;
-            }
-          }
-        }
-      }
-      return true;
-    };
-
-    auto checkWrites = [&](mlir::Operation *toTensor, mlir::Operation *other) {
-      assert(toTensor);
-      assert(other);
-      updateWriters();
-      if (writers.empty())
-        return true;
-
-      for (auto arg : toTensor->getOperands()) {
-        for (auto &&[writerArg, writers] : writers) {
-          if (AA.alias(arg, writerArg).isNo())
-            continue;
-
-          for (auto &&writer : writers) {
-
-            if (!checkDom(toTensor, other, writer))
-              return false;
-          }
-        }
-      }
-      return true;
-    };
-
     auto *context = &getContext();
     mlir::RewritePatternSet patterns(context);
 
-    patterns.insert<FuseAdjacentGenerics>(context, canFuse);
-    patterns.insert<MoveToTensor>(context, checkWrites);
+    patterns.insert<FuseAdjacentGenerics, MoveToTensor>(context);
 
     if (mlir::failed(mlir::applyPatternsAndFoldGreedily(getOperation(),
                                                         std::move(patterns))))
