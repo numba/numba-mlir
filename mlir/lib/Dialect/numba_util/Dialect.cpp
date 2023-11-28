@@ -2571,6 +2571,81 @@ void GetAllocTokenOp::getCanonicalizationPatterns(
   results.insert<PropagateAllocTokenCasts>(context);
 }
 
+namespace {
+struct ReshapeExpandShape
+    : public mlir::OpRewritePattern<numba::util::ReshapeOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(numba::util::ReshapeOp op,
+                  mlir::PatternRewriter &rewriter) const override {
+    mlir::Value src = op.getSource();
+    auto srcType = mlir::dyn_cast<mlir::TensorType>(src.getType());
+    if (!srcType || srcType.getRank() != 1)
+      return mlir::failure();
+
+    auto dstType = mlir::dyn_cast<mlir::TensorType>(op.getResult().getType());
+    if (!dstType)
+      return mlir::failure();
+
+    auto isUnitDim = [](mlir::OpFoldResult v) {
+      return mlir::isConstantIntValue(v, 1);
+    };
+
+    auto srcRank = static_cast<unsigned>(srcType.getRank());
+    auto dstRank = static_cast<unsigned>(dstType.getRank());
+    if (srcRank == dstRank)
+      return mlir::failure();
+
+    auto newShape = op.getShape();
+    auto unitDimsCount = [&]() {
+      unsigned ret = 0;
+      for (auto v : newShape)
+        if (isUnitDim(v))
+          ++ret;
+      return ret;
+    }();
+
+    if (dstRank != (srcRank + unitDimsCount))
+      return mlir::failure();
+
+    llvm::SmallVector<mlir::ReassociationIndices> reassoc(srcRank);
+    llvm::SmallVector<int64_t> expandShape(newShape.size());
+    int currInd = -1;
+    for (auto i : llvm::seq(0u, dstRank)) {
+      if (!isUnitDim(newShape[i])) {
+        ++currInd;
+        expandShape[i] = mlir::ShapedType::kDynamic;
+      } else {
+        expandShape[i] = 1;
+      }
+
+      reassoc[std::max(0, currInd)].emplace_back(i);
+    }
+
+    auto loc = op.getLoc();
+    llvm::SmallVector<int64_t> shape(srcRank, mlir::ShapedType::kDynamic);
+    auto dynShapeType = srcType.clone(shape);
+    if (dynShapeType != srcType)
+      src = rewriter.create<mlir::tensor::CastOp>(loc, dynShapeType, src);
+
+    auto expandType = dstType.clone(expandShape);
+    mlir::Value res = rewriter.create<mlir::tensor::ExpandShapeOp>(
+        loc, expandType, src, reassoc);
+    if (expandType != dstType)
+      res = rewriter.create<mlir::tensor::CastOp>(loc, dstType, res);
+
+    rewriter.replaceOp(op, res);
+    return mlir::success();
+  }
+};
+} // namespace
+
+void ReshapeOp::getCanonicalizationPatterns(mlir::RewritePatternSet &results,
+                                            mlir::MLIRContext *context) {
+  results.insert<ReshapeExpandShape>(context);
+}
+
 void ReshapeOp::build(mlir::OpBuilder &b, mlir::OperationState &result,
                       mlir::Value source, mlir::ValueRange shape) {
   auto shaped = mlir::cast<mlir::ShapedType>(source.getType());
