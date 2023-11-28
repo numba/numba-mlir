@@ -78,7 +78,7 @@ func.func @test(%arg1: !ntensor.ntensor<?xf32>, %arg2: !ntensor.ntensor<?xf32>) 
 }
 // CHECK-LABEL: func @test
 //  CHECK-SAME:   (%[[ARG1:.*]]: !ntensor.ntensor<?xf32>, %[[ARG2:.*]]: !ntensor.ntensor<?xf32>)
-//  CHECK-NEXT:   %[[SRC:.*]] = ntensor.to_tensor %[[ARG1]] : !ntensor.ntensor<?xf32> to tensor<?xf32>
+//  CHECK-NEXT:   %[[SRC:.*]] = ntensor.to_tensor_copy %[[ARG1]] : !ntensor.ntensor<?xf32> to tensor<?xf32>
 //  CHECK-NEXT:   %[[DST:.*]] = ntensor.to_memref %[[ARG2]] : !ntensor.ntensor<?xf32> to memref<?xf32>
 //  CHECK-NEXT:   linalg.generic {indexing_maps = [#map, #map], iterator_types = ["parallel"]} ins(%[[SRC]] : tensor<?xf32>) outs(%[[DST]] : memref<?xf32>) {
 //  CHECK-NEXT:   ^bb0(%[[BARG1:.*]]: f32, %[[ARG2:.*]]: f32):
@@ -95,7 +95,7 @@ func.func @test(%arg1: !ntensor.ntensor<?xf32, "test">, %arg2: !ntensor.ntensor<
 // CHECK-LABEL: func @test
 //  CHECK-SAME:   (%[[ARG1:.*]]: !ntensor.ntensor<?xf32, "test">, %[[ARG2:.*]]: !ntensor.ntensor<?xf32, "test">)
 //  CHECK-NEXT:   numba_util.env_region "test" {
-//  CHECK-NEXT:   %[[SRC:.*]] = ntensor.to_tensor %[[ARG1]] : !ntensor.ntensor<?xf32, "test"> to tensor<?xf32>
+//  CHECK-NEXT:   %[[SRC:.*]] = ntensor.to_tensor_copy %[[ARG1]] : !ntensor.ntensor<?xf32, "test"> to tensor<?xf32>
 //  CHECK-NEXT:   %[[DST:.*]] = ntensor.to_memref %[[ARG2]] : !ntensor.ntensor<?xf32, "test"> to memref<?xf32>
 //  CHECK-NEXT:   linalg.generic {indexing_maps = [#map, #map], iterator_types = ["parallel"]} ins(%[[SRC]] : tensor<?xf32>) outs(%[[DST]] : memref<?xf32>) {
 //  CHECK-NEXT:   ^bb0(%[[BARG1:.*]]: f32, %[[ARG2:.*]]: f32):
@@ -117,7 +117,7 @@ func.func @test(%arg1: !ntensor.ntensor<?x5xf32>) -> !ntensor.ntensor<?x5xf32> {
 // CHECK-LABEL: func @test
 //  CHECK-SAME:   (%[[ARG:.*]]: !ntensor.ntensor<?x5xf32>)
 //  CHECK-NEXT:   %[[C0:.*]] = arith.constant 0 : index
-//  CHECK-NEXT:   %[[T1:.*]] = ntensor.to_tensor %[[ARG]] : !ntensor.ntensor<?x5xf32> to tensor<?x5xf32>
+//  CHECK-NEXT:   %[[T1:.*]] = ntensor.to_tensor_copy %[[ARG]] : !ntensor.ntensor<?x5xf32> to tensor<?x5xf32>
 //  CHECK-NEXT:   %[[D:.*]] = tensor.dim %[[T1]], %[[C0]] : tensor<?x5xf32>
 //  CHECK-NEXT:   %[[E:.*]] = tensor.empty(%[[D]]) : tensor<?x5xf32>
 //  CHECK-NEXT:   %[[T2:.*]] = linalg.generic {indexing_maps = [#map, #map], iterator_types = ["parallel", "parallel"]} ins(%[[T1]] : tensor<?x5xf32>) outs(%[[E]] : tensor<?x5xf32>) {
@@ -141,7 +141,7 @@ func.func @test(%arg1: !ntensor.ntensor<?x5xf32, "test">) -> !ntensor.ntensor<?x
 //  CHECK-SAME:   (%[[ARG:.*]]: !ntensor.ntensor<?x5xf32, "test">)
 //  CHECK-NEXT:   %[[C0:.*]] = arith.constant 0 : index
 //  CHECK-NEXT:   %[[T0:.*]] = numba_util.env_region "test" -> !ntensor.ntensor<?x5xf32, "test"> {
-//  CHECK-NEXT:   %[[T1:.*]] = ntensor.to_tensor %[[ARG]] : !ntensor.ntensor<?x5xf32, "test"> to tensor<?x5xf32>
+//  CHECK-NEXT:   %[[T1:.*]] = ntensor.to_tensor_copy %[[ARG]] : !ntensor.ntensor<?x5xf32, "test"> to tensor<?x5xf32>
 //  CHECK-NEXT:   %[[D:.*]] = tensor.dim %[[T1]], %[[C0]] : tensor<?x5xf32>
 //  CHECK-NEXT:   %[[E:.*]] = tensor.empty(%[[D]]) : tensor<?x5xf32>
 //  CHECK-NEXT:   %[[T2:.*]] = linalg.generic {indexing_maps = [#map, #map], iterator_types = ["parallel", "parallel"]} ins(%[[T1]] : tensor<?x5xf32>) outs(%[[E]] : tensor<?x5xf32>) {
@@ -162,7 +162,7 @@ func.func @test(%arg1: !ntensor.ntensor<?xf32>) -> !ntensor.ntensor<5xf32> {
 }
 // CHECK-LABEL: func @test
 //  CHECK-SAME:   (%[[ARG:.*]]: !ntensor.ntensor<?xf32>)
-//  CHECK-NEXT:   %[[VAL1:.*]] = ntensor.to_tensor %[[ARG]] : !ntensor.ntensor<?xf32> to tensor<?xf32>
+//  CHECK-NEXT:   %[[VAL1:.*]] = ntensor.to_tensor_copy %[[ARG]] : !ntensor.ntensor<?xf32> to tensor<?xf32>
 //  CHECK-NEXT:   %[[VAL2:.*]] = tensor.cast %[[VAL1]] : tensor<?xf32> to tensor<5xf32>
 //  CHECK-NEXT:   %[[VAL3:.*]] = ntensor.from_tensor %[[VAL2]] : tensor<5xf32> to !ntensor.ntensor<5xf32>
 //  CHECK-NEXT:   return %[[VAL3]] : !ntensor.ntensor<5xf32>
@@ -176,7 +176,7 @@ func.func @test(%arg1: !ntensor.ntensor<?xf32, "test">) -> !ntensor.ntensor<5xf3
 // CHECK-LABEL: func @test
 //  CHECK-SAME:   (%[[ARG:.*]]: !ntensor.ntensor<?xf32, "test">)
 //  CHECK-NEXT:   %[[RES:.*]] = numba_util.env_region "test" -> !ntensor.ntensor<5xf32, "test"> {
-//  CHECK-NEXT:   %[[VAL1:.*]] = ntensor.to_tensor %[[ARG]] : !ntensor.ntensor<?xf32, "test"> to tensor<?xf32>
+//  CHECK-NEXT:   %[[VAL1:.*]] = ntensor.to_tensor_copy %[[ARG]] : !ntensor.ntensor<?xf32, "test"> to tensor<?xf32>
 //  CHECK-NEXT:   %[[VAL2:.*]] = tensor.cast %[[VAL1]] : tensor<?xf32> to tensor<5xf32>
 //  CHECK-NEXT:   %[[VAL3:.*]] = ntensor.from_tensor %[[VAL2]] : tensor<5xf32> to !ntensor.ntensor<5xf32, "test">
 //  CHECK-NEXT:   numba_util.env_region_yield %[[VAL3]] : !ntensor.ntensor<5xf32, "test">
@@ -266,7 +266,7 @@ func.func @test(%arg1: !ntensor.ntensor<?xf32>) -> f32 {
 // CHECK-LABEL: func @test
 //  CHECK-SAME:   (%[[ARG:.*]]: !ntensor.ntensor<?xf32>)
 //  CHECK-NEXT:   %[[IND:.*]] = arith.constant 0 : index
-//  CHECK-NEXT:   %[[T1:.*]] = ntensor.to_tensor %[[ARG]] : !ntensor.ntensor<?xf32> to tensor<?xf32>
+//  CHECK-NEXT:   %[[T1:.*]] = ntensor.to_tensor_copy %[[ARG]] : !ntensor.ntensor<?xf32> to tensor<?xf32>
 //  CHECK-NEXT:   %[[RES:.*]] = tensor.extract %[[T1]][%[[IND]]] : tensor<?xf32>
 //  CHECK-NEXT:   return %[[RES]] : f32
 
@@ -281,7 +281,7 @@ func.func @test(%arg1: !ntensor.ntensor<?xf32, "test">) -> f32 {
 //  CHECK-SAME:   (%[[ARG:.*]]: !ntensor.ntensor<?xf32, "test">)
 //  CHECK-NEXT:   %[[IND:.*]] = arith.constant 0 : index
 //  CHECK-NEXT:   %[[RES:.*]] = numba_util.env_region "test" -> f32 {
-//  CHECK-NEXT:   %[[T1:.*]] = ntensor.to_tensor %[[ARG]] : !ntensor.ntensor<?xf32, "test"> to tensor<?xf32>
+//  CHECK-NEXT:   %[[T1:.*]] = ntensor.to_tensor_copy %[[ARG]] : !ntensor.ntensor<?xf32, "test"> to tensor<?xf32>
 //  CHECK-NEXT:   %[[T2:.*]] = tensor.extract %[[T1]][%[[IND]]] : tensor<?xf32>
 //  CHECK-NEXT:   numba_util.env_region_yield %[[T2]] : f32
 //  CHECK-NEXT:   }
@@ -328,8 +328,8 @@ func.func @test(%arg1: !ntensor.ntensor<?x?xf32>, %arg2: !ntensor.ntensor<?x?xf3
 }
 // CHECK-LABEL: func @test
 //  CHECK-SAME:   (%[[ARG1:.*]]: !ntensor.ntensor<?x?xf32>, %[[ARG2:.*]]: !ntensor.ntensor<?x?xf32>)
-//       CHECK:   %[[SRC1:.*]] = ntensor.to_tensor %[[ARG1]] : !ntensor.ntensor<?x?xf32> to tensor<?x?xf32>
-//       CHECK:   %[[SRC2:.*]] = ntensor.to_tensor %[[ARG2]] : !ntensor.ntensor<?x?xf32> to tensor<?x?xf32>
+//       CHECK:   %[[SRC1:.*]] = ntensor.to_tensor_copy %[[ARG1]] : !ntensor.ntensor<?x?xf32> to tensor<?x?xf32>
+//       CHECK:   %[[SRC2:.*]] = ntensor.to_tensor_copy %[[ARG2]] : !ntensor.ntensor<?x?xf32> to tensor<?x?xf32>
 
 //       CHECK:   %[[SRC1D1:.*]] = scf.if %{{.*}} -> (tensor<?x?xf32>) {
 //       CHECK:     %[[TMP1:.*]] = tensor.empty(%{{.*}}, %{{.*}}) : tensor<?x?xf32>
@@ -388,8 +388,8 @@ func.func @test(%arg1: !ntensor.ntensor<?x?xf32>, %arg2: !ntensor.ntensor<?xf32>
 }
 // CHECK-LABEL: func @test
 //  CHECK-SAME:   (%[[ARG1:.*]]: !ntensor.ntensor<?x?xf32>, %[[ARG2:.*]]: !ntensor.ntensor<?xf32>)
-//       CHECK:   %[[SRC1:.*]] = ntensor.to_tensor %[[ARG1]] : !ntensor.ntensor<?x?xf32> to tensor<?x?xf32>
-//       CHECK:   %[[SRC2:.*]] = ntensor.to_tensor %[[ARG2]] : !ntensor.ntensor<?xf32> to tensor<?xf32>
+//       CHECK:   %[[SRC1:.*]] = ntensor.to_tensor_copy %[[ARG1]] : !ntensor.ntensor<?x?xf32> to tensor<?x?xf32>
+//       CHECK:   %[[SRC2:.*]] = ntensor.to_tensor_copy %[[ARG2]] : !ntensor.ntensor<?xf32> to tensor<?xf32>
 
 //       CHECK:   %[[SRC1D1:.*]] = scf.if %{{.*}} -> (tensor<?x?xf32>) {
 //       CHECK:     %[[TMP1:.*]] = tensor.empty(%{{.*}}, %{{.*}}) : tensor<?x?xf32>
@@ -442,8 +442,8 @@ func.func @test(%arg1: !ntensor.ntensor<?x?xf32>, %arg2: !ntensor.ntensor<f32>) 
 }
 // CHECK-LABEL: func @test
 //  CHECK-SAME:   (%[[ARG1:.*]]: !ntensor.ntensor<?x?xf32>, %[[ARG2:.*]]: !ntensor.ntensor<f32>)
-//       CHECK:   %[[SRC1:.*]] = ntensor.to_tensor %[[ARG1]] : !ntensor.ntensor<?x?xf32> to tensor<?x?xf32>
-//       CHECK:   %[[SRC2:.*]] = ntensor.to_tensor %[[ARG2]] : !ntensor.ntensor<f32> to tensor<f32>
+//       CHECK:   %[[SRC1:.*]] = ntensor.to_tensor_copy %[[ARG1]] : !ntensor.ntensor<?x?xf32> to tensor<?x?xf32>
+//       CHECK:   %[[SRC2:.*]] = ntensor.to_tensor_copy %[[ARG2]] : !ntensor.ntensor<f32> to tensor<f32>
 
 //       CHECK:   %[[SRC1D1:.*]] = scf.if %{{.*}} -> (tensor<?x?xf32>) {
 //       CHECK:     %[[TMP1:.*]] = tensor.empty(%{{.*}}, %{{.*}}) : tensor<?x?xf32>
@@ -485,8 +485,8 @@ func.func @test(%arg1: !ntensor.ntensor<?x?xf32, "test">, %arg2: !ntensor.ntenso
 // CHECK-LABEL: func @test
 //  CHECK-SAME:   (%[[ARG1:.*]]: !ntensor.ntensor<?x?xf32, "test">, %[[ARG2:.*]]: !ntensor.ntensor<f32, "test">)
 //       CHECK:   %[[RET:.*]]:2 = numba_util.env_region "test" -> !ntensor.ntensor<?x?xf32, "test">, !ntensor.ntensor<?x?xf32, "test"> {
-//       CHECK:   %[[SRC1:.*]] = ntensor.to_tensor %[[ARG1]] : !ntensor.ntensor<?x?xf32, "test"> to tensor<?x?xf32>
-//       CHECK:   %[[SRC2:.*]] = ntensor.to_tensor %[[ARG2]] : !ntensor.ntensor<f32, "test"> to tensor<f32>
+//       CHECK:   %[[SRC1:.*]] = ntensor.to_tensor_copy %[[ARG1]] : !ntensor.ntensor<?x?xf32, "test"> to tensor<?x?xf32>
+//       CHECK:   %[[SRC2:.*]] = ntensor.to_tensor_copy %[[ARG2]] : !ntensor.ntensor<f32, "test"> to tensor<f32>
 
 //       CHECK:   %[[SRC1D1:.*]] = scf.if %{{.*}} -> (tensor<?x?xf32>) {
 //       CHECK:     %[[TMP1:.*]] = tensor.empty(%{{.*}}, %{{.*}}) : tensor<?x?xf32>
