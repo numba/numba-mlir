@@ -849,26 +849,7 @@ mlir::OpFoldResult numba::ntensor::ToTensorOp::fold(FoldAdaptor) {
   }
   if (auto from = arr.getDefiningOp<numba::ntensor::FromTensorOp>()) {
     auto val = from.getTensor();
-    auto haveOnlySafeUses = [](mlir::Operation *op) -> bool {
-      // Fold if we are the only user.
-      if (op->hasOneUse())
-        return true;
-
-      for (auto user : op->getUsers()) {
-        if (!mlir::isa<ToTensorOp>(user))
-          return false;
-
-        // Fold only other ops cannot create aliases.
-        for (auto tensorUser : user->getUsers())
-          if (!mlir::isa<mlir::tensor::DimOp, mlir::tensor::ExtractOp,
-                         mlir::linalg::GenericOp>(tensorUser))
-            return false;
-      }
-
-      return true;
-    };
-
-    if (getType() == val.getType() && haveOnlySafeUses(from))
+    if (getType() == val.getType())
       return val;
   }
   return nullptr;
