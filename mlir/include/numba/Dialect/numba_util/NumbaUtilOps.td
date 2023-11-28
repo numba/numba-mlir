@@ -399,20 +399,37 @@ def GetAllocTokenOp : NumbaUtil_Op<"get_alloc_token", [
 def ReshapeOp : NumbaUtil_Op<"reshape", [
     Pure, ViewLikeOpInterface]> {
 
+  let summary = "Shaped type reshape operation";
+  let description = [{
+    Reshapes source into provided shape.
+
+    Total elements count in source array must match destination shape.
+
+    Reshape may be lowered either into copy or memory view, depending on
+    lowering strategy, arg types and inferred layout.
+  }];
+
   let arguments = (ins
     AnyShaped:$source,
     Variadic<Index>:$shape
   );
+
   let results = (outs AnyShaped:$result);
 
   let extraClassDeclaration = [{
       ::mlir::Value getViewSource() { return getSource(); }
   }];
 
-
   let assemblyFormat = [{
     $source `(` $shape `)` attr-dict `:` functional-type(operands, results)
   }];
+
+  let builders = [
+    OpBuilder<(ins
+      "::mlir::Value":$source,
+      "::mlir::ValueRange":$shape
+    )>
+  ];
 }
 
 
