@@ -2572,7 +2572,7 @@ struct SimplifyExpandDims
       auto prevExpr = inMap.getResult(i);
       bool canConvert = [&]() {
         if (outShape[i] == 1) {
-          auto constExpr = prevExpr.dyn_cast<mlir::AffineConstantExpr>();
+          auto constExpr = mlir::dyn_cast<mlir::AffineConstantExpr>(prevExpr);
           if (constExpr && constExpr.getValue() == 0)
             return true;
         }
