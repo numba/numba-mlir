@@ -858,32 +858,12 @@ struct NtensorLowerToTensorCopyPass
       auto src = toTensor.getArray();
 
       builder.setInsertionPoint(toTensor);
-      if (hasWrite(toTensor.getArray())) {
-        auto dstShape = resType.getShape();
-        tmp.clear();
-        for (auto &&[i, s] : llvm::enumerate(dstShape)) {
-          if (mlir::ShapedType::isDynamic(s))
-            tmp.emplace_back(
-                builder.create<numba::ntensor::DimOp>(loc, src, i));
-        }
-
-        auto srcType = mlir::cast<mlir::ShapedType>(src.getType());
-        auto tmpType = srcType.clone(dstShape);
-        mlir::Value tmpArray = builder.create<numba::ntensor::CreateArrayOp>(
-            loc, tmpType, tmp, /*init*/ nullptr);
-        builder.create<numba::ntensor::CopyOp>(loc, src, tmpArray);
-        writers.insert(tmpArray);
-
-        auto res =
-            builder.create<numba::ntensor::ToTensorOp>(loc, resType, tmpArray);
-        toTensor->replaceAllUsesWith(res->getResults());
-
-      } else {
+      if (!hasWrite(toTensor.getArray())) {
         auto res =
             builder.create<numba::ntensor::ToTensorOp>(loc, resType, src);
         toTensor->replaceAllUsesWith(res->getResults());
+        toTensor->erase();
       }
-      toTensor->erase();
     }
   }
 };
