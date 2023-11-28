@@ -75,7 +75,7 @@ def ParallelAttr : NumbaUtil_Attr<"Parallel", "parallel">;
 
 def AtomicAttr : NumbaUtil_Attr<"Atomic", "atomic">;
 
-def EnforceShapeOp : NumbaUtil_Op<"enforce_shape", [Pure]> {
+def EnforceShapeOp : NumbaUtil_Op<"enforce_shape", [Pure, ViewLikeOpInterface]> {
 
   let arguments = (ins AnyShaped:$value, Variadic<Index>:$sizes);
   let results = (outs AnyShaped:$result);
@@ -88,6 +88,10 @@ def EnforceShapeOp : NumbaUtil_Op<"enforce_shape", [Pure]> {
   let hasCanonicalizer = 1;
 
   let assemblyFormat = "attr-dict $value `:` type($value) `(` $sizes `)` `->` type($result)";
+
+  let extraClassDeclaration = [{
+      ::mlir::Value getViewSource() { return getValue(); }
+  }];
 }
 
 def ParallelOp : NumbaUtil_Op<"parallel", [
