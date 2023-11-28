@@ -361,6 +361,23 @@ struct ToTensorDimPropagate
   }
 };
 
+struct ToTensorCopyDimPropagate
+    : public mlir::OpRewritePattern<mlir::tensor::DimOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(mlir::tensor::DimOp op,
+                  mlir::PatternRewriter &rewriter) const override {
+    auto src = op.getSource().getDefiningOp<numba::ntensor::ToTensorCopyOp>();
+    if (!src)
+      return mlir::failure();
+
+    rewriter.replaceOpWithNewOp<numba::ntensor::DimOp>(op, src.getArray(),
+                                                       op.getIndex());
+    return mlir::success();
+  }
+};
+
 // TODO: upstream
 struct LinalgGenericDimPropagate
     : public mlir::OpRewritePattern<mlir::tensor::DimOp> {
@@ -431,7 +448,8 @@ struct ExtractSliceDimPropagate
 void numba::ntensor::DimOp::getCanonicalizationPatterns(
     ::mlir::RewritePatternSet &results, ::mlir::MLIRContext *context) {
   results.insert<FromTensorDimPropagate, ToTensorDimPropagate,
-                 LinalgGenericDimPropagate, ExtractSliceDimPropagate>(context);
+                 ToTensorCopyDimPropagate, LinalgGenericDimPropagate,
+                 ExtractSliceDimPropagate>(context);
 }
 
 mlir::OpFoldResult numba::ntensor::DimOp::fold(FoldAdaptor) {
