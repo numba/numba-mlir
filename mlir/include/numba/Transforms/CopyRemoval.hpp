@@ -4,16 +4,11 @@
 
 #pragma once
 
-#include "numba/Analysis/AliasAnalysis.hpp"
+#include <memory>
 
-#include <mlir/IR/Dominance.h>
-#include <mlir/Interfaces/FunctionInterfaces.h>
-#include <mlir/Interfaces/SideEffectInterfaces.h>
-#include <mlir/Pass/Pass.h>
-
-#include "numba/Dialect/ntensor/IR/NTensorOps.hpp"
-
-#include <functional>
+namespace mlir {
+class Pass;
+}
 
 namespace numba {
 std::unique_ptr<mlir::Pass> createCopyRemovalPass();

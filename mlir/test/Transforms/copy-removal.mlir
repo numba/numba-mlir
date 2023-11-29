@@ -149,4 +149,3 @@ func.func @test(%arg1: memref<?xf32>, %arg2: memref<?xf32>) {
   }
   return
 }
-
