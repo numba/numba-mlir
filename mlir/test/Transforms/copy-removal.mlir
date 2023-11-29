@@ -1,4 +1,4 @@
-// RUN: numba-mlir-opt -pass-pipeline='builtin.module(func.func(copy-removal))' --split-input-file %s | FileCheck %s
+// RUN: numba-mlir-opt -pass-pipeline='builtin.module(func.func(copy-removal))' -allow-unregistered-dialect --split-input-file %s | FileCheck %s
 
 // CHECK-LABEL: func @test
 //  CHECK-SAME: (%[[ARG1:.*]]: !ntensor.ntensor<?xf32>, %[[ARG2:.*]]: !ntensor.ntensor<?xf32>)
@@ -86,3 +86,67 @@ func.func @test(%arg0: memref<?xi64, strided<[-1], offset: ?>>, %arg1: memref<?x
   }
   return
 }
+
+// -----
+
+// CHECK-LABEL: func @test
+//  CHECK-SAME: (%[[ARG1:.*]]: memref<?xf32>, %[[ARG2:.*]]: memref<?xf32>)
+//       CHECK: scf.for
+//       CHECK: %{{.*}} = memref.load %[[ARG1]][%{{.*}}] : memref<?xf32>
+//       CHECK: }
+//       CHECK: return
+#map = affine_map<(d0) -> (d0)>
+func.func @test(%arg1: memref<?xf32>, %arg2: memref<?xf32>) {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %c10 = arith.constant 10 : index
+  %alloc = memref.alloc(%c10) : memref<?xf32>
+  linalg.generic {indexing_maps = [#map, #map], iterator_types = ["parallel"]} ins(%arg2 : memref<?xf32>) outs(%arg1 : memref<?xf32>) {
+    ^bb0(%in: f32, %out: f32):
+      linalg.yield %in : f32
+  }
+  scf.for %arg5 = %c0 to %c10 step %c1 {
+    %alloc2 = memref.alloc(%c10) : memref<?xf32>
+    linalg.generic {indexing_maps = [#map, #map], iterator_types = ["parallel"]} ins(%arg1 : memref<?xf32>) outs(%alloc2 : memref<?xf32>) {
+      ^bb0(%in: f32, %out: f32):
+        linalg.yield %in : f32
+    }
+    %1 = memref.load %alloc2[%c0] : memref<?xf32>
+    "test.test"(%1) : (f32) -> ()
+  }
+  return
+}
+
+// -----
+
+// CHECK-LABEL: func @test
+//  CHECK-SAME: (%[[ARG1:.*]]: memref<?xf32>, %[[ARG2:.*]]: memref<?xf32>)
+//       CHECK: scf.for
+//       CHECK: %{{.*}} = memref.load %[[ARG1]][%{{.*}}] : memref<?xf32>
+//       CHECK: memref.store %{{.*}}, %[[ARG1]][%{{.*}}] : memref<?xf32>
+//       CHECK: }
+//       CHECK: return
+#map = affine_map<(d0) -> (d0)>
+func.func @test(%arg1: memref<?xf32>, %arg2: memref<?xf32>) {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %c10 = arith.constant 10 : index
+  %alloc = memref.alloc(%c10) : memref<?xf32>
+  linalg.generic {indexing_maps = [#map, #map], iterator_types = ["parallel"]} ins(%arg2 : memref<?xf32>) outs(%arg1 : memref<?xf32>) {
+    ^bb0(%in: f32, %out: f32):
+      linalg.yield %in : f32
+  }
+  scf.for %arg5 = %c0 to %c10 step %c1 {
+    %alloc2 = memref.alloc(%c10) : memref<?xf32>
+    linalg.generic {indexing_maps = [#map, #map], iterator_types = ["parallel"]} ins(%arg1 : memref<?xf32>) outs(%alloc2 : memref<?xf32>) {
+      ^bb0(%in: f32, %out: f32):
+        linalg.yield %in : f32
+    }
+    %1 = memref.load %alloc2[%c0] : memref<?xf32>
+    "test.test"(%1) : (f32) -> ()
+    %2 = "test.test"() : () -> (f32)
+    memref.store %2, %arg1[%c0] : memref<?xf32>
+  }
+  return
+}
+

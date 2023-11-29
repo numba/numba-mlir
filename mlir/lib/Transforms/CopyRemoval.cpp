@@ -4,6 +4,7 @@
 
 #include "numba/Analysis/AliasAnalysis.hpp"
 
+#include <mlir/Interfaces/LoopLikeInterface.h>
 #include <mlir/Dialect/Linalg/IR/Linalg.h>
 #include <mlir/Dialect/MemRef/IR/MemRef.h>
 #include <mlir/IR/Dominance.h>
@@ -155,6 +156,12 @@ struct CopyRemovalPass
 
     auto inBetween = [&](mlir::Operation *op, mlir::Operation *begin,
                          mlir::Operation *end) -> bool {
+      mlir::Operation* loop = end;
+      while ((loop = loop->getParentOfType<mlir::LoopLikeOpInterface>())) {
+        if (!loop->isProperAncestor(begin) && loop->isProperAncestor(op))
+          return true;
+      }
+
       if (postDom.postDominates(begin, op))
         return false;
 
@@ -198,10 +205,8 @@ struct CopyRemovalPass
         auto memInterface =
             mlir::dyn_cast<mlir::MemoryEffectOpInterface>(owner);
         if (!memInterface ||
-            !memInterface.template getEffectOnValue<mlir::MemoryEffects::Read>(
-                dst) ||
-            memInterface.template getEffectOnValue<mlir::MemoryEffects::Write>(
-                dst)) {
+            !memInterface.getEffectOnValue<mlir::MemoryEffects::Read>(dst) ||
+            memInterface.getEffectOnValue<mlir::MemoryEffects::Write>(dst)) {
           continue;
         }
 
