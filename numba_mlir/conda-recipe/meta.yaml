@@ -28,10 +28,10 @@ requirements:
         - mkl-dpcpp {{ dpcpp_version }}
         - dpcpp-cpp-rt {{ dpcpp_version }}
         - dpcpp_cpp_rt {{ dpcpp_version }}
-        - tbb-devel =2021.10.0
+        - tbb-devel >=2021.6.0
         - level-zero-devel
         - ninja
-        - numba =0.57
+        - numba >=0.57
         - pybind11
         - python
         - setuptools
@@ -40,7 +40,7 @@ requirements:
     run:
         - mkl
         - mkl-dpcpp
-        - numba =0.57
+        - numba >=0.57
         - packaging
         - python
         - tbb >=2021.6.0
