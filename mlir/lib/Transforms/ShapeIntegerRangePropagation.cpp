@@ -143,7 +143,8 @@ struct ShapeValueLattice : public mlir::dataflow::Lattice<ShapeValue> {
 
 static bool isShapedCast(mlir::Operation *op) {
   if (mlir::isa<numba::ntensor::FromTensorOp, numba::ntensor::ToTensorOp,
-                numba::ntensor::FromMemrefOp, numba::ntensor::ToMemrefOp>(op))
+                numba::ntensor::ToTensorCopyOp, numba::ntensor::FromMemrefOp,
+                numba::ntensor::ToMemrefOp>(op))
     return true;
 
   return mlir::isa<mlir::CastOpInterface>(op) && op->getNumOperands() == 1 &&
