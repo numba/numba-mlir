@@ -97,10 +97,9 @@ template <typename T> static size_t countUntil(T *ptr, T &&elem) {
   return static_cast<size_t>(curr - ptr);
 }
 
-static auto countEvents(sycl::event **events) {
+template <typename T> static auto countEvents(T **events) {
   assert(events);
-  return static_cast<uint32_t>(
-      countUntil(events, static_cast<sycl::event *>(nullptr)));
+  return static_cast<uint32_t>(countUntil(events, static_cast<T *>(nullptr)));
 }
 
 static void *checkAlloc(void *mem, const char *err) {
@@ -170,16 +169,16 @@ public:
     destroyGPUKernel(kernel);
   }
 
-  sycl::event *launchKernel(GPUKernel *kernel, size_t gridX, size_t gridY,
-                            size_t gridZ, size_t blockX, size_t blockY,
-                            size_t blockZ, sycl::event **srcEvents,
-                            numba::GPUParamDesc *params) {
+  EventStorage *launchKernel(GPUKernel *kernel, size_t gridX, size_t gridY,
+                             size_t gridZ, size_t blockX, size_t blockY,
+                             size_t blockZ, EventStorage **srcEvents,
+                             numba::GPUParamDesc *params) {
     assert(kernel);
     auto eventsCount = countEvents(srcEvents);
     auto paramsCount = countUntil(
         params, numba::GPUParamDesc{nullptr, 0, numba::GpuParamType::null});
 
-    auto evStorage = getEvent();
+    auto *evStorage = getEvent();
     assert(evStorage);
 
     auto globalRange =
@@ -191,7 +190,7 @@ public:
       for (decltype(eventsCount) i = 0; i < eventsCount; ++i) {
         auto event = srcEvents[i];
         assert(event);
-        cgh.depends_on(*event);
+        cgh.depends_on(event->event);
       }
 
       for (decltype(paramsCount) i = 0; i < paramsCount; i++)
@@ -200,32 +199,31 @@ public:
       cgh.parallel_for(ndRange, syclKernel);
     });
 
-    return &(evStorage->event);
+    return evStorage;
   }
 
-  void waitEvent(sycl::event *event) {
+  void waitEvent(EventStorage *event) {
     assert(event);
-    event->wait();
+    event->event.wait();
   }
 
-  void destroyEvent(sycl::event *event) {
+  void destroyEvent(EventStorage *event) {
     assert(event);
-    auto storage = reinterpret_cast<EventStorage *>(event);
-    returnEvent(storage);
+    returnEvent(event);
   }
 
-  std::tuple<void *, sycl::event *> allocBuffer(size_t size, size_t alignment,
-                                                numba::GpuAllocType type,
-                                                sycl::event **srcEvents) {
+  std::tuple<void *, EventStorage *> allocBuffer(size_t size, size_t alignment,
+                                                 numba::GpuAllocType type,
+                                                 EventStorage **srcEvents) {
     // Alloc is always sync for now, synchronize
     auto eventsCount = countEvents(srcEvents);
     for (decltype(eventsCount) i = 0; i < eventsCount; ++i) {
       auto event = srcEvents[i];
       assert(event);
-      event->wait();
+      event->event.wait();
     }
 
-    auto evStorage = getEvent();
+    auto *evStorage = getEvent();
 
     auto mem = [&]() -> void * {
       void *ret = nullptr;
@@ -250,7 +248,7 @@ public:
     // Prolong gpu_runtime lifetime until all buffers are released (in case we
     // need to return allocated buffer from function).
     retain();
-    return {mem, &(evStorage->event)};
+    return {mem, evStorage};
   }
 
   void deallocBuffer(void *ptr) {
@@ -406,7 +404,7 @@ gpuxLaunchKernel(void *queue, void *kernel, size_t gridX, size_t gridY,
   return catchAll([&]() {
     return toQueue(queue)->launchKernel(
         static_cast<GPUKernel *>(kernel), gridX, gridY, gridZ, blockX, blockY,
-        blockZ, static_cast<sycl::event **>(events),
+        blockZ, static_cast<EventStorage **>(events),
         static_cast<numba::GPUParamDesc *>(params));
   });
 }
@@ -414,15 +412,16 @@ gpuxLaunchKernel(void *queue, void *kernel, size_t gridX, size_t gridY,
 extern "C" NUMBA_MLIR_GPU_RUNTIME_SYCL_EXPORT void gpuxWait(void *queue,
                                                             void *event) {
   LOG_FUNC();
-  catchAll(
-      [&]() { toQueue(queue)->waitEvent(static_cast<sycl::event *>(event)); });
+  catchAll([&]() {
+    toQueue(queue)->waitEvent(static_cast<EventStorage *>(event));
+  });
 }
 
 extern "C" NUMBA_MLIR_GPU_RUNTIME_SYCL_EXPORT void
 gpuxDestroyEvent(void *queue, void *event) {
   LOG_FUNC();
   catchAll([&]() {
-    toQueue(queue)->destroyEvent(static_cast<sycl::event *>(event));
+    toQueue(queue)->destroyEvent(static_cast<EventStorage *>(event));
   });
 }
 
@@ -433,7 +432,7 @@ gpuxAlloc(void *queue, size_t size, size_t alignment, int type, void *events,
   catchAll([&]() {
     auto res = toQueue(queue)->allocBuffer(
         size, alignment, static_cast<numba::GpuAllocType>(type),
-        static_cast<sycl::event **>(events));
+        static_cast<EventStorage **>(events));
     *ret = {std::get<0>(res), std::get<1>(res)};
   });
 }
