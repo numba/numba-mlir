@@ -2572,19 +2572,19 @@ void GetAllocTokenOp::getCanonicalizationPatterns(
 }
 
 namespace {
-struct ReshapeExpandShape
-    : public mlir::OpRewritePattern<numba::util::ReshapeOp> {
+struct ReshapeSimplify : public mlir::OpRewritePattern<numba::util::ReshapeOp> {
   using OpRewritePattern::OpRewritePattern;
 
   mlir::LogicalResult
   matchAndRewrite(numba::util::ReshapeOp op,
                   mlir::PatternRewriter &rewriter) const override {
     mlir::Value src = op.getSource();
-    auto srcType = mlir::dyn_cast<mlir::TensorType>(src.getType());
+    auto srcType = mlir::dyn_cast<mlir::RankedTensorType>(src.getType());
     if (!srcType || srcType.getRank() != 1)
       return mlir::failure();
 
-    auto dstType = mlir::dyn_cast<mlir::TensorType>(op.getResult().getType());
+    auto dstType =
+        mlir::dyn_cast<mlir::RankedTensorType>(op.getResult().getType());
     if (!dstType)
       return mlir::failure();
 
@@ -2594,10 +2594,27 @@ struct ReshapeExpandShape
 
     auto srcRank = static_cast<unsigned>(srcType.getRank());
     auto dstRank = static_cast<unsigned>(dstType.getRank());
+    auto newShape = op.getShape();
+    if (newShape.size() != dstRank)
+      return mlir::failure();
+
+    if (srcRank == 1 && dstRank == 1) {
+      mlir::OpFoldResult offset = rewriter.getIndexAttr(0);
+      mlir::OpFoldResult size = newShape.front();
+      mlir::OpFoldResult stride = rewriter.getIndexAttr(1);
+      auto loc = op.getLoc();
+      mlir::Value res = rewriter.create<mlir::tensor::ExtractSliceOp>(
+          loc, src, offset, size, stride);
+      if (res.getType() != dstType)
+        res = rewriter.create<mlir::tensor::CastOp>(loc, dstType, res);
+
+      rewriter.replaceOp(op, res);
+      return mlir::success();
+    }
+
     if (srcRank == dstRank)
       return mlir::failure();
 
-    auto newShape = op.getShape();
     auto unitDimsCount = [&]() {
       unsigned ret = 0;
       for (auto v : newShape)
@@ -2643,7 +2660,7 @@ struct ReshapeExpandShape
 
 void ReshapeOp::getCanonicalizationPatterns(mlir::RewritePatternSet &results,
                                             mlir::MLIRContext *context) {
-  results.insert<ReshapeExpandShape>(context);
+  results.insert<ReshapeSimplify>(context);
 }
 
 void ReshapeOp::build(mlir::OpBuilder &b, mlir::OperationState &result,
