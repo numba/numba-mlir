@@ -205,6 +205,7 @@ def _gen_math_funcs():
 
     math_funcs = [
         ("floor", 1),
+        ("ceil", 1),
         ("log", 1),
         ("sqrt", 1),
         ("exp", 1),

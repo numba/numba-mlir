@@ -1354,8 +1354,19 @@ static py::object selectImpl(py::capsule context, py::handle cond,
   auto &builder = ctx.builder;
   auto loc = ctx.loc;
   auto condVal = ctx.context.unwrapVal(loc, builder, cond);
+  auto condType = condVal.getType();
+  if (!condType.isInteger(1))
+    numba::reportError("Condition expected to be `i1` but got: " +
+                       toStr(condType));
+
   auto trueVal = ctx.context.unwrapVal(loc, builder, trueV);
   auto falseVal = ctx.context.unwrapVal(loc, builder, falseV);
+  auto trueType = trueVal.getType();
+  auto falseType = falseVal.getType();
+  if (trueType != falseType)
+    numba::reportError("Select args types must match, but got: " +
+                       toStr(trueType) + " and " + toStr(falseType));
+
   auto res =
       builder.create<mlir::arith::SelectOp>(loc, condVal, trueVal, falseVal);
   return ctx.context.createVar(context, res);
