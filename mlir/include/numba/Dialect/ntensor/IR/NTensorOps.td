@@ -699,6 +699,8 @@ def ToTensorCopyOp : NTensor_OpBase<"to_tensor_copy",
   let results = (outs Res<AnyRankedTensor, "", [MemAlloc<DefaultResource>]>:$result);
 
   let assemblyFormat = "$array attr-dict `:` qualified(type($array)) `to` type($result)";
+
+  let hasFolder = 1;
 }
 
 def FromMemrefOp : NTensor_OpBase<"from_memref",

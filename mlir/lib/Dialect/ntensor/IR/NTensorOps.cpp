@@ -923,6 +923,19 @@ mlir::OpFoldResult numba::ntensor::ToTensorOp::fold(FoldAdaptor) {
   return nullptr;
 }
 
+mlir::OpFoldResult numba::ntensor::ToTensorCopyOp::fold(FoldAdaptor) {
+  auto arr = getArray();
+  if (auto from = arr.getDefiningOp<numba::ntensor::FromTensorOp>()) {
+    if (!arr.hasOneUse())
+      return nullptr;
+
+    auto val = from.getTensor();
+    if (getType() == val.getType())
+      return val;
+  }
+  return nullptr;
+}
+
 mlir::OpFoldResult numba::ntensor::FromMemrefOp::fold(FoldAdaptor) {
   if (auto to = getMemref().getDefiningOp<numba::ntensor::ToMemrefOp>()) {
     auto array = to.getArray();
