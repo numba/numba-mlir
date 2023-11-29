@@ -2601,7 +2601,7 @@ struct ReshapeSimplify : public mlir::OpRewritePattern<numba::util::ReshapeOp> {
     if (srcRank == 1 && dstRank == 1) {
       mlir::OpFoldResult offset = rewriter.getIndexAttr(0);
       mlir::OpFoldResult size = newShape.front();
-      mlir::OpFoldResult stride = rewriter.getIndexAttr(0);
+      mlir::OpFoldResult stride = rewriter.getIndexAttr(1);
       auto loc = op.getLoc();
       mlir::Value res = rewriter.create<mlir::tensor::ExtractSliceOp>(
           loc, src, offset, size, stride);

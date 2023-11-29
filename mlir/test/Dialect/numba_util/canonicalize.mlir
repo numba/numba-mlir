@@ -233,7 +233,7 @@ func.func @test(%arg0: tensor<?xf32>, %arg1: index) -> tensor<?x?x?xf32> {
 
 // CHECK-LABEL: func @test
 //  CHECK-SAME:   (%[[ARG1:.*]]: tensor<?xf32>, %[[ARG2]]: index)
-//       CHECK:   %[[RES:.*]] = tensor.extract_slice %[[ARG1]][0] [%[[ARG2]]] [0] : tensor<?xf32> to tensor<?xf32>
+//       CHECK:   %[[RES:.*]] = tensor.extract_slice %[[ARG1]][0] [%[[ARG2]]] [1] : tensor<?xf32> to tensor<?xf32>
 //       CHECK:   return %[[RES]]
 func.func @test(%arg0: tensor<?xf32>, %arg1: index) -> tensor<?xf32> {
   %c1 = arith.constant 1 : index
@@ -245,7 +245,7 @@ func.func @test(%arg0: tensor<?xf32>, %arg1: index) -> tensor<?xf32> {
 
 // CHECK-LABEL: func @test
 //  CHECK-SAME:   (%[[ARG1:.*]]: !ntensor.ntensor<?xf32>, %[[ARG2]]: index)
-//       CHECK:   %[[RES:.*]] = ntensor.subview %[[ARG1]][0] [%[[ARG2]]] [0] : !ntensor.ntensor<?xf32> to !ntensor.ntensor<?xf32>
+//       CHECK:   %[[RES:.*]] = ntensor.subview %[[ARG1]][0] [%[[ARG2]]] [1] : !ntensor.ntensor<?xf32> to !ntensor.ntensor<?xf32>
 //       CHECK:   return %[[RES]]
 func.func @test(%arg0: !ntensor.ntensor<?xf32>, %arg1: index) -> !ntensor.ntensor<?xf32> {
   %c1 = arith.constant 1 : index
