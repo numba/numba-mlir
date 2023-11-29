@@ -631,6 +631,7 @@ def arange_impl(builder, start, stop=None, step=None, dtype=None):
 
     inc = builder.select(step < 0, 1, -1)
     count = (stop - start + step + inc) // step
+    count = builder.cast(count, builder.int64)
     count = builder.select(count < 0, 0, count)
 
     start = builder.from_elements(start)
