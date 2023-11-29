@@ -2,12 +2,15 @@
 //
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "numba/Transforms/CopyRemoval.hpp"
+
 #include "numba/Analysis/AliasAnalysis.hpp"
 
 #include <mlir/Dialect/Linalg/IR/Linalg.h>
 #include <mlir/Dialect/MemRef/IR/MemRef.h>
 #include <mlir/IR/Dominance.h>
 #include <mlir/Interfaces/FunctionInterfaces.h>
+#include <mlir/Interfaces/LoopLikeInterface.h>
 #include <mlir/Interfaces/SideEffectInterfaces.h>
 #include <mlir/Pass/Pass.h>
 
@@ -71,7 +74,7 @@ static bool isLocallyAllocated(mlir::Value value) {
       value.getDefiningOp());
 }
 
-static mlir::Value CastTensor(mlir::OpBuilder &builder, mlir::Location &loc,
+static mlir::Value castTensor(mlir::OpBuilder &builder, mlir::Location &loc,
                               mlir::Value src, mlir::Value dst) {
   if (mlir::isa_and_nonnull<numba::ntensor::NTensorType>(src.getType()))
     return builder.create<numba::ntensor::CastOp>(loc, dst.getType(), src);
@@ -105,7 +108,7 @@ static mlir::Value getCopyOpTarget(mlir::Operation &op) {
   llvm_unreachable("Unknown tensor type");
 }
 
-namespace numba {
+namespace {
 struct CopyRemovalPass
     : public mlir::PassWrapper<CopyRemovalPass,
                                mlir::InterfacePass<mlir::FunctionOpInterface>> {
@@ -147,14 +150,20 @@ struct CopyRemovalPass
     });
 
     if (copies.empty())
-      return this->markAllAnalysesPreserved();
+      return markAllAnalysesPreserved();
 
-    auto &dom = this->template getAnalysis<mlir::DominanceInfo>();
-    auto &postDom = this->template getAnalysis<mlir::PostDominanceInfo>();
-    auto &aa = this->template getAnalysis<numba::LocalAliasAnalysis>();
+    auto &dom = getAnalysis<mlir::DominanceInfo>();
+    auto &postDom = getAnalysis<mlir::PostDominanceInfo>();
+    auto &aa = getAnalysis<numba::LocalAliasAnalysis>();
 
     auto inBetween = [&](mlir::Operation *op, mlir::Operation *begin,
                          mlir::Operation *end) -> bool {
+      mlir::Operation *loop = end;
+      while ((loop = loop->getParentOfType<mlir::LoopLikeOpInterface>())) {
+        if (!loop->isProperAncestor(begin) && loop->isProperAncestor(op))
+          return true;
+      }
+
       if (postDom.postDominates(begin, op))
         return false;
 
@@ -181,7 +190,7 @@ struct CopyRemovalPass
       return false;
     };
 
-    mlir::OpBuilder builder(&this->getContext());
+    mlir::OpBuilder builder(&getContext());
 
     // Propagate copy src.
     for (auto copy : copies) {
@@ -198,10 +207,8 @@ struct CopyRemovalPass
         auto memInterface =
             mlir::dyn_cast<mlir::MemoryEffectOpInterface>(owner);
         if (!memInterface ||
-            !memInterface.template getEffectOnValue<mlir::MemoryEffects::Read>(
-                dst) ||
-            memInterface.template getEffectOnValue<mlir::MemoryEffects::Write>(
-                dst)) {
+            !memInterface.getEffectOnValue<mlir::MemoryEffects::Read>(dst) ||
+            memInterface.getEffectOnValue<mlir::MemoryEffects::Write>(dst)) {
           continue;
         }
 
@@ -209,7 +216,7 @@ struct CopyRemovalPass
         if (src.getType() != dst.getType()) {
           auto loc = owner->getLoc();
           builder.setInsertionPoint(owner);
-          newArg = CastTensor(builder, loc, newArg, dst);
+          newArg = castTensor(builder, loc, newArg, dst);
         }
 
         use.set(newArg);
@@ -281,8 +288,8 @@ struct CopyRemovalPass
       op->erase();
   }
 };
+} // namespace
 
-std::unique_ptr<mlir::Pass> createCopyRemovalPass() {
-  return std::unique_ptr<mlir::Pass>(new CopyRemovalPass());
+std::unique_ptr<mlir::Pass> numba::createCopyRemovalPass() {
+  return std::make_unique<CopyRemovalPass>();
 }
-} // namespace numba
