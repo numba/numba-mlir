@@ -411,6 +411,23 @@ struct ToTensorDimPropagate
   }
 };
 
+struct ToTensorCopyDimPropagate
+    : public mlir::OpRewritePattern<mlir::tensor::DimOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(mlir::tensor::DimOp op,
+                  mlir::PatternRewriter &rewriter) const override {
+    auto src = op.getSource().getDefiningOp<numba::ntensor::ToTensorCopyOp>();
+    if (!src)
+      return mlir::failure();
+
+    rewriter.replaceOpWithNewOp<numba::ntensor::DimOp>(op, src.getArray(),
+                                                       op.getIndex());
+    return mlir::success();
+  }
+};
+
 // TODO: upstream
 struct LinalgGenericDimPropagate
     : public mlir::OpRewritePattern<mlir::tensor::DimOp> {
@@ -481,7 +498,8 @@ struct ExtractSliceDimPropagate
 void numba::ntensor::DimOp::getCanonicalizationPatterns(
     ::mlir::RewritePatternSet &results, ::mlir::MLIRContext *context) {
   results.insert<FromTensorDimPropagate, ToTensorDimPropagate,
-                 LinalgGenericDimPropagate, ExtractSliceDimPropagate>(context);
+                 ToTensorCopyDimPropagate, LinalgGenericDimPropagate,
+                 ExtractSliceDimPropagate>(context);
 }
 
 mlir::OpFoldResult numba::ntensor::DimOp::fold(FoldAdaptor) {
@@ -899,26 +917,20 @@ mlir::OpFoldResult numba::ntensor::ToTensorOp::fold(FoldAdaptor) {
   }
   if (auto from = arr.getDefiningOp<numba::ntensor::FromTensorOp>()) {
     auto val = from.getTensor();
-    auto haveOnlySafeUses = [](mlir::Operation *op) -> bool {
-      // Fold if we are the only user.
-      if (op->hasOneUse())
-        return true;
+    if (getType() == val.getType())
+      return val;
+  }
+  return nullptr;
+}
 
-      for (auto user : op->getUsers()) {
-        if (!mlir::isa<ToTensorOp>(user))
-          return false;
+mlir::OpFoldResult numba::ntensor::ToTensorCopyOp::fold(FoldAdaptor) {
+  auto arr = getArray();
+  if (auto from = arr.getDefiningOp<numba::ntensor::FromTensorOp>()) {
+    if (!arr.hasOneUse())
+      return nullptr;
 
-        // Fold only other ops cannot create aliases.
-        for (auto tensorUser : user->getUsers())
-          if (!mlir::isa<mlir::tensor::DimOp, mlir::tensor::ExtractOp,
-                         mlir::linalg::GenericOp>(tensorUser))
-            return false;
-      }
-
-      return true;
-    };
-
-    if (getType() == val.getType() && haveOnlySafeUses(from))
+    auto val = from.getTensor();
+    if (getType() == val.getType())
       return val;
   }
   return nullptr;

@@ -108,21 +108,6 @@ func.func @test(%arg1: tensor<?xf32>) -> tensor<?xf32> {
 
 // -----
 
-func.func @test(%arg1: tensor<?xf32>) -> tensor<?xf32> {
-  %0 = ntensor.from_tensor %arg1 : tensor<?xf32> to !ntensor.ntensor<?xf32>
-  "test.test5"(%0) : (!ntensor.ntensor<?xf32>) -> ()
-  %1 = ntensor.to_tensor %0 : !ntensor.ntensor<?xf32> to tensor<?xf32>
-  return %1 : tensor<?xf32>
-}
-// CHECK-LABEL: func @test
-//  CHECK-SAME:   (%[[ARG:.*]]: tensor<?xf32>)
-//  CHECK-NEXT:   %[[TMP:.*]] = ntensor.from_tensor %[[ARG]] : tensor<?xf32> to !ntensor.ntensor<?xf32>
-//  CHECK-NEXT:   "test.test5"(%[[TMP]]) : (!ntensor.ntensor<?xf32>) -> ()
-//  CHECK-NEXT:   %[[RES:.*]] = ntensor.to_tensor %[[TMP]] : !ntensor.ntensor<?xf32> to tensor<?xf32>
-//  CHECK-NEXT:   return %[[RES]] : tensor<?xf32>
-
-// -----
-
 func.func @test(%arg1: !ntensor.ntensor<?xf32>) -> !ntensor.ntensor<?xf32> {
   %0 = ntensor.to_tensor %arg1 : !ntensor.ntensor<?xf32> to tensor<?xf32>
   %1 = ntensor.from_tensor %0 : tensor<?xf32> to !ntensor.ntensor<?xf32>

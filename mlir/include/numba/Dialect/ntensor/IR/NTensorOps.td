@@ -655,7 +655,7 @@ def FromTensorOp : NTensor_OpBase<"from_tensor",
   }];
 
   let arguments = (ins AnyRankedTensor:$tensor);
-  let results = (outs Res<NTensor_Tensor, "", [MemAlloc<DefaultResource>]>:$result);
+  let results = (outs NTensor_Tensor:$result);
 
   let assemblyFormat = "$tensor attr-dict `:` type($tensor) `to` qualified(type($result))";
 
@@ -668,14 +668,13 @@ def FromTensorOp : NTensor_OpBase<"from_tensor",
 }
 
 def ToTensorOp : NTensor_OpBase<"to_tensor",
-    [SameOperandsShape, SameOperandsElementType, ViewLikeOpInterface]> {
+    [Pure, SameOperandsShape, SameOperandsElementType, ViewLikeOpInterface]> {
   let summary = "converts ntensor array to tensor.";
   let description = [{
     Converts from ntensor array to tensor. Shape and element type must match.
   }];
 
-  let arguments = (ins Arg<NTensor_Tensor,
-                       "the reference to load from", [MemRead]>:$array);
+  let arguments = (ins NTensor_Tensor:$array);
   let results = (outs AnyRankedTensor:$result);
 
   let assemblyFormat = "$array attr-dict `:` qualified(type($array)) `to` type($result)";
@@ -685,6 +684,22 @@ def ToTensorOp : NTensor_OpBase<"to_tensor",
   let extraClassDeclaration = [{
       ::mlir::Value getViewSource() { return getArray(); }
   }];
+}
+
+def ToTensorCopyOp : NTensor_OpBase<"to_tensor_copy",
+    [SameOperandsShape, SameOperandsElementType]> {
+  let summary = "converts ntensor array to tensor.";
+  let description = [{
+    Copy array into newly allocated tensor. Shape and element type must match.
+  }];
+
+  let arguments = (ins Arg<NTensor_Tensor,
+                       "the reference to load from", [MemRead]>:$array);
+  let results = (outs AnyRankedTensor:$result);
+
+  let assemblyFormat = "$array attr-dict `:` qualified(type($array)) `to` type($result)";
+
+  let hasFolder = 1;
 }
 
 def FromMemrefOp : NTensor_OpBase<"from_memref",
