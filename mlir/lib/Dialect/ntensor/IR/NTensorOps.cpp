@@ -4,6 +4,8 @@
 
 #include "numba/Dialect/ntensor/IR/NTensorOps.hpp"
 
+#include "numba/Dialect/numba_util/Dialect.hpp"
+
 #include <mlir/Dialect/Arith/IR/Arith.h>
 #include <mlir/Dialect/Arith/Utils/Utils.h>
 #include <mlir/Dialect/Linalg/IR/Linalg.h>
@@ -63,6 +65,54 @@ mlir::Operation *numba::ntensor::NTensorDialect::materializeConstant(
       return builder.create<mlir::arith::ConstantIndexOp>(loc, *val);
 
   return nullptr;
+}
+
+namespace {
+struct NtensorReshapeSimplify
+    : public mlir::OpRewritePattern<numba::util::ReshapeOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(numba::util::ReshapeOp op,
+                  mlir::PatternRewriter &rewriter) const override {
+    mlir::Value src = op.getSource();
+    auto srcType = mlir::dyn_cast<numba::ntensor::NTensorType>(src.getType());
+    if (!srcType || srcType.getRank() != 1)
+      return mlir::failure();
+
+    auto dstType =
+        mlir::dyn_cast<numba::ntensor::NTensorType>(op.getResult().getType());
+    if (!dstType)
+      return mlir::failure();
+
+    auto srcRank = static_cast<unsigned>(srcType.getRank());
+    auto dstRank = static_cast<unsigned>(dstType.getRank());
+    auto newShape = op.getShape();
+    if (newShape.size() != dstRank)
+      return mlir::failure();
+
+    if (srcRank == 1 && dstRank == 1) {
+      mlir::OpFoldResult offset = rewriter.getIndexAttr(0);
+      mlir::OpFoldResult size = newShape.front();
+      mlir::OpFoldResult stride = rewriter.getIndexAttr(0);
+      auto loc = op.getLoc();
+      mlir::Value res = rewriter.create<numba::ntensor::SubviewOp>(
+          loc, src, offset, size, stride);
+      if (res.getType() != dstType)
+        res = rewriter.create<numba::ntensor::CastOp>(loc, dstType, res);
+
+      rewriter.replaceOp(op, res);
+      return mlir::success();
+    }
+
+    return mlir::failure();
+  }
+};
+} // namespace
+
+void numba::ntensor::NTensorDialect::getCanonicalizationPatterns(
+    mlir::RewritePatternSet &results) const {
+  results.add<NtensorReshapeSimplify>(getContext());
 }
 
 bool numba::ntensor::NTensorBase::hasRank() const { return true; }

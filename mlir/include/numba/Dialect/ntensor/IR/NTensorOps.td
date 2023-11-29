@@ -47,6 +47,7 @@ def NTensor_Dialect : Dialect {
     "::mlir::tensor::TensorDialect",
     "::mlir::linalg::LinalgDialect"];
 
+  let hasCanonicalizer = 1;
   let hasConstantMaterializer = 1;
   let useDefaultTypePrinterParser = 1;
 }

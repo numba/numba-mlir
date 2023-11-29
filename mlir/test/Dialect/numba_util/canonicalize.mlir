@@ -240,3 +240,15 @@ func.func @test(%arg0: tensor<?xf32>, %arg1: index) -> tensor<?xf32> {
   %0 = numba_util.reshape %arg0(%arg1) : (tensor<?xf32>, index) -> tensor<?xf32>
   return %0: tensor<?xf32>
 }
+
+// -----
+
+// CHECK-LABEL: func @test
+//  CHECK-SAME:   (%[[ARG1:.*]]: !ntensor.ntensor<?xf32>, %[[ARG2]]: index)
+//       CHECK:   %[[RES:.*]] = ntensor.subview %[[ARG1]][0] [%[[ARG2]]] [0] : !ntensor.ntensor<?xf32> to !ntensor.ntensor<?xf32>
+//       CHECK:   return %[[RES]]
+func.func @test(%arg0: !ntensor.ntensor<?xf32>, %arg1: index) -> !ntensor.ntensor<?xf32> {
+  %c1 = arith.constant 1 : index
+  %0 = numba_util.reshape %arg0(%arg1) : (!ntensor.ntensor<?xf32>, index) -> !ntensor.ntensor<?xf32>
+  return %0: !ntensor.ntensor<?xf32>
+}
