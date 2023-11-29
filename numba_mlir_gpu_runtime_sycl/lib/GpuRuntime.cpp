@@ -412,9 +412,8 @@ gpuxLaunchKernel(void *queue, void *kernel, size_t gridX, size_t gridY,
 extern "C" NUMBA_MLIR_GPU_RUNTIME_SYCL_EXPORT void gpuxWait(void *queue,
                                                             void *event) {
   LOG_FUNC();
-  catchAll([&]() {
-    toQueue(queue)->waitEvent(static_cast<EventStorage *>(event));
-  });
+  catchAll(
+      [&]() { toQueue(queue)->waitEvent(static_cast<EventStorage *>(event)); });
 }
 
 extern "C" NUMBA_MLIR_GPU_RUNTIME_SYCL_EXPORT void
