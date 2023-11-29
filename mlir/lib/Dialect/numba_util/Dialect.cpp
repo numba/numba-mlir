@@ -274,14 +274,75 @@ struct ReshapeAlloca : public mlir::OpRewritePattern<mlir::memref::ReshapeOp> {
     return mlir::success();
   }
 };
+
+static bool hasWritesBetween(mlir::Operation *begin, mlir::Operation *end) {
+  auto it = begin->getIterator();
+  auto endIt = end->getIterator();
+  if (it == endIt)
+    return false;
+
+  ++it;
+  while (it != endIt) {
+    auto effects = mlir::getEffectsRecursively(&*it);
+    if (!effects)
+      return true;
+
+    for (const auto &effect : *effects) {
+      if (mlir::isa<mlir::MemoryEffects::Write>(effect.getEffect()))
+        return true;
+    }
+
+    ++it;
+  }
+  return false;
+}
+
+// TODO: upstream
+struct MemrefLoadCopy : public mlir::OpRewritePattern<mlir::memref::LoadOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(mlir::memref::LoadOp op,
+                  mlir::PatternRewriter &rewriter) const override {
+    auto memref = op.getMemRef();
+    mlir::Value arg;
+    for (auto user : memref.getUsers()) {
+      if (op == user)
+        continue;
+
+      auto copy = mlir::dyn_cast<mlir::CopyOpInterface>(user);
+      if (!copy)
+        continue;
+
+      if (copy.getTarget() != memref)
+        continue;
+
+      if (copy->getBlock() != op->getBlock() || !copy->isBeforeInBlock(op))
+        continue;
+
+      if (hasWritesBetween(copy, op))
+        continue;
+
+      arg = copy.getSource();
+      break;
+    }
+
+    if (!arg)
+      return mlir::failure();
+
+    rewriter.replaceOpWithNewOp<mlir::memref::LoadOp>(op, arg, op.getIndices(),
+                                                      op.getNontemporal());
+    return mlir::success();
+  }
+};
 } // namespace
 
 void NumbaUtilDialect::getCanonicalizationPatterns(
     mlir::RewritePatternSet &results) const {
   results.add<DimExpandShape<mlir::tensor::DimOp, mlir::tensor::ExpandShapeOp>,
               DimExpandShape<mlir::memref::DimOp, mlir::memref::ExpandShapeOp>,
-              DimInsertSlice, FillExtractSlice, SpirvInputCSE, ReshapeAlloca>(
-      getContext());
+              DimInsertSlice, FillExtractSlice, SpirvInputCSE, ReshapeAlloca,
+              MemrefLoadCopy>(getContext());
 }
 
 void EnforceShapeOp::build(mlir::OpBuilder &builder,
