@@ -15,6 +15,8 @@
 
 #include "numba/Dialect/numba_util/Dialect.hpp"
 
+/// Return type bitwidth for vectorization purposes or 0 if type cannot be
+/// vectorized.
 static unsigned getTypeBitWidth(mlir::Type type) {
   if (mlir::isa<mlir::IndexType>(type))
     return 64; // TODO: unhardcode
@@ -44,6 +46,8 @@ static bool isSupportedVecElem(mlir::Type type) {
   return type.isIntOrIndexOrFloat();
 }
 
+/// Check if one `ValueRange` is permutation of another, i.e. contains same
+/// values, potentially in different order.
 static bool isRangePermutation(mlir::ValueRange val1, mlir::ValueRange val2) {
   if (val1.size() != val2.size())
     return false;
@@ -84,6 +88,10 @@ cavTriviallyVectorizeMemOpImpl(mlir::scf::ParallelOp loop, unsigned dim,
   return width;
 }
 
+/// Check if memref load/store can be converted into vectorized load/store
+///
+/// Returns memref element bitwidth or `std::nullopt` if access cannot be
+/// vectorized.
 static std::optional<unsigned>
 cavTriviallyVectorizeMemOp(mlir::scf::ParallelOp loop, unsigned dim,
                            mlir::Operation &op) {
@@ -101,6 +109,8 @@ template <typename T> static bool isOp(mlir::Operation &op) {
   return mlir::isa<T>(op);
 }
 
+/// Returns `vector.reduce` kind for specified `scf.parallel` reduce op ot
+/// `std::nullopt` if reduction cannot be handled by `vector.reduce`.
 static std::optional<mlir::vector::CombiningKind>
 getReductionKind(mlir::scf::ReduceOp op) {
   mlir::Block &body = op.getReductionOperator().front();
@@ -137,6 +147,7 @@ numba::getLoopVectorizeInfo(mlir::scf::ParallelOp loop, unsigned dim,
   if (factor <= 1)
     return std::nullopt;
 
+  /// Only step==1 is supported for now.
   if (!mlir::isConstantIntValue(loop.getStep()[dim], 1))
     return std::nullopt;
 
@@ -144,6 +155,9 @@ numba::getLoopVectorizeInfo(mlir::scf::ParallelOp loop, unsigned dim,
   bool masked = true;
 
   for (mlir::Operation &op : loop.getBody()->without_terminator()) {
+    /// Check if `scf.reduce` can be handled by `vector.reduce`.
+    /// If not we still can vectorize the loop but we cannot use masked
+    /// vectorize.
     if (auto reduce = mlir::dyn_cast<mlir::scf::ReduceOp>(op)) {
       if (!getReductionKind(reduce))
         masked = false;
@@ -151,9 +165,11 @@ numba::getLoopVectorizeInfo(mlir::scf::ParallelOp loop, unsigned dim,
       continue;
     }
 
+    /// Ops with nested regions are not supported yet.
     if (op.getNumRegions() > 0)
       return std::nullopt;
 
+    /// Check mem ops.
     if (auto w = cavTriviallyVectorizeMemOp(loop, dim, op)) {
       auto newFactor = vectorBitwidth / *w;
       if (newFactor > 1) {
@@ -163,6 +179,8 @@ numba::getLoopVectorizeInfo(mlir::scf::ParallelOp loop, unsigned dim,
       continue;
     }
 
+    /// If met the op which cannot be vectorized, we can replicate it and still
+    /// potentially vectorize other ops, but we cannot use masked vectorize.
     if (!isSupportedVectorOp(op)) {
       masked = false;
       continue;
@@ -181,12 +199,14 @@ numba::getLoopVectorizeInfo(mlir::scf::ParallelOp loop, unsigned dim,
     ++count;
   }
 
+  /// No ops to vectorize.
   if (count == 0)
     return std::nullopt;
 
   return SCFVectorizeInfo{dim, factor, count, masked};
 }
 
+/// Get fastmath flags if ops support them or default (none).
 static mlir::arith::FastMathFlags getFMF(mlir::Operation &op) {
   if (auto fmf = mlir::dyn_cast<mlir::arith::ArithFastMathInterface>(op))
     return fmf.getFastMathFlagsAttr().getValue();
@@ -223,6 +243,8 @@ numba::vectorizeLoop(mlir::OpBuilder &builder, mlir::scf::ParallelOp loop,
   mlir::Value count =
       builder.create<mlir::arith::SubIOp>(loc, origUpper, origLower);
   mlir::Value newCount;
+
+  // Compute new loop count, ceildiv if masked, floordiv otherwise.
   if (masked) {
     mlir::Value incCount =
         builder.create<mlir::arith::AddIOp>(loc, count, factorVal);
@@ -237,6 +259,7 @@ numba::vectorizeLoop(mlir::OpBuilder &builder, mlir::scf::ParallelOp loop,
   lower[dim] = zero;
   upper[dim] = newCount;
 
+  // Vectorized loop.
   auto newLoop = builder.create<mlir::scf::ParallelOp>(loc, lower, upper, step,
                                                        loop.getInitVals());
   auto newIndexVar = newLoop.getInductionVars()[dim];
@@ -253,10 +276,14 @@ numba::vectorizeLoop(mlir::OpBuilder &builder, mlir::scf::ParallelOp loop,
     return builder.create<mlir::ub::PoisonOp>(loc, vecType, nullptr);
   };
 
+  // Get vector value in new loop for provided `orig` value in source loop.
   auto getVecVal = [&](mlir::Value orig) -> mlir::Value {
+    // Use cached value if present.
     if (auto mapped = mapping.lookupOrNull(orig))
       return mapped;
 
+    // Vectorized loop index, loop index is divided by factor, so for factorN
+    // vectorized index will looks like `splat(idx) + (0, 1, ..., N - 1)`
     if (orig == origIndexVar) {
       auto vecType = toVectorType(builder.getIndexType());
       llvm::SmallVector<mlir::Attribute> elems(factor);
@@ -280,8 +307,15 @@ numba::vectorizeLoop(mlir::OpBuilder &builder, mlir::scf::ParallelOp loop,
     mlir::Value val = orig;
     auto origIndexVars = loop.getInductionVars();
     auto it = llvm::find(origIndexVars, orig);
+
+    // If loop index, but not on vectorized dimension, just take new loop index
+    // and splat it.
     if (it != origIndexVars.end())
       val = newLoop.getInductionVars()[it - origIndexVars.begin()];
+
+    // Values which are defined inside loop body are preemptively added to the
+    // mapper and not handled here. Values defined outside body are just
+    // splatted.
 
     auto vecType = toVectorType(type);
     mlir::Value vec = builder.create<mlir::vector::SplatOp>(loc, val, vecType);
@@ -290,18 +324,28 @@ numba::vectorizeLoop(mlir::OpBuilder &builder, mlir::scf::ParallelOp loop,
   };
 
   llvm::DenseMap<mlir::Value, llvm::SmallVector<mlir::Value>> unpackedVals;
+
+  // Get unpacked values for provided `orig` value in source loop.
+  // Values are returned as `ValueRange` and not as vector value.
   auto getUnpackedVals = [&](mlir::Value val) -> mlir::ValueRange {
+    // Use cached values if present.
     auto it = unpackedVals.find(val);
     if (it != unpackedVals.end())
       return it->second;
 
+    // Values which are defined inside loop body are preemptively added to the
+    // cache and not handled here.
+
     auto &ret = unpackedVals[val];
     assert(ret.empty());
     if (!isSupportedVecElem(val.getType())) {
+      // Non vectorizable value, it must be a value defined outside the loop,
+      // just replicate it.
       ret.resize(factor, val);
       return ret;
     }
 
+    // Get vector value and extract elements from it.
     auto vecVal = getVecVal(val);
     ret.resize(factor);
     for (auto i : llvm::seq(0u, factor)) {
@@ -311,6 +355,7 @@ numba::vectorizeLoop(mlir::OpBuilder &builder, mlir::scf::ParallelOp loop,
     return ret;
   };
 
+  // Add unpacked values to the cache.
   auto setUnpackedVals = [&](mlir::Value origVal, mlir::ValueRange newVals) {
     assert(newVals.size() == factor);
     assert(unpackedVals.count(origVal) == 0);
@@ -320,6 +365,8 @@ numba::vectorizeLoop(mlir::OpBuilder &builder, mlir::scf::ParallelOp loop,
     if (!isSupportedVecElem(type))
       return;
 
+    // If type is vectorizabale construct a vector add it to vector cache as
+    // well.
     auto vecType = toVectorType(type);
 
     mlir::Value vec = createPosionVec(vecType);
@@ -332,6 +379,9 @@ numba::vectorizeLoop(mlir::OpBuilder &builder, mlir::scf::ParallelOp loop,
   };
 
   mlir::Value mask;
+
+  // Contruct mask value and cache it. If not a masked mode mask is always all
+  // 1s.
   auto getMask = [&]() -> mlir::Value {
     if (mask)
       return mask;
@@ -357,6 +407,7 @@ numba::vectorizeLoop(mlir::OpBuilder &builder, mlir::scf::ParallelOp loop,
     return !!::cavTriviallyVectorizeMemOpImpl(loop, dim, op);
   };
 
+  // Get idices for vectorized memref load/store.
   auto getMemrefVecIndices = [&](mlir::ValueRange indices) {
     scalarMapping.clear();
     scalarMapping.map(loop.getInductionVars(), newLoop.getInductionVars());
@@ -376,6 +427,7 @@ numba::vectorizeLoop(mlir::OpBuilder &builder, mlir::scf::ParallelOp loop,
     return ret;
   };
 
+  // Check if memref access can be converted into gather/scatter.
   auto canGatherScatter = [&](auto op) {
     auto memref = op.getMemRef();
     auto memrefType = mlir::cast<mlir::MemRefType>(memref.getType());
@@ -386,6 +438,7 @@ numba::vectorizeLoop(mlir::OpBuilder &builder, mlir::scf::ParallelOp loop,
            memrefType.getLayout().isIdentity();
   };
 
+  // Create vectorized memref load for specified non-vectorized load.
   auto genLoad = [&](auto loadOp) {
     auto indices = getMemrefVecIndices(loadOp.getIndices());
     auto resType = toVectorType(loadOp.getResult().getType());
@@ -403,6 +456,7 @@ numba::vectorizeLoop(mlir::OpBuilder &builder, mlir::scf::ParallelOp loop,
     mapping.map(loadOp.getResult(), vecLoad);
   };
 
+  // Create vectorized memref store for specified non-vectorized store.
   auto genStore = [&](auto storeOp) {
     auto indices = getMemrefVecIndices(storeOp.getIndices());
     auto value = getVecVal(storeOp.getValueToStore());
@@ -423,6 +477,8 @@ numba::vectorizeLoop(mlir::OpBuilder &builder, mlir::scf::ParallelOp loop,
   for (mlir::Operation &op : loop.getBody()->without_terminator()) {
     loc = op.getLoc();
     if (isSupportedVectorOp(op)) {
+      // If op can be vectorized, clone it with vectorized inputs and  update
+      // resuls to vectorized types.
       for (auto arg : op.getOperands())
         getVecVal(arg); // init mapper for op args
 
@@ -434,12 +490,14 @@ numba::vectorizeLoop(mlir::OpBuilder &builder, mlir::scf::ParallelOp loop,
     }
 
     if (auto reduceOp = mlir::dyn_cast<mlir::scf::ReduceOp>(op)) {
+      // Vectorize `scf.reduce` op.
       scalarMapping.clear();
       auto &reduceBody = reduceOp.getReductionOperator().front();
       assert(reduceBody.getNumArguments() == 2);
 
       mlir::Value reduceVal;
       if (auto redKind = getReductionKind(reduceOp)) {
+        // Generate `vector.reduce` if possible.
         mlir::Value redArg = getVecVal(reduceOp.getOperand());
         if (redArg) {
           auto neutral = mlir::arith::getNeutralElement(&reduceBody.front());
@@ -460,6 +518,9 @@ numba::vectorizeLoop(mlir::OpBuilder &builder, mlir::scf::ParallelOp loop,
         if (masked)
           return op.emitError("Cannot vectorize op in masked mode");
 
+        // If `vector.reduce` cannot be used, unpack values and reduce them
+        // individually.
+
         auto reduceTerm =
             mlir::cast<mlir::scf::ReduceReturnOp>(reduceBody.getTerminator());
         auto lhs = reduceBody.getArgument(0);
@@ -477,12 +538,16 @@ numba::vectorizeLoop(mlir::OpBuilder &builder, mlir::scf::ParallelOp loop,
           reduceVal = scalarMapping.lookupOrDefault(reduceTerm.getResult());
         }
       }
+
+      // Clone `scf.reduce` op to reduce across loop iterations.
       scalarMapping.clear();
       scalarMapping.map(reduceOp.getOperand(), reduceVal);
       builder.clone(op, scalarMapping);
       continue;
     }
 
+    // Vectorize memref load/store ops, vector load/store are preffered over
+    // gather/scatter.
     if (auto loadOp = mlir::dyn_cast<mlir::memref::LoadOp>(op)) {
       if (canTriviallyVectorizeMemOp(loadOp)) {
         genLoad(loadOp);
@@ -555,6 +620,8 @@ numba::vectorizeLoop(mlir::OpBuilder &builder, mlir::scf::ParallelOp loop,
     }
   }
 
+  // If in masked mode remove old loop, otherwise update loop bounds to
+  // repurpose it for handling remaining values.
   if (masked) {
     loop->replaceAllUsesWith(newLoop.getResults());
     loop->erase();
@@ -608,6 +675,8 @@ struct SCFVectorizePass
         std::pair<mlir::scf::ParallelOp, numba::SCFVectorizeParams>>
         toVectorize;
 
+    // Simple heuristic: total number of elements processed by vector ops, but
+    // prefer masked mode over non-masked.
     auto getBenefit = [](const numba::SCFVectorizeInfo &info) {
       return info.factor * info.count * (int(info.masked) + 1);
     };
