@@ -95,7 +95,6 @@ def _gen_tests():
         "test_namedtuple3",  # namedtuple
         "test_issue6102",  # list support
         "test_oversized_tuple_as_arg_to_kernel",  # UnsupportedParforsError not raised
-        "test_ufunc_expr",  # np.bitwise_and(
         "test_parfor_generate_fuse",  # operand #0 does not dominate this use
         "test_parfor_slice7",  # array.transpose
         "test_one_d_array_reduction",  # np.array
@@ -350,7 +349,6 @@ def _gen_replace_parfor_tests():
         "test_var",
         "test_pi",
         "test_prange_unknown_call1",
-        "test_ufunc_expr",
         "test_reduce",
         "test_parfor_bitmask6",
         "test_issue3169",
@@ -374,6 +372,8 @@ def _gen_replace_parfor_tests():
         "test_ssa_false_reduction",
         "test_min",
         "test_nd_parfor",
+        "test_arange",
+        "test_linspace",
     }
     skip_tests = {
         "test_copy_global_for_parfor",  # flaky test
