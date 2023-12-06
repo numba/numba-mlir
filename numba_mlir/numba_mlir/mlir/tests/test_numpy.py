@@ -11,6 +11,7 @@ from numpy.testing import assert_equal, assert_allclose  # for nans comparison
 import numpy as np
 import itertools
 import math
+import copy
 from functools import partial
 import pytest
 from sklearn.datasets import make_regression
@@ -354,6 +355,129 @@ def test_logical1(py_func, a):
 def test_logical2(py_func, a, b):
     jit_func = njit(py_func)
     assert_equal(py_func(a, b), jit_func(a, b))
+
+
+_test_bitwise_binary_test_arrays = [
+    13,
+    -17,
+    14,
+    np.array([14, 3]),
+    np.array([17, 19]),
+    np.array([2, 5, 255]),
+    np.array([3, 14, 16]),
+    np.array([True, True]),
+    np.array([False, True]),
+    np.random.randint(10, size=100),
+    np.random.randint(-10, 10, size=100),
+]
+
+_test_bitwise_binary_test_arrays_ids = [
+    "13",
+    "-17",
+    "14",
+    "np.array([14, 3])",
+    "np.array([17, 19])",
+    "np.array([2, 5, 255])",
+    "np.array([3, 14, 16])",
+    "np.array([True, True])",
+    "np.array([False, True])",
+    "np.random.randint(10, size=100)",
+    "np.random.randint(-10, 10, size=100)",
+]
+
+
+@pytest.mark.smoke
+@parametrize_function_variants(
+    "py_func",
+    [
+        "lambda a, b: np.bitwise_and(a, b)",
+        # "lambda a, b: a & b",  # shorthand doesn't work for now
+        "lambda a, b: np.bitwise_or(a, b)",
+        # "lambda a, b: a | b",  # shorthand doesn't work for now
+        "lambda a, b: np.bitwise_xor(a, b)",
+        # "lambda a, b: a ^ b",  # shorthand doesn't work for now
+    ],
+)
+@pytest.mark.parametrize(
+    "a", _test_bitwise_binary_test_arrays, ids=_test_bitwise_binary_test_arrays_ids
+)
+@pytest.mark.parametrize(
+    "b", _test_bitwise_binary_test_arrays, ids=_test_bitwise_binary_test_arrays_ids
+)
+def test_bitwise2(py_func, a, b):
+    if isinstance(a, np.ndarray) and isinstance(b, np.ndarray) and a.shape != b.shape:
+        # TODO: njit() needs to throw ValueError when array shapes don't match
+        raise pytest.skip("Skipping dissimilar shapes.")
+    else:
+        jit_func = njit(py_func)
+        x = py_func(a, b)
+        y = jit_func(a, b)
+        assert_equal(x, y)
+
+
+@pytest.mark.smoke
+@parametrize_function_variants(
+    "py_func",
+    [
+        "lambda a, b: np.left_shift(a, b)",
+        # "lambda a, b: a << b",  # shorthand doesn't work for now
+        "lambda a, b: np.right_shift(a, b)",
+        # "lambda a, b: a >> b",  # shorthand doesn't work for now
+    ],
+)
+@pytest.mark.parametrize(
+    "a", _test_bitwise_binary_test_arrays, ids=_test_bitwise_binary_test_arrays_ids
+)
+@pytest.mark.parametrize(
+    "b", _test_bitwise_binary_test_arrays, ids=_test_bitwise_binary_test_arrays_ids
+)
+def test_shift(py_func, a, b, request):
+    if "left_shift" in request.node.callspec.id:
+        if (
+            isinstance(a, np.ndarray)
+            and isinstance(b, np.ndarray)
+            and a.dtype == bool
+            and b.dtype == bool
+        ):
+            raise pytest.xfail("Doesn't support boolean arrays.")
+        if type(a) == int and type(b) == int and b < 0:
+            raise pytest.xfail("Doesn't support Z^{-} for x2.")
+    elif "right_shift" in request.node.callspec.id:
+        if (
+            isinstance(a, np.ndarray)
+            and isinstance(b, np.ndarray)
+            and a.shape != b.shape
+        ):
+            # TODO: njit() needs to throw ValueError when array shapes don't match
+            raise pytest.skip("Skipping dissimilar shapes.")
+    else:
+        jit_func = njit(py_func)
+        x = py_func(a, b)
+        y = jit_func(a, b)
+        assert_equal(x, y)
+
+
+@pytest.mark.smoke
+@parametrize_function_variants(
+    "py_func",
+    [
+        "lambda a: np.invert(a)",
+        # "lambda a: ~a",  # shorthand doesn't work for now
+    ],
+)
+@pytest.mark.parametrize(
+    "a",
+    _test_bitwise_binary_test_arrays,
+    ids=_test_bitwise_binary_test_arrays_ids,
+)
+def test_invert(py_func, a):
+    if isinstance(a, np.ndarray) and a.dtype == bool:
+        raise pytest.skip("Doesn't support boolean arrays.")
+    else:
+        jit_func = njit(py_func)
+        x = py_func(a)
+        y = jit_func(a)
+        assert_equal(x, y)
 
 
 _test_broadcast_test_arrays = [
