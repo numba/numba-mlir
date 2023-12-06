@@ -34,7 +34,7 @@ struct SCFVectorizeInfo {
 };
 
 /// Collect vectorization statistics on specified `scf.parallel` dimension.
-/// Return `SCFVectorizeInfo` or `std::nullptr` if loop cannot be vectorized on
+/// Return `SCFVectorizeInfo` or `std::nullopt` if loop cannot be vectorized on
 /// specified dimension.
 ///
 /// `vectorBitwidth` - maximum vector size, in bits.
