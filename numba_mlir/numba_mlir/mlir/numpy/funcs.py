@@ -377,6 +377,7 @@ def _gen_unary_ops():
         (reg_func("numpy.positive", numpy.positive), None, lambda a, b: +a),
         (reg_func("operator.neg"), None, lambda a, b: -a),
         (reg_func("operator.pos"), None, lambda a, b: +a),
+        (reg_func("operator.invert"), None, lambda a, b: ~a),
         (
             reg_func("numpy.logical_not", numpy.logical_not),
             bool_type,

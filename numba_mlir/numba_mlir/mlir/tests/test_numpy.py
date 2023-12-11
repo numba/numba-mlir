@@ -462,7 +462,7 @@ def test_shift(py_func, a, b, request):
     "py_func",
     [
         "lambda a: np.invert(a)",
-        # "lambda a: ~a",  # shorthand doesn't work for now
+        "lambda a: ~a",
     ],
 )
 @pytest.mark.parametrize(
