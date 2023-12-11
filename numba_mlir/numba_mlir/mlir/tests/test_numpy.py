@@ -391,11 +391,11 @@ _test_bitwise_binary_test_arrays_ids = [
     "py_func",
     [
         "lambda a, b: np.bitwise_and(a, b)",
-        # "lambda a, b: a & b",  # shorthand doesn't work for now
+        "lambda a, b: a & b",
         "lambda a, b: np.bitwise_or(a, b)",
-        # "lambda a, b: a | b",  # shorthand doesn't work for now
+        "lambda a, b: a | b",
         "lambda a, b: np.bitwise_xor(a, b)",
-        # "lambda a, b: a ^ b",  # shorthand doesn't work for now
+        "lambda a, b: a ^ b",
     ],
 )
 @pytest.mark.parametrize(
