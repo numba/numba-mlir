@@ -40,7 +40,8 @@ message(STATUS "NUMBA_MLIR_USE_SYCL ${NUMBA_MLIR_USE_SYCL}")
 message(STATUS "NUMBA_MLIR_USE_MKL ${NUMBA_MLIR_USE_MKL}")
 
 if(NUMBA_MLIR_USE_SYCL AND NUMBA_MLIR_USE_MKL)
-    find_package(IntelDPCPP REQUIRED)
+    find_package(IntelSYCL REQUIRED)
+    add_sycl_to_target(TARGET ${PROJECT_NAME} SOURCES ${SOURCES_LIST})
     if (NOT DEFINED(MKL_THREADING))
         set(MKL_THREADING tbb_thread)
     endif()
@@ -56,8 +57,8 @@ if(NUMBA_MLIR_USE_SYCL AND NUMBA_MLIR_USE_MKL)
     target_link_libraries(${PROJECT_NAME} PUBLIC $<LINK_ONLY:MKL::MKL_DPCPP>)
 
     target_compile_definitions(${PROJECT_NAME} PRIVATE NUMBA_MLIR_USE_SYCL_MKL=1)
+    target_compile_options(${PROJECT_NAME} PRIVATE -fno-sycl-id-queries-fit-in-int)
 endif()
-target_compile_options(${PROJECT_NAME} PRIVATE -fno-sycl-id-queries-fit-in-int)
 
 install(TARGETS ${PROJECT_NAME}
         DESTINATION "${MATH_SYCL_RUNTIME_INSTALL_PATH}"
