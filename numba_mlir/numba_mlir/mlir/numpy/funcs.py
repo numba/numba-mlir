@@ -528,6 +528,8 @@ def _gen_binary_ops():
         (reg_func("operator.ge"), bool_type, lambda a, b, c: a >= b),
         (reg_func("operator.eq"), bool_type, lambda a, b, c: a == b),
         (reg_func("operator.ne"), bool_type, lambda a, b, c: a != b),
+        (reg_func("operator.lshift"), None, lambda a, b, c: a << b),
+        (reg_func("operator.rshift"), None, lambda a, b, c: a >> b),
         (
             reg_func("numpy.bitwise_and", numpy.bitwise_and),
             None,

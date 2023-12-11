@@ -420,9 +420,9 @@ def test_bitwise2(py_func, a, b):
     "py_func",
     [
         "lambda a, b: np.left_shift(a, b)",
-        # "lambda a, b: a << b",  # shorthand doesn't work for now
+        "lambda a, b: a << b",
         "lambda a, b: np.right_shift(a, b)",
-        # "lambda a, b: a >> b",  # shorthand doesn't work for now
+        "lambda a, b: a >> b",
     ],
 )
 @pytest.mark.parametrize(
@@ -432,7 +432,7 @@ def test_bitwise2(py_func, a, b):
     "b", _test_bitwise_binary_test_arrays, ids=_test_bitwise_binary_test_arrays_ids
 )
 def test_shift(py_func, a, b, request):
-    if "left_shift" in request.node.callspec.id:
+    if "left_shift" in request.node.callspec.id or "<<" in request.node.callspec.id:
         if (
             isinstance(a, np.ndarray)
             and isinstance(b, np.ndarray)
@@ -442,7 +442,7 @@ def test_shift(py_func, a, b, request):
             raise pytest.xfail("Doesn't support boolean arrays.")
         if type(a) == int and type(b) == int and b < 0:
             raise pytest.xfail("Doesn't support Z^{-} for x2.")
-    elif "right_shift" in request.node.callspec.id:
+    elif "right_shift" in request.node.callspec.id or ">>" in request.node.callspec.id:
         if (
             isinstance(a, np.ndarray)
             and isinstance(b, np.ndarray)
