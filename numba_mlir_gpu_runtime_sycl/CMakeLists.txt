@@ -6,7 +6,7 @@ cmake_minimum_required(VERSION 3.20)
 
 project(numba-mlir-gpu-runtime-sycl LANGUAGES CXX C)
 
-find_package(IntelDPCPP REQUIRED)
+find_package(IntelSYCL REQUIRED)
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/../cmake/modules/")
 
@@ -25,6 +25,7 @@ set(HEADERS_LIST
 
 add_library(${PROJECT_NAME} SHARED ${SOURCES_LIST} ${HEADERS_LIST})
 generate_export_header(${PROJECT_NAME})
+add_sycl_to_target(TARGET ${PROJECT_NAME} SOURCES ${SOURCES_LIST})
 
 if (CMAKE_SYSTEM_NAME STREQUAL Linux)
     target_link_options(${PROJECT_NAME} PRIVATE "LINKER:--version-script=${CMAKE_CURRENT_SOURCE_DIR}/../numba_mlir_gpu_common/export.txt")
