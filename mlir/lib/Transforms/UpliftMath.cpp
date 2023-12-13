@@ -4,6 +4,8 @@
 
 #include "numba/Transforms/UpliftMath.hpp"
 
+#include "numba/Dialect/math_ext/IR/MathExt.hpp"
+
 #include <mlir/Dialect/Arith/IR/Arith.h>
 #include <mlir/Dialect/Complex/IR/Complex.h>
 #include <mlir/Dialect/Func/IR/FuncOps.h>
@@ -65,6 +67,7 @@ struct UpliftMathCalls : public mlir::OpRewritePattern<mlir::func::CallOp> {
         {"sin", &replaceOp1<mlir::math::SinOp>},
         {"cos", &replaceOp1<mlir::math::CosOp>},
         {"erf", &replaceOp1<mlir::math::ErfOp>},
+        {"acos", &replaceOp1<numba::math_ext::AcosOp>},
         {"tanh", &replaceOp1<mlir::math::TanhOp>},
         {"atan2", &replaceOp2<mlir::math::Atan2Op>},
     };
@@ -254,6 +257,7 @@ struct UpliftMathPass
     registry.insert<mlir::complex::ComplexDialect>();
     registry.insert<mlir::func::FuncDialect>();
     registry.insert<mlir::math::MathDialect>();
+    registry.insert<numba::math_ext::MathExtDialect>();
   }
 
   void runOnOperation() override {
