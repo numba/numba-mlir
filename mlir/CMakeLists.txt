@@ -40,6 +40,7 @@ set(SOURCES_LIST
     lib/Conversion/DecomposeMemrefs.cpp
     lib/Conversion/GpuRuntimeToLlvm.cpp
     lib/Conversion/GpuToGpuRuntime.cpp
+    lib/Conversion/MathExtToLibm.cpp
     lib/Conversion/NtensorToLinalg.cpp
     lib/Conversion/NtensorToMemref.cpp
     lib/Conversion/SCFToAffine/SCFToAffine.cpp
@@ -92,6 +93,7 @@ set(HEADERS_LIST
     include/numba/Conversion/CfgToScf.hpp
     include/numba/Conversion/GpuRuntimeToLlvm.hpp
     include/numba/Conversion/GpuToGpuRuntime.hpp
+    include/numba/Conversion/MathExtToLibm.hpp
     include/numba/Conversion/NtensorToLinalg.hpp
     include/numba/Conversion/NtensorToMemref.hpp
     include/numba/Conversion/SCFToAffine/SCFToAffine.h
