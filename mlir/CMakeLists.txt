@@ -28,6 +28,7 @@ add_subdirectory(include/numba/Dialect/plier)
 add_subdirectory(include/numba/Dialect/numba_util)
 add_subdirectory(include/numba/Dialect/gpu_runtime/IR)
 add_subdirectory(include/numba/Dialect/ntensor/IR)
+add_subdirectory(include/numba/Dialect/math_ext/IR)
 
 set(SOURCES_LIST
     lib/Analysis/AliasAnalysis.cpp
@@ -46,6 +47,8 @@ set(SOURCES_LIST
     lib/Conversion/UtilToLlvm.cpp
     lib/Dialect/gpu_runtime/IR/GpuRuntimeOps.cpp
     lib/Dialect/gpu_runtime/Transforms/MakeBarriersUniform.cpp
+    lib/Dialect/math_ext/IR/MathExtDialect.cpp
+    lib/Dialect/math_ext/IR/MathExtOps.cpp
     lib/Dialect/ntensor/IR/NTensorOps.cpp
     lib/Dialect/ntensor/Transforms/PropagateEnvironment.cpp
     lib/Dialect/ntensor/Transforms/ResolveArrayOps.cpp
@@ -58,8 +61,8 @@ set(SOURCES_LIST
     lib/Transforms/CastUtils.cpp
     lib/Transforms/CommonOpts.cpp
     lib/Transforms/CompositePass.cpp
-    lib/Transforms/CopyRemoval.cpp
     lib/Transforms/ConstUtils.cpp
+    lib/Transforms/CopyRemoval.cpp
     lib/Transforms/ExpandTuple.cpp
     lib/Transforms/FuncTransforms.cpp
     lib/Transforms/FuncUtils.cpp
@@ -96,6 +99,7 @@ set(HEADERS_LIST
     include/numba/Conversion/UtilToLlvm.hpp
     include/numba/Dialect/gpu_runtime/IR/GpuRuntimeOps.hpp
     include/numba/Dialect/gpu_runtime/Transforms/MakeBarriersUniform.hpp
+    include/numba/Dialect/math_ext/IR/MathExt.hpp
     include/numba/Dialect/ntensor/IR/NTensorOps.hpp
     include/numba/Dialect/ntensor/Transforms/PropagateEnvironment.hpp
     include/numba/Dialect/ntensor/Transforms/ResolveArrayOps.hpp
@@ -109,8 +113,8 @@ set(HEADERS_LIST
     include/numba/Transforms/CastUtils.hpp
     include/numba/Transforms/CommonOpts.hpp
     include/numba/Transforms/CompositePass.hpp
-    include/numba/Transforms/CopyRemoval.hpp
     include/numba/Transforms/ConstUtils.hpp
+    include/numba/Transforms/CopyRemoval.hpp
     include/numba/Transforms/ExpandTuple.hpp
     include/numba/Transforms/FuncTransforms.hpp
     include/numba/Transforms/FuncUtils.hpp
@@ -178,7 +182,7 @@ target_include_directories(${NUMBA_MLIR_LIB} PUBLIC
     ${PROJECT_BINARY_DIR}/numba/include
     )
 
-add_dependencies(${NUMBA_MLIR_LIB} MLIRPlierOpsIncGen MLIRNumbaUtilOpsIncGen MLIRGpuRuntimeOpsIncGen MLIRNTensorOpsIncGen)
+add_dependencies(${NUMBA_MLIR_LIB} MLIRPlierOpsIncGen MLIRNumbaUtilOpsIncGen MLIRGpuRuntimeOpsIncGen MLIRNTensorOpsIncGen MLIRMathExtOpsIncGen)
 
 add_subdirectory(tools)
 if(NUMBA_MLIR_ENABLE_TESTS)
