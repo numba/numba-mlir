@@ -2,7 +2,6 @@
 //
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-
 #include "numba/Dialect/math_ext/IR/MathExt.hpp"
 
 #include "mlir/Transforms/InliningUtils.h"
@@ -16,7 +15,8 @@ struct MathExtInlinerInterface : public mlir::DialectInlinerInterface {
   using DialectInlinerInterface::DialectInlinerInterface;
 
   /// All operations within math ops can be inlined.
-  bool isLegalToInline(mlir::Operation *, mlir::Region *, bool, mlir::IRMapping &) const final {
+  bool isLegalToInline(mlir::Operation *, mlir::Region *, bool,
+                       mlir::IRMapping &) const final {
     return true;
   }
 };
