@@ -212,19 +212,31 @@ def test_cast(py_func, val):
     assert_equal(py_func(val), jit_func(val))
 
 
+_math_unary_funcs = [
+    "sqrt",
+    "log",
+    "exp",
+    "sin",
+    "cos",
+    "erf",
+    "tanh",
+    "floor",
+    "ceil",
+    "acos",
+]
+
+
 @pytest.mark.parametrize("val", [1, 5, 5.5])
-@pytest.mark.parametrize(
-    "name", ["sqrt", "log", "exp", "sin", "cos", "erf", "tanh", "floor", "ceil"]
-)
+@pytest.mark.parametrize("name", _math_unary_funcs)
 def test_math_uplifting1(val, name):
     py_func = eval(f"lambda a: math.{name}(a)")
 
     with print_pass_ir([], ["UpliftMathPass"]):
         jit_func = njit(py_func)
 
-        assert_equal(py_func(val), jit_func(val))
+        assert_equal(_skip_python_errors(py_func)(val), jit_func(val))
         ir = get_print_buffer()
-        assert ir.count(f"math.{name}") == 1, ir
+        assert ir.count(f"math.{name}") == 1 or ir.count(f"math_ext.{name}") == 1, ir
 
 
 @pytest.mark.parametrize("val", [5, 5.5])

@@ -52,6 +52,7 @@
 #include "BasePipeline.hpp"
 
 #include "numba/Compiler/PipelineRegistry.hpp"
+#include "numba/Conversion/MathExtToLibm.hpp"
 #include "numba/Conversion/UtilToLlvm.hpp"
 #include "numba/Dialect/numba_util/Dialect.hpp"
 #include "numba/Transforms/FuncUtils.hpp"
@@ -1834,6 +1835,7 @@ static void populateLowerToLlvmPipeline(mlir::OpPassManager &pm) {
   pm.addNestedPass<mlir::func::FuncOp>(mlir::createConvertMathToLLVMPass());
   pm.addNestedPass<mlir::func::FuncOp>(std::make_unique<LowerVectorOps>());
   pm.addPass(mlir::createConvertMathToLibmPass());
+  pm.addPass(numba::createMathExtToLibmPass());
   pm.addPass(numba::createUtilToLLVMPass(&getLLVMOptions));
   pm.addPass(std::make_unique<LLVMLoweringPass>());
   pm.addPass(std::make_unique<FixLLVMStructABIPass>());
