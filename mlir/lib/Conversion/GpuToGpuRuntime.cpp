@@ -812,7 +812,7 @@ struct ElementwiseOpPattern : public OpConversionPattern<Op> {
 template <typename Op, typename SPIRVOp>
 struct CheckedElementwiseOpPattern final
     : public ElementwiseOpPattern<Op, SPIRVOp> {
-  using BasePattern = typename ElementwiseOpPattern<Op, SPIRVOp>;
+  using BasePattern = ElementwiseOpPattern<Op, SPIRVOp>;
   using BasePattern::BasePattern;
 
   LogicalResult
