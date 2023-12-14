@@ -486,7 +486,7 @@ def _test_unary(func, dtype, ir_pass, ir_check):
     sim_func = kernel_sim(func)
     gpu_func = kernel_cached(func)
 
-    a = np.array([1, 2, 3, 4, 5, 6, 7, 8, 9], dtype)
+    a = np.array([0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9], dtype)
 
     sim_res = np.zeros(a.shape, dtype)
     sim_func[a.shape, DEFAULT_LOCAL_SIZE](a, sim_res)
@@ -521,8 +521,22 @@ def _test_binary(func, dtype, ir_pass, ir_check):
     assert_allclose(gpu_res, sim_res, rtol=1e-5)
 
 
+_math_unary_funcs = [
+    "sqrt",
+    "log",
+    "exp",
+    "sin",
+    "cos",
+    "erf",
+    "tanh",
+    "floor",
+    "ceil",
+    "acos",
+]
+
+
 @require_gpu
-@pytest.mark.parametrize("op", ["sqrt", "log", "sin", "cos", "floor"])
+@pytest.mark.parametrize("op", _math_unary_funcs)
 @pytest.mark.parametrize("dtype", skip_fp64_args([np.float32, np.float64]))
 def test_math_funcs_unary(op, dtype):
     f = eval(f"math.{op}")

@@ -8,6 +8,7 @@
 
 #include "numba/Analysis/AliasAnalysis.hpp"
 #include "numba/Dialect/gpu_runtime/IR/GpuRuntimeOps.hpp"
+#include "numba/Dialect/math_ext/IR/MathExt.hpp"
 #include "numba/Dialect/numba_util/Dialect.hpp"
 #include "numba/Transforms/CastUtils.hpp"
 #include "numba/Transforms/FuncUtils.hpp"
@@ -738,133 +739,89 @@ public:
 namespace {
 using namespace mlir;
 
-Region::iterator getBlockIt(Region &region, unsigned index) {
-  return std::next(region.begin(), index);
+/// Check if the type is supported by math-to-spirv conversion. We expect to
+/// only see scalars and vectors at this point, with higher-level types already
+/// lowered.
+static bool isSupportedSourceType(Type originalType) {
+  if (originalType.isIntOrIndexOrFloat())
+    return true;
+
+  if (auto vecTy = dyn_cast<VectorType>(originalType)) {
+    if (!vecTy.getElementType().isIntOrIndexOrFloat())
+      return false;
+    if (vecTy.isScalable())
+      return false;
+    if (vecTy.getRank() > 1)
+      return false;
+
+    return true;
+  }
+
+  return false;
 }
 
-template <typename OpTy>
-class SCFToSPIRVPattern : public OpConversionPattern<OpTy> {
-public:
-  SCFToSPIRVPattern<OpTy>(MLIRContext *context, SPIRVTypeConverter &converter,
-                          ScfToSPIRVContextImpl *scfToSPIRVContext)
-      : OpConversionPattern<OpTy>::OpConversionPattern(converter, context,
-                                                       /*benefit*/ 10),
-        scfToSPIRVContext(scfToSPIRVContext), typeConverter(converter) {}
+/// Check if all `sourceOp` types are supported by math-to-spirv conversion.
+/// Notify of a match failure othwerise and return a `failure` result.
+/// This is intended to simplify type checks in `OpConversionPattern`s.
+static LogicalResult checkSourceOpTypes(ConversionPatternRewriter &rewriter,
+                                        Operation *sourceOp) {
+  auto allTypes = llvm::to_vector(sourceOp->getOperandTypes());
+  llvm::append_range(allTypes, sourceOp->getResultTypes());
 
-protected:
-  ScfToSPIRVContextImpl *scfToSPIRVContext;
-  // FIXME: We explicitly keep a reference of the type converter here instead of
-  // passing it to OpConversionPattern during construction. This effectively
-  // bypasses the conversion framework's automation on type conversion. This is
-  // needed right now because the conversion framework will unconditionally
-  // legalize all types used by SCF ops upon discovering them, for example, the
-  // types of loop carried values. We use SPIR-V variables for those loop
-  // carried values. Depending on the available capabilities, the SPIR-V
-  // variable can be different, for example, cooperative matrix or normal
-  // variable. We'd like to detach the conversion of the loop carried values
-  // from the SCF ops (which is mainly a region). So we need to "mark" types
-  // used by SCF ops as legal, if to use the conversion framework for type
-  // conversion. There isn't a straightforward way to do that yet, as when
-  // converting types, ops aren't taken into consideration. Therefore, we just
-  // bypass the framework's type conversion for now.
-  SPIRVTypeConverter &typeConverter;
-};
+  for (Type ty : allTypes) {
+    if (!isSupportedSourceType(ty)) {
+      return rewriter.notifyMatchFailure(
+          sourceOp,
+          llvm::formatv(
+              "unsupported source type for Math to SPIR-V conversion: {0}",
+              ty));
+    }
+  }
 
-// TODO: need fix upstream
-struct WhileOpConversion final : SCFToSPIRVPattern<scf::WhileOp> {
-  using SCFToSPIRVPattern::SCFToSPIRVPattern;
+  return success();
+}
+
+template <typename Op, typename SPIRVOp>
+struct ElementwiseOpPattern : public OpConversionPattern<Op> {
+  using OpConversionPattern<Op>::OpConversionPattern;
 
   LogicalResult
-  matchAndRewrite(scf::WhileOp whileOp, OpAdaptor adaptor,
+  matchAndRewrite(Op op, typename Op::Adaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-    auto loc = whileOp.getLoc();
-    auto loopOp = rewriter.create<spirv::LoopOp>(loc, spirv::LoopControl::None);
-    loopOp.addEntryAndMergeBlock();
-
-    OpBuilder::InsertionGuard guard(rewriter);
-
-    Region &beforeRegion = whileOp.getBefore();
-    Region &afterRegion = whileOp.getAfter();
-
-    if (failed(rewriter.convertRegionTypes(&beforeRegion, typeConverter)) ||
-        failed(rewriter.convertRegionTypes(&afterRegion, typeConverter)))
-      return mlir::failure();
-
-    Block &entryBlock = *loopOp.getEntryBlock();
-    Block &beforeBlock = beforeRegion.front();
-    Block &afterBlock = afterRegion.front();
-    Block &mergeBlock = *loopOp.getMergeBlock();
-
-    auto cond = cast<scf::ConditionOp>(beforeBlock.getTerminator());
-    SmallVector<Value> condArgs;
-    if (failed(rewriter.getRemappedValues(cond.getArgs(), condArgs)))
-      return failure();
-
-    Value conditionVal = rewriter.getRemappedValue(cond.getCondition());
-    if (!conditionVal)
-      return failure();
-
-    auto yield = cast<scf::YieldOp>(afterBlock.getTerminator());
-    SmallVector<Value> yieldArgs;
-    if (failed(rewriter.getRemappedValues(yield.getResults(), yieldArgs)))
-      return failure();
-
-    // Move the while before block as the initial loop header block.
-    rewriter.inlineRegionBefore(beforeRegion, loopOp.getBody(),
-                                getBlockIt(loopOp.getBody(), 1));
-
-    // Move the while after block as the initial loop body block.
-    rewriter.inlineRegionBefore(afterRegion, loopOp.getBody(),
-                                getBlockIt(loopOp.getBody(), 2));
-
-    // Jump from the loop entry block to the loop header block.
-    rewriter.setInsertionPointToEnd(&entryBlock);
-    rewriter.create<spirv::BranchOp>(loc, &beforeBlock, adaptor.getInits());
-
-    auto condLoc = cond.getLoc();
-
-    SmallVector<Value> resultValues(condArgs.size());
-
-    // For other SCF ops, the scf.yield op yields the value for the whole SCF
-    // op. So we use the scf.yield op as the anchor to create/load/store SPIR-V
-    // local variables. But for the scf.while op, the scf.yield op yields a
-    // value for the before region, which may not matching the whole op's
-    // result. Instead, the scf.condition op returns values matching the whole
-    // op's results. So we need to create/load/store variables according to
-    // that.
-    for (const auto &it : llvm::enumerate(condArgs)) {
-      auto res = it.value();
-      auto i = it.index();
-      auto pointerType =
-          spirv::PointerType::get(res.getType(), spirv::StorageClass::Function);
-
-      // Create local variables before the scf.while op.
-      rewriter.setInsertionPoint(loopOp);
-      auto alloc = rewriter.create<spirv::VariableOp>(
-          condLoc, pointerType, spirv::StorageClass::Function,
-          /*initializer=*/nullptr);
-
-      // Load the final result values after the scf.while op.
-      rewriter.setInsertionPointAfter(loopOp);
-      auto loadResult = rewriter.create<spirv::LoadOp>(condLoc, alloc);
-      resultValues[i] = loadResult;
-
-      // Store the current iteration's result value.
-      rewriter.setInsertionPointToEnd(&beforeBlock);
-      rewriter.create<spirv::StoreOp>(condLoc, alloc, res);
+    assert(adaptor.getOperands().size() <= 3);
+    Type dstType = this->getTypeConverter()->convertType(op.getType());
+    if (!dstType) {
+      return rewriter.notifyMatchFailure(
+          op->getLoc(),
+          llvm::formatv("failed to convert type {0} for SPIR-V", op.getType()));
     }
 
-    rewriter.setInsertionPointToEnd(&beforeBlock);
-    rewriter.replaceOpWithNewOp<spirv::BranchConditionalOp>(
-        cond, conditionVal, &afterBlock, condArgs, &mergeBlock, std::nullopt);
-
-    // Convert the scf.yield op to a branch back to the header block.
-    rewriter.setInsertionPointToEnd(&afterBlock);
-    rewriter.replaceOpWithNewOp<spirv::BranchOp>(yield, &beforeBlock,
-                                                 yieldArgs);
-
-    rewriter.replaceOp(whileOp, resultValues);
+    if (SPIRVOp::template hasTrait<OpTrait::spirv::UnsignedOp>() &&
+        !getElementTypeOrSelf(op.getType()).isIndex() &&
+        dstType != op.getType()) {
+      op.dump();
+      return op.emitError("bitwidth emulation is not implemented yet on "
+                          "unsigned op pattern version");
+    }
+    rewriter.template replaceOpWithNewOp<SPIRVOp>(op, dstType,
+                                                  adaptor.getOperands());
     return success();
+  }
+};
+
+template <typename Op, typename SPIRVOp>
+struct CheckedElementwiseOpPattern final
+    : public ElementwiseOpPattern<Op, SPIRVOp> {
+  using BasePattern = ElementwiseOpPattern<Op, SPIRVOp>;
+  using BasePattern::BasePattern;
+
+  LogicalResult
+  matchAndRewrite(Op op, typename Op::Adaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    if (LogicalResult res = checkSourceOpTypes(rewriter, op); failed(res))
+      return res;
+
+    return BasePattern::matchAndRewrite(op, adaptor, rewriter);
   }
 };
 } // namespace
@@ -971,8 +928,9 @@ struct GPUToSpirvPass
                                  mlir::spirv::BuiltIn::GlobalInvocationId>>(
           typeConverter, context);
 
-      patterns.add<WhileOpConversion>(patterns.getContext(), typeConverter,
-                                      scfToSpirvCtx.getImpl());
+      patterns.add<CheckedElementwiseOpPattern<numba::math_ext::AcosOp,
+                                               mlir::spirv::CLAcosOp>>(
+          typeConverter, patterns.getContext());
 
       if (failed(
               applyFullConversion(kernelModule, *target, std::move(patterns))))
