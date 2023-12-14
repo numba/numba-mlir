@@ -213,6 +213,7 @@ def _gen_math_funcs():
         ("sin", 1),
         ("cos", 1),
         ("tanh", 1),
+        ("acos", 1),
         ("atan2", 2),
     ]
 
