@@ -8,6 +8,7 @@
 
 #include "numba/Analysis/AliasAnalysis.hpp"
 #include "numba/Dialect/gpu_runtime/IR/GpuRuntimeOps.hpp"
+#include "numba/Dialect/math_ext/IR/MathExt.hpp"
 #include "numba/Dialect/numba_util/Dialect.hpp"
 #include "numba/Transforms/CastUtils.hpp"
 #include "numba/Transforms/FuncUtils.hpp"
@@ -867,6 +868,93 @@ struct WhileOpConversion final : SCFToSPIRVPattern<scf::WhileOp> {
     return success();
   }
 };
+
+/// Check if the type is supported by math-to-spirv conversion. We expect to
+/// only see scalars and vectors at this point, with higher-level types already
+/// lowered.
+static bool isSupportedSourceType(mlir::Type originalType) {
+  if (originalType.isIntOrIndexOrFloat())
+    return true;
+
+  if (auto vecTy = mlir::dyn_cast<mlir::VectorType>(originalType)) {
+    if (!vecTy.getElementType().isIntOrIndexOrFloat())
+      return false;
+    if (vecTy.isScalable())
+      return false;
+    if (vecTy.getRank() > 1)
+      return false;
+
+    return true;
+  }
+
+  return false;
+}
+
+/// Check if all `sourceOp` types are supported by math-to-spirv conversion.
+/// Notify of a match failure othwerise and return a `failure` result.
+/// This is intended to simplify type checks in `OpConversionPattern`s.
+static mlir::LogicalResult
+checkSourceOpTypes(mlir::ConversionPatternRewriter &rewriter,
+                   mlir::Operation *sourceOp) {
+  auto allTypes = llvm::to_vector(sourceOp->getOperandTypes());
+  llvm::append_range(allTypes, sourceOp->getResultTypes());
+
+  for (mlir::Type ty : allTypes) {
+    if (!isSupportedSourceType(ty)) {
+      return rewriter.notifyMatchFailure(
+          sourceOp,
+          llvm::formatv(
+              "unsupported source type for Math to SPIR-V conversion: {0}",
+              ty));
+    }
+  }
+
+  return success();
+}
+
+template <typename Op, typename SPIRVOp>
+struct ElementwiseOpPattern : public mlir::OpConversionPattern<Op> {
+  using mlir::OpConversionPattern<Op>::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(Op op, typename Op::Adaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    assert(adaptor.getOperands().size() <= 3);
+    mlir::Type dstType = this->getTypeConverter()->convertType(op.getType());
+    if (!dstType) {
+      return rewriter.notifyMatchFailure(
+          op->getLoc(),
+          llvm::formatv("failed to convert type {0} for SPIR-V", op.getType()));
+    }
+
+    if (SPIRVOp::template hasTrait<mlir::OpTrait::spirv::UnsignedOp>() &&
+        !getElementTypeOrSelf(op.getType()).isIndex() &&
+        dstType != op.getType()) {
+      op.dump();
+      return op.emitError("bitwidth emulation is not implemented yet on "
+                          "unsigned op pattern version");
+    }
+    rewriter.template replaceOpWithNewOp<SPIRVOp>(op, dstType,
+                                                  adaptor.getOperands());
+    return mlir::success();
+  }
+};
+
+template <typename Op, typename SPIRVOp>
+struct CheckedElementwiseOpPattern final
+    : public ElementwiseOpPattern<Op, SPIRVOp> {
+  using BasePattern = typename ElementwiseOpPattern<Op, SPIRVOp>;
+  using BasePattern::BasePattern;
+
+  LogicalResult
+  matchAndRewrite(Op op, typename Op::Adaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    if (mlir::LogicalResult res = checkSourceOpTypes(rewriter, op); failed(res))
+      return res;
+
+    return BasePattern::matchAndRewrite(op, adaptor, rewriter);
+  }
+};
 } // namespace
 
 struct GPUToSpirvPass
@@ -970,6 +1058,10 @@ struct GPUToSpirvPass
           LaunchConfigConversion<mlir::gpu::GlobalIdOp,
                                  mlir::spirv::BuiltIn::GlobalInvocationId>>(
           typeConverter, context);
+
+      patterns.add<CheckedElementwiseOpPattern<numba::math_ext::AcosOp,
+                                               mlir::spirv::CLAcosOp>>(
+          typeConverter, patterns.getContext());
 
       patterns.add<WhileOpConversion>(patterns.getContext(), typeConverter,
                                       scfToSpirvCtx.getImpl());
