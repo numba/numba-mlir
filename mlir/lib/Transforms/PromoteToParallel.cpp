@@ -361,6 +361,9 @@ struct PromoteToParallel : public mlir::OpRewritePattern<mlir::scf::ForOp> {
   mlir::LogicalResult
   matchAndRewrite(mlir::scf::ForOp op,
                   mlir::PatternRewriter &rewriter) const override {
+    if (!op.getLowerBound().getType().isIndex())
+      return mlir::failure();
+
     if (!canParallelizeLoop(op, isInsideParallelRegion(op)))
       return mlir::failure();
 
@@ -434,6 +437,9 @@ struct MergeNestedForIntoParallel
                   mlir::PatternRewriter &rewriter) const override {
     auto parent = mlir::dyn_cast<mlir::scf::ForOp>(op->getParentOp());
     if (!parent)
+      return mlir::failure();
+
+    if (!parent.getLowerBound().getType().isIndex())
       return mlir::failure();
 
     auto block = parent.getBody();

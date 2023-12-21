@@ -971,7 +971,6 @@ struct WhileOpLICM : public mlir::OpRewritePattern<mlir::scf::WhileOp> {
     bool changed = false;
 
     mlir::DominanceInfo dom;
-    rewriter.startRootUpdate(loop);
     for (mlir::Block *body : {loop.getBeforeBody(), loop.getAfterBody()}) {
       for (mlir::Operation &op :
            llvm::make_early_inc_range(body->without_terminator())) {
@@ -984,12 +983,8 @@ struct WhileOpLICM : public mlir::OpRewritePattern<mlir::scf::WhileOp> {
           continue;
 
         rewriter.updateRootInPlace(&op, [&]() { op.moveBefore(loop); });
+        changed = true;
       }
-    }
-    if (changed) {
-      rewriter.finalizeRootUpdate(loop);
-    } else {
-      rewriter.cancelRootUpdate(loop);
     }
     return mlir::success(changed);
   }
