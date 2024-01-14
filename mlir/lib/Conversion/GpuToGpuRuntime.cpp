@@ -1548,7 +1548,6 @@ struct TileParallelOp : public mlir::OpRewritePattern<mlir::scf::ParallelOp> {
       mapper.map(originalBlock->getArguments(), argMapping);
       mlir::OpBuilder::InsertionGuard g(rewriter);
       auto loc = originalBlock->getTerminator()->getLoc();
-      rewriter.eraseOp(originalBlock->getTerminator());
       rewriter.setInsertionPointToEnd(originalBlock);
       llvm::SmallVector<mlir::Value> results;
       for (auto &&[i, val] : llvm::enumerate(initVals)) {
@@ -1562,7 +1561,12 @@ struct TileParallelOp : public mlir::OpRewritePattern<mlir::scf::ParallelOp> {
       auto ifResults = ifOp.getResults();
       mapper.map(reductionOp.getOperands(), ifResults);
       rewriter.clone(*reductionOp, mapper);
+    } else {
+      mlir::OpBuilder::InsertionGuard g(rewriter);
+      rewriter.setInsertionPointToEnd(originalBlock);
+      rewriter.create<mlir::scf::YieldOp>(loc);
     }
+    rewriter.eraseOp(reductionOp);
     rewriter.mergeBlocks(originalBlock, newBlock, argMapping);
     rewriter.replaceOp(op, newOp->getResults());
 
