@@ -2234,7 +2234,7 @@ struct LowerGPUGlobalReduce
       mlir::Value value =
           b.create<mlir::memref::LoadOp>(l, reduceArray, iters.front());
       auto reduce = b.create<mlir::scf::ReduceOp>(l, value);
-      auto &finalReduceBlock = reduce.getRegion().front();
+      mlir::Block &finalReduceBlock = reduce.getReductions().front().front();
 
       mlir::IRMapping mapper;
       mapper.map(reduceBlock.getArguments(), finalReduceBlock.getArguments());
@@ -2249,7 +2249,6 @@ struct LowerGPUGlobalReduce
         auto result = mapper.lookupOrDefault(term.getValues().front());
         b.create<mlir::scf::ReduceReturnOp>(l, result);
       }
-      b.create<mlir::scf::YieldOp>(l);
     };
 
     mlir::Value initVal = rewriter.create<mlir::arith::ConstantOp>(
@@ -2304,10 +2303,10 @@ struct AllReduceRemoveRegion
         &convertAllReduceOp<mlir::arith::OrIOp, RedOp::OR>,
         &convertAllReduceOp<mlir::arith::MulIOp, RedOp::MUL>,
         &convertAllReduceOp<mlir::arith::MulFOp, RedOp::MUL>,
-        &convertAllReduceOp<mlir::arith::MaxSIOp, RedOp::MAX>,
-        &convertAllReduceOp<mlir::arith::MaximumFOp, RedOp::MAX>,
-        &convertAllReduceOp<mlir::arith::MinSIOp, RedOp::MIN>,
-        &convertAllReduceOp<mlir::arith::MinimumFOp, RedOp::MIN>,
+        &convertAllReduceOp<mlir::arith::MaxSIOp, RedOp::MAXSI>,
+        &convertAllReduceOp<mlir::arith::MaximumFOp, RedOp::MAXIMUMF>,
+        &convertAllReduceOp<mlir::arith::MinSIOp, RedOp::MINSI>,
+        &convertAllReduceOp<mlir::arith::MinimumFOp, RedOp::MINIMUMF>,
     };
 
     auto result = [&]() -> std::optional<RedOp> {
