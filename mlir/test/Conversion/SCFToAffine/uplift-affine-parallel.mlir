@@ -11,7 +11,6 @@ func.func @copy_affine(%arg0: memref<?xf64>, %arg1: memref<?xf64>) {
   scf.parallel (%arg4) = (%c0) to (%0) step (%c1) {
     %2 = memref.load %arg0[%arg4] : memref<?xf64>
     memref.store %2, %arg1[%arg4] : memref<?xf64>
-    scf.yield
   }
   return
 }
@@ -30,7 +29,6 @@ func.func @copy_affine_with_strides(%arg0: memref<?xf64, #map>, %arg1: memref<?x
   scf.parallel (%arg4) = (%c0) to (%0) step (%c1) {
     %2 = memref.load %arg0[%arg4] : memref<?xf64, #map>
     memref.store %2, %arg1[%arg4] : memref<?xf64, #map>
-    scf.yield
   }
   return
 }
