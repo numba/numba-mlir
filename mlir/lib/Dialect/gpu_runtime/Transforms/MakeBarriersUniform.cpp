@@ -44,10 +44,10 @@ getNeutralValue(mlir::Type resultType, mlir::gpu::AllReduceOperation op) {
       return b.getFloatAttr(resultType, llvm::APFloat::getZero(semantic));
     if (op == Op::MUL)
       return b.getFloatAttr(resultType, llvm::APFloat(semantic, 1));
-    if (op == Op::MAX)
+    if (op == Op::MAXIMUMF || op == Op::MAXNUMF)
       return b.getFloatAttr(resultType,
                             llvm::APFloat::getInf(semantic, /*Negative=*/true));
-    if (op == Op::MIN)
+    if (op == Op::MINIMUMF || op == Op::MINNUMF)
       return b.getFloatAttr(
           resultType, llvm::APFloat::getInf(semantic, /*Negative=*/false));
     return std::nullopt;
@@ -56,10 +56,10 @@ getNeutralValue(mlir::Type resultType, mlir::gpu::AllReduceOperation op) {
     return b.getIntegerAttr(resultType, 0);
   if (op == Op::AND)
     return b.getIntegerAttr(resultType, -1);
-  if (op == Op::MAX)
+  if (op == Op::MAXSI)
     return b.getIntegerAttr(resultType,
                             getMinVal(resultType.getIntOrFloatBitWidth()));
-  if (op == Op::MIN)
+  if (op == Op::MINSI)
     return b.getIntegerAttr(resultType,
                             getMaxVal(resultType.getIntOrFloatBitWidth()));
   if (op == Op::MUL)

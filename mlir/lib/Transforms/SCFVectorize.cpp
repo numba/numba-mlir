@@ -112,8 +112,7 @@ template <typename T> static bool isOp(mlir::Operation &op) {
 /// Returns `vector.reduce` kind for specified `scf.parallel` reduce op ot
 /// `std::nullopt` if reduction cannot be handled by `vector.reduce`.
 static std::optional<mlir::vector::CombiningKind>
-getReductionKind(mlir::scf::ReduceOp op) {
-  mlir::Block &body = op.getReductionOperator().front();
+getReductionKind(mlir::Block &body) {
   if (!llvm::hasSingleElement(body.without_terminator()))
     return std::nullopt;
 
@@ -154,17 +153,18 @@ numba::getLoopVectorizeInfo(mlir::scf::ParallelOp loop, unsigned dim,
   unsigned count = 0;
   bool masked = true;
 
+  /// Check if `scf.reduce` can be handled by `vector.reduce`.
+  /// If not we still can vectorize the loop but we cannot use masked
+  /// vectorize.
+  auto reduce = mlir::cast<mlir::scf::ReduceOp>(loop.getBody()->getTerminator());
+  for (mlir::Region &reg : reduce.getReductions()) {
+    if (!getReductionKind(reg.front()))
+      masked = false;
+
+    continue;
+  }
+
   for (mlir::Operation &op : loop.getBody()->without_terminator()) {
-    /// Check if `scf.reduce` can be handled by `vector.reduce`.
-    /// If not we still can vectorize the loop but we cannot use masked
-    /// vectorize.
-    if (auto reduce = mlir::dyn_cast<mlir::scf::ReduceOp>(op)) {
-      if (!getReductionKind(reduce))
-        masked = false;
-
-      continue;
-    }
-
     /// Ops with nested regions are not supported yet.
     if (op.getNumRegions() > 0)
       return std::nullopt;
@@ -489,63 +489,6 @@ numba::vectorizeLoop(mlir::OpBuilder &builder, mlir::scf::ParallelOp loop,
       continue;
     }
 
-    if (auto reduceOp = mlir::dyn_cast<mlir::scf::ReduceOp>(op)) {
-      // Vectorize `scf.reduce` op.
-      scalarMapping.clear();
-      auto &reduceBody = reduceOp.getReductionOperator().front();
-      assert(reduceBody.getNumArguments() == 2);
-
-      mlir::Value reduceVal;
-      if (auto redKind = getReductionKind(reduceOp)) {
-        // Generate `vector.reduce` if possible.
-        mlir::Value redArg = getVecVal(reduceOp.getOperand());
-        if (redArg) {
-          auto neutral = mlir::arith::getNeutralElement(&reduceBody.front());
-          assert(neutral);
-          mlir::Value neutralVal =
-              builder.create<mlir::arith::ConstantOp>(loc, *neutral);
-          mlir::Value neutralVec = builder.create<mlir::vector::SplatOp>(
-              loc, neutralVal, redArg.getType());
-          auto mask = getMask();
-          redArg = builder.create<mlir::arith::SelectOp>(loc, mask, redArg,
-                                                         neutralVec);
-        }
-
-        auto fmf = getFMF(reduceBody.front());
-        reduceVal = builder.create<mlir::vector::ReductionOp>(loc, *redKind,
-                                                              redArg, fmf);
-      } else {
-        if (masked)
-          return op.emitError("Cannot vectorize op in masked mode");
-
-        // If `vector.reduce` cannot be used, unpack values and reduce them
-        // individually.
-
-        auto reduceTerm =
-            mlir::cast<mlir::scf::ReduceReturnOp>(reduceBody.getTerminator());
-        auto lhs = reduceBody.getArgument(0);
-        auto rhs = reduceBody.getArgument(1);
-        auto unpacked = getUnpackedVals(reduceOp.getOperand());
-        assert(unpacked.size() == factor);
-        reduceVal = unpacked.front();
-        for (auto i : llvm::seq(1u, factor)) {
-          mlir::Value val = unpacked[i];
-          scalarMapping.map(lhs, reduceVal);
-          scalarMapping.map(rhs, val);
-          for (auto &redOp : reduceBody.without_terminator())
-            builder.clone(redOp, scalarMapping);
-
-          reduceVal = scalarMapping.lookupOrDefault(reduceTerm.getResult());
-        }
-      }
-
-      // Clone `scf.reduce` op to reduce across loop iterations.
-      scalarMapping.clear();
-      scalarMapping.map(reduceOp.getOperand(), reduceVal);
-      builder.clone(op, scalarMapping);
-      continue;
-    }
-
     // Vectorize memref load/store ops, vector load/store are preffered over
     // gather/scatter.
     if (auto loadOp = mlir::dyn_cast<mlir::memref::LoadOp>(op)) {
@@ -619,6 +562,67 @@ numba::vectorizeLoop(mlir::OpBuilder &builder, mlir::scf::ParallelOp loop,
       setUnpackedVals(op.getResult(i), results);
     }
   }
+
+  // Vectorize `scf.reduce` op.
+  auto reduceOp = mlir::cast<mlir::scf::ReduceOp>(loop.getBody()->getTerminator());
+  llvm::SmallVector<mlir::Value> reduceVals;
+  reduceVals.reserve(reduceOp.getNumOperands());
+
+  for (auto && [body, arg] : llvm::zip(reduceOp.getReductions(), reduceOp.getOperands())) {
+    scalarMapping.clear();
+    mlir::Block &reduceBody = body.front();
+    assert(reduceBody.getNumArguments() == 2);
+
+    mlir::Value reduceVal;
+    if (auto redKind = getReductionKind(reduceBody)) {
+      // Generate `vector.reduce` if possible.
+      mlir::Value redArg = getVecVal(arg);
+      if (redArg) {
+        auto neutral = mlir::arith::getNeutralElement(&reduceBody.front());
+        assert(neutral);
+        mlir::Value neutralVal =
+            builder.create<mlir::arith::ConstantOp>(loc, *neutral);
+        mlir::Value neutralVec = builder.create<mlir::vector::SplatOp>(
+            loc, neutralVal, redArg.getType());
+        auto mask = getMask();
+        redArg = builder.create<mlir::arith::SelectOp>(loc, mask, redArg,
+                                                       neutralVec);
+      }
+
+      auto fmf = getFMF(reduceBody.front());
+      reduceVal = builder.create<mlir::vector::ReductionOp>(loc, *redKind,
+                                                            redArg, fmf);
+    } else {
+      if (masked)
+        return reduceOp.emitError("Cannot vectorize reduce op in masked mode");
+
+      // If `vector.reduce` cannot be used, unpack values and reduce them
+      // individually.
+
+      auto reduceTerm =
+          mlir::cast<mlir::scf::ReduceReturnOp>(reduceBody.getTerminator());
+      auto lhs = reduceBody.getArgument(0);
+      auto rhs = reduceBody.getArgument(1);
+      auto unpacked = getUnpackedVals(arg);
+      assert(unpacked.size() == factor);
+      reduceVal = unpacked.front();
+      for (auto i : llvm::seq(1u, factor)) {
+        mlir::Value val = unpacked[i];
+        scalarMapping.map(lhs, reduceVal);
+        scalarMapping.map(rhs, val);
+        for (auto &redOp : reduceBody.without_terminator())
+          builder.clone(redOp, scalarMapping);
+
+        reduceVal = scalarMapping.lookupOrDefault(reduceTerm.getResult());
+      }
+    }
+    reduceVals.emplace_back(reduceVal);
+  }
+
+  // Clone `scf.reduce` op to reduce across loop iterations.
+  scalarMapping.clear();
+  scalarMapping.map(reduceOp.getOperands(), reduceVals);
+  builder.clone(*reduceOp, scalarMapping);
 
   // If in masked mode remove old loop, otherwise update loop bounds to
   // repurpose it for handling remaining values.
