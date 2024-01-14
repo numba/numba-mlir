@@ -62,9 +62,9 @@ func.func @test() {
 }
 
 // CHECK-LABEL: func @test
-//       CHECK: %[[V6:.*]] = ub.poison : index
-//       CHECK: %[[V4:.*]] = ub.poison : i64
-//       CHECK: %[[V3:.*]] = ub.poison : i32
+//   CHECK-DAG: %[[V6:.*]] = ub.poison : index
+//   CHECK-DAG: %[[V4:.*]] = ub.poison : i64
+//   CHECK-DAG: %[[V3:.*]] = ub.poison : i32
 //       CHECK: gpu.launch blocks
 //       CHECK: %[[COND:.*]] = "test.test1"() : () -> i1
 //       CHECK: %[[RES1:.*]]:2 = scf.if %[[COND]] -> (i32, i64) {
@@ -119,9 +119,9 @@ func.func @test() {
 }
 
 // CHECK-LABEL: func @test
-//       CHECK: %[[V4:.*]] = ub.poison : i64
-//       CHECK: %[[V3:.*]] = ub.poison : i32
-//       CHECK: %[[NEUTRAL:.*]] = arith.constant 0 : i64
+//   CHECK-DAG: %[[V4:.*]] = ub.poison : i64
+//   CHECK-DAG: %[[V3:.*]] = ub.poison : i32
+//   CHECK-DAG: %[[NEUTRAL:.*]] = arith.constant 0 : i64
 //       CHECK: gpu.launch blocks
 //       CHECK: %[[COND:.*]] = "test.test1"() : () -> i1
 //       CHECK: %[[RES1:.*]]:2 = scf.if %[[COND]] -> (i32, i64) {
@@ -168,9 +168,9 @@ func.func @test() {
 }
 
 // CHECK-LABEL: func @test
-//       CHECK: %[[V4:.*]] = ub.poison : i64
-//       CHECK: %[[V3:.*]] = ub.poison : i32
-//       CHECK: %[[NEUTRAL:.*]] = arith.constant 1 : i64
+//   CHECK-DAG: %[[V4:.*]] = ub.poison : i64
+//   CHECK-DAG: %[[V3:.*]] = ub.poison : i32
+//   CHECK-DAG: %[[NEUTRAL:.*]] = arith.constant 1 : i64
 //       CHECK: gpu.launch blocks
 //       CHECK: %[[COND:.*]] = "test.test1"() : () -> i1
 //       CHECK: %[[RES1:.*]]:2 = scf.if %[[COND]] -> (i32, i64) {
@@ -203,7 +203,7 @@ func.func @test() {
       "test.test2"() : () -> ()
       %1 = "test.test3"() : () -> i32
       %2 = "test.test4"() : () -> i64
-      %3 = gpu.subgroup_reduce min %2 {} : (i64) -> (i64)
+      %3 = gpu.subgroup_reduce minsi %2 {} : (i64) -> (i64)
       "test.test5"() : () -> ()
       "test.test6"(%1) : (i32) -> ()
       "test.test7"(%3) : (i64) -> ()
@@ -214,9 +214,9 @@ func.func @test() {
 }
 
 // CHECK-LABEL: func @test
-//       CHECK: %[[V4:.*]] = ub.poison : i64
-//       CHECK: %[[V3:.*]] = ub.poison : i32
-//       CHECK: %[[NEUTRAL:.*]] = arith.constant 9223372036854775807 : i64
+//   CHECK-DAG: %[[V4:.*]] = ub.poison : i64
+//   CHECK-DAG: %[[V3:.*]] = ub.poison : i32
+//   CHECK-DAG: %[[NEUTRAL:.*]] = arith.constant 9223372036854775807 : i64
 //       CHECK: gpu.launch blocks
 //       CHECK: %[[COND:.*]] = "test.test1"() : () -> i1
 //       CHECK: %[[RES1:.*]]:2 = scf.if %[[COND]] -> (i32, i64) {
@@ -228,7 +228,7 @@ func.func @test() {
 //       CHECK: scf.yield %[[V3]], %[[V4]] : i32, i64
 //       CHECK: }
 //       CHECK: %[[RARG:.*]] = arith.select %[[COND]], %[[RES1]]#1, %[[NEUTRAL]] : i64
-//       CHECK: %[[RRES:.*]] = gpu.subgroup_reduce min %[[RARG]] uniform : (i64) -> i64
+//       CHECK: %[[RRES:.*]] = gpu.subgroup_reduce minsi %[[RARG]] uniform : (i64) -> i64
 //       CHECK: scf.if %[[COND]] {
 //       CHECK: "test.test5"() : () -> ()
 //       CHECK: "test.test6"(%[[RES1]]#0) : (i32) -> ()
