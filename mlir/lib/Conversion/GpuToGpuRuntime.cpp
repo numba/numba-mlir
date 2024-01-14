@@ -1093,7 +1093,7 @@ struct ExpandAllocOp : public mlir::OpRewritePattern<mlir::gpu::AllocOp> {
         op.getLoc(), op.getType(), token, op.getAsyncDependencies(), *queue,
         op.getDynamicSizes(), op.getSymbolOperands(), hostShared);
 
-    newOp->setAttrs(op->getDiscardableAttrs());
+    newOp->setAttrs(op->getDiscardableAttrDictionary());
     rewriter.replaceOp(op, newOp.getResults());
     return mlir::success();
   }
@@ -1406,14 +1406,12 @@ struct TileParallelOp : public mlir::OpRewritePattern<mlir::scf::ParallelOp> {
         op->hasAttr(mlir::gpu::getMappingAttrName()))
       return mlir::failure();
 
-    auto reductionOps =
-        llvm::to_vector(op.getBody()->getOps<mlir::scf::ReduceOp>());
+    auto reductionOp = mlir::cast<mlir::scf::ReduceOp>(op.getBody()->getTerminator());
     mlir::ValueRange initVals = op.getInitVals();
-    assert(reductionOps.size() == initVals.size());
 
     llvm::SmallVector<mlir::TypedAttr> neutralValues;
-    for (auto reduction : reductionOps) {
-      auto neutralValue = getNeutralValue(reduction.getRegion().front());
+    for (auto &reductionReg : reductionOp.getReductions()) {
+      auto neutralValue = getNeutralValue(reductionReg.front());
       if (!neutralValue)
         return mlir::failure();
 
@@ -1523,7 +1521,7 @@ struct TileParallelOp : public mlir::OpRewritePattern<mlir::scf::ParallelOp> {
       assert(inBounds);
 
       ifOp = [&]() -> mlir::scf::IfOp {
-        if (!reductionOps.empty()) {
+        if (!reductionOp.getReductions().empty()) {
           llvm::SmallVector<mlir::Value> results;
           for (auto &&[i, val] : llvm::enumerate(initVals)) {
             auto constVal =
@@ -1545,7 +1543,7 @@ struct TileParallelOp : public mlir::OpRewritePattern<mlir::scf::ParallelOp> {
       newBlock = ifOp.thenBlock();
     }
     rewriter.eraseOp(newBlock->getTerminator()); // Erase exisitng yield.
-    if (!reductionOps.empty()) {
+    if (!reductionOp.getReductions().empty()) {
       mlir::IRMapping mapper;
       mapper.map(originalBlock->getArguments(), argMapping);
       mlir::OpBuilder::InsertionGuard g(rewriter);
@@ -1555,18 +1553,15 @@ struct TileParallelOp : public mlir::OpRewritePattern<mlir::scf::ParallelOp> {
       llvm::SmallVector<mlir::Value> results;
       for (auto &&[i, val] : llvm::enumerate(initVals)) {
         auto reductionArg =
-            mapper.lookupOrDefault(reductionOps[i].getOperand());
+            mapper.lookupOrDefault(reductionOp.getOperand(i));
         results.emplace_back(reductionArg);
       }
       rewriter.create<mlir::scf::YieldOp>(loc, results);
 
       rewriter.setInsertionPointAfter(ifOp);
       auto ifResults = ifOp.getResults();
-      for (auto &&[i, reductionOp] : llvm::enumerate(reductionOps)) {
-        mapper.map(reductionOp.getOperand(), ifResults[i]);
-        rewriter.clone(*reductionOp, mapper);
-        rewriter.eraseOp(reductionOp);
-      }
+      mapper.map(reductionOp.getOperands(), ifResults);
+      rewriter.clone(*reductionOp, mapper);
     }
     rewriter.mergeBlocks(originalBlock, newBlock, argMapping);
     rewriter.replaceOp(op, newOp->getResults());
