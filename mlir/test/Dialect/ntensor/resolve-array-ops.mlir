@@ -127,8 +127,8 @@ func.func @test(%arg1: !ntensor.ntensor<?x?xf32>, %arg2: tuple<index, index>) ->
 }
 // CHECK-LABEL: func @test
 //  CHECK-SAME:   (%[[ARG1:.*]]: !ntensor.ntensor<?x?xf32>, %[[ARG2:.*]]: tuple<index, index>)
-//  CHECK-NEXT:   %[[C0:.*]] = arith.constant 0 : index
-//  CHECK-NEXT:   %[[C1:.*]] = arith.constant 1 : index
+//   CHECK-DAG:   %[[C0:.*]] = arith.constant 0 : index
+//   CHECK-DAG:   %[[C1:.*]] = arith.constant 1 : index
 //  CHECK-NEXT:   %[[E1:.*]] = numba_util.tuple_extract %[[ARG2]] : tuple<index, index>, %[[C0]] -> index
 //  CHECK-NEXT:   %[[DIM1:.*]] = ntensor.dim %[[ARG1]], %[[C0]] : !ntensor.ntensor<?x?xf32>
 //  CHECK-NEXT:   %[[IND1:.*]] = ntensor.resolve_index %[[E1]], %[[DIM1]]
@@ -146,8 +146,8 @@ func.func @test(%arg1: !ntensor.ntensor<?x?xf32>, %arg2: tuple<index, index>, %a
 }
 // CHECK-LABEL: func @test
 //  CHECK-SAME:   (%[[ARG1:.*]]: !ntensor.ntensor<?x?xf32>, %[[ARG2:.*]]: tuple<index, index>, %[[ARG3:.*]]: f32)
-//  CHECK-NEXT:   %[[C0:.*]] = arith.constant 0 : index
-//  CHECK-NEXT:   %[[C1:.*]] = arith.constant 1 : index
+//   CHECK-DAG:   %[[C0:.*]] = arith.constant 0 : index
+//   CHECK-DAG:   %[[C1:.*]] = arith.constant 1 : index
 //  CHECK-NEXT:   %[[E1:.*]] = numba_util.tuple_extract %[[ARG2]] : tuple<index, index>, %[[C0]] -> index
 //  CHECK-NEXT:   %[[DIM1:.*]] = ntensor.dim %[[ARG1]], %[[C0]] : !ntensor.ntensor<?x?xf32>
 //  CHECK-NEXT:   %[[IND1:.*]] = ntensor.resolve_index %[[E1]], %[[DIM1]]
@@ -181,8 +181,8 @@ func.func @test(%arg1: !ntensor.ntensor<?x?xf32>, %arg2: tuple<!ntensor.slice, i
 }
 // CHECK-LABEL: func @test
 //  CHECK-SAME:   (%[[ARG1:.*]]: !ntensor.ntensor<?x?xf32>, %[[ARG2:.*]]: tuple<!ntensor.slice, index>, %[[ARG3:.*]]: !ntensor.ntensor<?xf32>)
-//  CHECK-NEXT:   %[[C0:.*]] = arith.constant 0 : index
-//  CHECK-NEXT:   %[[C1:.*]] = arith.constant 1 : index
+//   CHECK-DAG:   %[[C0:.*]] = arith.constant 0 : index
+//   CHECK-DAG:   %[[C1:.*]] = arith.constant 1 : index
 //  CHECK-NEXT:   %[[IDX1:.*]] = numba_util.tuple_extract %[[ARG2]] : tuple<!ntensor.slice, index>, %[[C0]] -> !ntensor.slice
 //  CHECK-NEXT:   %[[DIM1:.*]] = ntensor.dim %[[ARG1]], %[[C0]] : !ntensor.ntensor<?x?xf32>
 //  CHECK-NEXT:   %[[BEGIN:.*]], %[[END:.*]], %[[STEP:.*]], %[[COUNT:.*]] = ntensor.resolve_slice %[[IDX1]], %[[DIM1]]
@@ -204,9 +204,9 @@ func.func @test(%arg1: tuple<f32, f32>, %arg2: index) -> f32 {
 }
 // CHECK-LABEL: func @test
 //  CHECK-SAME:   (%[[ARG1:.*]]: tuple<f32, f32>, %[[ARG2:.*]]: index)
-//  CHECK-NEXT:   %[[C0:.*]] = arith.constant 0 : index
-//  CHECK-NEXT:   %[[C1:.*]] = arith.constant 1 : index
-//  CHECK-NEXT:   %[[C2:.*]] = arith.constant 2 : index
+//   CHECK-DAG:   %[[C0:.*]] = arith.constant 0 : index
+//   CHECK-DAG:   %[[C1:.*]] = arith.constant 1 : index
+//   CHECK-DAG:   %[[C2:.*]] = arith.constant 2 : index
 //  CHECK-NEXT:   %[[E1:.*]] = numba_util.tuple_extract %[[ARG1]] : tuple<f32, f32>, %[[C0]] -> f32
 //  CHECK-NEXT:   %[[E2:.*]] = numba_util.tuple_extract %[[ARG1]] : tuple<f32, f32>, %[[C1]] -> f32
 //  CHECK-NEXT:   %[[T1:.*]] = ntensor.from_elements %[[E1]], %[[E2]] : !ntensor.ntensor<2xf32>
