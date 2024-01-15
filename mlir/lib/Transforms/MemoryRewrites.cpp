@@ -233,7 +233,7 @@ std::optional<mlir::LogicalResult>
 numba::optimizeMemoryOps(mlir::AnalysisManager &am) {
   auto &memSSAAnalysis = am.getAnalysis<MemorySSAAnalysis>();
   if (!memSSAAnalysis.memssa)
-    return {};
+    return std::nullopt;
 
   using fptr_t = mlir::LogicalResult (*)(MemorySSAAnalysis &);
   const fptr_t funcs[] = {

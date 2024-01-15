@@ -78,27 +78,21 @@ struct ParallelToTbb : public mlir::OpRewritePattern<mlir::scf::ParallelOp> {
 
     llvm::SmallVector<mlir::TypedAttr> initVals;
     initVals.reserve(op.getNumResults());
-    for (auto &nestedOp : op.getBody()->without_terminator()) {
-      if (auto reduce = mlir::dyn_cast<mlir::scf::ReduceOp>(nestedOp)) {
-        auto ind = static_cast<unsigned>(initVals.size());
-        if (ind >= op.getNumResults())
-          return mlir::failure();
+    auto reduceOp =
+        mlir::cast<mlir::scf::ReduceOp>(op.getBody()->getTerminator());
+    for (mlir::Region &region : reduceOp.getReductions()) {
+      if (!llvm::hasSingleElement(region))
+        return mlir::failure();
 
-        auto &region = reduce.getReductionOperator();
-        if (!llvm::hasSingleElement(region))
-          return mlir::failure();
+      auto ind = static_cast<unsigned>(initVals.size());
+      auto reduceInitVal =
+          getReduceInitVal(op.getResult(ind).getType(), region.front());
+      if (!reduceInitVal)
+        return mlir::failure();
 
-        auto reduceInitVal =
-            getReduceInitVal(op.getResult(ind).getType(), region.front());
-        if (!reduceInitVal)
-          return mlir::failure();
-
-        initVals.emplace_back(*reduceInitVal);
-      }
+      initVals.emplace_back(*reduceInitVal);
     }
-
-    if (initVals.size() != op.getNumResults())
-      return mlir::failure();
+    assert(initVals.size() == op.getNumResults());
 
     numba::AllocaInsertionPoint allocaIP(op);
 
@@ -136,7 +130,6 @@ struct ParallelToTbb : public mlir::OpRewritePattern<mlir::scf::ParallelOp> {
                                       reduceStep, std::nullopt,
                                       reduceInitBodyBuilder);
 
-    auto oldBody = op.getBody();
     auto origLowerBound = op.getLowerBound();
     auto origUpperBound = op.getUpperBound();
     auto origStep = op.getStep();
@@ -169,17 +162,14 @@ struct ParallelToTbb : public mlir::OpRewritePattern<mlir::scf::ParallelOp> {
                                  mlir::Value index, mlir::ValueRange args) {
       assert(args.size() == reduceVars.size());
       mapping.clear();
-      auto reduceOps =
-          llvm::make_filter_range(oldBody->without_terminator(), [](auto &op) {
-            return mlir::isa<mlir::scf::ReduceOp>(op);
-          });
+
       llvm::SmallVector<mlir::Value> yieldArgs;
       yieldArgs.reserve(args.size());
-      for (auto &&[i, iOp] : llvm::enumerate(reduceOps)) {
+      for (auto &&[i, reduceOpRegion] :
+           llvm::enumerate(reduceOp.getReductions())) {
         auto &reduceVar = reduceVars[i];
         auto arg = args[static_cast<unsigned>(i)];
-        auto reduceOp = mlir::cast<mlir::scf::ReduceOp>(iOp);
-        auto &reduceOpBody = reduceOp.getReductionOperator().front();
+        auto &reduceOpBody = reduceOpRegion.front();
         assert(reduceOpBody.getNumArguments() == 2);
         auto prevVal =
             builder.create<mlir::memref::LoadOp>(loc, reduceVar, index);

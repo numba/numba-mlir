@@ -389,31 +389,36 @@ mlir::LogicalResult numba::MemorySSA::optimizeUses(
 }
 
 namespace {
-auto hasMemEffect(mlir::Operation &op) {
-  struct Result {
-    bool read = false;
-    bool write = false;
-  };
+static std::pair<bool, bool> hasMemEffect(mlir::Operation &op) {
+  bool read = false;
+  bool write = false;
 
-  Result ret;
   if (auto effects = mlir::dyn_cast<mlir::MemoryEffectOpInterface>(op)) {
     if (effects.hasEffect<mlir::MemoryEffects::Write>())
-      ret.write = true;
+      write = true;
 
     if (effects.hasEffect<mlir::MemoryEffects::Read>())
-      ret.read = true;
+      read = true;
   } else if (op.hasTrait<mlir::OpTrait::HasRecursiveMemoryEffects>()) {
-    ret.write = true;
+    for (mlir::Region &reg : op.getRegions()) {
+      for (mlir::Block &block : reg) {
+        for (auto &innerOp : block) {
+          auto [r, w] = hasMemEffect(innerOp);
+          read = read || r;
+          write = write || w;
+        }
+      }
+    }
   } else if (mlir::isa<mlir::CallOpInterface>(op)) {
     for (auto arg : op.getOperands()) {
       if (mlir::isa<mlir::MemRefType>(arg.getType())) {
-        ret.read = true;
-        ret.write = true;
+        read = true;
+        write = true;
         break;
       }
     }
   }
-  return ret;
+  return {read, write};
 }
 
 numba::MemorySSA::Node *memSSAProcessRegion(mlir::Region &region,
@@ -579,8 +584,8 @@ numba::MemorySSA::Node *memSSAProcessRegion(mlir::Region &region,
       } else {
         // Unsupported op, check if it has any mem effects
         if (op.walk([](mlir::Operation *nestedOp) {
-                auto res = hasMemEffect(*nestedOp);
-                if (res.read || res.write)
+                auto [read, write] = hasMemEffect(*nestedOp);
+                if (read || write)
                   return mlir::WalkResult::interrupt();
 
                 return mlir::WalkResult::advance();
@@ -589,14 +594,14 @@ numba::MemorySSA::Node *memSSAProcessRegion(mlir::Region &region,
         }
       }
     } else {
-      auto res = hasMemEffect(op);
-      if (res.write) {
+      auto [read, write] = hasMemEffect(op);
+      if (write) {
         auto newNode = memSSA.createDef(&op, currentNode);
         newNode->setDominator(currentNode);
         currentNode->setPostDominator(newNode);
         currentNode = newNode;
       }
-      if (res.read)
+      if (read)
         memSSA.createUse(&op, currentNode);
     }
   }

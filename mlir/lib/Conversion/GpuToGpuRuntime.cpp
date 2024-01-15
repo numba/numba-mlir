@@ -1093,7 +1093,7 @@ struct ExpandAllocOp : public mlir::OpRewritePattern<mlir::gpu::AllocOp> {
         op.getLoc(), op.getType(), token, op.getAsyncDependencies(), *queue,
         op.getDynamicSizes(), op.getSymbolOperands(), hostShared);
 
-    newOp->setAttrs(op->getDiscardableAttrs());
+    newOp->setAttrs(op->getDiscardableAttrDictionary());
     rewriter.replaceOp(op, newOp.getResults());
     return mlir::success();
   }
@@ -1406,14 +1406,13 @@ struct TileParallelOp : public mlir::OpRewritePattern<mlir::scf::ParallelOp> {
         op->hasAttr(mlir::gpu::getMappingAttrName()))
       return mlir::failure();
 
-    auto reductionOps =
-        llvm::to_vector(op.getBody()->getOps<mlir::scf::ReduceOp>());
+    auto reductionOp =
+        mlir::cast<mlir::scf::ReduceOp>(op.getBody()->getTerminator());
     mlir::ValueRange initVals = op.getInitVals();
-    assert(reductionOps.size() == initVals.size());
 
     llvm::SmallVector<mlir::TypedAttr> neutralValues;
-    for (auto reduction : reductionOps) {
-      auto neutralValue = getNeutralValue(reduction.getRegion().front());
+    for (auto &reductionReg : reductionOp.getReductions()) {
+      auto neutralValue = getNeutralValue(reductionReg.front());
       if (!neutralValue)
         return mlir::failure();
 
@@ -1523,7 +1522,7 @@ struct TileParallelOp : public mlir::OpRewritePattern<mlir::scf::ParallelOp> {
       assert(inBounds);
 
       ifOp = [&]() -> mlir::scf::IfOp {
-        if (!reductionOps.empty()) {
+        if (!reductionOp.getReductions().empty()) {
           llvm::SmallVector<mlir::Value> results;
           for (auto &&[i, val] : llvm::enumerate(initVals)) {
             auto constVal =
@@ -1545,29 +1544,29 @@ struct TileParallelOp : public mlir::OpRewritePattern<mlir::scf::ParallelOp> {
       newBlock = ifOp.thenBlock();
     }
     rewriter.eraseOp(newBlock->getTerminator()); // Erase exisitng yield.
-    if (!reductionOps.empty()) {
+    if (!reductionOp.getReductions().empty()) {
       mlir::IRMapping mapper;
       mapper.map(originalBlock->getArguments(), argMapping);
       mlir::OpBuilder::InsertionGuard g(rewriter);
       auto loc = originalBlock->getTerminator()->getLoc();
-      rewriter.eraseOp(originalBlock->getTerminator());
       rewriter.setInsertionPointToEnd(originalBlock);
       llvm::SmallVector<mlir::Value> results;
       for (auto &&[i, val] : llvm::enumerate(initVals)) {
-        auto reductionArg =
-            mapper.lookupOrDefault(reductionOps[i].getOperand());
+        auto reductionArg = mapper.lookupOrDefault(reductionOp.getOperand(i));
         results.emplace_back(reductionArg);
       }
       rewriter.create<mlir::scf::YieldOp>(loc, results);
 
       rewriter.setInsertionPointAfter(ifOp);
       auto ifResults = ifOp.getResults();
-      for (auto &&[i, reductionOp] : llvm::enumerate(reductionOps)) {
-        mapper.map(reductionOp.getOperand(), ifResults[i]);
-        rewriter.clone(*reductionOp, mapper);
-        rewriter.eraseOp(reductionOp);
-      }
+      mapper.map(reductionOp.getOperands(), ifResults);
+      rewriter.clone(*reductionOp, mapper);
+    } else {
+      mlir::OpBuilder::InsertionGuard g(rewriter);
+      rewriter.setInsertionPointToEnd(originalBlock);
+      rewriter.create<mlir::scf::YieldOp>(loc);
     }
+    rewriter.eraseOp(reductionOp);
     rewriter.mergeBlocks(originalBlock, newBlock, argMapping);
     rewriter.replaceOp(op, newOp->getResults());
 
@@ -2015,13 +2014,8 @@ struct InsertGPUGlobalReduce
     if (op.getInitVals().empty())
       return mlir::failure();
 
-    auto reductionOps = op.getBody()->getOps<mlir::scf::ReduceOp>();
-    assert(static_cast<size_t>(
-               std::distance(reductionOps.begin(), reductionOps.end())) ==
-           op.getInitVals().size());
-
-    llvm::SmallVector<mlir::scf::ReduceOp> reductionOpsVec(reductionOps.begin(),
-                                                           reductionOps.end());
+    auto reductionOp =
+        mlir::cast<mlir::scf::ReduceOp>(op.getBody()->getTerminator());
 
     llvm::SmallVector<mlir::Value> results;
     results.reserve(op.getInitVals().size());
@@ -2044,7 +2038,9 @@ struct InsertGPUGlobalReduce
       }
     }
 
-    for (auto &&[reduce, init] : llvm::zip(reductionOpsVec, op.getInitVals())) {
+    for (auto &&[reduceRegion, reduceArg, init] :
+         llvm::zip(reductionOp.getReductions(), reductionOp.getOperands(),
+                   op.getInitVals())) {
       auto reduceType = init.getType();
       auto memrefType = mlir::MemRefType::get(std::nullopt, reduceType);
 
@@ -2056,8 +2052,6 @@ struct InsertGPUGlobalReduce
                   /*asyncDeps*/ std::nullopt, /*dynSizes*/ std::nullopt,
                   /*symbols*/ std::nullopt, /*hostShared*/ true)
               .getMemref();
-
-      auto &reduceRegion = reduce.getReductionOperator();
 
       rewriter.setInsertionPointAfter(op);
       mlir::Value res = rewriter.create<mlir::memref::LoadOp>(loc, array);
@@ -2077,9 +2071,9 @@ struct InsertGPUGlobalReduce
       results.emplace_back(mapper.lookupOrNull(termResult));
       assert(results.back());
 
-      rewriter.setInsertionPoint(reduce);
+      rewriter.setInsertionPoint(reductionOp);
       auto newReduce = rewriter.create<gpu_runtime::GPUGlobalReduceOp>(
-          reduce.getLoc(), reduce.getOperand(), array);
+          reductionOp.getLoc(), reduceArg, array);
 
       auto &newRegion = newReduce.getRegion();
       rewriter.inlineRegionBefore(reduceRegion, newRegion, newRegion.end());
@@ -2089,8 +2083,9 @@ struct InsertGPUGlobalReduce
                                                            termResult);
 
       rewriter.eraseOp(term);
-      rewriter.eraseOp(reduce);
     }
+    rewriter.setInsertionPoint(reductionOp);
+    rewriter.replaceOpWithNewOp<mlir::scf::ReduceOp>(reductionOp);
 
     rewriter.setInsertionPoint(op);
     auto newParallel = rewriter.create<mlir::scf::ParallelOp>(
@@ -2246,7 +2241,7 @@ struct LowerGPUGlobalReduce
       mlir::Value value =
           b.create<mlir::memref::LoadOp>(l, reduceArray, iters.front());
       auto reduce = b.create<mlir::scf::ReduceOp>(l, value);
-      auto &finalReduceBlock = reduce.getRegion().front();
+      mlir::Block &finalReduceBlock = reduce.getReductions().front().front();
 
       mlir::IRMapping mapper;
       mapper.map(reduceBlock.getArguments(), finalReduceBlock.getArguments());
@@ -2261,7 +2256,6 @@ struct LowerGPUGlobalReduce
         auto result = mapper.lookupOrDefault(term.getValues().front());
         b.create<mlir::scf::ReduceReturnOp>(l, result);
       }
-      b.create<mlir::scf::YieldOp>(l);
     };
 
     mlir::Value initVal = rewriter.create<mlir::arith::ConstantOp>(
@@ -2316,10 +2310,10 @@ struct AllReduceRemoveRegion
         &convertAllReduceOp<mlir::arith::OrIOp, RedOp::OR>,
         &convertAllReduceOp<mlir::arith::MulIOp, RedOp::MUL>,
         &convertAllReduceOp<mlir::arith::MulFOp, RedOp::MUL>,
-        &convertAllReduceOp<mlir::arith::MaxSIOp, RedOp::MAX>,
-        &convertAllReduceOp<mlir::arith::MaximumFOp, RedOp::MAX>,
-        &convertAllReduceOp<mlir::arith::MinSIOp, RedOp::MIN>,
-        &convertAllReduceOp<mlir::arith::MinimumFOp, RedOp::MIN>,
+        &convertAllReduceOp<mlir::arith::MaxSIOp, RedOp::MAXSI>,
+        &convertAllReduceOp<mlir::arith::MaximumFOp, RedOp::MAXIMUMF>,
+        &convertAllReduceOp<mlir::arith::MinSIOp, RedOp::MINSI>,
+        &convertAllReduceOp<mlir::arith::MinimumFOp, RedOp::MINIMUMF>,
     };
 
     auto result = [&]() -> std::optional<RedOp> {
@@ -2456,7 +2450,9 @@ struct SortSCFParallel : public mlir::OpRewritePattern<mlir::scf::ParallelOp> {
     auto newOp = rewriter.create<mlir::scf::ParallelOp>(
         loc, newLowerBounds, newUpperBounds, newSteps, op.getInitVals());
     auto newBody = newOp.getBody();
-    rewriter.eraseOp(newBody->getTerminator());
+
+    if (!newBody->empty())
+      rewriter.eraseOp(newBody->getTerminator());
 
     llvm::SmallVector<mlir::Value> indVarMapped(numVars);
     for (auto i : llvm::seq(0u, numVars)) {

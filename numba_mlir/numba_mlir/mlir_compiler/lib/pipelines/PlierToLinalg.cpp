@@ -2540,7 +2540,7 @@ struct SimplifyExpandDims
   mlir::LogicalResult
   matchAndRewrite(mlir::linalg::GenericOp op,
                   mlir::PatternRewriter &rewriter) const override {
-    if (!op.hasTensorSemantics())
+    if (!op.hasPureTensorSemantics())
       return mlir::failure();
 
     if (op.getInputs().size() != 1 || op.getOutputs().size() != 1)
@@ -2705,7 +2705,7 @@ struct SliceOfGeneric : public mlir::OpRewritePattern<mlir::linalg::GenericOp> {
   mlir::LogicalResult
   matchAndRewrite(mlir::linalg::GenericOp op,
                   mlir::PatternRewriter &rewriter) const override {
-    if (!op.hasTensorSemantics())
+    if (!op.hasPureTensorSemantics())
       return mlir::failure();
 
     if (op->getNumResults() != 1)
@@ -3150,7 +3150,8 @@ static bool defaultControlFusionFn(mlir::OpOperand *fusedOperand) {
   if (auto generic =
           mlir::dyn_cast<mlir::linalg::GenericOp>(fusedOperand->getOwner())) {
     // Mixed generics fusion
-    if (!generic.hasTensorSemantics() && !generic.hasBufferSemantics()) {
+    if (!generic.hasPureTensorSemantics() &&
+        !generic.hasPureBufferSemantics()) {
       auto numInputs = generic.getNumDpsInputs();
       auto noalias = generic->getAttrOfType<mlir::DenseBoolArrayAttr>(
           kMixedGenericNoalias);
@@ -3201,7 +3202,7 @@ struct FuseAdjacentGenerics
   mlir::LogicalResult
   matchAndRewrite(mlir::linalg::GenericOp op,
                   mlir::PatternRewriter &rewriter) const override {
-    if (!op.hasTensorSemantics())
+    if (!op.hasPureTensorSemantics())
       return mlir::failure();
 
     llvm::SmallDenseMap<mlir::Value, mlir::Attribute> origArgs;
@@ -3217,7 +3218,7 @@ struct FuseAdjacentGenerics
 
         auto other = mlir::dyn_cast<mlir::linalg::GenericOp>(user);
         if (!other || other.getIteratorTypes() != op.getIteratorTypes() ||
-            !other.hasTensorSemantics())
+            !other.hasPureTensorSemantics())
           continue;
 
         auto dominates = [&]() -> bool {
@@ -3465,7 +3466,7 @@ struct MixedGenericsAliasAnalysis
     auto attrName = builder.getStringAttr(kMixedGenericNoalias);
     llvm::SmallVector<bool> flagsArray;
     auto visitor = [&](mlir::linalg::GenericOp op) {
-      if (op.hasBufferSemantics() || op.hasTensorSemantics())
+      if (op.hasPureBufferSemantics() || op.hasPureTensorSemantics())
         return;
 
       flagsArray.resize(op.getNumDpsInputs());
@@ -3577,7 +3578,7 @@ struct BufferizeMixedGeneric
   matchAndRewrite(mlir::linalg::GenericOp op,
                   mlir::linalg::GenericOp::Adaptor adaptor,
                   mlir::ConversionPatternRewriter &rewriter) const override {
-    if (op.hasTensorSemantics() || op.hasBufferSemantics())
+    if (op.hasPureTensorSemantics() || op.hasPureBufferSemantics())
       return mlir::failure();
 
     auto noalias =
@@ -3697,7 +3698,7 @@ struct AdditionalBufferize
 
     target.addDynamicallyLegalOp<mlir::linalg::GenericOp>(
         [](mlir::linalg::GenericOp op) {
-          return op.hasTensorSemantics() || op.hasBufferSemantics();
+          return op.hasPureTensorSemantics() || op.hasPureBufferSemantics();
         });
 
     patterns.insert<BufferizeReshape, BufferizeExtractSlice,

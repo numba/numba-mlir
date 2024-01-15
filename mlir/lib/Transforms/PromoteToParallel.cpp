@@ -45,8 +45,11 @@ static bool canParallelizeLoop(mlir::Operation *op, bool hasParallelAttr) {
 }
 
 using CheckFunc = bool (*)(mlir::Operation *, mlir::Value);
-using LowerFunc = void (*)(mlir::OpBuilder &, mlir::Location, mlir::Value,
-                           mlir::Operation *);
+using LowerFunc = mlir::Value (*)(mlir::OpBuilder &, mlir::Location,
+                                  mlir::Value, mlir::Operation *);
+using LowerReductionFunc = void (*)(mlir::OpBuilder &, mlir::Location,
+                                    mlir::Value, mlir::Value,
+                                    mlir::Operation *);
 
 template <typename Op>
 static bool simpleCheck(mlir::Operation *op, mlir::Value /*iterVar*/) {
@@ -63,58 +66,69 @@ static bool lhsArgCheck(mlir::Operation *op, mlir::Value iterVar) {
 }
 
 template <typename Op>
-static void simpleLower(mlir::OpBuilder &builder, mlir::Location loc,
-                        mlir::Value val, mlir::Operation *origOp) {
-  auto bodyBuilder = [&](mlir::OpBuilder &b, mlir::Location l, mlir::Value lhs,
-                         mlir::Value rhs) {
-    auto casted = mlir::cast<Op>(origOp);
-    mlir::IRMapping mapper;
-    mapper.map(casted.getLhs(), lhs);
-    mapper.map(casted.getRhs(), rhs);
-    mlir::Value res = b.clone(*origOp, mapper)->getResult(0);
-    b.create<mlir::scf::ReduceReturnOp>(l, res);
-  };
-  builder.create<mlir::scf::ReduceOp>(loc, val, bodyBuilder);
+static mlir::Value simpleLower(mlir::OpBuilder &builder, mlir::Location loc,
+                               mlir::Value val, mlir::Operation *origOp) {
+  return val;
+}
+
+template <typename Op>
+static void simpleBodyLower(mlir::OpBuilder &builder, mlir::Location loc,
+                            mlir::Value lhs, mlir::Value rhs,
+                            mlir::Operation *origOp) {
+  auto casted = mlir::cast<Op>(origOp);
+  mlir::IRMapping mapper;
+  mapper.map(casted.getLhs(), lhs);
+  mapper.map(casted.getRhs(), rhs);
+  mlir::Value res = builder.clone(*origOp, mapper)->getResult(0);
+  builder.create<mlir::scf::ReduceReturnOp>(loc, res);
 }
 
 template <typename SubOp, typename AddOp>
-static void subLower(mlir::OpBuilder &builder, mlir::Location loc,
-                     mlir::Value val, mlir::Operation *origOp) {
+static mlir::Value subLower(mlir::OpBuilder &builder, mlir::Location loc,
+                            mlir::Value val, mlir::Operation *origOp) {
   auto type = val.getType();
   auto zeroAttr = numba::getConstAttr(type, 0.0);
   auto zero = builder.create<mlir::arith::ConstantOp>(loc, type, zeroAttr);
   val = builder.create<SubOp>(loc, zero, val);
-  auto bodyBuilder = [&](mlir::OpBuilder &b, mlir::Location l, mlir::Value lhs,
-                         mlir::Value rhs) {
-    mlir::Value res = b.create<AddOp>(l, lhs, rhs);
-    b.create<mlir::scf::ReduceReturnOp>(l, res);
-  };
-  builder.create<mlir::scf::ReduceOp>(loc, val, bodyBuilder);
+  return val;
+}
+
+template <typename SubOp, typename AddOp>
+static void subBodyLower(mlir::OpBuilder &builder, mlir::Location loc,
+                         mlir::Value lhs, mlir::Value rhs,
+                         mlir::Operation *origOp) {
+  mlir::Value res = builder.create<AddOp>(loc, lhs, rhs);
+  builder.create<mlir::scf::ReduceReturnOp>(loc, res);
 }
 
 template <typename DivOp, typename MulOp>
-static void divLower(mlir::OpBuilder &builder, mlir::Location loc,
-                     mlir::Value val, mlir::Operation *origOp) {
+static mlir::Value divLower(mlir::OpBuilder &builder, mlir::Location loc,
+                            mlir::Value val, mlir::Operation *origOp) {
   auto type = val.getType();
   auto oneAttr = numba::getConstAttr(type, 1.0);
   auto one = builder.create<mlir::arith::ConstantOp>(loc, type, oneAttr);
   val = builder.create<DivOp>(loc, one, val);
-  auto bodyBuilder = [&](mlir::OpBuilder &b, mlir::Location l, mlir::Value lhs,
-                         mlir::Value rhs) {
-    mlir::Value res = b.create<MulOp>(l, lhs, rhs);
-    b.create<mlir::scf::ReduceReturnOp>(l, res);
-  };
-  builder.create<mlir::scf::ReduceOp>(loc, val, bodyBuilder);
+  return val;
+}
+
+template <typename DivOp, typename MulOp>
+static void divBodyLower(mlir::OpBuilder &builder, mlir::Location loc,
+                         mlir::Value lhs, mlir::Value rhs,
+                         mlir::Operation *origOp) {
+  mlir::Value res = builder.create<MulOp>(loc, lhs, rhs);
+  builder.create<mlir::scf::ReduceReturnOp>(loc, res);
 }
 
 template <typename Op>
-static constexpr std::pair<CheckFunc, LowerFunc> getSimpleHandler() {
-  return {&simpleCheck<Op>, &simpleLower<Op>};
+static constexpr std::tuple<CheckFunc, LowerFunc, LowerReductionFunc>
+getSimpleHandler() {
+  return {&simpleCheck<Op>, &simpleLower<Op>, &simpleBodyLower<Op>};
 }
 
 namespace arith = mlir::arith;
-static const constexpr std::pair<CheckFunc, LowerFunc> promoteHandlers[] = {
-    // clang-format off
+static const constexpr std::tuple<CheckFunc, LowerFunc, LowerReductionFunc>
+    promoteHandlers[] = {
+        // clang-format off
     getSimpleHandler<arith::AddIOp>(),
     getSimpleHandler<arith::AddFOp>(),
 
@@ -129,20 +143,21 @@ static const constexpr std::pair<CheckFunc, LowerFunc> promoteHandlers[] = {
     getSimpleHandler<arith::MaxUIOp>(),
     getSimpleHandler<arith::MaximumFOp>(),
 
-    {&lhsArgCheck<arith::SubIOp>, &subLower<arith::SubIOp, arith::AddIOp>},
-    {&lhsArgCheck<arith::SubFOp>, &subLower<arith::SubFOp, arith::AddFOp>},
+    {&lhsArgCheck<arith::SubIOp>, &subLower<arith::SubIOp, arith::AddIOp>, &subBodyLower<arith::SubIOp, arith::AddIOp>},
+    {&lhsArgCheck<arith::SubFOp>, &subLower<arith::SubFOp, arith::AddFOp>, &subBodyLower<arith::SubFOp, arith::AddFOp>},
 
-    {&lhsArgCheck<arith::DivFOp>, &divLower<arith::DivFOp, arith::MulFOp>},
-    // clang-format on
+    {&lhsArgCheck<arith::DivFOp>, &divLower<arith::DivFOp, arith::MulFOp>, &divBodyLower<arith::DivFOp, arith::MulFOp>},
+        // clang-format on
 };
 
-static LowerFunc getLowerer(mlir::Operation *op, mlir::Value iterVar) {
+static std::pair<LowerFunc, LowerReductionFunc>
+getLowerer(mlir::Operation *op, mlir::Value iterVar) {
   assert(op);
-  for (auto &&[checker, lowerer] : promoteHandlers)
+  for (auto &&[checker, lowerer, bodyLowerer] : promoteHandlers)
     if (checker(op, iterVar))
-      return lowerer;
+      return {lowerer, bodyLowerer};
 
-  return nullptr;
+  return {nullptr, nullptr};
 }
 
 static bool isInsideParallelRegion(mlir::Operation *op) {
@@ -372,7 +387,8 @@ struct PromoteToParallel : public mlir::OpRewritePattern<mlir::scf::ForOp> {
     auto iterVars = op.getRegionIterArgs();
     assert(iterVars.size() == term.getResults().size());
 
-    using ReductionDesc = std::tuple<mlir::Operation *, LowerFunc, mlir::Value>;
+    using ReductionDesc = std::tuple<mlir::Operation *, LowerFunc,
+                                     LowerReductionFunc, mlir::Value>;
     llvm::SmallVector<ReductionDesc> reductionOps;
     llvm::SmallDenseSet<mlir::Operation *> reductionOpsSet;
     for (auto &&[iterVar, result] : llvm::zip(iterVars, term.getResults())) {
@@ -391,11 +407,12 @@ struct PromoteToParallel : public mlir::OpRewritePattern<mlir::scf::ForOp> {
         return mlir::failure();
       }
 
-      auto lowerer = getLowerer(reductionOp, iterVar);
+      auto &&[lowerer, bodyLowerer] = getLowerer(reductionOp, iterVar);
       if (!lowerer)
         return mlir::failure();
 
-      reductionOps.emplace_back(reductionOp, lowerer, reductionArg);
+      reductionOps.emplace_back(reductionOp, lowerer, bodyLowerer,
+                                reductionArg);
       reductionOpsSet.insert(reductionOp);
     }
 
@@ -413,11 +430,27 @@ struct PromoteToParallel : public mlir::OpRewritePattern<mlir::scf::ForOp> {
         if (0 == reductionOpsSet.count(&oldOp))
           builder.clone(oldOp, mapping);
 
-      for (auto &&[reductionOp, lowerer, reductionArg] : reductionOps) {
+      llvm::SmallVector<mlir::Value> redArgs;
+      for (auto &&[reductionOp, lowerer, bodyLowerer, reductionArg] :
+           reductionOps) {
         auto arg = mapping.lookupOrDefault(reductionArg);
-        lowerer(builder, loc, arg, reductionOp);
+        auto res = lowerer(builder, loc, arg, reductionOp);
+        ;
+        redArgs.emplace_back(res);
       }
-      builder.create<mlir::scf::YieldOp>(loc);
+
+      auto reduceOp = builder.create<mlir::scf::ReduceOp>(loc, redArgs);
+
+      mlir::OpBuilder::InsertionGuard g(builder);
+      for (auto &&[region, it] :
+           llvm::zip(reduceOp.getReductions(), reductionOps)) {
+        auto &&[reductionOp, lowerer, bodyLowerer, reductionArg] = it;
+        mlir::Block &body = region.front();
+        assert(body.getNumArguments() == 2);
+        builder.setInsertionPointToStart(&body);
+        bodyLowerer(builder, loc, body.getArgument(0), body.getArgument(1),
+                    reductionOp);
+      }
     };
 
     rewriter.replaceOpWithNewOp<mlir::scf::ParallelOp>(
@@ -494,7 +527,7 @@ struct MergeNestedForIntoParallel
       assert((oldBody->getNumArguments() + 1) == iter_vals.size());
       mapping.map(block->getArgument(0), iter_vals.front());
       mapping.map(oldBody->getArguments(), iter_vals.drop_front());
-      for (auto &op : oldBody->without_terminator())
+      for (auto &op : *oldBody)
         builder.clone(op, mapping);
     };
 

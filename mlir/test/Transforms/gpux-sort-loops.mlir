@@ -14,7 +14,6 @@ func.func @check(%arg0: memref<?x?xf64>, %arg1: memref<?x?xf64>, %arg2: index, %
     scf.parallel (%arg4, %arg5) = (%c0, %c0) to (%arg2, %arg3) step (%c1, %c1) {
       %2 = memref.load %arg0[%arg4, %arg5] : memref<?x?xf64>
       memref.store %2, %arg1[%arg4, %arg5] : memref<?x?xf64>
-      scf.yield
     }
   }
   return
@@ -38,7 +37,6 @@ func.func @check(%arg0: memref<?x?x?xf64>, %arg1: memref<?x?x?xf64>, %arg3: inde
     scf.parallel (%arg6, %arg7, %arg8) = (%c0, %c0, %c0) to (%arg3, %arg4, %arg5) step (%c1, %c1, %c1) {
       %2 = memref.load %arg0[%arg6, %arg7, %arg8] : memref<?x?x?xf64>
       memref.store %2, %arg1[%arg6, %arg7, %arg8] : memref<?x?x?xf64>
-      scf.yield
     }
   }
   return
@@ -62,7 +60,6 @@ func.func @check(%arg0: memref<?x?x?xf64>, %arg1: memref<?x?x?xf64>, %arg3: inde
     scf.parallel (%arg6, %arg7, %arg8) = (%c0, %c0, %c0) to (%arg3, %arg4, %arg5) step (%c1, %c1, %c1) {
       %2 = memref.load %arg0[%arg6, %arg8, %arg7] : memref<?x?x?xf64>
       memref.store %2, %arg1[%arg6, %arg8, %arg7] : memref<?x?x?xf64>
-      scf.yield
     }
   }
   return
