@@ -2206,7 +2206,7 @@ std::optional<int64_t> TupleExtractOp::getConstantIndex() {
 
 mlir::OpFoldResult TupleExtractOp::fold(FoldAdaptor adaptor) {
   // All forms of folding require a known index.
-  auto index = adaptor.getIndex().dyn_cast_or_null<mlir::IntegerAttr>();
+  auto index = mlir::dyn_cast_if_present<mlir::IntegerAttr>(adaptor.getIndex());
   if (!index)
     return {};
 
@@ -2219,7 +2219,11 @@ mlir::OpFoldResult TupleExtractOp::fold(FoldAdaptor adaptor) {
   if (indexVal < 0 || indexVal >= static_cast<int64_t>(args.size()))
     return {};
 
-  return args[indexVal];
+  auto arg = args[indexVal];
+  if (arg.getType() != getType())
+    return {};
+
+  return arg;
 }
 
 void TupleExtractOp::build(::mlir::OpBuilder &odsBuilder,
