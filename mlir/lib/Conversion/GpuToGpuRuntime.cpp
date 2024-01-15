@@ -2447,7 +2447,9 @@ struct SortSCFParallel : public mlir::OpRewritePattern<mlir::scf::ParallelOp> {
     auto newOp = rewriter.create<mlir::scf::ParallelOp>(
         loc, newLowerBounds, newUpperBounds, newSteps, op.getInitVals());
     auto newBody = newOp.getBody();
-    rewriter.eraseOp(newBody->getTerminator());
+
+    if (!newBody->empty())
+      rewriter.eraseOp(newBody->getTerminator());
 
     llvm::SmallVector<mlir::Value> indVarMapped(numVars);
     for (auto i : llvm::seq(0u, numVars)) {
