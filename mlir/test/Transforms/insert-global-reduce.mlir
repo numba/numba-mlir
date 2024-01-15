@@ -5,12 +5,11 @@ func.func @test(%lb: index, %ub: index, %s: index) {
   %init = "test.init"() : () -> f32
   %0 = scf.parallel (%i, %j, %k) = (%lb, %lb, %lb) to (%ub, %ub, %ub) step (%s, %s, %s) init(%init) -> f32 {
     %1 = "test.produce"() : () -> f32
-    scf.reduce(%1) : f32 {
+    scf.reduce(%1 : f32) {
     ^bb0(%lhs: f32, %rhs: f32):
       %2 = "test.transform"(%lhs, %rhs) : (f32, f32) -> f32
       scf.reduce.return %2 : f32
     }
-    scf.yield
   } {mapping = [#gpu.loop_dim_map<processor = block_x, map = (d0) -> (d0), bound = (d0) -> (d0)>,
                 #gpu.loop_dim_map<processor = block_y, map = (d0) -> (d0), bound = (d0) -> (d0)>,
                 #gpu.loop_dim_map<processor = block_z, map = (d0) -> (d0), bound = (d0) -> (d0)>]}
@@ -30,7 +29,7 @@ func.func @test(%lb: index, %ub: index, %s: index) {
 //       CHECK: %[[VAL:.*]] = "test.transform"(%[[ARG4]], %[[ARG5]]) : (f32, f32) -> f32
 //       CHECK: gpu_runtime.global_reduce_yield %[[VAL]] : f32
 //       CHECK: }
-//       CHECK: scf.yield
+//       CHECK: scf.reduce
 //       CHECK: }
 //       CHECK: %[[RES1:.*]] = memref.load %[[ARRAY]][] : memref<f32>
 //       CHECK: gpu.dealloc %[[ARRAY]] : memref<f32>

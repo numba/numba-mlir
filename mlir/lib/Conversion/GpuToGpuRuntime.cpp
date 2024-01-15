@@ -2037,7 +2037,6 @@ struct InsertGPUGlobalReduce
       }
     }
 
-    rewriter.setInsertionPoint(reductionOp);
     for (auto &&[reduceRegion, reduceArg, init] : llvm::zip(reductionOp.getReductions(), reductionOp.getOperands(), op.getInitVals())) {
       auto reduceType = init.getType();
       auto memrefType = mlir::MemRefType::get(std::nullopt, reduceType);
@@ -2069,7 +2068,7 @@ struct InsertGPUGlobalReduce
       results.emplace_back(mapper.lookupOrNull(termResult));
       assert(results.back());
 
-
+      rewriter.setInsertionPoint(reductionOp);
       auto newReduce = rewriter.create<gpu_runtime::GPUGlobalReduceOp>(
           reductionOp.getLoc(), reduceArg, array);
 
@@ -2082,7 +2081,8 @@ struct InsertGPUGlobalReduce
 
       rewriter.eraseOp(term);
     }
-    rewriter.eraseOp(reductionOp);
+    rewriter.setInsertionPoint(reductionOp);
+    rewriter.replaceOpWithNewOp<mlir::scf::ReduceOp>(reductionOp);
 
     rewriter.setInsertionPoint(op);
     auto newParallel = rewriter.create<mlir::scf::ParallelOp>(
