@@ -138,11 +138,12 @@ isFusionLegal(scf::ParallelOp firstPloop, scf::ParallelOp secondPloop,
 /// Prepends operations of firstPloop's body into secondPloop's body.
 static bool
 fuseIfLegal(scf::ParallelOp firstPloop, scf::ParallelOp &secondPloop,
-            OpBuilder &b,
+            OpBuilder &builder,
             llvm::function_ref<mlir::AliasAnalysis &()> getAnalysis) {
+  Block *block1 = firstPloop.getBody();
+  Block *block2 = secondPloop.getBody();
   IRMapping firstToSecondPloopIndices;
-  firstToSecondPloopIndices.map(firstPloop.getBody()->getArguments(),
-                                secondPloop.getBody()->getArguments());
+  firstToSecondPloopIndices.map(block1->getArguments(), block2->getArguments());
 
   if (!isFusionLegal(firstPloop, secondPloop, firstToSecondPloopIndices,
                      getAnalysis))
@@ -153,41 +154,52 @@ fuseIfLegal(scf::ParallelOp firstPloop, scf::ParallelOp &secondPloop,
     if (!dom.properlyDominates(secondPloop, user))
       return false;
 
-  auto init1 = firstPloop.getInitVals();
-  auto numResults1 = init1.size();
-  auto init2 = secondPloop.getInitVals();
-  auto numResults2 = init2.size();
+  ValueRange inits1 = firstPloop.getInitVals();
+  ValueRange inits2 = secondPloop.getInitVals();
 
-  SmallVector<mlir::Value> newInitVars;
-  newInitVars.reserve(numResults1 + numResults2);
-  newInitVars.assign(init2.begin(), init2.end());
-  newInitVars.append(init1.begin(), init1.end());
+  SmallVector<Value> newInitVars(inits1.begin(), inits1.end());
+  newInitVars.append(inits2.begin(), inits2.end());
 
+  IRRewriter b(builder);
   b.setInsertionPoint(secondPloop);
-  auto newSecondPloop = b.create<mlir::scf::ParallelOp>(
+  auto newSecondPloop = b.create<scf::ParallelOp>(
       secondPloop.getLoc(), secondPloop.getLowerBound(),
       secondPloop.getUpperBound(), secondPloop.getStep(), newInitVars);
 
-  newSecondPloop.getRegion().getBlocks().splice(
-      newSecondPloop.getRegion().begin(), secondPloop.getRegion().getBlocks());
-  auto term =
-      mlir::cast<mlir::scf::YieldOp>(newSecondPloop.getBody()->getTerminator());
+  Block *newBlock = newSecondPloop.getBody();
+  auto term1 = cast<scf::ReduceOp>(block1->getTerminator());
+  auto term2 = cast<scf::ReduceOp>(block2->getTerminator());
 
-  b.setInsertionPointToStart(newSecondPloop.getBody());
-  for (auto &op : firstPloop.getBody()->without_terminator()) {
-    if (isa<mlir::scf::ReduceOp>(op)) {
-      mlir::OpBuilder::InsertionGuard g(b);
-      b.setInsertionPoint(term);
-      b.clone(op, firstToSecondPloopIndices);
-    } else {
-      b.clone(op, firstToSecondPloopIndices);
+  b.inlineBlockBefore(block2, newBlock, newBlock->begin(),
+                      newBlock->getArguments());
+  b.inlineBlockBefore(block1, newBlock, newBlock->begin(),
+                      newBlock->getArguments());
+
+  ValueRange results = newSecondPloop.getResults();
+  if (!results.empty()) {
+    b.setInsertionPointToEnd(newBlock);
+
+    ValueRange reduceArgs1 = term1.getOperands();
+    ValueRange reduceArgs2 = term2.getOperands();
+    SmallVector<Value> newReduceArgs(reduceArgs1.begin(), reduceArgs1.end());
+    newReduceArgs.append(reduceArgs2.begin(), reduceArgs2.end());
+
+    auto newReduceOp = b.create<scf::ReduceOp>(term2.getLoc(), newReduceArgs);
+
+    for (auto &&[i, reg] : llvm::enumerate(llvm::concat<Region>(
+             term1.getReductions(), term2.getReductions()))) {
+      Block &oldRedBlock = reg.front();
+      Block &newRedBlock = newReduceOp.getReductions()[i].front();
+      b.inlineBlockBefore(&oldRedBlock, &newRedBlock, newRedBlock.begin(),
+                          newRedBlock.getArguments());
     }
+
+    firstPloop.replaceAllUsesWith(results.take_front(inits1.size()));
+    secondPloop.replaceAllUsesWith(results.take_back(inits2.size()));
   }
-  firstPloop.replaceAllUsesWith(
-      newSecondPloop.getResults().take_back(numResults1));
+  term1->erase();
+  term2->erase();
   firstPloop.erase();
-  secondPloop.replaceAllUsesWith(
-      newSecondPloop.getResults().take_front(numResults2));
   secondPloop.erase();
   secondPloop = newSecondPloop;
   return true;
