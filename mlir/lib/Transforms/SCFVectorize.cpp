@@ -620,9 +620,7 @@ numba::vectorizeLoop(mlir::OpBuilder &builder, mlir::scf::ParallelOp loop,
   }
 
   // Clone `scf.reduce` op to reduce across loop iterations.
-  scalarMapping.clear();
-  scalarMapping.map(reduceOp.getOperands(), reduceVals);
-  builder.clone(*reduceOp, scalarMapping);
+  builder.clone(*reduceOp)->setOperands(reduceVals);
 
   // If in masked mode remove old loop, otherwise update loop bounds to
   // repurpose it for handling remaining values.
