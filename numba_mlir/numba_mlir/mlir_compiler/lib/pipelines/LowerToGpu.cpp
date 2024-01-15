@@ -205,7 +205,8 @@ convertParallelToFor(mlir::scf::ParallelOp op,
 
   auto reduceOp = mlir::cast<mlir::scf::ReduceOp>(newBody->getTerminator());
   rewriter.setInsertionPoint(reduceOp);
-  for (auto &&[reduceRegion, reduceArg] : llvm::zip(reduceOp.getReductions(), reduceOp.getOperands())) {
+  for (auto &&[reduceRegion, reduceArg] :
+       llvm::zip(reduceOp.getReductions(), reduceOp.getOperands())) {
     auto &reduceBody = reduceRegion.front();
     assert(reduceBody.getNumArguments() == 2);
     auto term =
@@ -1588,10 +1589,14 @@ public:
     using funcptr_t =
         void (*)(mlir::Operation *, mlir::PatternRewriter &, mlir::Value);
     const std::tuple<llvm::StringRef, funcptr_t, funcptr_t> handlers[] = {
-        {"reduce_add", &genGroupOp<mlir::gpu::AllReduceOperation::ADD>, &genGroupOp<mlir::gpu::AllReduceOperation::ADD>},
-        {"reduce_mul", &genGroupOp<mlir::gpu::AllReduceOperation::MUL>, &genGroupOp<mlir::gpu::AllReduceOperation::MUL>},
-        {"reduce_min", &genGroupOp<mlir::gpu::AllReduceOperation::MINSI>, &genGroupOp<mlir::gpu::AllReduceOperation::MINIMUMF>},
-        {"reduce_max", &genGroupOp<mlir::gpu::AllReduceOperation::MAXSI>, &genGroupOp<mlir::gpu::AllReduceOperation::MAXIMUMF>},
+        {"reduce_add", &genGroupOp<mlir::gpu::AllReduceOperation::ADD>,
+         &genGroupOp<mlir::gpu::AllReduceOperation::ADD>},
+        {"reduce_mul", &genGroupOp<mlir::gpu::AllReduceOperation::MUL>,
+         &genGroupOp<mlir::gpu::AllReduceOperation::MUL>},
+        {"reduce_min", &genGroupOp<mlir::gpu::AllReduceOperation::MINSI>,
+         &genGroupOp<mlir::gpu::AllReduceOperation::MINIMUMF>},
+        {"reduce_max", &genGroupOp<mlir::gpu::AllReduceOperation::MAXSI>,
+         &genGroupOp<mlir::gpu::AllReduceOperation::MAXIMUMF>},
     };
 
     for (auto &&[name, intFunc, floatFunc] : handlers) {

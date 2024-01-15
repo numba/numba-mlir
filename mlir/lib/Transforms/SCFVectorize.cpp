@@ -156,7 +156,8 @@ numba::getLoopVectorizeInfo(mlir::scf::ParallelOp loop, unsigned dim,
   /// Check if `scf.reduce` can be handled by `vector.reduce`.
   /// If not we still can vectorize the loop but we cannot use masked
   /// vectorize.
-  auto reduce = mlir::cast<mlir::scf::ReduceOp>(loop.getBody()->getTerminator());
+  auto reduce =
+      mlir::cast<mlir::scf::ReduceOp>(loop.getBody()->getTerminator());
   for (mlir::Region &reg : reduce.getReductions()) {
     if (!getReductionKind(reg.front()))
       masked = false;
@@ -564,11 +565,13 @@ numba::vectorizeLoop(mlir::OpBuilder &builder, mlir::scf::ParallelOp loop,
   }
 
   // Vectorize `scf.reduce` op.
-  auto reduceOp = mlir::cast<mlir::scf::ReduceOp>(loop.getBody()->getTerminator());
+  auto reduceOp =
+      mlir::cast<mlir::scf::ReduceOp>(loop.getBody()->getTerminator());
   llvm::SmallVector<mlir::Value> reduceVals;
   reduceVals.reserve(reduceOp.getNumOperands());
 
-  for (auto && [body, arg] : llvm::zip(reduceOp.getReductions(), reduceOp.getOperands())) {
+  for (auto &&[body, arg] :
+       llvm::zip(reduceOp.getReductions(), reduceOp.getOperands())) {
     scalarMapping.clear();
     mlir::Block &reduceBody = body.front();
     assert(reduceBody.getNumArguments() == 2);
@@ -590,8 +593,8 @@ numba::vectorizeLoop(mlir::OpBuilder &builder, mlir::scf::ParallelOp loop,
       }
 
       auto fmf = getFMF(reduceBody.front());
-      reduceVal = builder.create<mlir::vector::ReductionOp>(loc, *redKind,
-                                                            redArg, fmf);
+      reduceVal =
+          builder.create<mlir::vector::ReductionOp>(loc, *redKind, redArg, fmf);
     } else {
       if (masked)
         return reduceOp.emitError("Cannot vectorize reduce op in masked mode");

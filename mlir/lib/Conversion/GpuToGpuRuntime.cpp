@@ -1406,7 +1406,8 @@ struct TileParallelOp : public mlir::OpRewritePattern<mlir::scf::ParallelOp> {
         op->hasAttr(mlir::gpu::getMappingAttrName()))
       return mlir::failure();
 
-    auto reductionOp = mlir::cast<mlir::scf::ReduceOp>(op.getBody()->getTerminator());
+    auto reductionOp =
+        mlir::cast<mlir::scf::ReduceOp>(op.getBody()->getTerminator());
     mlir::ValueRange initVals = op.getInitVals();
 
     llvm::SmallVector<mlir::TypedAttr> neutralValues;
@@ -1551,8 +1552,7 @@ struct TileParallelOp : public mlir::OpRewritePattern<mlir::scf::ParallelOp> {
       rewriter.setInsertionPointToEnd(originalBlock);
       llvm::SmallVector<mlir::Value> results;
       for (auto &&[i, val] : llvm::enumerate(initVals)) {
-        auto reductionArg =
-            mapper.lookupOrDefault(reductionOp.getOperand(i));
+        auto reductionArg = mapper.lookupOrDefault(reductionOp.getOperand(i));
         results.emplace_back(reductionArg);
       }
       rewriter.create<mlir::scf::YieldOp>(loc, results);
@@ -2014,7 +2014,8 @@ struct InsertGPUGlobalReduce
     if (op.getInitVals().empty())
       return mlir::failure();
 
-    auto reductionOp = mlir::cast<mlir::scf::ReduceOp>(op.getBody()->getTerminator());
+    auto reductionOp =
+        mlir::cast<mlir::scf::ReduceOp>(op.getBody()->getTerminator());
 
     llvm::SmallVector<mlir::Value> results;
     results.reserve(op.getInitVals().size());
@@ -2037,7 +2038,9 @@ struct InsertGPUGlobalReduce
       }
     }
 
-    for (auto &&[reduceRegion, reduceArg, init] : llvm::zip(reductionOp.getReductions(), reductionOp.getOperands(), op.getInitVals())) {
+    for (auto &&[reduceRegion, reduceArg, init] :
+         llvm::zip(reductionOp.getReductions(), reductionOp.getOperands(),
+                   op.getInitVals())) {
       auto reduceType = init.getType();
       auto memrefType = mlir::MemRefType::get(std::nullopt, reduceType);
 

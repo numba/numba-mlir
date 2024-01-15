@@ -78,8 +78,9 @@ struct ParallelToTbb : public mlir::OpRewritePattern<mlir::scf::ParallelOp> {
 
     llvm::SmallVector<mlir::TypedAttr> initVals;
     initVals.reserve(op.getNumResults());
-    auto reduceOp = mlir::cast<mlir::scf::ReduceOp>(op.getBody()->getTerminator());
-    for (mlir::Region& region : reduceOp.getReductions()) {
+    auto reduceOp =
+        mlir::cast<mlir::scf::ReduceOp>(op.getBody()->getTerminator());
+    for (mlir::Region &region : reduceOp.getReductions()) {
       if (!llvm::hasSingleElement(region))
         return mlir::failure();
 
@@ -164,7 +165,8 @@ struct ParallelToTbb : public mlir::OpRewritePattern<mlir::scf::ParallelOp> {
 
       llvm::SmallVector<mlir::Value> yieldArgs;
       yieldArgs.reserve(args.size());
-      for (auto &&[i, reduceOpRegion] : llvm::enumerate(reduceOp.getReductions())) {
+      for (auto &&[i, reduceOpRegion] :
+           llvm::enumerate(reduceOp.getReductions())) {
         auto &reduceVar = reduceVars[i];
         auto arg = args[static_cast<unsigned>(i)];
         auto &reduceOpBody = reduceOpRegion.front();

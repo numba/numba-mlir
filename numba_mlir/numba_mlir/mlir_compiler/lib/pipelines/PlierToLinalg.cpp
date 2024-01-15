@@ -3150,7 +3150,8 @@ static bool defaultControlFusionFn(mlir::OpOperand *fusedOperand) {
   if (auto generic =
           mlir::dyn_cast<mlir::linalg::GenericOp>(fusedOperand->getOwner())) {
     // Mixed generics fusion
-    if (!generic.hasPureTensorSemantics() && !generic.hasPureBufferSemantics()) {
+    if (!generic.hasPureTensorSemantics() &&
+        !generic.hasPureBufferSemantics()) {
       auto numInputs = generic.getNumDpsInputs();
       auto noalias = generic->getAttrOfType<mlir::DenseBoolArrayAttr>(
           kMixedGenericNoalias);

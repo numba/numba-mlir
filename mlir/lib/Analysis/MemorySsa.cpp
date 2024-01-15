@@ -400,9 +400,9 @@ static std::pair<bool, bool> hasMemEffect(mlir::Operation &op) {
     if (effects.hasEffect<mlir::MemoryEffects::Read>())
       read = true;
   } else if (op.hasTrait<mlir::OpTrait::HasRecursiveMemoryEffects>()) {
-    for(mlir::Region &reg : op.getRegions()) {
-      for (mlir::Block & block : reg) {
-        for (auto& innerOp : block) {
+    for (mlir::Region &reg : op.getRegions()) {
+      for (mlir::Block &block : reg) {
+        for (auto &innerOp : block) {
           auto [r, w] = hasMemEffect(innerOp);
           read = read || r;
           write = write || w;
