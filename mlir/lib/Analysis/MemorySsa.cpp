@@ -426,10 +426,8 @@ numba::MemorySSA::Node *memSSAProcessRegion(mlir::Region &region,
                                             numba::MemorySSA &memSSA) {
   assert(nullptr != entryNode);
   // Only structured control flow is supported for now
-  if (!llvm::hasSingleElement(region)) {
-    llvm::errs() << "failed 1\n";
+  if (!llvm::hasSingleElement(region))
     return nullptr;
-  }
 
   auto &block = region.front();
   numba::MemorySSA::Node *currentNode = entryNode;
@@ -440,10 +438,8 @@ numba::MemorySSA::Node *memSSAProcessRegion(mlir::Region &region,
                                                            currentNode};
         auto phi = memSSA.createPhi(&op, phiArgs);
         auto result = memSSAProcessRegion(loop->getRegion(0), phi, memSSA);
-        if (nullptr == result) {
-          llvm::errs() << "failed 2\n";
+        if (nullptr == result)
           return nullptr;
-        }
 
         if (result != phi) {
           phi->setArgument(0, result);
@@ -565,23 +561,18 @@ numba::MemorySSA::Node *memSSAProcessRegion(mlir::Region &region,
                               predecessors};
 
         if (parentPredecessors.empty()) {
-          llvm::errs() << "failed 3\n";
           return nullptr;
         } else if (parentPredecessors.size() == 1) {
           currentNode = visitor.visit(parentPredecessors[0]);
-          if (currentNode == nullptr) {
-            llvm::errs() << "failed 4\n";
+          if (currentNode == nullptr)
             return nullptr;
-          }
         } else {
           llvm::SmallVector<numba::MemorySSA::Node *> prevNodes(
               parentPredecessors.size());
           for (auto &&[i, val] : llvm::enumerate(parentPredecessors)) {
             auto prev = visitor.visit(val);
-            if (prev == nullptr) {
-              llvm::errs() << "failed 5\n";
+            if (prev == nullptr)
               return nullptr;
-            }
 
             prevNodes[i] = prev;
           }
@@ -599,8 +590,6 @@ numba::MemorySSA::Node *memSSAProcessRegion(mlir::Region &region,
 
                 return mlir::WalkResult::advance();
               }).wasInterrupted()) {
-          llvm::errs() << "failed 6\n";
-          llvm::errs() << op << "\n";
           return nullptr;
         }
       }
