@@ -514,7 +514,7 @@ struct MergeNestedForIntoParallel
       assert((oldBody->getNumArguments() + 1) == iter_vals.size());
       mapping.map(block->getArgument(0), iter_vals.front());
       mapping.map(oldBody->getArguments(), iter_vals.drop_front());
-      for (auto &op : oldBody->without_terminator())
+      for (auto &op : *oldBody)
         builder.clone(op, mapping);
     };
 
