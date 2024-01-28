@@ -20,7 +20,7 @@ operations and ability to acess workitem level API directly.
 
 ### Kernel definition
 Simple example of pairwise distance kernel:
-```
+```python
 # Current OpenCL/SYCL style kernel
 @kernel
 def pairwise_distance_kernel(X1, X2, D):
@@ -63,7 +63,7 @@ def pairwise_distance_kernel(group, X1, X2, D):
     group.store(D[gid[0]:, gid[1]:], np.sqrt(diff))
 ```
 ### Launching the kernel:
-```
+```python
 # Current kernel API
 pairwise_distance_kernel[global_size, local_size](X1, X2, D)
 
@@ -85,7 +85,7 @@ the kernel.
 Tensors can be of arbitrary, possibly dynamic, shape and support masking access.
 
 Creating tensor from array
-```
+```python
 x1 = group.load(X1[gid[0]:], shape=(group.shape[0], X1.shape[1]))
 ```
 
@@ -93,19 +93,19 @@ Resulting tensor is always of requested shape, but if source slice was of
 smaller shape, some elements will be masked.
 
 Copying data back into array
-```
+```python
 group.store(D[gid[0]:, gid[1]:], tensor)
 ```
 
 If tensor is masked, only active elements will be written.
 
 Tensor data created from `group.load` can either be direct view into source
-array or local copy. Any changes made to tensor may or amy not be visible to
+array or local copy. Any changes made to tensor may or may not be visible to
 source array. If user wants to make make changes visible, it must call
 `group.store` explicitly.
 
 Allocating new tensor:
-```
+```python
 arr = group.empty(shape=(...), dtype=dtyp)
 arr = group.zeros(shape=(...), dtype=dtyp)
 arr = group.ones(shape=(...), dtype=dtyp)
@@ -117,7 +117,7 @@ actual allocation placement is left to the compler.
 
 Tensors support usual numpy operations, including fancy indexing and
 broadcasting:
-```
+```python
 diff = ((x1[None, :, :] - x2[:, None, :])**2).sum(axis=2)
 ```
 Numpy ops follows usual Numpy semantics by returning newly allocated tensor as
@@ -126,7 +126,7 @@ allocations. If some of the intermediate allocation wasn't removed it will
 result in compiler warning.
 
 User also can pass out buffer explcitly:
-```
+```python
 arr = group.zeros(shape=(...), dtype=dtyp)
 res = np.subtract(x1, x2, out=arr)
 ```
@@ -139,7 +139,7 @@ While the main execution model is WorkGroup scope execution, it's possible to
 swhich to subgroup or workitem scope for convenience.
 
 SG Level:
-```
+```python
 @new_kernel
 def foo(group, X1, X2, D):
     for sg in group.subgroups():
@@ -148,7 +148,7 @@ def foo(group, X1, X2, D):
 ```
 
 Workitem scope:
-```
+```python
 @new_kernel
 def foo(group, X1, X2, D):
     for wi in group.workitems():
@@ -160,7 +160,7 @@ Programming on workitem scope is close to usual OpenCL programming.
 ### Extending
 
 Free functions:
-```
+```python
 @kernel.func
 def add(a, b):
     return a + b
@@ -173,7 +173,7 @@ def foo(group, ...):
 
 
 Functions overloads for specific scope:
-```
+```python
 def foo(a, b):
     pass
 
@@ -204,7 +204,7 @@ def bar(group, ...):
 ```
 
 Defining low level intrinsics/codegen:
-```
+```python
 def my_intrinsic(a, b):
     pass
 
@@ -229,7 +229,7 @@ def foo(group, ...):
 ```
 
 Putting everything together:
-```
+```python
 # module device_lib.py
 
 def my_hw_gemm(a, b, acc):
