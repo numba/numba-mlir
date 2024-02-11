@@ -204,8 +204,8 @@ SG Level:
 def foo(group, X1, X2, D):
     @group.subgroups
     def inner(sg):
-        id = sg.id
-        size = sg.size
+        id = sg.subgroup_id()
+        size = sg.size()
 
     inner()
 ```
@@ -216,7 +216,7 @@ Workitem scope:
 def foo(group, X1, X2, D):
     @group.workitems
     def inner(wi):
-        i, j, k = wi.id
+        i, j, k = wi.global_id()
 
     inner()
 ```
@@ -246,17 +246,17 @@ def foo(a, b):
 
 @kernel.func(foo, scope=WorkGroup)
 def foo_wg(g, a, b):
-    i,j,k = g.id()
+    i,j,k = g.group_id()
     ...
 
 @kernel.func(foo, scope=SubGroup)
 def foo_wg(sg, a, b):
-    i = group.id()
+    i = sg.subgroup_id()
     ...
 
 @kernel.func(foo, scope=WorkItem)
 def foo_wg(wi, a, b):
-    i,j,k = wi.id()
+    i,j,k = wi.group_id()
     ...
 
 @kernel
