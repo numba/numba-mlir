@@ -206,7 +206,7 @@ active.
 
 Assigning tensor elements via `[]` will mark them as active.
 
-There is intentionally no way to mark element as inactive opther than creating
+There is intentionally no way to mark element as inactive other than creating
 new tensor/vector.
 
 For numpy functions operating on tensors/vectors, spicific element will be
