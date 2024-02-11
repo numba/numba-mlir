@@ -256,7 +256,7 @@ def foo_wg(sg, a, b):
 
 @kernel.func(foo, scope=WorkItem)
 def foo_wg(wi, a, b):
-    i,j,k = wi.group_id()
+    i,j,k = wi.global_id()
     ...
 
 @kernel
