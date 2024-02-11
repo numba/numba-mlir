@@ -209,7 +209,7 @@ Assigning tensor elements via `[]` will mark them as active.
 There is intentionally no way to mark element as inactive other than creating
 new tensor/vector.
 
-For numpy functions operating on tensors/vectors, spicific element will be
+For numpy functions operating on tensors/vectors, specific element will be
 marked as active only if all source elements it accesses are marked as active.
 
 Reduction functions will only consider active elements.
@@ -217,7 +217,7 @@ Reduction functions will only consider active elements.
 Allocation functions `group.(v)zeros`,`group.(v)ones`,`group.(v)full` will mark
 all elements as active, `group.empty` will ask all elements as inactive.
 
-Mask is allocated in the same storage as tensor/vector data. In some cases
+Mask is allocated in the same storage type as tensor/vector data. In some cases
 (allocation function) compiler can elide mask allocation and return pseudo-mask,
 always active.
 
