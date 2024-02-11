@@ -8,7 +8,7 @@ We propose new high-level kernel API (TBD)
 
 ## Motivation
 
-Current low-level Kernel API is too verbose not very convenient for fast
+Current low-level Kernel API is too verbose and not very convenient for fast
 prototyping.
 Current high-level APIs (array API and prange), on the other hand, provide too
 little low level control over GPU execution.
@@ -35,11 +35,12 @@ def pairwise_distance_kernel(X1, X2, D):
         D[i, j] = np.sqrt(d)
 
 # New api, immediately swithing to workitem level.
-@new_kernel
+@kernel
 def pairwise_distance_kernel(group, X1, X2, D):
     # switch to workitem level
     # parallel loop over work items
-    for ind in group.wi_range():
+    @group.workitems
+    def inner(ind):
         i, j = ind.global_id()
 
         if i < X1.shape[0] and j < X2.shape[0]:
@@ -47,8 +48,10 @@ def pairwise_distance_kernel(group, X1, X2, D):
             d = ((X1[i] - X2[j])**2).sum()
             D[i, j] = np.sqrt(d)
 
+    inner()
+
 # Using WG level api
-@new_kernel
+@kernel
 def pairwise_distance_kernel(group, X1, X2, D):
     gid = group.work_offset() # global offset to current WG (i.e. group_size * group_id)
 
@@ -136,23 +139,29 @@ compiler due ops fusion and/or DCE.
 ### Switching to SubGroup or WorkItem scope
 
 While the main execution model is WorkGroup scope execution, it's possible to
-swhich to subgroup or workitem scope for convenience.
+swihch to subgroup or workitem scope for convenience.
 
 SG Level:
 ```python
-@new_kernel
+@kernel
 def foo(group, X1, X2, D):
-    for sg in group.subgroups():
+    @group.subgroups
+    def inner(sg):
         id = sg.id
         size = sg.size
+
+    inner()
 ```
 
 Workitem scope:
 ```python
-@new_kernel
+@kernel
 def foo(group, X1, X2, D):
-    for wi in group.workitems():
+    @group.workitems
+    def inner(wi):
         i, j, k = wi.id
+
+    inner()
 ```
 
 Programming on workitem scope is close to usual OpenCL programming.
@@ -165,7 +174,7 @@ Free functions:
 def add(a, b):
     return a + b
 
-@newkernel
+@kernel
 def foo(group, ...):
     c = add(a, b)
 ```
@@ -192,15 +201,21 @@ def foo_wg(wi, a, b):
     i,j,k = wi.id()
     ...
 
-@newkernel
+@kernel
 def bar(group, ...):
     # Index objects are passed implicitly
     c1 = foo(a1, b1)
-    for sg in group.subgroups():
+    @group.subgroups
+    def inner1(sg):
         c2 = foo(a2, b2)
 
-    for wi in group.workitems():
+    inner1()
+
+    @group.workitems
+    def inner2(wi):
         c3 = foo(a3, b3)
+
+    inner2()
 ```
 
 Defining low level intrinsics/codegen:
@@ -222,7 +237,7 @@ def my_intrinsic_impl(a, b):
     # Can return None if intrinsic doesn't supported for specific data types.
     return None
 
-@newkernel
+@kernel
 def foo(group, ...):
     ...
     c = my_intrinsic(a, b)
@@ -259,7 +274,8 @@ def my_tile_store_impl(arr, data):
 @kernel.func(foo, scope=WorkGroup)
 def my_gemm(group, a, b, acc):
     i, j = group.id()
-    for sg in group.subgroups():
+    @group.subgroups
+    def inner(sg):
         M, N = 8, 16 # Or from autotuning
         tile_acc = my_tile_load(...)
         for k in range(0, K, TK):
@@ -269,11 +285,13 @@ def my_gemm(group, a, b, acc):
 
         my_tile_store(acc[...], tile_acc)
 
+    inner()
+
 
 # module main.py
 import device_lib
 
-@newkernel
+@kernel
 def my_kernel(group, a, b, res, device_lib)
     acc = group.zeros(a.shape[0], b.shape[1])
     device_lib.my_gemm(a, b, acc)
