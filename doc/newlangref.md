@@ -193,6 +193,40 @@ broadcasting is supported. `out=` argument is not supported.
 Supported Numpy ops on vectors: (TBD)
 
 
+### Masking
+
+Tensors and vectors are masked, i.e. individual elements can be marked active or
+inactive.
+
+`group.load/vload` will mark elements which are outside of requested shape as
+inactive.
+
+`group.store` will only update destination elements which have source mask
+active.
+
+Assigning tensor elements via `[]` will mark them as active.
+
+There is intentionally no way to mark element as inactive opther than creating
+new tensor/vector.
+
+For numpy functions operating on tensors/vectors, spicific element will be
+marked as active only if all source elements it accesses are marked as active.
+
+Reduction functions will only consider active elements.
+
+Allocation functions `group.(v)zeros`,`group.(v)ones`,`group.(v)full` will mark
+all elements as active, `group.empty` will ask all elements as inactive.
+
+Mask is allocated in the same storage as tensor/vector data. In some cases
+(allocation function) compiler can elide mask allocation and return pseudo-mask,
+always active.
+
+Mask can be accessed directly via `tensor.mask` property. Returned mask will
+have same shape as the original array and has dtype of `bool`. Returned mask is
+read-only. Active elements are marked as `False` as the returned mask (following
+Numpy masked arrays convention).
+
+
 ### Switching to SubGroup or WorkItem scope
 
 While the main execution model is WorkGroup scope execution, it's possible to
