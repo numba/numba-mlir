@@ -8,7 +8,7 @@ We propose new high-level kernel API (TBD)
 
 ## Motivation
 
-Current low-level Kernel API is too verbose not very convenient for fast
+Current low-level Kernel API is too verbose and not very convenient for fast
 prototyping.
 Current high-level APIs (array API and prange), on the other hand, provide too
 little low level control over GPU execution.
@@ -17,6 +17,7 @@ little low level control over GPU execution.
 
 We propose a new Workgroup-level API, with direct access to Numpy array
 operations and ability to acess workitem level API directly.
+
 
 ### Kernel definition
 Simple example of pairwise distance kernel:
@@ -35,11 +36,12 @@ def pairwise_distance_kernel(X1, X2, D):
         D[i, j] = np.sqrt(d)
 
 # New api, immediately swithing to workitem level.
-@new_kernel
+@kernel
 def pairwise_distance_kernel(group, X1, X2, D):
     # switch to workitem level
     # parallel loop over work items
-    for ind in group.wi_range():
+    @group.workitems
+    def inner(ind):
         i, j = ind.global_id()
 
         if i < X1.shape[0] and j < X2.shape[0]:
@@ -47,8 +49,10 @@ def pairwise_distance_kernel(group, X1, X2, D):
             d = ((X1[i] - X2[j])**2).sum()
             D[i, j] = np.sqrt(d)
 
+    inner()
+
 # Using WG level api
-@new_kernel
+@kernel
 def pairwise_distance_kernel(group, X1, X2, D):
     gid = group.work_offset() # global offset to current WG (i.e. group_size * group_id)
 
@@ -62,6 +66,8 @@ def pairwise_distance_kernel(group, X1, X2, D):
     # store result to D, but with boundary checks
     group.store(D[gid[0]:, gid[1]:], np.sqrt(diff))
 ```
+
+
 ### Launching the kernel:
 ```python
 # Current kernel API
@@ -76,7 +82,8 @@ pairwise_distance_kernel(group, X1, X2, D)
 # autotuning.
 ```
 
-### Tensors (Name TBD) and arrays
+
+### Tensors and arrays
 
 Numpy arrays passed as arguments to the kernel can be accessed directly inside
 but we also provide `tensor` object as a convenient way to access data inside
@@ -92,7 +99,7 @@ x1 = group.load(X1[gid[0]:], shape=(group.shape[0], X1.shape[1]))
 Resulting tensor is always of requested shape, but if source slice was of
 smaller shape, some elements will be masked.
 
-Copying data back into array
+Copying data back into array:
 ```python
 group.store(D[gid[0]:, gid[1]:], tensor)
 ```
@@ -125,6 +132,8 @@ result, but compiler is heavily rely on ops fusion to remove intermedialte
 allocations. If some of the intermediate allocation wasn't removed it will
 result in compiler warning.
 
+Supported Numpy ops on tensors: (TBD)
+
 User also can pass out buffer explcitly:
 ```python
 arr = group.zeros(shape=(...), dtype=dtyp)
@@ -133,29 +142,87 @@ res = np.subtract(x1, x2, out=arr)
 Explicit allocations won't generate such warnings, but still can be removed by
 compiler due ops fusion and/or DCE.
 
+Tensor allocation is only allowed on workgroup level, they are not allowed on
+subgroup or workitem level.
+
+
+### Vectors
+
+In addition to `tensor` objects compiler supports operations over `vector` types.
+Vectors are immutable and statically-sized.
+
+
+New vector allocation:
+```python
+arr = group.vzeros(shape=(...), dtype=dtyp)
+arr = group.vones(shape=(...), dtype=dtyp)
+arr = group.vfull(shape=(...), dtype=dtyp, fill_value=...)
+```
+
+Creating vector from array:
+```python
+x1 = group.vload(X1[gid[0]:], shape=(W, H))
+```
+Vector allocation shape must be deteminable at compile time.
+
+Creating vector from tensor:
+```python
+x1 = group.load(X1[gid[0]:], shape=(W, H)).vec();
+x2 = group.load(X1[gid[0]:], shape=(group.shape[0], X1.shape[1]))[x:x+W,y:y+W].vec()
+x3 = group.load(X1[gid[0]:], shape=(group.shape[0], X1.shape[1])).vec(shape=(W,H))
+```
+`vec()` shape must be deteminable at compile time. If shape is omitted, source
+tensor shape will be used and must be static.
+
+
+Storing vector back into array/tensor:
+```python
+group.store(D[gid[0]:, gid[1]:], vector)
+```
+Note: we don't distinguish between tensor/vector store and they have the same
+semantics.
+
+Vectors can be masked. If source tensor was masked, resulting vector will be
+masked as well.
+
+Vector operations are permitted on workgroup, subgroup and workitem level.
+
+Vectors generally support same set of Numpy ops as Tensors. Numpy-style
+broadcasting is supported. `out=` argument is not supported.
+
+Supported Numpy ops on vectors: (TBD)
+
+
 ### Switching to SubGroup or WorkItem scope
 
 While the main execution model is WorkGroup scope execution, it's possible to
-swhich to subgroup or workitem scope for convenience.
+swihch to subgroup or workitem scope for convenience.
 
 SG Level:
 ```python
-@new_kernel
+@kernel
 def foo(group, X1, X2, D):
-    for sg in group.subgroups():
-        id = sg.id
-        size = sg.size
+    @group.subgroups
+    def inner(sg):
+        id = sg.subgroup_id()
+        size = sg.size()
+
+    inner()
 ```
 
 Workitem scope:
 ```python
-@new_kernel
+@kernel
 def foo(group, X1, X2, D):
-    for wi in group.workitems():
-        i, j, k = wi.id
+    @group.workitems
+    def inner(wi):
+        i, j, k = wi.global_id()
+
+    inner()
 ```
 
 Programming on workitem scope is close to usual OpenCL programming.
+
 
 ### Extending
 
@@ -165,7 +232,7 @@ Free functions:
 def add(a, b):
     return a + b
 
-@newkernel
+@kernel
 def foo(group, ...):
     c = add(a, b)
 ```
@@ -179,28 +246,34 @@ def foo(a, b):
 
 @kernel.func(foo, scope=WorkGroup)
 def foo_wg(g, a, b):
-    i,j,k = g.id()
+    i,j,k = g.group_id()
     ...
 
 @kernel.func(foo, scope=SubGroup)
 def foo_wg(sg, a, b):
-    i = group.id()
+    i = sg.subgroup_id()
     ...
 
 @kernel.func(foo, scope=WorkItem)
 def foo_wg(wi, a, b):
-    i,j,k = wi.id()
+    i,j,k = wi.global_id()
     ...
 
-@newkernel
+@kernel
 def bar(group, ...):
     # Index objects are passed implicitly
     c1 = foo(a1, b1)
-    for sg in group.subgroups():
+    @group.subgroups
+    def inner1(sg):
         c2 = foo(a2, b2)
 
-    for wi in group.workitems():
+    inner1()
+
+    @group.workitems
+    def inner2(wi):
         c3 = foo(a3, b3)
+
+    inner2()
 ```
 
 Defining low level intrinsics/codegen:
@@ -222,7 +295,7 @@ def my_intrinsic_impl(a, b):
     # Can return None if intrinsic doesn't supported for specific data types.
     return None
 
-@newkernel
+@kernel
 def foo(group, ...):
     ...
     c = my_intrinsic(a, b)
@@ -259,7 +332,8 @@ def my_tile_store_impl(arr, data):
 @kernel.func(foo, scope=WorkGroup)
 def my_gemm(group, a, b, acc):
     i, j = group.id()
-    for sg in group.subgroups():
+    @group.subgroups
+    def inner(sg):
         M, N = 8, 16 # Or from autotuning
         tile_acc = my_tile_load(...)
         for k in range(0, K, TK):
@@ -269,16 +343,19 @@ def my_gemm(group, a, b, acc):
 
         my_tile_store(acc[...], tile_acc)
 
+    inner()
+
 
 # module main.py
 import device_lib
 
-@newkernel
+@kernel
 def my_kernel(group, a, b, res, device_lib)
     acc = group.zeros(a.shape[0], b.shape[1])
     device_lib.my_gemm(a, b, acc)
     group.store(res, acc)
 ```
+
 
 ### Autotuning
 
