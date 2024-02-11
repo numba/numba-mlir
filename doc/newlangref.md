@@ -18,6 +18,7 @@ little low level control over GPU execution.
 We propose a new Workgroup-level API, with direct access to Numpy array
 operations and ability to acess workitem level API directly.
 
+
 ### Kernel definition
 Simple example of pairwise distance kernel:
 ```python
@@ -65,6 +66,8 @@ def pairwise_distance_kernel(group, X1, X2, D):
     # store result to D, but with boundary checks
     group.store(D[gid[0]:, gid[1]:], np.sqrt(diff))
 ```
+
+
 ### Launching the kernel:
 ```python
 # Current kernel API
@@ -79,7 +82,8 @@ pairwise_distance_kernel(group, X1, X2, D)
 # autotuning.
 ```
 
-### Tensors (Name TBD) and arrays
+
+### Tensors and arrays
 
 Numpy arrays passed as arguments to the kernel can be accessed directly inside
 but we also provide `tensor` object as a convenient way to access data inside
@@ -95,7 +99,7 @@ x1 = group.load(X1[gid[0]:], shape=(group.shape[0], X1.shape[1]))
 Resulting tensor is always of requested shape, but if source slice was of
 smaller shape, some elements will be masked.
 
-Copying data back into array
+Copying data back into array:
 ```python
 group.store(D[gid[0]:, gid[1]:], tensor)
 ```
@@ -128,6 +132,8 @@ result, but compiler is heavily rely on ops fusion to remove intermedialte
 allocations. If some of the intermediate allocation wasn't removed it will
 result in compiler warning.
 
+Supported Numpy ops on tensors: (TBD)
+
 User also can pass out buffer explcitly:
 ```python
 arr = group.zeros(shape=(...), dtype=dtyp)
@@ -135,6 +141,57 @@ res = np.subtract(x1, x2, out=arr)
 ```
 Explicit allocations won't generate such warnings, but still can be removed by
 compiler due ops fusion and/or DCE.
+
+Tensor allocation is only allowed on workgroup level, they are not allowed on
+subgroup or workitem level.
+
+
+### Vectors
+
+In addition to `tensor` objects compiler supports operations over `vector` types.
+Vectors are immutable and statically-sized.
+
+
+New vector allocation:
+```python
+arr = group.vzeros(shape=(...), dtype=dtyp)
+arr = group.vones(shape=(...), dtype=dtyp)
+arr = group.vfull(shape=(...), dtype=dtyp, fill_value=...)
+```
+
+Creating vector from array:
+```python
+x1 = group.vload(X1[gid[0]:], shape=(W, H))
+```
+Vector allocation shape must be deteminable at compile time.
+
+Creating vector from tensor:
+```python
+x1 = group.load(X1[gid[0]:], shape=(W, H)).vec();
+x2 = group.load(X1[gid[0]:], shape=(group.shape[0], X1.shape[1]))[x:x+W,y:y+W].vec()
+x3 = group.load(X1[gid[0]:], shape=(group.shape[0], X1.shape[1])).vec(shape=(W,H))
+```
+`vec()` shape must be deteminable at compile time. If shape is omitted, source
+tensor shape will be used and must be static.
+
+
+Storing vector back into array/tensor:
+```python
+group.store(D[gid[0]:, gid[1]:], vector)
+```
+Note: we don't distinguish between tensor/vector store and they have the same
+semantics.
+
+Vectors can be masked. If source tensor was masked, resulting vector will be
+masked as well.
+
+Vector operations are permitted on workgroup, subgroup and workitem level.
+
+Vectors generally support same set of Numpy ops as Tensors. Numpy-style
+broadcasting is supported. `out=` argument is not supported.
+
+Supported Numpy ops on vectors: (TBD)
+
 
 ### Switching to SubGroup or WorkItem scope
 
@@ -165,6 +222,7 @@ def foo(group, X1, X2, D):
 ```
 
 Programming on workitem scope is close to usual OpenCL programming.
+
 
 ### Extending
 
@@ -297,6 +355,7 @@ def my_kernel(group, a, b, res, device_lib)
     device_lib.my_gemm(a, b, acc)
     group.store(res, acc)
 ```
+
 
 ### Autotuning
 
