@@ -39,7 +39,7 @@ def pairwise_distance_kernel(X1, X2, D):
 W1 = sym.W1
 W2 = sym.W2
 H = sym.H
-@kernel(work_size=(W1, W2))
+@kernel(work_shape=(W1, W2))
 def pairwise_distance_kernel(group: CurrentGroup,
                              X1: Buffer[W1, H],
                              X2: Buffer[W2, H],
@@ -57,7 +57,7 @@ def pairwise_distance_kernel(group: CurrentGroup,
     inner()
 
 # Using WG level api
-@kernel(work_size=(W1, W2))
+@kernel(work_shape=(W1, W2))
 def pairwise_distance_kernel(group: CurrentGroup,
                              X1: Buffer[W1, H],
                              X2: Buffer[W2, H],
@@ -81,16 +81,16 @@ def pairwise_distance_kernel(group: CurrentGroup,
 # Current kernel API
 pairwise_distance_kernel[global_size, local_size](X1, X2, D)
 
-# In New API, work, group and subgroup sizes are bound to kernel params via
-# symbols, i.e. in previous example they are directly taken from input buffers
+# In New API work/group shapes and subgroup size are bound to kernel params via
+# symbols, i.e. in previous example they are taken from input buffers
 # dimenstions.
 pairwise_distance_kernel(X1, X2, D)
 ```
 While kernel function takes `CurrentGroup` as argument, it's not passed to the
-kernel invocation directly and group dimension are iferred from bound symbols.
+kernel invocation directly and work/group shapes are inferred from bound symbols.
 
-If user need to pass dimensions unrelated to any buffer args, he can bind them
-to the separate kernel int/tuple arg.
+If user wants to specify work/group shapes explicitly they may bind it
+to (tuples of) symbols passed as kernel arguments
 ```python
 @kernel(work_shape=(G1,G2,G3), group_shape=(L1,L2,L3))
 def test(gr: CurrentGroup,
@@ -108,7 +108,7 @@ Symbols are the way to define some relations between input buffers dimensions
 and/or work or group shape:
 ```python
 W, H = sym.W, sym.H
-@kernel(work_size=(W, H))
+@kernel(work_shape=(W, H))
 def pairwise_distance_kernel(group: CurrentGroup,
                              X1: Buffer[W, H],
                              X2: Buffer[W, H]):
@@ -123,7 +123,7 @@ will be a single kernel for every input arrays size.
 Symbols can also be declared as literals, and in this case, runtime will compile
 separate versions of the kernel for each distinct symbol value:
 ```python
-# H is usually small and won't change between kernel invocations, declare is as
+# H is usually small and won't change between kernel invocations, declaring it as
 # literal so compiler can unroll it instead of doing dynamic loop.
 @kernel(work_size=(W1, W2), literals={H})
 def pairwise_distance_kernel(group: CurrentGroup,
