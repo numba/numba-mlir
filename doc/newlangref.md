@@ -35,15 +35,20 @@ def pairwise_distance_kernel(X1, X2, D):
             d += tmp * tmp
         D[i, j] = np.sqrt(d)
 
-# New api, immediately swithing to workitem level.
-@kernel
-def pairwise_distance_kernel(group, X1, X2, D):
+# New api, immediately switching to workitem level.
+W1 = sym.W1
+W2 = sym.W2
+H = sym.H
+@kernel(work_shape=(W1, W2))
+def pairwise_distance_kernel(group: CurrentGroup,
+                             X1: Buffer[W1, H],
+                             X2: Buffer[W2, H],
+                             D: Buffer[W1, W2]):
     # switch to workitem level
     # parallel loop over work items
     @group.workitems
     def inner(ind):
         i, j = ind.global_id()
-
         if i < X1.shape[0] and j < X2.shape[0]:
             # using high-level array api to calculate distance
             d = ((X1[i] - X2[j])**2).sum()
@@ -52,8 +57,11 @@ def pairwise_distance_kernel(group, X1, X2, D):
     inner()
 
 # Using WG level api
-@kernel
-def pairwise_distance_kernel(group, X1, X2, D):
+@kernel(work_shape=(W1, W2))
+def pairwise_distance_kernel(group: CurrentGroup,
+                             X1: Buffer[W1, H],
+                             X2: Buffer[W2, H],
+                             D: Buffer[W1, W2]):
     gid = group.work_offset() # global offset to current WG (i.e. group_size * group_id)
 
     # Create tensor of specified shape, but with boundary checks of X1 and X2
@@ -73,18 +81,80 @@ def pairwise_distance_kernel(group, X1, X2, D):
 # Current kernel API
 pairwise_distance_kernel[global_size, local_size](X1, X2, D)
 
-# New API, `group` kernel arg directly corresponds to host API param, using
-# to setup iteration dimensions.
-group = Group(work_shape=global_size, group_shape_hint=local_size, subgroup_size_hint=sg_size)
-pairwise_distance_kernel(group, X1, X2, D)
+# In New API work/group shapes and subgroup size are bound to kernel params via
+# symbols, i.e. in previous example they are taken from input buffers
+# dimenstions.
+pairwise_distance_kernel(X1, X2, D)
+```
+While kernel function takes `CurrentGroup` as argument, it's not passed to the
+kernel invocation directly and work/group shapes are inferred from bound symbols.
 
-# Local and subgroup sizes are only hints and are subject to heuristica and
-# autotuning.
+If user wants to specify work/group shapes explicitly they may bind it
+to (tuples of) symbols passed as kernel arguments
+```python
+@kernel(work_shape=(G1,G2,G3), group_shape=(L1,L2,L3))
+def test(gr: CurrentGroup,
+         gsize: tuple[G1, G2, G3],
+         lsize: tuple[L1, L2, L3]):
+    # gsize and lsize are not used inside kernel and only needed to bind
+    # work and group shape.
+    ...
+
+test((1024, 1, 1), (64, 1, 1))
 ```
 
+### Symbols
+Symbols are the way to define some relations between input buffers dimensions
+and/or work or group shape:
+```python
+W, H = sym.W, sym.H
+@kernel(work_shape=(W, H))
+def pairwise_distance_kernel(group: CurrentGroup,
+                             X1: Buffer[W, H],
+                             X2: Buffer[W, H]):
+    # Kernel expects 2 buffers with same shape and work size will be equal to
+    # that shape
+    ...
+```
+
+By default symbols are treated as dynamic values, i.e. in previous example there
+will be a single kernel for every input arrays size.
+
+Symbols can also be declared as literals, and in this case, runtime will compile
+separate versions of the kernel for each distinct symbol value:
+```python
+# H is usually small and won't change between kernel invocations, declaring it as
+# literal so compiler can unroll it instead of doing dynamic loop.
+@kernel(work_size=(W1, W2), literals={H})
+def pairwise_distance_kernel(group: CurrentGroup,
+                             X1: Buffer[W1, H],
+                             X2: Buffer[W2, H],
+                             D: Buffer[W1, W2]):
+```
+Literal symbols can be used in context where constant is expected (e.g. vector
+dimensions).
+
+Subgroup size must always be a constant or literal symbol:
+```python
+@kernel(work_shape=(G1,G2,G3), group_shape=(L1,L2,L3), subgroup_size=SG, literals={SG})
+def test(gr: CurrentGroup,
+         gsize: tuple[G1, G2, G3],
+         lsize: tuple[L1, L2, L3],
+         sgsize: SG):
+    ...
+```
+
+For buffer it's also possible to declare specific dimension as constant if it's
+known beforehead:
+```python
+@kernel(work_size=(W1, W2))
+def pairwise_distance_kernel(group: CurrentGroup,
+                             X1: Buffer[W1, 3],
+                             X2: Buffer[W2, 3],
+                             D: Buffer[W1, W2]):
+```
 
 ### Tensors and arrays
-
 Numpy arrays passed as arguments to the kernel can be accessed directly inside
 but we also provide `tensor` object as a convenient way to access data inside
 the kernel.
