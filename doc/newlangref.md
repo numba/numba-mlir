@@ -62,7 +62,7 @@ def pairwise_distance_kernel(group: CurrentGroup,
                              X1: Buffer[W1, H],
                              X2: Buffer[W2, H],
                              D: Buffer[W1, W2]):
-    gid = group.work_offset() # global offset to current WG (i.e. group_size * group_id)
+    gid = group.work_offset # global offset to current WG (i.e. group_size * group_id)
 
     # Create tensor of specified shape, but with boundary checks of X1 and X2
     x1 = group.load(X1[gid[0]:], shape=(group.shape[0], X1.shape[1]))
@@ -237,7 +237,7 @@ Vector allocation shape must be deteminable at compile time.
 
 Creating vector from tensor:
 ```python
-x1 = group.load(X1[gid[0]:], shape=(W, H)).vec();
+x1 = group.load(X1[gid[0]:], shape=(W, H)).vec()
 x2 = group.load(X1[gid[0]:], shape=(group.shape[0], X1.shape[1]))[x:x+W,y:y+W].vec()
 x3 = group.load(X1[gid[0]:], shape=(group.shape[0], X1.shape[1])).vec(shape=(W,H))
 ```
@@ -385,7 +385,7 @@ Defining low level intrinsics/codegen:
 def my_intrinsic(a, b):
     pass
 
-@kernel.intrinsic(my_intrinsic, scope=WorkGroup):
+@kernel.intrinsic(my_intrinsic, scope=WorkGroup)
 def my_intrinsic_impl(a, b):
     # Can query 'a' and 'b' types here
     if is_fp16(a) and is_int8(b):
@@ -418,18 +418,18 @@ def my_tile_load(arr):
 def my_tile_store(arr, data):
     pass
 
-@kernel.intrinsic(my_hw_gemm, scope=SubGroup):
+@kernel.intrinsic(my_hw_gemm, scope=SubGroup)
 def my_hw_gemm_impl(a, b, acc):
     def func(builder, a, b, acc):
         return builder.create(spirv.call)("__my_hw_gemm", a, b, acc)
 
     return func
 
-@kernel.intrinsic(my_tile_load, scope=SubGroup):
+@kernel.intrinsic(my_tile_load, scope=SubGroup)
 def my_tile_load_impl(arr):
     ...
 
-@kernel.intrinsic(my_tile_store, scope=SubGroup):
+@kernel.intrinsic(my_tile_store, scope=SubGroup)
 def my_tile_store_impl(arr, data):
     ...
 
@@ -463,4 +463,117 @@ def my_kernel(group, a, b, res, device_lib)
 
 ### Autotuning
 
-(TBD)
+When developing a kernel, there are often kernel hyperparameters that need to be fine-tuned to get better performance.
+The simplest examples of such hyperparameters are the size of the workgroup or size of a tile to work with.
+In more complex kernels there may be several such parameters.
+Such hyperparameters usually hardware depended and should be tuned for specific device.
+
+Let's look at an example of reduction:
+
+```python
+
+WS, GS, N = sym.WS, sym.GS, sym.N
+
+@kernel(work_shape=ceil_div(WS, N), group_shape=GS)
+def reduction(group: CurrentGroup, a: Buffer[WS], result: Buffer[1], n: N, gshape: GS):
+    temp_result = group.zeros(group.size)
+    for i in range(n):
+        work_offset = group.work_offset[0]*n + i*group.size
+        a_view = group.load(a[work_offset:], shape=group.size)
+        temp_result += a_view
+
+    atomic_ref(result)[0] += temp_result.sum()
+
+...
+
+reduction(a, result, n, gsize)
+
+```
+
+Here we see two such hyperparameters which we need to fine-tune: workgroup size (GS) and number of iterations done by single group (N).
+In order to automate the process of parameters selection there is an autotuner API.
+
+It mainly consists of the following:
+1. TunabelParams class with following constructor params:
+    ```python
+        class TunableParam:
+            def __init__(self, sym, default, vals):
+    ```
+    Where:
+    * `sym` is a symbol to be tuned
+    * `default` is default value of the symbol without tuning
+    * `vals` set of applicable values
+
+2. `tunables` argument of `@kernel` decorator:
+    ```python
+        @kernel(..., tunables=(Tunable1, Tunable2, ...))
+    ```
+
+3. `autotune` function which accepts kernel with tunables and kernel arguments to pass:
+    ```python
+        tuned_params = autotune(my_kernel, kernel_arg1, kernel_arg2, ...)
+    ```
+
+Let's see how we can apply this to our reduction:
+
+```python
+TP = TunableParam
+
+WS, GS, N = sym.WS, sym.GS, sym.N
+
+@kernel(work_shape=ceil_div(WS, N),
+        group_shape=GS,
+        tunables=(TP(GS, 64, range(64, 1024, 64)), TP(N, 16, range(16, 256, 16))))
+def reduction(group: CurrentGroup, a: Buffer[WS], result: Buffer[1]):
+    temp_result = group.zeros(group.size)
+    for i in range(N):
+        work_offset = group.work_offset[0]*N + i*group.size
+        a_view = group.load(a[work_offset:], shape=group.size)
+        temp_result += a_view
+
+    atomic_ref(result)[0] += temp_result.sum()
+
+...
+
+tparams = autotune(reduction, a_for_tuning, result_for_tuning)
+
+tuned_reduction = reduction.parametrize(tparams)
+
+tuned_reduction(a, result)
+
+```
+
+Things to note:
+* `GS` and `N` are no longer passed as kernel arguments
+* You must use original symbols (`N` and `GS`) inside kernels, not wrapped in `TunableParams`
+* You should `parametrize` you kernel with tuned parameters.
+
+Since tuning could take significant time and usually need to be done only once for each kernel per device there is a possibility to save and load tuned parameters:
+
+```python
+tparams = autotune(reduction)
+
+tparams.save(path_to_file)
+
+...
+
+tparams = autotune.load(path_to_file)
+
+tuned_reduction = reduction.parametrize(tparams)
+
+tuned_reduction(a, result)
+
+```
+
+Tunable symbols as any other symbols could be declared as literals:
+```python
+...
+
+@kernel(work_shape=ceil_div(WS, N),
+        group_shape=GS,
+        tunables=(TP(GS, 64, range(64, 1024, 64)), TP(N, 16, range(16, 256, 16))),
+        literals={N})
+def reduction(group: CurrentGroup, a: Buffer[WS], result: Buffer[1]):
+    ...
+
+```
