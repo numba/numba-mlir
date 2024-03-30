@@ -203,7 +203,7 @@ jobs:
       - name: Build Python frontend
         run: |
           cd numba_mlir
-          conda create -y -n test-env python=${{ matrix.python }} "pip>=22" numba=0.58 numpy=1.24 "setuptools<65.6" scikit-learn pytest-xdist ninja scipy pybind11 pytest "tbb>=$env:TBB_VER" "tbb-devel>=$env:TBB_VER" cmake "mkl-devel-dpcpp>=2023.1" zlib dpcpp_win-64 level-zero-devel -c conda-forge -c intel -c numba
+          conda create -y -n test-env python=${{ matrix.python }} "pip>=22" numba=0.58 numpy=1.24 "setuptools<65.6" scikit-learn pytest-xdist ninja scipy pybind11 pytest "tbb>=$env:TBB_VER" "tbb-devel>=$env:TBB_VER" cmake "mkl-devel-dpcpp=2024.0.0" zlib dpcpp_win-64 level-zero-devel -c conda-forge -c intel -c numba
           conda info
           conda activate test-env
           echo "Conda prefix: $env:CONDA_PREFIX"
@@ -273,7 +273,7 @@ jobs:
 
         run: |
           cd numba_mlir_wheels
-          conda create -y -n wheels-test-env python=${{ matrix.python }} numba=0.58 numpy=1.24 scikit-learn pytest-xdist scipy pytest "tbb=$env:TBB_VER" cmake "mkl-devel-dpcpp>=2023.0.0" dpcpp_win-64 -c conda-forge -c intel -c numba
+          conda create -y -n wheels-test-env python=${{ matrix.python }} numba=0.58 numpy=1.24 scikit-learn pytest-xdist scipy pytest "tbb=$env:TBB_VER" cmake "mkl-devel-dpcpp=2024.0.0" dpcpp_win-64 -c conda-forge -c intel -c numba
           conda info
           conda activate wheels-test-env
           conda list
@@ -550,7 +550,7 @@ jobs:
 
         run: |
           cd numba_mlir
-          conda create -y -n test-env python=${{ matrix.python }} "pip>=22" numba=0.58 numpy=1.24 "setuptools<65.6" scikit-learn pytest-xdist ninja scipy pybind11 pytest "tbb>=${TBB_VER}" "tbb-devel>=${TBB_VER}" cmake "mkl-devel-dpcpp>=2023.1" zlib dpcpp_linux-64 level-zero-devel -c conda-forge -c intel -c numba
+          conda create -y -n test-env python=${{ matrix.python }} "pip>=22" numba=0.58 numpy=1.24 "setuptools<65.6" scikit-learn pytest-xdist ninja scipy pybind11 pytest "tbb>=${TBB_VER}" "tbb-devel>=${TBB_VER}" cmake "mkl-devel-dpcpp=2024.0.0" zlib dpcpp_linux-64 level-zero-devel -c conda-forge -c intel -c numba
           conda info
           source $CONDA/bin/activate test-env
           conda install gxx_linux-64 -c conda-forge --override-channels
@@ -622,7 +622,7 @@ jobs:
 
         run: |
           cd numba_mlir_wheels
-          conda create -y -n wheels-test-env python=${{ matrix.python }} numba=0.58 numpy=1.24 scikit-learn pytest-xdist scipy pytest tbb=${TBB_VER} cmake "mkl-devel-dpcpp>=2023.0.0" dpcpp_linux-64 -c conda-forge -c intel -c numba
+          conda create -y -n wheels-test-env python=${{ matrix.python }} numba=0.58 numpy=1.24 scikit-learn pytest-xdist scipy pytest tbb=${TBB_VER} cmake "mkl-devel-dpcpp=2024.0.0" dpcpp_linux-64 -c conda-forge -c intel -c numba
           conda info
           source $CONDA/bin/activate wheels-test-env
           conda list
