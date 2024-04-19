@@ -540,7 +540,7 @@ struct HoistScfIfChecks : public mlir::OpRewritePattern<mlir::scf::IfOp> {
       }
 
       for (auto innerOp : opsToMove) {
-        rewriter.updateRootInPlace(innerOp, [&] { innerOp->moveBefore(op); });
+        rewriter.modifyOpInPlace(innerOp, [&] { innerOp->moveBefore(op); });
       }
       changed = true;
     };
@@ -2015,7 +2015,7 @@ struct SinkGpuDims : public mlir::OpRewritePattern<mlir::gpu::LaunchOp> {
       auto *use = it.first;
       auto dim = it.second;
       auto owner = use->getOwner();
-      rewriter.updateRootInPlace(owner, [&]() {
+      rewriter.modifyOpInPlace(owner, [&]() {
         auto type = use->get().getType();
         auto newVal = getDim(dim, type);
         use->set(newVal);

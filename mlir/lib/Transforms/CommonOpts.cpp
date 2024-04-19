@@ -736,7 +736,7 @@ struct MoveArithOutOfIf : public mlir::OpRewritePattern<mlir::scf::IfOp> {
 
       for (auto &bodyOp : llvm::make_early_inc_range(ops)) {
 
-        rewriter.updateRootInPlace(&bodyOp, [&]() { bodyOp.moveBefore(op); });
+        rewriter.modifyOpInPlace(&bodyOp, [&]() { bodyOp.moveBefore(op); });
         changed = true;
       }
     }
@@ -982,7 +982,7 @@ struct WhileOpLICM : public mlir::OpRewritePattern<mlir::scf::WhileOp> {
             }))
           continue;
 
-        rewriter.updateRootInPlace(&op, [&]() { op.moveBefore(loop); });
+        rewriter.modifyOpInPlace(&op, [&]() { op.moveBefore(loop); });
         changed = true;
       }
     }

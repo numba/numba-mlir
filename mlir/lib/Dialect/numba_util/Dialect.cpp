@@ -835,7 +835,7 @@ struct ChangeLayoutLinalgGeneric
       }
 
       if (needUpdate) {
-        rewriter.updateRootInPlace(op, [&]() {
+        rewriter.modifyOpInPlace(op, [&]() {
           (isInputs ? op.getInputsMutable() : op.getOutputsMutable())
               .assign(newOperands);
         });
@@ -910,7 +910,7 @@ struct ChangeLayoutIf : public mlir::OpRewritePattern<mlir::scf::YieldOp> {
                 otherArg.getDefiningOp<numba::util::ChangeLayoutOp>()) {
           auto otherSrc = otherCl.getSource();
           if (otherSrc.getType() == srcType) {
-            rewriter.updateRootInPlace(
+            rewriter.modifyOpInPlace(
                 otherYield, [&]() { otherYield.setOperand(i, otherSrc); });
             newType = srcType;
             break;
@@ -929,14 +929,14 @@ struct ChangeLayoutIf : public mlir::OpRewritePattern<mlir::scf::YieldOp> {
                                                           dstType, src);
             }
 
-            rewriter.updateRootInPlace(clYield,
-                                       [&]() { clYield.setOperand(i, src); });
+            rewriter.modifyOpInPlace(clYield,
+                                     [&]() { clYield.setOperand(i, src); });
 
             rewriter.setInsertionPoint(otherYield);
             auto otherRes = rewriter.createOrFold<mlir::memref::CastOp>(
                 otherYield.getLoc(), dstType, otherArg);
 
-            rewriter.updateRootInPlace(
+            rewriter.modifyOpInPlace(
                 otherYield, [&]() { otherYield.setOperand(i, otherRes); });
             newType = dstType;
             outerBreak = true;
@@ -958,7 +958,7 @@ struct ChangeLayoutIf : public mlir::OpRewritePattern<mlir::scf::YieldOp> {
 
     if (changed) {
       rewriter.setInsertionPointAfter(ifOp);
-      rewriter.updateRootInPlace(ifOp, [&]() {
+      rewriter.modifyOpInPlace(ifOp, [&]() {
         auto loc = ifOp.getLoc();
         for (auto i : llvm::seq(0u, count)) {
           auto res = ifOp.getResult(i);
@@ -1562,10 +1562,10 @@ struct ChangeLayoutEnvRegion
 
     auto region =
         mlir::cast<numba::util::EnvironmentRegionOp>(op->getParentOp());
-    rewriter.updateRootInPlace(
+    rewriter.modifyOpInPlace(
         op, [&]() { op.getResultsMutable().assign(updatedArgs); });
 
-    rewriter.updateRootInPlace(region, [&]() {
+    rewriter.modifyOpInPlace(region, [&]() {
       auto loc = region.getLoc();
       mlir::OpBuilder::InsertionGuard g(rewriter);
       rewriter.setInsertionPointAfter(region);
@@ -1583,7 +1583,7 @@ struct ChangeLayoutEnvRegion
           if (owner == cast)
             continue;
 
-          rewriter.updateRootInPlace(owner, [&]() { use.set(newResult); });
+          rewriter.modifyOpInPlace(owner, [&]() { use.set(newResult); });
         }
         result.setType(newType);
       }
@@ -2448,7 +2448,7 @@ struct MergeAdjacentRegions
         auto *owner = use.getOwner();
         if (nextOp->isProperAncestor(owner)) {
           auto arg = yieldArgs[i];
-          rewriter.updateRootInPlace(owner, [&]() { use.set(arg); });
+          rewriter.modifyOpInPlace(owner, [&]() { use.set(arg); });
         }
       }
     }

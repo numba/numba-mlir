@@ -1240,7 +1240,7 @@ struct FoldCreateCast
         resType.getElementType() != thisType.getElementType())
       return mlir::failure();
 
-    rewriter.updateRootInPlace(op, [&]() { op.getResult().setType(resType); });
+    rewriter.modifyOpInPlace(op, [&]() { op.getResult().setType(resType); });
     rewriter.replaceOp(cast, op);
     return mlir::success();
   }

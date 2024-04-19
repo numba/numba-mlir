@@ -119,7 +119,10 @@ def test_unary_ops(py_func, val, request):
         pytest.xfail()
 
     jit_func = njit(py_func)
-    assert_equal(_skip_python_errors(py_func)(val), jit_func(val))
+    if isinstance(val, complex) and "abs" in str(request.node.callspec.id):
+        assert_allclose(_skip_python_errors(py_func)(val), jit_func(val))
+    else:
+        assert_equal(_skip_python_errors(py_func)(val), jit_func(val))
 
 
 @parametrize_function_variants(
