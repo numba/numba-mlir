@@ -10,6 +10,7 @@
 #include "numba/Dialect/numba_util/Utils.hpp"
 
 #include <mlir/Dialect/Arith/IR/Arith.h>
+#include <mlir/Dialect/Bufferization/IR/Bufferization.h>
 #include <mlir/Dialect/Linalg/IR/Linalg.h>
 #include <mlir/Dialect/MemRef/IR/MemRef.h>
 #include <mlir/Dialect/SCF/IR/SCF.h>
@@ -23,6 +24,10 @@ static const constexpr llvm::StringLiteral kReadonly("ntensor_readonly");
 
 static mlir::RankedTensorType toTensorType(mlir::ShapedType type) {
   return mlir::RankedTensorType::get(type.getShape(), type.getElementType());
+}
+
+static mlir::MemRefType toMemrefType(mlir::ShapedType type) {
+  return mlir::MemRefType::get(type.getShape(), type.getElementType());
 }
 
 namespace {
@@ -121,8 +126,10 @@ struct ConvertCopyOp : public mlir::OpRewritePattern<numba::ntensor::CopyOp> {
             assert(args.size() == 2);
             b.create<mlir::linalg::YieldOp>(l, args.front());
           };
-          builder.create<mlir::linalg::GenericOp>(loc, srcTensor, dstMemref,
-                                                  maps, iterators, bodyBuilder);
+          auto memref = builder.create<mlir::bufferization::ToMemrefOp>(
+              loc, toMemrefType(srcType), srcTensor);
+          builder.create<mlir::linalg::GenericOp>(
+              loc, memref.getResult(), dstMemref, maps, iterators, bodyBuilder);
           return std::nullopt;
         });
 
@@ -804,6 +811,7 @@ struct NtensorToLinalgPass
     registry.insert<mlir::tensor::TensorDialect>();
     registry.insert<numba::ntensor::NTensorDialect>();
     registry.insert<numba::util::NumbaUtilDialect>();
+    registry.insert<mlir::bufferization::BufferizationDialect>();
   }
 
   void runOnOperation() override {

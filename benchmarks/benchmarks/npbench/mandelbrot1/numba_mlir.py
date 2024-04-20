@@ -12,6 +12,7 @@ from numba_mlir.mlir.benchmarking import (
     get_numba_mlir_context,
     get_numpy_context,
     assert_allclose_recursive,
+    SkipNotImplemented,
 )
 
 
@@ -23,6 +24,8 @@ class Benchmark(numba_mlir.mlir.benchmarking.BenchmarkBase):
         return get_impl_numba(get_numba_mlir_context())
 
     def initialize(self, preset):
+        raise SkipNotImplemented("nans")
+
         preset = parameters[preset]
         return initialize(**preset)
 

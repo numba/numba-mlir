@@ -642,7 +642,7 @@ struct ChangeLayoutReturn
                                      r.getTypes());
     }();
 
-    rewriter.updateRootInPlace(func, [&]() {
+    rewriter.modifyOpInPlace(func, [&]() {
       func.setFunctionTypeAttr(mlir::TypeAttr::get(newFuncType));
     });
 
@@ -798,7 +798,7 @@ struct ChangeLayoutCall : public mlir::OpRewritePattern<mlir::func::CallOp> {
     auto newFuncType = funcType.clone(newArgTypes, funcType.getResults());
 
     mlir::OpBuilder::InsertionGuard g(rewriter);
-    rewriter.updateRootInPlace(func, [&]() {
+    rewriter.modifyOpInPlace(func, [&]() {
       func.setType(newFuncType);
       assert(!func.getFunctionBody().empty());
       auto &block = func.getFunctionBody().front();
@@ -2593,8 +2593,8 @@ struct SimplifyExpandDims
               mlir::AffineMap::get(numDims, 0, exprs, context)),
           maps[1]};
       auto newMapsAttr = mlir::ArrayAttr::get(context, newMaps);
-      rewriter.updateRootInPlace(
-          op, [&]() { op.setIndexingMapsAttr(newMapsAttr); });
+      rewriter.modifyOpInPlace(op,
+                               [&]() { op.setIndexingMapsAttr(newMapsAttr); });
     }
 
     return mlir::success(changed);
@@ -2955,7 +2955,7 @@ struct SliceOfGeneric : public mlir::OpRewritePattern<mlir::linalg::GenericOp> {
         if (!droppedDims[dim])
           ++newIndex;
       }
-      rewriter.updateRootInPlace(indexOp, [&]() { indexOp.setDim(newIndex); });
+      rewriter.modifyOpInPlace(indexOp, [&]() { indexOp.setDim(newIndex); });
 
       return mlir::WalkResult::advance();
     };
@@ -3374,7 +3374,7 @@ struct MoveToTensor
       if (std::next(it1) == it2)
         return mlir::failure();
 
-      rewriter.updateRootInPlace(op, [&]() { op->moveAfter(defOp); });
+      rewriter.modifyOpInPlace(op, [&]() { op->moveAfter(defOp); });
       return mlir::success();
     }
 
@@ -3386,7 +3386,7 @@ struct MoveToTensor
 
     auto *prevOp = &(*begin);
 
-    rewriter.updateRootInPlace(op, [&]() { op->moveBefore(prevOp); });
+    rewriter.modifyOpInPlace(op, [&]() { op->moveBefore(prevOp); });
     return mlir::success();
   }
 };
@@ -4260,7 +4260,7 @@ struct MakeGenericReduceInnermost
       newMaps.emplace_back(mlir::AffineMapAttr::get(newMap));
     }
 
-    rewriter.updateRootInPlace(op, [&]() {
+    rewriter.modifyOpInPlace(op, [&]() {
       op.setIndexingMapsAttr(rewriter.getArrayAttr(newMaps));
       op.setIteratorTypesAttr(rewriter.getArrayAttr(remappedIters));
     });
@@ -4379,12 +4379,12 @@ struct GenAtomicRegion : public mlir::OpRewritePattern<plier::InplaceBinOp> {
     auto res = op.getResult();
     auto newTerm =
         rewriter.create<numba::util::EnvironmentRegionYieldOp>(loc, res);
-    rewriter.updateRootInPlace(op, [&]() { op->moveBefore(newTerm); });
+    rewriter.modifyOpInPlace(op, [&]() { op->moveBefore(newTerm); });
     for (auto user : op->getUsers()) {
       if (!mlir::isa<plier::SetItemOp>(user))
         continue;
 
-      rewriter.updateRootInPlace(user, [&]() { user->moveBefore(newTerm); });
+      rewriter.modifyOpInPlace(user, [&]() { user->moveBefore(newTerm); });
     }
 
     auto checker = [&](mlir::OpOperand &arg) {

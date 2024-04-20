@@ -116,18 +116,18 @@ std::optional<PyFuncResolver::Result> PyFuncResolver::getFunc(
   if (externalFunc) {
     res.func = externalFunc;
   } else {
-    rewriter.startRootUpdate(module);
+    rewriter.startOpModification(module);
     auto resOp = static_cast<mlir::Operation *>(
         context->compiler(pyFunc, pyTypes, flags).cast<py::capsule>());
     if (!resOp) {
-      rewriter.cancelRootUpdate(module);
+      rewriter.cancelOpModification(module);
       return std::nullopt;
     }
 
     res.func = mlir::cast<mlir::func::FuncOp>(resOp);
     res.func.setPrivate();
     res.func.setName(mangledName);
-    rewriter.finalizeRootUpdate(module);
+    rewriter.finalizeOpModification(module);
   }
 
   return res;

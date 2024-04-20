@@ -50,17 +50,17 @@ struct ForceInline : public mlir::OpRewritePattern<mlir::func::CallOp> {
 
     mlir::InlinerInterface inlinerInterface(op->getContext());
     auto parent = op->getParentOp();
-    rewriter.startRootUpdate(parent);
+    rewriter.startOpModification(parent);
     auto res =
         mlir::inlineCall(inlinerInterface, newCall, func, &func.getRegion());
     if (mlir::succeeded(res)) {
       assert(newCall->getUsers().empty());
       rewriter.eraseOp(newCall);
       rewriter.replaceOp(op, reg.getResults());
-      rewriter.finalizeRootUpdate(parent);
+      rewriter.finalizeOpModification(parent);
     } else {
       rewriter.eraseOp(reg);
-      rewriter.cancelRootUpdate(parent);
+      rewriter.cancelOpModification(parent);
     }
     return res;
   }

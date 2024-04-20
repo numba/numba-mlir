@@ -43,7 +43,7 @@ IfOpConstCond::matchAndRewrite(mlir::scf::IfOp op,
       auto owner = use.getOwner();
       if (block.findAncestorOpInBlock(*owner)) {
         updated = true;
-        rewriter.updateRootInPlace(owner, [&]() { use.set(newVal); });
+        rewriter.modifyOpInPlace(owner, [&]() { use.set(newVal); });
       }
     }
   };

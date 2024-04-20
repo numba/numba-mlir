@@ -738,7 +738,7 @@ struct ApplyFastmathFlags : public mlir::OpRewritePattern<Op> {
     auto parent = mlir::cast<mlir::LLVM::LLVMFuncOp>(op->getParentOp());
     bool changed = false;
 
-    rewriter.startRootUpdate(op);
+    rewriter.startOpModification(op);
     auto fmf = op.getFastmathFlags();
     getFastmathFlags(parent, [&](auto flag) {
       if (!mlir::LLVM::bitEnumContainsAny(fmf, flag)) {
@@ -749,9 +749,9 @@ struct ApplyFastmathFlags : public mlir::OpRewritePattern<Op> {
     if (changed) {
       op.setFastmathFlagsAttr(
           mlir::LLVM::FastmathFlagsAttr::get(op.getContext(), fmf));
-      rewriter.finalizeRootUpdate(op);
+      rewriter.finalizeOpModification(op);
     } else {
-      rewriter.cancelRootUpdate(op);
+      rewriter.cancelOpModification(op);
     }
 
     return mlir::success(changed);
@@ -830,7 +830,7 @@ private:
           mlir::LLVM::LLVMFunctionType::get(llvmVoidType, llvmVoidPointerType));
       if (defineMeminfoFuncs) {
         func.setPrivate();
-        auto block = func.addEntryBlock();
+        auto block = func.addEntryBlock(builder);
         builder.setInsertionPointToStart(block);
         auto arg = block->getArgument(0);
         auto meminfoType = getMeminfoType(*getTypeConverter());
@@ -920,7 +920,7 @@ struct LowerWrapAllocPointerOp
       auto func = rewriter.create<mlir::LLVM::LLVMFuncOp>(loc, wrapperName,
                                                           wrapperFuncType);
       func.setPrivate();
-      auto block = func.addEntryBlock();
+      auto block = func.addEntryBlock(rewriter);
       rewriter.setInsertionPointToStart(block);
       auto ptr = block->getArgument(0);
       auto dtorData = block->getArgument(2);
@@ -1178,7 +1178,7 @@ private:
           mlir::LLVM::LLVMFunctionType::get(llvmVoidType, llvmVoidPointerType));
       if (defineMeminfoFuncs) {
         func.setPrivate();
-        auto block = func.addEntryBlock();
+        auto block = func.addEntryBlock(builder);
         auto releaseBlock = func.addBlock();
         auto returnBlock = func.addBlock();
 

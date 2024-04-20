@@ -107,7 +107,7 @@ func.func @test() {
       %3 = gpu.all_reduce %2 uniform {
       ^bb(%lhs : i64, %rhs : i64):
         %xor = arith.xori %lhs, %rhs : i64
-        "gpu.yield"(%xor) : (i64) -> ()
+        gpu.yield %xor : i64
       } : (i64) -> (i64)
       "test.test5"() : () -> ()
       "test.test6"(%1) : (i32) -> ()
@@ -136,7 +136,7 @@ func.func @test() {
 //       CHECK: %[[RRES:.*]] = gpu.all_reduce %[[RARG]] uniform {
 //       CHECK:  ^bb0(%[[A1:.*]]: i64, %[[A2:.*]]: i64):
 //       CHECK:   %[[X:.*]] = arith.xori %[[A1]], %[[A2]] : i64
-//       CHECK:   "gpu.yield"(%[[X]]) : (i64) -> ()
+//       CHECK:   gpu.yield %[[X]] : i64
 //       CHECK:   } : (i64) -> i64
 //       CHECK: scf.if %[[COND]] {
 //       CHECK: "test.test5"() : () -> ()

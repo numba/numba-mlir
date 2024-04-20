@@ -237,7 +237,7 @@ struct WhileReductionSelect
 
     mlir::SmallVector<mlir::Value> newInits(inits.begin(), inits.end());
     newInits[falseArg.getArgNumber()] = trueArg;
-    rewriter.updateRootInPlace(
+    rewriter.modifyOpInPlace(
         whileOp, [&]() { whileOp.getInitsMutable().assign(newInits); });
     rewriter.replaceOp(op, falseArg);
     return mlir::success();
@@ -344,7 +344,7 @@ struct HoistSelects : public mlir::OpRewritePattern<mlir::scf::IfOp> {
   matchAndRewrite(mlir::scf::IfOp op,
                   mlir::PatternRewriter &rewriter) const override {
     bool changed = false;
-    rewriter.startRootUpdate(op);
+    rewriter.startOpModification(op);
 
     mlir::DominanceInfo dom;
     for (auto block : {op.thenBlock(), op.elseBlock()}) {
@@ -358,15 +358,15 @@ struct HoistSelects : public mlir::OpRewritePattern<mlir::scf::IfOp> {
             !dom.properlyDominates(blockOp.getFalseValue(), op))
           continue;
 
-        rewriter.updateRootInPlace(blockOp, [&]() { blockOp->moveBefore(op); });
+        rewriter.modifyOpInPlace(blockOp, [&]() { blockOp->moveBefore(op); });
         changed = true;
       }
     }
 
     if (changed) {
-      rewriter.finalizeRootUpdate(op);
+      rewriter.finalizeOpModification(op);
     } else {
-      rewriter.cancelRootUpdate(op);
+      rewriter.cancelOpModification(op);
     }
     return mlir::success(changed);
   }

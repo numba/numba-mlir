@@ -232,7 +232,7 @@ public:
 
     auto zero = rewriter.create<mlir::arith::ConstantIndexOp>(loc, 0);
     llvm::SmallVector<mlir::Value> newIndices(rank, zero);
-    rewriter.updateRootInPlace(op, [&]() {
+    rewriter.modifyOpInPlace(op, [&]() {
       op.getIndicesMutable().assign(newIndices);
       op.getMemrefMutable().assign(view);
     });

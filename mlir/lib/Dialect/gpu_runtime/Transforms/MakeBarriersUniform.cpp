@@ -223,7 +223,7 @@ static mlir::LogicalResult convertBlockingOp(mlir::Operation *op,
       auto it = yieldArgsMap.find(val);
       if (it != yieldArgsMap.end()) {
         auto newVal = getBeforeIfResult(it->second);
-        rewriter.updateRootInPlace(innerOp, [&]() { arg.set(newVal); });
+        rewriter.modifyOpInPlace(innerOp, [&]() { arg.set(newVal); });
       }
     }
   });

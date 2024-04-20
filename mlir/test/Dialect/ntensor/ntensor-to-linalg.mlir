@@ -80,7 +80,8 @@ func.func @test(%arg1: !ntensor.ntensor<?xf32>, %arg2: !ntensor.ntensor<?xf32>) 
 //  CHECK-SAME:   (%[[ARG1:.*]]: !ntensor.ntensor<?xf32>, %[[ARG2:.*]]: !ntensor.ntensor<?xf32>)
 //  CHECK-NEXT:   %[[SRC:.*]] = ntensor.to_tensor_copy %[[ARG1]] : !ntensor.ntensor<?xf32> to tensor<?xf32>
 //  CHECK-NEXT:   %[[DST:.*]] = ntensor.to_memref %[[ARG2]] : !ntensor.ntensor<?xf32> to memref<?xf32>
-//  CHECK-NEXT:   linalg.generic {indexing_maps = [#map, #map], iterator_types = ["parallel"]} ins(%[[SRC]] : tensor<?xf32>) outs(%[[DST]] : memref<?xf32>) {
+//  CHECK-NEXT:   %[[REFSRC:.*]] = bufferization.to_memref %[[SRC]] : memref<?xf32>
+//  CHECK-NEXT:   linalg.generic {indexing_maps = [#map, #map], iterator_types = ["parallel"]} ins(%[[REFSRC]] : memref<?xf32>) outs(%[[DST]] : memref<?xf32>) {
 //  CHECK-NEXT:   ^bb0(%[[BARG1:.*]]: f32, %[[ARG2:.*]]: f32):
 //  CHECK-NEXT:   linalg.yield %[[BARG1]] : f32
 //  CHECK-NEXT:   }
@@ -97,7 +98,8 @@ func.func @test(%arg1: !ntensor.ntensor<?xf32, "test">, %arg2: !ntensor.ntensor<
 //  CHECK-NEXT:   numba_util.env_region "test" {
 //  CHECK-NEXT:   %[[SRC:.*]] = ntensor.to_tensor_copy %[[ARG1]] : !ntensor.ntensor<?xf32, "test"> to tensor<?xf32>
 //  CHECK-NEXT:   %[[DST:.*]] = ntensor.to_memref %[[ARG2]] : !ntensor.ntensor<?xf32, "test"> to memref<?xf32>
-//  CHECK-NEXT:   linalg.generic {indexing_maps = [#map, #map], iterator_types = ["parallel"]} ins(%[[SRC]] : tensor<?xf32>) outs(%[[DST]] : memref<?xf32>) {
+//  CHECK-NEXT:   %[[REFSRC:.*]] = bufferization.to_memref %[[SRC]] : memref<?xf32>
+//  CHECK-NEXT:   linalg.generic {indexing_maps = [#map, #map], iterator_types = ["parallel"]} ins(%[[REFSRC]] : memref<?xf32>) outs(%[[DST]] : memref<?xf32>) {
 //  CHECK-NEXT:   ^bb0(%[[BARG1:.*]]: f32, %[[ARG2:.*]]: f32):
 //  CHECK-NEXT:   linalg.yield %[[BARG1]] : f32
 //  CHECK-NEXT:   }
