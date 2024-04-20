@@ -811,6 +811,7 @@ struct NtensorToLinalgPass
     registry.insert<mlir::tensor::TensorDialect>();
     registry.insert<numba::ntensor::NTensorDialect>();
     registry.insert<numba::util::NumbaUtilDialect>();
+    registry.insert<mlir::bufferization::BufferizationDialect>();
   }
 
   void runOnOperation() override {
