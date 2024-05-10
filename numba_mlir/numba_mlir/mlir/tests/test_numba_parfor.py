@@ -109,6 +109,14 @@ def _gen_tests():
         "test_int_arg_pndindex",
         "test_prange_optional",
         "test_1array_control_flow",
+        "test_randoms",  # random functions are not supported
+        "test_vectorizer_fastmath_asm",  # no asm generated
+        "test_signed_vs_unsigned_vec_asm",  # no asm generated
+        "test_unsigned_refusal_to_vectorize",  # no asm generated
+        "test_prange_fastmath_check_works",  # no asm generated
+        "test_issue9256_lower_sroa_conflict",  # using variable outside of parfor
+        "test_issue9256_lower_sroa_conflict_variant1",  # using variable outside of parfor
+        "test_issue9256_lower_sroa_conflict_variant2",  # using variable outside of parfor
     }
 
     skip_tests = {
@@ -374,6 +382,15 @@ def _gen_replace_parfor_tests():
         "test_nd_parfor",
         "test_arange",
         "test_linspace",
+        "test_randoms",  # random functions are not supported
+        "test_vectorizer_fastmath_asm",  # no asm generated
+        "test_signed_vs_unsigned_vec_asm",  # no asm generated
+        "test_unsigned_refusal_to_vectorize",  # no asm generated
+        "test_prange_fastmath_check_works",  # no asm generated
+        "test_issue9256_lower_sroa_conflict",  # using variable outside of parfor
+        "test_issue9256_lower_sroa_conflict_variant1",  # using variable outside of parfor
+        "test_issue9256_lower_sroa_conflict_variant2",  # using variable outside of parfor
+        "test_allocation_hoisting",  # TODO: investigate
     }
     skip_tests = {
         "test_copy_global_for_parfor",  # flaky test

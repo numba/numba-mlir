@@ -25,7 +25,6 @@ class MlirTempCompiler(CompilerBase):  # custom compiler extends from CompilerBa
         untyped_passes = dpb.define_untyped_pipeline(self.state)
         pm.passes.extend(untyped_passes.passes)
 
-        pm.add_pass(ReconstructSSA, "ssa")
         pm.add_pass(NopythonTypeInference, "nopython frontend")
         pm.add_pass(MlirBackendInner, "mlir backend")
 

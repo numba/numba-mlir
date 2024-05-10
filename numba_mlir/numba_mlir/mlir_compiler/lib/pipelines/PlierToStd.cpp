@@ -125,6 +125,24 @@ static mlir::Value lowerConst(mlir::OpBuilder &builder, mlir::Location loc,
   return nullptr;
 }
 
+struct UndefOpLowering : public mlir::OpConversionPattern<plier::UndefOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(plier::UndefOp op, plier::UndefOp::Adaptor adaptor,
+                  mlir::ConversionPatternRewriter &rewriter) const override {
+    auto &converter = *getTypeConverter();
+    auto expectedType = converter.convertType(op.getType());
+    if (!expectedType)
+      return mlir::failure();
+
+    expectedType = numba::makeSignlessType(expectedType);
+    rewriter.replaceOpWithNewOp<mlir::ub::PoisonOp>(op, expectedType, nullptr);
+
+    return mlir::success();
+  }
+};
+
 struct ConstOpLowering : public mlir::OpConversionPattern<plier::ConstOp> {
   using OpConversionPattern::OpConversionPattern;
 
@@ -139,6 +157,7 @@ struct ConstOpLowering : public mlir::OpConversionPattern<plier::ConstOp> {
     if (mlir::isa<mlir::NoneType>(expectedType)) {
       rewriter.replaceOpWithNewOp<mlir::ub::PoisonOp>(op, expectedType,
                                                       nullptr);
+
       return mlir::success();
     }
 
@@ -1263,7 +1282,7 @@ void PlierToStdPass::runOnOperation() {
         return !mlir::isa<plier::RangeIterType>(op.getValue().getType());
       });
   target.addIllegalOp<plier::BuildTupleOp, plier::PairfirstOp,
-                      plier::PairsecondOp>();
+                      plier::PairsecondOp, plier::UndefOp>();
   target.addLegalOp<numba::util::BuildTupleOp, numba::util::TupleExtractOp>();
   target.addLegalDialect<mlir::arith::ArithDialect>();
   target.addLegalDialect<mlir::complex::ComplexDialect>();
@@ -1275,6 +1294,7 @@ void PlierToStdPass::runOnOperation() {
       BinOpTupleLowering,
       UnaryOpLowering,
       LowerCasts,
+      UndefOpLowering,
       ConstOpLowering,
       LiteralLowering<plier::CastOp>,
       LiteralLowering<plier::GlobalOp>,
