@@ -12,7 +12,7 @@ from numba.extending import typeof_impl as numba_typeof_impl
 from numba.core.typing import Context
 from numba.core.registry import CPUTarget
 from numba.core.imputils import Registry as LowerRegistry
-from numba.core.dispatcher import Dispatcher
+from numba.core.dispatcher import Dispatcher, _FunctionCompiler
 from numba.core.typing.templates import Registry as TypingRegistry
 from numba.core.typing.typeof import Purpose, _TypeofContext, _termcolor
 from numba.core.target_extension import (
@@ -244,15 +244,14 @@ class NumbaMLIRDispatcher(Dispatcher):
         py_func,
         locals={},
         targetoptions={},
-        impl_kind="direct",
         pipeline_class=compiler.Compiler,
     ):
-        super().__init__(py_func, locals, targetoptions, impl_kind, pipeline_class)
+        super().__init__(py_func, locals, targetoptions, pipeline_class)
 
         # Import locally to avoid circular module dependency
         from .compiler import dummy_compiler_pipeline
 
-        compiler_class = self._impl_kinds[impl_kind]
+        compiler_class = _FunctionCompiler
         self._dummy_compiler = compiler_class(
             py_func, self.targetdescr, targetoptions, locals, dummy_compiler_pipeline
         )

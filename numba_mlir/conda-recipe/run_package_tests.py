@@ -31,6 +31,11 @@ def run_tests(params):
     if "verbose" in params:
         args += ["-vv"]
 
+    if "replace_parfors" not in params:
+        args += ["-k", "not replace_parfors"]
+    else:
+        args += ["-k", "replace_parfors"]
+
     print(f"INFO: nproc {np}")
 
     os.environ["NUMBA_DISABLE_PERFORMANCE_WARNINGS"] = "1"

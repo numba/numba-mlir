@@ -99,6 +99,10 @@ def ConstOp : Plier_Op<"const", [Pure]> {
   let builders = [OpBuilder<(ins "::mlir::Attribute" : $val)>];
 }
 
+def UndefOp : Plier_Op<"undef", [Pure]> {
+  let results = (outs AnyType);
+}
+
 def GlobalOp : Plier_Op<"global", [Pure]> {
   let arguments = (ins StrAttr : $name);
 
@@ -269,5 +273,7 @@ def SliceGetItemOp : Plier_Op<"slice_getitem", [Pure]> {
 
   let results = (outs AnyType);
 }
+
+
 
 #endif // PLIER_OPS

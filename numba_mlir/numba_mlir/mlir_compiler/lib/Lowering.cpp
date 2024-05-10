@@ -319,6 +319,13 @@ struct PlierLowerer final {
     ctx.loadDialect<numba::ntensor::NTensorDialect>();
     ctx.loadDialect<numba::util::NumbaUtilDialect>();
     ctx.loadDialect<plier::PlierDialect>();
+
+    numbaUndefined = getNumbaUndefined();
+  }
+
+  py::object getNumbaUndefined() {
+    py::module_ numbaIr = py::module_::import("numba.core.ir");
+    return numbaIr.attr("UNDEFINED");
   }
 
   mlir::func::FuncOp lower(const py::object &compilationContext,
@@ -461,6 +468,7 @@ private:
   py::object funcNameResolver;
   py::object globals;
   py::object cellvars;
+  py::object numbaUndefined;
 
   std::unordered_map<mlir::Block *, BlockInfo> blockInfos;
 
@@ -890,6 +898,40 @@ private:
     return builder.create<plier::BuildTupleOp>(getCurrentLoc(), args);
   }
 
+  bool isNumbaUndefined(py::handle val) { return val.is(numbaUndefined); }
+
+  std::string makeUndefName() {
+    size_t id = 2 * varsMap.size();
+
+    std::string undef = "Undef??";
+    while (varsMap.find(undef + std::to_string(id)) != varsMap.end()) {
+      ++id;
+    }
+
+    return undef + std::to_string(id);
+  }
+
+  std::string getPlierUndefined(mlir::Block *block, mlir::Type type) {
+    mlir::OpBuilder::InsertionGuard guard(builder);
+
+    builder.setInsertionPointToStart(block);
+    auto loc = builder.getUnknownLoc();
+    auto undef = builder.create<plier::UndefOp>(loc, type);
+    auto undefName = makeUndefName();
+    varsMap[undefName] = undef;
+
+    return undefName;
+  }
+
+  std::string getNameOrUndefined(py::handle val, mlir::Block *block,
+                                 mlir::Type type) {
+    if (isNumbaUndefined(val)) {
+      return getPlierUndefined(block, type);
+    }
+
+    return val.attr("name").cast<std::string>();
+  }
+
   mlir::Value lowerPhi(py::handle expr) {
     auto incomingVals = expr.attr("incoming_values").cast<py::list>();
     auto incomingBlocks = expr.attr("incoming_blocks").cast<py::list>();
@@ -900,12 +942,12 @@ private:
 
     auto argIndex = currentBlock->getNumArguments();
     auto loc = builder.getUnknownLoc();
-    auto arg =
-        currentBlock->addArgument(getType(currentInstr.attr("target")), loc);
+    auto phiRetType = getType(currentInstr.attr("target"));
+    auto arg = currentBlock->addArgument(phiRetType, loc);
 
     for (auto i : llvm::seq<size_t>(0, incomingVals.size())) {
-      auto var = incomingVals[i].attr("name").cast<std::string>();
       auto block = getBlock(incomingBlocks[i]);
+      auto var = getNameOrUndefined(incomingVals[i], block, phiRetType);
       blockInfos[block].outgoingPhiNodes.push_back(
           {currentBlock, std::move(var), argIndex});
     }
