@@ -63,7 +63,7 @@ def _to_device_kernel_args(args):
         else:
             order = "K"
         return dpt.asarray(
-            obj=args,
+            args,
             dtype=args.dtype,
             device=_def_device,
             copy=None,
@@ -1438,7 +1438,7 @@ def _from_host(arr, buffer):
     else:
         order = "K"
     return dpt.asarray(
-        obj=arr,
+        arr,
         dtype=arr.dtype,
         device=_def_device,
         copy=True,

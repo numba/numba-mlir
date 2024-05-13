@@ -188,3 +188,6 @@ _install
 
 # airspeed velocity cache
 .asv
+
+# vscode
+.vscode
