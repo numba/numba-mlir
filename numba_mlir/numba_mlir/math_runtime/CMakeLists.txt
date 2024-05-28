@@ -26,9 +26,6 @@ if(NUMBA_MLIR_USE_MKL)
     if (NOT DEFINED(MKL_THREADING))
         set(MKL_THREADING tbb_thread)
     endif()
-    if (NOT DEFINED(MKL_LINK))
-        set(MKL_LINK sdl)
-    endif()
 
     find_package(MKL CONFIG REQUIRED)
 

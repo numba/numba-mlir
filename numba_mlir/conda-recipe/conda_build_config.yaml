@@ -5,5 +5,4 @@ numpy:
 pin_run_as_build:
   mkl: x.x
   mkl-dpcpp: x.x
-  dpcpp-cpp-rt: x.x
-  dpcpp_cpp_rt: x.x
+  conda-forge::dpcpp-cpp-rt: x.x

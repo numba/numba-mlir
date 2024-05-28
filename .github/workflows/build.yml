@@ -174,7 +174,7 @@ jobs:
           run-post: false
           miniforge-variant: Mambaforge
           miniforge-version: latest
-          channels: intel,conda-forge
+          channels: conda-forge,intel
 
       - name: Checkout repo
         uses: actions/checkout@v2
@@ -203,7 +203,7 @@ jobs:
       - name: Build Python frontend
         run: |
           cd numba_mlir
-          conda create -y -n test-env python=${{ matrix.python }} "pip>=22" numba=0.59.1 numpy=1.24 "setuptools<65.6" scikit-learn pytest-xdist ninja scipy pybind11 pytest "tbb>=$env:TBB_VER" "tbb-devel>=$env:TBB_VER" cmake "mkl-devel-dpcpp=2024.0.0" zlib dpcpp_win-64 level-zero-devel -c conda-forge -c intel -c numba
+          conda create -y -n test-env python=${{ matrix.python }} "pip>=22" numba=0.59.1 numpy=1.24 "setuptools<65.6" scikit-learn pytest-xdist ninja scipy pybind11 pytest "tbb>=$env:TBB_VER" "tbb-devel>=$env:TBB_VER" cmake intel::mkl intel::mkl-devel "intel::mkl-devel-dpcpp=2024.1" zlib "conda-forge::dpcpp_win-64=2024.1" level-zero-devel -c conda-forge -c numba -c intel --override-channels
           conda info
           conda activate test-env
           echo "Conda prefix: $env:CONDA_PREFIX"
@@ -234,7 +234,7 @@ jobs:
         run: |
           cd numba_mlir
           conda activate test-env
-          conda install greenlet "dpctl=0.15" "dpcpp-cpp-rt=2024.0.0" -c dppy/label/dev -c intel -c conda-forge
+          conda install greenlet "dpctl=0.18" "conda-forge::dpcpp-cpp-rt=2024.1" -c dppy/label/dev -c conda-forge -c intel
           conda list
           $env:NUMBA_MLIR_DEFAULT_DEVICE="opencl:cpu:0"
           python "$env:GITHUB_WORKSPACE/numba_mlir/conda-recipe/run_package_tests.py" verbose gpu
@@ -274,7 +274,7 @@ jobs:
 
         run: |
           cd numba_mlir_wheels
-          conda create -y -n wheels-test-env python=${{ matrix.python }} numba=0.59.1 numpy=1.24 scikit-learn pytest-xdist scipy pytest "tbb=$env:TBB_VER" cmake "mkl-devel-dpcpp=2024.0.0" dpcpp_win-64 -c conda-forge -c intel -c numba
+          conda create -y -n wheels-test-env python=${{ matrix.python }} numba=0.59.1 numpy=1.24 scikit-learn pytest-xdist scipy pytest "tbb>=$env:TBB_VER" cmake intel::mkl intel::mkl-devel "intel::mkl-devel-dpcpp=2024.1" "conda-forge::dpcpp_win-64=2024.1" -c conda-forge -c numba -c intel --override-channels
           conda info
           conda activate wheels-test-env
           conda list
@@ -314,7 +314,7 @@ jobs:
           run-post: false
           miniforge-variant: Mambaforge
           miniforge-version: latest
-          channels: intel,conda-forge
+          channels: conda-forge,intel
 
       - name: Checkout repo
         uses: actions/checkout@v2
@@ -359,7 +359,7 @@ jobs:
           $env:CXX="cl.exe"
           $env:CC="cl.exe"
           $env:VSCMD_DEBUG = 3
-          conda mambabuild --output-folder=. ../numba_mlir/conda-recipe --python=${{ matrix.python }} -c intel -c conda-forge -c numba --override-channels
+          conda mambabuild --output-folder=. ../numba_mlir/conda-recipe --python=${{ matrix.python }} -c conda-forge -c numba -c intel --override-channels
           cd win-64
           ls .
           popd
@@ -522,7 +522,7 @@ jobs:
           run-post: false
           miniforge-variant: Mambaforge
           miniforge-version: latest
-          channels: intel,conda-forge
+          channels: conda-forge,intel
 
       - name: Checkout repo
         uses: actions/checkout@v2
@@ -551,10 +551,10 @@ jobs:
 
         run: |
           cd numba_mlir
-          conda create -y -n test-env python=${{ matrix.python }} "pip>=22" numba=0.59.1 numpy=1.24 "setuptools<65.6" scikit-learn pytest-xdist ninja scipy pybind11 pytest "tbb>=${TBB_VER}" "tbb-devel>=${TBB_VER}" cmake "mkl-devel-dpcpp=2024.0.0" zlib dpcpp_linux-64 level-zero-devel -c conda-forge -c intel -c numba
+          conda create -y -n test-env python=${{ matrix.python }} "pip>=22" numba=0.59.1 numpy=1.24 "setuptools<65.6" scikit-learn pytest-xdist ninja scipy pybind11 pytest "tbb>=${TBB_VER}" "tbb-devel>=${TBB_VER}" cmake intel::mkl intel::mkl-devel "intel::mkl-devel-dpcpp=2024.1" zlib "dpcpp_linux-64=2024.1" level-zero-devel -c conda-forge -c numba -c intel --override-channels
           conda info
           source $CONDA/bin/activate test-env
-          conda install gxx_linux-64 -c conda-forge --override-channels
+          conda install gxx_linux-64 -c conda-forge
           conda list
           python -c "import numba; print('numba', numba.__version__)"
           python -c "import numpy; print(numpy.get_include())"
@@ -578,13 +578,12 @@ jobs:
 
 
       - name: Run offload tests
-        if: false # Doesn't work
         shell: bash -l {0}
 
         run: |
           cd numba_mlir
           source $CONDA/bin/activate test-env
-          conda install greenlet "dpctl=0.15" "dpcpp-cpp-rt=2024.0.0" -c dppy/label/dev -c intel -c conda-forge
+          conda install greenlet "dpctl=0.18" "conda-forge::dpcpp-cpp-rt=2024.1" -c dppy/label/dev -c conda-forge -c intel
           conda list
           export NUMBA_MLIR_DEFAULT_DEVICE=opencl:cpu:0
           python $GITHUB_WORKSPACE/numba_mlir/conda-recipe/run_package_tests.py verbose gpu
@@ -625,7 +624,7 @@ jobs:
 
         run: |
           cd numba_mlir_wheels
-          conda create -y -n wheels-test-env python=${{ matrix.python }} numba=0.59.1 numpy=1.24 scikit-learn pytest-xdist scipy pytest tbb=${TBB_VER} cmake "mkl-devel-dpcpp=2024.0.0" dpcpp_linux-64 -c conda-forge -c intel -c numba
+          conda create -y -n wheels-test-env python=${{ matrix.python }} numba=0.59.1 numpy=1.24 scikit-learn pytest-xdist scipy pytest tbb>=${TBB_VER} cmake intel::mkl intel::mkl-devel "intel::mkl-devel-dpcpp=2024.1" "conda-forge::dpcpp_linux-64=2024.1" -c conda-forge -c numba -c intel --override-channels
           conda info
           source $CONDA/bin/activate wheels-test-env
           conda list
@@ -659,7 +658,7 @@ jobs:
           run-post: false
           miniforge-variant: Mambaforge
           miniforge-version: latest
-          channels: intel,conda-forge
+          channels: conda-forge,intel
 
       - name: Checkout repo
         uses: actions/checkout@v2
@@ -694,7 +693,7 @@ jobs:
           export LLVM_PATH=/home/runner/work/llvm-mlir/_mlir_install
           export LEVEL_ZERO_VERSION_CHECK_OFF=1
           export NUMBA_MLIR_USE_SYCL=ON
-          conda mambabuild --output-folder=. ../numba_mlir/conda-recipe --python=${{ matrix.python }} -c intel -c conda-forge -c numba --override-channels || exit 1
+          conda mambabuild --output-folder=. ../numba_mlir/conda-recipe --python=${{ matrix.python }} -c conda-forge -c numba -c intel --override-channels || exit 1
           cd linux-64
           ls -l --block-size=M
           popd
@@ -738,7 +737,7 @@ jobs:
           miniforge-variant: Mambaforge
           miniforge-version: latest
           channel-priority: "disabled"
-          channels: intel,conda-forge
+          channels: conda-forge,intel
 
       - name: Install anaconda-client
         run: conda install anaconda-client
