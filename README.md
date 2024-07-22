@@ -47,7 +47,7 @@ ninja install
 Building and testing Python package
 ```Bash
 cd numba_mlir
-conda create -n test-env python=3.11 numba=0.59.1 numpy=1.24 "setuptools<65.6" scikit-learn pytest-xdist ninja scipy pybind11 pytest lit tbb=2021.11 tbb-devel=2021.11 cmake "intel::mkl-devel-dpcpp=2024.1" conda-forge::dpcpp_linux-64 level-zero-devel -c conda-forge -c intel -c numba --override-channels
+conda create -n test-env python=3.11 numba=0.59.1 numpy=1.24 "setuptools<65.6" scikit-learn pytest-xdist ninja scipy pybind11 pytest lit tbb=2021.11 tbb-devel=2021.11 cmake "intel::mkl-devel-dpcpp=2024.1" conda-forge::dpcpp_linux-64 level-zero-devel -c conda-forge -c https://software.repos.intel.com/python/conda/ -c numba --override-channels
 conda activate test-env
 export LLVM_PATH=<...>/llvm-install
 export NUMBA_MLIR_USE_SYCL=ON # Optional
@@ -62,7 +62,7 @@ TBD
 ## Using GPU offload
 
 * Install Intel GPU drivers: https://dgpu-docs.intel.com/installation-guides/index.html
-* Install dpctl `conda install dpctl -c dppy/label/dev -c intel`
+* Install dpctl `conda install dpctl -c dppy/label/dev -c https://software.repos.intel.com/python/conda/`
 
 Kernel offload example:
 ```Python
