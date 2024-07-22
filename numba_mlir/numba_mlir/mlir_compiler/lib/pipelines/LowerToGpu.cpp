@@ -2042,8 +2042,7 @@ struct GPUToLLVMPass
 
     mlir::populateAsyncStructuralTypeConversionsAndLegality(converter, patterns,
                                                             target);
-    mlir::populateGpuToLLVMConversionPatterns(
-        converter, patterns, mlir::gpu::getDefaultGpuBinaryAnnotation());
+    mlir::populateGpuToLLVMConversionPatterns(converter, patterns);
 
     numba::populateControlFlowTypeConversionRewritesAndTarget(converter,
                                                               patterns, target);

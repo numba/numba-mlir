@@ -262,7 +262,8 @@ struct ConvertTensorExpandShape
       return mlir::failure();
 
     rewriter.replaceOpWithNewOp<mlir::tensor::ExpandShapeOp>(
-        op, newResType, adaptor.getSrc(), adaptor.getReassociation());
+        op, newResType, adaptor.getSrc(), adaptor.getReassociation(),
+        adaptor.getOutputShape(), adaptor.getStaticOutputShape());
     return mlir::success();
   }
 };

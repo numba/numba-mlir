@@ -353,8 +353,8 @@ static mlir::Value divStrides(mlir::Location loc, mlir::OpBuilder &builder,
                               mlir::Value strides, mlir::Value m) {
   auto arrayType = strides.getType().cast<mlir::LLVM::LLVMArrayType>();
   mlir::Value array = builder.create<mlir::LLVM::UndefOp>(loc, arrayType);
-  auto count = arrayType.getNumElements();
-  for (auto i : llvm::seq(0u, count)) {
+  size_t count = arrayType.getNumElements();
+  for (auto i : llvm::seq(size_t(0), count)) {
     mlir::Value prev = builder.create<mlir::LLVM::ExtractValueOp>(
         loc, arrayType.getElementType(), strides, i);
     mlir::Value val = builder.create<mlir::LLVM::SDivOp>(loc, prev, m);
@@ -367,8 +367,8 @@ static mlir::Value mulStrides(mlir::Location loc, mlir::OpBuilder &builder,
                               mlir::Value strides, mlir::Value m) {
   auto arrayType = strides.getType().cast<mlir::LLVM::LLVMArrayType>();
   mlir::Value array = builder.create<mlir::LLVM::UndefOp>(loc, arrayType);
-  auto count = arrayType.getNumElements();
-  for (auto i : llvm::seq(0u, count)) {
+  size_t count = arrayType.getNumElements();
+  for (auto i : llvm::seq(size_t(0), count)) {
     mlir::Value prev = builder.create<mlir::LLVM::ExtractValueOp>(
         loc, arrayType.getElementType(), strides, i);
     mlir::Value val = builder.create<mlir::LLVM::MulOp>(loc, prev, m);

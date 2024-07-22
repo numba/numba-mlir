@@ -220,7 +220,7 @@ func.func @test(%arg: memref<?xf32>) -> index {
 
 // CHECK-LABEL: func @test
 //  CHECK-SAME:   (%[[ARG1:.*]]: tensor<?xf32>, %[[ARG2]]: index)
-//       CHECK:   %[[EXPAND:.*]] = tensor.expand_shape %[[ARG1]] {{\[}}[0, 1, 2]] : tensor<?xf32> into tensor<1x?x1xf32>
+//       CHECK:   %[[EXPAND:.*]] = tensor.expand_shape %[[ARG1]] {{\[}}[0, 1, 2]] output_shape [1, %dim, 1] : tensor<?xf32> into tensor<1x?x1xf32>
 //       CHECK:   %[[RES:.*]] = tensor.cast %[[EXPAND]] : tensor<1x?x1xf32> to tensor<?x?x?xf32>
 //       CHECK:   return %[[RES]]
 func.func @test(%arg0: tensor<?xf32>, %arg1: index) -> tensor<?x?x?xf32> {

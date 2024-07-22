@@ -41,10 +41,11 @@ public:
   ShapeValue() = default;
   ShapeValue(mlir::ShapedType shaped) : shapeRanges(std::in_place) {
     shapeRanges->reserve(shaped.getRank());
-    for (auto dim : shaped.getShape())
+    for (auto dim : shaped.getShape()) {
       shapeRanges->emplace_back(mlir::ShapedType::isDynamic(dim)
                                     ? getDefaultDimRange()
                                     : getFixedDimRange(dim));
+    }
   }
   ShapeValue(mlir::ArrayAttr attr) : shapeRanges(std::in_place) {
     shapeRanges->reserve(attr.size());
@@ -395,41 +396,88 @@ public:
       if (generic->getNumResults() == 0)
         return;
 
-      if (!llvm::all_of(generic.getIndexingMaps(), [](mlir::Attribute map) {
+      bool allIdentity =
+          llvm::all_of(generic.getIndexingMaps(), [](mlir::Attribute map) {
             return mlir::cast<mlir::AffineMapAttr>(map).getValue().isIdentity();
-          }))
-        return;
+          });
 
-      if (!llvm::all_of(generic.getIteratorTypes(), [](mlir::Attribute map) {
+      bool allParallel =
+          llvm::all_of(generic.getIteratorTypes(), [](mlir::Attribute map) {
             return mlir::cast<mlir::linalg::IteratorTypeAttr>(map).getValue() ==
                    mlir::utils::IteratorType::parallel;
-          }))
+          });
 
-        return;
+      auto inputsNum = generic.getInputs().size();
+      auto outs = generic.getOutputs();
 
-      ShapeValue newVal;
-      for (auto arg : op->getOperands())
-        newVal = ShapeValue::intersect(
-            newVal, {mlir::cast<mlir::ShapedType>(arg.getType())});
+      mlir::SmallVector<ShapeValue> newVals(outs.size());
 
-      for (auto result : op->getResults())
-        newVal = ShapeValue::intersect(
-            newVal, {mlir::cast<mlir::ShapedType>(result.getType())});
+      for (size_t i = 0; i < outs.size(); ++i) {
+        auto resOperandShape = operands[inputsNum + i]->getValue();
 
-      for (auto input : operands) {
-        auto inpuLatticeVal = input->getValue();
-        if (inpuLatticeVal.isUninitialized())
-          return;
-
-        newVal = ShapeValue::intersect(newVal, inpuLatticeVal);
+        if (!resOperandShape.isUninitialized()) {
+          newVals[i] = resOperandShape;
+        } else if (auto shaped =
+                       mlir::dyn_cast<mlir::ShapedType>(outs[i].getType())) {
+          newVals[i] = ShapeValue(shaped);
+        }
       }
 
-      LLVM_DEBUG(llvm::dbgs() << "ShapeValueAnalysis: Shaped linalg generic: "
-                              << newVal << "\n");
+      if (allIdentity && allParallel) {
+        // if all indexing maps are identity all outputs must be of the same
+        // shape
+        ShapeValue newVal = [&]() {
+          for (auto &&v : newVals)
+            if (!v.isUninitialized())
+              return v;
 
-      for (auto resultLattice : results) {
-        auto changed = resultLattice->join(newVal);
-        propagateIfChanged(resultLattice, changed);
+          return ShapeValue();
+        }();
+
+        if (!newVal.isUninitialized()) {
+          for (auto &&v : newVals)
+            if (!v.isUninitialized())
+              newVal = ShapeValue::intersect(newVal, v);
+        }
+
+        for (auto arg : op->getOperands())
+          newVal = ShapeValue::intersect(
+              newVal, {mlir::cast<mlir::ShapedType>(arg.getType())});
+
+        for (auto result : op->getResults())
+          newVal = ShapeValue::intersect(
+              newVal, {mlir::cast<mlir::ShapedType>(result.getType())});
+
+        for (auto input : operands) {
+          auto inputLatticeVal = input->getValue();
+          if (inputLatticeVal.isUninitialized())
+            return;
+
+          newVal = ShapeValue::intersect(newVal, inputLatticeVal);
+        }
+
+        // Since all indexing maps are identity we can propagate single result
+        // to all outputs
+        if (!newVal.isUninitialized()) {
+          for (auto &v : newVals)
+            v = ShapeValue::intersect(v, newVal);
+        }
+      }
+
+      auto debug_msg = [&]() {
+        llvm::dbgs() << "ShapeValueAnalysis: Shaped linalg generic: ";
+        for (auto &&v : newVals)
+          llvm::dbgs() << v << " ";
+
+        llvm::dbgs() << "\n";
+      };
+
+      LLVM_DEBUG(debug_msg());
+
+      assert(results.size() == newVals.size());
+      for (size_t i = 0; i < results.size(); ++i) {
+        auto changed = results[i]->join(newVals[i]);
+        propagateIfChanged(results[i], changed);
       }
       return;
     }
@@ -581,7 +629,6 @@ public:
           return std::nullopt;
 
         auto shape = shapeVal.getShape();
-
         auto indexVal = *index;
         if (indexVal < 0 || indexVal >= static_cast<int64_t>(shape.size()))
           return std::nullopt;
@@ -592,10 +639,43 @@ public:
       if (newRange) {
         LLVM_DEBUG(llvm::dbgs() << "IntegerRangeAnalysisEx: New dim val: "
                                 << newRange << "\n");
-        auto changed =
-            lattice->join(mlir::dataflow::IntegerValueRange{newRange});
+
+        auto changed = lattice->join(mlir::IntegerValueRange{newRange});
         propagateIfChanged(lattice, changed);
       }
+      return;
+    }
+
+    if (auto select = mlir::dyn_cast<mlir::arith::SelectOp>(op)) {
+      assert(op->getNumResults() == 1);
+      assert(results.size() == 1);
+
+      auto *lattice = results.front();
+      auto newRange = [&]() {
+        auto &condLattice = operands[0]->getValue();
+        std::optional<mlir::APInt> mbCondVal =
+            condLattice.isUninitialized()
+                ? std::nullopt
+                : condLattice.getValue().getConstantValue();
+
+        const auto &trueCase = operands[1]->getValue();
+        const auto &falseCase = operands[2]->getValue();
+
+        if (mbCondVal) {
+          if (mbCondVal->isZero())
+            return falseCase;
+          else
+            return trueCase;
+        }
+
+        if (trueCase.isUninitialized() || falseCase.isUninitialized())
+          return mlir::IntegerValueRange{};
+
+        return mlir::IntegerValueRange::join(trueCase, falseCase);
+      }();
+
+      auto changed = lattice->join(mlir::IntegerValueRange{newRange});
+      propagateIfChanged(lattice, changed);
       return;
     }
 
@@ -605,14 +685,36 @@ public:
         if (value.getType().isIntOrIndex()) {
           propagateIfChanged(
               lattice,
-              lattice->join(
-                  mlir::dataflow::IntegerValueRange::getMaxRange(value)));
+              lattice->join(mlir::IntegerValueRange::getMaxRange(value)));
         }
       }
       return setAllToEntryStates(results);
     }
 
     mlir::dataflow::IntegerRangeAnalysis::visitOperation(op, operands, results);
+  }
+
+  void visitNonControlFlowArguments(
+      mlir::Operation *op, const mlir::RegionSuccessor &successor,
+      mlir::ArrayRef<mlir::dataflow::IntegerValueRangeLattice *> argLattices,
+      unsigned firstIndex) override {
+
+    if (auto loop = mlir::dyn_cast<mlir::LoopLikeOpInterface>(op)) {
+      if (op->getNumResults() == 0) {
+        std::optional<mlir::Value> iv = loop.getSingleInductionVar();
+        if (iv) {
+          mlir::dataflow::IntegerValueRangeLattice *ivEntry =
+              getLatticeElement(*iv);
+          propagateIfChanged(
+              ivEntry,
+              ivEntry->join(mlir::IntegerValueRange::getMaxRange(*iv)));
+          return;
+        }
+      }
+    }
+
+    mlir::dataflow::IntegerRangeAnalysis::visitNonControlFlowArguments(
+        op, successor, argLattices, firstIndex);
   }
 };
 

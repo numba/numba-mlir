@@ -70,6 +70,10 @@
 #include "numba/Transforms/TypeConversion.hpp"
 #include "numba/Transforms/UpliftMath.hpp"
 
+#include "legacy/Dialect/Arith/Transforms/Passes.h"
+#include "legacy/Dialect/Linalg/Transforms/Passes.h"
+#include "legacy/Dialect/Tensor/Transforms/Passes.h"
+
 #include "BasePipeline.hpp"
 #include "NumpyResolver.hpp"
 #include "PyLinalgResolver.hpp"
@@ -2058,7 +2062,7 @@ rewritePrimitiveFunc(mlir::PatternRewriter &rewriter, mlir::Location loc,
       return mlir::isa<mlir::NoneType>(val.getType());
     };
 
-    if (opName.startswith("array.") && args.size() >= 1 &&
+    if (opName.starts_with("array.") && args.size() >= 1 &&
         llvm::all_of(args.drop_front(), isNone))
       return resolver.rewriteAttr(opName, loc, rewriter, args.front());
 
@@ -4488,7 +4492,7 @@ static void populatePlierToLinalgOptPipeline(mlir::OpPassManager &pm) {
 
   pm.addPass(mlir::createReconcileUnrealizedCastsPass());
 
-  pm.addPass(mlir::arith::createConstantBufferizePass());
+  pm.addPass(mlir::arith::legacy::createConstantBufferizePass());
   pm.addNestedPass<mlir::func::FuncOp>(
       mlir::bufferization::createEmptyTensorToAllocTensorPass());
   pm.addPass(mlir::createCanonicalizerPass());
@@ -4497,9 +4501,10 @@ static void populatePlierToLinalgOptPipeline(mlir::OpPassManager &pm) {
       std::make_unique<MixedGenericsAliasAnalysis>());
   pm.addNestedPass<mlir::func::FuncOp>(std::make_unique<AdditionalBufferize>());
   pm.addNestedPass<mlir::func::FuncOp>(mlir::createSCFBufferizePass());
-  pm.addNestedPass<mlir::func::FuncOp>(mlir::createLinalgBufferizePass());
   pm.addNestedPass<mlir::func::FuncOp>(
-      mlir::tensor::createTensorBufferizePass());
+      mlir::linalg::legacy::createLinalgBufferizePass());
+  pm.addNestedPass<mlir::func::FuncOp>(
+      mlir::tensor::legacy::createTensorBufferizePass());
   pm.addPass(mlir::func::createFuncBufferizePass());
   pm.addNestedPass<mlir::func::FuncOp>(mlir::createCanonicalizerPass());
   pm.addNestedPass<mlir::func::FuncOp>(

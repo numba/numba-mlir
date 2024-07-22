@@ -855,6 +855,20 @@ private:
   }
 };
 
+class EraseGpuModuleOpPattern
+    : public mlir::OpRewritePattern<mlir::gpu::GPUModuleOp> {
+  using mlir::OpRewritePattern<mlir::gpu::GPUModuleOp>::OpRewritePattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(mlir::gpu::GPUModuleOp op,
+                  mlir::PatternRewriter &rewriter) const override {
+    // GPU kernel modules are no longer necessary since we have a global
+    // constant with the CUBIN, or HSACO data.
+    rewriter.eraseOp(op);
+    return mlir::success();
+  }
+};
+
 struct GPUToLLVMPass
     : public mlir::PassWrapper<GPUToLLVMPass,
                                mlir::OperationPass<mlir::ModuleOp>> {
@@ -868,8 +882,7 @@ struct GPUToLLVMPass
 
     mlir::populateAsyncStructuralTypeConversionsAndLegality(converter, patterns,
                                                             target);
-    mlir::populateGpuToLLVMConversionPatterns(
-        converter, patterns, mlir::gpu::getDefaultGpuBinaryAnnotation());
+    mlir::populateGpuToLLVMConversionPatterns(converter, patterns);
 
     numba::populateControlFlowTypeConversionRewritesAndTarget(converter,
                                                               patterns, target);
@@ -922,6 +935,8 @@ void gpu_runtime::populateGpuToLLVMPatternsAndLegality(
       ConvertGpuSuggestBlockSizePattern
       // clang-format on
       >(converter);
+
+  patterns.add<EraseGpuModuleOpPattern>(&converter.getContext());
 
   target.addIllegalDialect<mlir::gpu::GPUDialect>();
   target.addIllegalDialect<gpu_runtime::GpuRuntimeDialect>();
