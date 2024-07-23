@@ -32,6 +32,10 @@ jobs:
       # - uses: ilammy/msvc-dev-cmd@v1
       #   with:
       #     vsversion : "2019"
+      - uses: microsoft/setup-msbuild@v2
+        with:
+          msbuild-architecture: x64
+          vs-version: '[16.9,17)'
 
       - name: Disable Defender
         shell: powershell
@@ -152,6 +156,10 @@ jobs:
         python: ["3.9", "3.10", "3.11"]
 
     steps:
+      - uses: microsoft/setup-msbuild@v2
+        with:
+          msbuild-architecture: x64
+          vs-version: '[16.9,17)'
       # - uses: ilammy/msvc-dev-cmd@v1
       #   with:
       #     vsversion : "2019"
