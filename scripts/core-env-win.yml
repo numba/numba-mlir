@@ -1,7 +1,7 @@
 name: dev
 channels:
   - conda-forge
-  - intel
+  - https://software.repos.intel.com/python/conda/
   - nodefaults
 dependencies:
   - cmake
