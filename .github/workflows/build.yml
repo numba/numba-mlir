@@ -10,6 +10,10 @@ on:
       - main
   pull_request:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   TBB_VER: 2021.10.0
   LLVM_SHA_FILE: llvm-sha.txt
@@ -25,14 +29,9 @@ jobs:
     timeout-minutes: 450
 
     steps:
-      - uses: ilammy/msvc-dev-cmd@v1
-        with:
-          vsversion : "2019"
-
-      - name: Cancel Previous Runs
-        uses: styfle/cancel-workflow-action@0.6.0
-        with:
-          access_token: ${{ github.token }}
+      # - uses: ilammy/msvc-dev-cmd@v1
+      #   with:
+      #     vsversion : "2019"
 
       - name: Disable Defender
         shell: powershell
@@ -153,14 +152,9 @@ jobs:
         python: ["3.9", "3.10", "3.11"]
 
     steps:
-      - uses: ilammy/msvc-dev-cmd@v1
-        with:
-          vsversion : "2019"
-
-      - name: Cancel Previous Runs
-        uses: styfle/cancel-workflow-action@0.6.0
-        with:
-          access_token: ${{ github.token }}
+      # - uses: ilammy/msvc-dev-cmd@v1
+      #   with:
+      #     vsversion : "2019"
 
       - name: Disable Defender
         shell: powershell
@@ -297,11 +291,6 @@ jobs:
           - ${{ github.ref == 'refs/heads/main' }}
 
     steps:
-      - name: Cancel Previous Runs
-        uses: styfle/cancel-workflow-action@0.6.0
-        with:
-          access_token: ${{ github.token }}
-
       - name: Disable Defender
         shell: powershell
         run: |
@@ -381,11 +370,6 @@ jobs:
     timeout-minutes: 450
 
     steps:
-      - name: Cancel Previous Runs
-        uses: styfle/cancel-workflow-action@0.6.0
-        with:
-          access_token: ${{ github.token }}
-
       - name: Checkout repo
         uses: actions/checkout@v2
         with:
@@ -510,11 +494,6 @@ jobs:
           - ${{ github.ref == 'refs/heads/main' }}
 
     steps:
-      - name: Cancel Previous Runs
-        uses: styfle/cancel-workflow-action@0.6.0
-        with:
-          access_token: ${{ github.token }}
-
       - name: Setup conda
         uses: conda-incubator/setup-miniconda@v2
         with:
@@ -646,11 +625,6 @@ jobs:
           - ${{ github.ref == 'refs/heads/main' }}
 
     steps:
-      - name: Cancel Previous Runs
-        uses: styfle/cancel-workflow-action@0.6.0
-        with:
-          access_token: ${{ github.token }}
-
       - name: Setup conda
         uses: conda-incubator/setup-miniconda@v2
         with:
