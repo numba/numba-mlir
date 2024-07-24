@@ -10,6 +10,10 @@ on:
       - main
   pull_request:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   TBB_VER: 2021.10.0
   LLVM_SHA_FILE: llvm-sha.txt
@@ -25,27 +29,18 @@ jobs:
     timeout-minutes: 450
 
     steps:
-      - uses: ilammy/msvc-dev-cmd@v1
-        with:
-          vsversion : "2019"
-
-      - name: Cancel Previous Runs
-        uses: styfle/cancel-workflow-action@0.6.0
-        with:
-          access_token: ${{ github.token }}
-
       - name: Disable Defender
         shell: powershell
         run: |
           Set-MpPreference -DisableRealtimeMonitoring $true
 
       - name: Checkout repo
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
       - name: Cache conda packages
-        uses: actions/cache@v2
+        uses: actions/cache@v3
         env:
           CACHE_NUMBER: 1  # Increase to reset cache
         with:
@@ -64,7 +59,7 @@ jobs:
           activate-environment: test-env
           environment-file: ${{ env.CORE_ENV_FILE }}
           python-version: "3.10"
-          channels: conda-forge,intel
+          channels: conda-forge,https://software.repos.intel.com/python/conda/
 
       - name: Setup Cache Vars
         run: |
@@ -88,6 +83,10 @@ jobs:
         if: steps.cache-llvm-mlir.outputs.cache-hit != 'true'
         timeout-minutes: 420
         run: |
+          $env:vcvarsPath = (Resolve-Path "$env:GITHUB_WORKSPACE\scripts")
+          pushd $env:vcvarsPath
+          ./vcvars.ps1
+          popd
           conda list
           cd $env:WORKSPACE
           mkdir -ea 0 -p llvm-mlir
@@ -120,6 +119,10 @@ jobs:
 
       - name: Build Numba-MLIR
         run: |
+          $env:vcvarsPath = (Resolve-Path "$env:GITHUB_WORKSPACE\scripts")
+          pushd $env:vcvarsPath
+          ./vcvars.ps1
+          popd
           $external_lit="$env:GITHUB_WORKSPACE\scripts\runlit.py"
           mkdir -p _build
           cd _build
@@ -153,15 +156,6 @@ jobs:
         python: ["3.9", "3.10", "3.11"]
 
     steps:
-      - uses: ilammy/msvc-dev-cmd@v1
-        with:
-          vsversion : "2019"
-
-      - name: Cancel Previous Runs
-        uses: styfle/cancel-workflow-action@0.6.0
-        with:
-          access_token: ${{ github.token }}
-
       - name: Disable Defender
         shell: powershell
         run: |
@@ -174,10 +168,10 @@ jobs:
           run-post: false
           miniforge-variant: Mambaforge
           miniforge-version: latest
-          channels: conda-forge,intel
+          channels: conda-forge,https://software.repos.intel.com/python/conda/
 
       - name: Checkout repo
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
@@ -202,10 +196,15 @@ jobs:
 
       - name: Build Python frontend
         run: |
+          $env:vcvarsPath = (Resolve-Path "$env:GITHUB_WORKSPACE\scripts")
+          pushd $env:vcvarsPath
+          ./vcvars.ps1
+          popd
           cd numba_mlir
-          conda create -y -n test-env python=${{ matrix.python }} "pip>=22" numba=0.59.1 numpy=1.24 "setuptools<65.6" scikit-learn pytest-xdist ninja scipy pybind11 pytest "tbb>=$env:TBB_VER" "tbb-devel>=$env:TBB_VER" cmake intel::mkl intel::mkl-devel "intel::mkl-devel-dpcpp=2024.1" zlib "conda-forge::dpcpp_win-64=2024.1" level-zero-devel -c conda-forge -c numba -c intel --override-channels
+          conda create -y -n test-env python=${{ matrix.python }} "dpcpp_win-64=2024.1" --file ../scripts/numba-mlir.env -c conda-forge
           conda info
           conda activate test-env
+          conda install --file ../scripts/mkl.env -c https://software.repos.intel.com/python/conda/
           echo "Conda prefix: $env:CONDA_PREFIX"
           echo "Patch broken Windows MKLConfig.cmake"
           cp "$env:GITHUB_WORKSPACE/numba_mlir/conda-recipe/MKLConfig.cmake" "$env:CONDA_PREFIX/Library/lib/cmake/mkl" -Force
@@ -234,7 +233,7 @@ jobs:
         run: |
           cd numba_mlir
           conda activate test-env
-          conda install greenlet "dpctl=0.18" "conda-forge::dpcpp-cpp-rt=2024.1" -c dppy/label/dev -c conda-forge -c intel
+          conda install greenlet "dpctl=0.18" dpcpp-cpp-rt -c dppy/label/dev -c conda-forge -c https://software.repos.intel.com/python/conda/
           conda list
           $env:NUMBA_MLIR_DEFAULT_DEVICE="opencl:cpu:0"
           python "$env:GITHUB_WORKSPACE/numba_mlir/conda-recipe/run_package_tests.py" verbose gpu
@@ -255,6 +254,10 @@ jobs:
       - name: Build wheels
 
         run: |
+          $env:vcvarsPath = (Resolve-Path "$env:GITHUB_WORKSPACE\scripts")
+          pushd $env:vcvarsPath
+          ./vcvars.ps1
+          popd
           mkdir numba_mlir_wheels
           pushd numba_mlir_wheels
           conda activate test-env
@@ -274,9 +277,10 @@ jobs:
 
         run: |
           cd numba_mlir_wheels
-          conda create -y -n wheels-test-env python=${{ matrix.python }} numba=0.59.1 numpy=1.24 scikit-learn pytest-xdist scipy pytest "tbb>=$env:TBB_VER" cmake intel::mkl intel::mkl-devel "intel::mkl-devel-dpcpp=2024.1" "conda-forge::dpcpp_win-64=2024.1" -c conda-forge -c numba -c intel --override-channels
+          conda create -y -n wheels-test-env python=${{ matrix.python }} "dpcpp_win-64=2024.1" --file ../scripts/numba-mlir.env -c conda-forge
           conda info
           conda activate wheels-test-env
+          conda install --file ../scripts/mkl.env -c https://software.repos.intel.com/python/conda/
           conda list
           ls .
           ls *.whl | Foreach-Object { pip install $_.FullName }
@@ -297,11 +301,6 @@ jobs:
           - ${{ github.ref == 'refs/heads/main' }}
 
     steps:
-      - name: Cancel Previous Runs
-        uses: styfle/cancel-workflow-action@0.6.0
-        with:
-          access_token: ${{ github.token }}
-
       - name: Disable Defender
         shell: powershell
         run: |
@@ -314,10 +313,10 @@ jobs:
           run-post: false
           miniforge-variant: Mambaforge
           miniforge-version: latest
-          channels: conda-forge,intel
+          channels: conda-forge,https://software.repos.intel.com/python/conda/
 
       - name: Checkout repo
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
@@ -359,7 +358,7 @@ jobs:
           $env:CXX="cl.exe"
           $env:CC="cl.exe"
           $env:VSCMD_DEBUG = 3
-          conda mambabuild --output-folder=. ../numba_mlir/conda-recipe --python=${{ matrix.python }} -c conda-forge -c numba -c intel --override-channels
+          conda mambabuild --output-folder=. ../numba_mlir/conda-recipe --python=${{ matrix.python }} -c conda-forge -c numba -c https://software.repos.intel.com/python/conda/ --override-channels
           cd win-64
           ls .
           popd
@@ -381,18 +380,13 @@ jobs:
     timeout-minutes: 450
 
     steps:
-      - name: Cancel Previous Runs
-        uses: styfle/cancel-workflow-action@0.6.0
-        with:
-          access_token: ${{ github.token }}
-
       - name: Checkout repo
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
       - name: Cache conda packages
-        uses: actions/cache@v2
+        uses: actions/cache@v3
         env:
           CACHE_NUMBER: 1  # Increase to reset cache
         with:
@@ -411,7 +405,7 @@ jobs:
           activate-environment: test-env
           environment-file: ${{ env.CORE_ENV_FILE }}
           python-version: "3.10"
-          channels: conda-forge,intel
+          channels: conda-forge,https://software.repos.intel.com/python/conda/
 
       - name: Setup Cache Vars
         run: |
@@ -510,11 +504,6 @@ jobs:
           - ${{ github.ref == 'refs/heads/main' }}
 
     steps:
-      - name: Cancel Previous Runs
-        uses: styfle/cancel-workflow-action@0.6.0
-        with:
-          access_token: ${{ github.token }}
-
       - name: Setup conda
         uses: conda-incubator/setup-miniconda@v2
         with:
@@ -522,10 +511,10 @@ jobs:
           run-post: false
           miniforge-variant: Mambaforge
           miniforge-version: latest
-          channels: conda-forge,intel
+          channels: conda-forge,https://software.repos.intel.com/python/conda/
 
       - name: Checkout repo
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
@@ -551,9 +540,10 @@ jobs:
 
         run: |
           cd numba_mlir
-          conda create -y -n test-env python=${{ matrix.python }} "pip>=22" numba=0.59.1 numpy=1.24 "setuptools<65.6" scikit-learn pytest-xdist ninja scipy pybind11 pytest "tbb>=${TBB_VER}" "tbb-devel>=${TBB_VER}" cmake intel::mkl intel::mkl-devel "intel::mkl-devel-dpcpp=2024.1" zlib "dpcpp_linux-64=2024.1" level-zero-devel -c conda-forge -c numba -c intel --override-channels
+          conda create -y -n test-env python=${{ matrix.python }} "dpcpp_linux-64=2024.1" --file ../scripts/numba-mlir.env -c conda-forge
           conda info
           source $CONDA/bin/activate test-env
+          conda install --file ../scripts/mkl.env -c https://software.repos.intel.com/python/conda/
           conda install gxx_linux-64 -c conda-forge
           conda list
           python -c "import numba; print('numba', numba.__version__)"
@@ -578,12 +568,13 @@ jobs:
 
 
       - name: Run offload tests
+        if: false # Re-enable after packages update to 2024.2
         shell: bash -l {0}
 
         run: |
           cd numba_mlir
           source $CONDA/bin/activate test-env
-          conda install greenlet "dpctl=0.18" "conda-forge::dpcpp-cpp-rt=2024.1" -c dppy/label/dev -c conda-forge -c intel
+          conda install greenlet "dpctl=0.18" dpcpp-cpp-rt -c dppy/label/dev -c conda-forge -c https://software.repos.intel.com/python/conda/
           conda list
           export NUMBA_MLIR_DEFAULT_DEVICE=opencl:cpu:0
           python $GITHUB_WORKSPACE/numba_mlir/conda-recipe/run_package_tests.py verbose gpu
@@ -624,9 +615,10 @@ jobs:
 
         run: |
           cd numba_mlir_wheels
-          conda create -y -n wheels-test-env python=${{ matrix.python }} numba=0.59.1 numpy=1.24 scikit-learn pytest-xdist scipy pytest tbb>=${TBB_VER} cmake intel::mkl intel::mkl-devel "intel::mkl-devel-dpcpp=2024.1" "conda-forge::dpcpp_linux-64=2024.1" -c conda-forge -c numba -c intel --override-channels
+          conda create -y -n wheels-test-env python=${{ matrix.python }} "dpcpp_linux-64=2024.1" --file ../scripts/numba-mlir.env -c conda-forge
           conda info
           source $CONDA/bin/activate wheels-test-env
+          conda install --file ../scripts/mkl.env -c https://software.repos.intel.com/python/conda/
           conda list
           pip install *.whl
           python $GITHUB_WORKSPACE/numba_mlir/conda-recipe/run_package_tests.py verbose smoke
@@ -646,11 +638,6 @@ jobs:
           - ${{ github.ref == 'refs/heads/main' }}
 
     steps:
-      - name: Cancel Previous Runs
-        uses: styfle/cancel-workflow-action@0.6.0
-        with:
-          access_token: ${{ github.token }}
-
       - name: Setup conda
         uses: conda-incubator/setup-miniconda@v2
         with:
@@ -658,10 +645,10 @@ jobs:
           run-post: false
           miniforge-variant: Mambaforge
           miniforge-version: latest
-          channels: conda-forge,intel
+          channels: conda-forge,https://software.repos.intel.com/python/conda/
 
       - name: Checkout repo
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
@@ -693,7 +680,7 @@ jobs:
           export LLVM_PATH=/home/runner/work/llvm-mlir/_mlir_install
           export LEVEL_ZERO_VERSION_CHECK_OFF=1
           export NUMBA_MLIR_USE_SYCL=ON
-          conda mambabuild --output-folder=. ../numba_mlir/conda-recipe --python=${{ matrix.python }} -c conda-forge -c numba -c intel --override-channels || exit 1
+          conda mambabuild --output-folder=. ../numba_mlir/conda-recipe --python=${{ matrix.python }} -c conda-forge -c numba -c https://software.repos.intel.com/python/conda/ --override-channels || exit 1
           cd linux-64
           ls -l --block-size=M
           popd
@@ -737,7 +724,7 @@ jobs:
           miniforge-variant: Mambaforge
           miniforge-version: latest
           channel-priority: "disabled"
-          channels: conda-forge,intel
+          channels: conda-forge,https://software.repos.intel.com/python/conda/
 
       - name: Install anaconda-client
         run: conda install anaconda-client
@@ -772,7 +759,7 @@ jobs:
         run: conda install anaconda-client
 
       - name: Checkout repo
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           repository: IntelPython/devops-tools
           fetch-depth: 0
