@@ -47,8 +47,9 @@ ninja install
 Building and testing Python package
 ```Bash
 cd numba_mlir
-conda create -n test-env python=3.11 numba=0.59.1 numpy=1.24 "setuptools<65.6" scikit-learn pytest-xdist ninja scipy pybind11 pytest lit tbb=2021.11 tbb-devel=2021.11 cmake "intel::mkl-devel-dpcpp=2024.1" conda-forge::dpcpp_linux-64 level-zero-devel -c conda-forge -c https://software.repos.intel.com/python/conda/ -c numba --override-channels
+conda create -n test-env python=3.11 dpcpp_linux-64=2024.2 --file ../scripts/numba-mlir.env -c conda-forge
 conda activate test-env
+conda install --file ../scripts/mkl.env -c https://software.repos.intel.com/python/conda/
 export LLVM_PATH=<...>/llvm-install
 export NUMBA_MLIR_USE_SYCL=ON # Optional
 python setup.py develop
