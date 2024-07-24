@@ -201,10 +201,10 @@ jobs:
           ./vcvars.ps1
           popd
           cd numba_mlir
-          conda create -y -n test-env python=${{ matrix.python }} "dpcpp_win-64=2024.1" --file ../scripts/numba-mlir.env -c conda-forge
+          conda create -y -n test-env python=${{ matrix.python }} --file ../scripts/numba-mlir.env -c conda-forge
           conda info
           conda activate test-env
-          conda install --file ../scripts/mkl.env -c https://software.repos.intel.com/python/conda/
+          conda install dpcpp_win-64=2024.2 --file ../scripts/mkl.env -c https://software.repos.intel.com/python/conda/
           echo "Conda prefix: $env:CONDA_PREFIX"
           echo "Patch broken Windows MKLConfig.cmake"
           cp "$env:GITHUB_WORKSPACE/numba_mlir/conda-recipe/MKLConfig.cmake" "$env:CONDA_PREFIX/Library/lib/cmake/mkl" -Force
@@ -277,10 +277,10 @@ jobs:
 
         run: |
           cd numba_mlir_wheels
-          conda create -y -n wheels-test-env python=${{ matrix.python }} "dpcpp_win-64=2024.1" --file ../scripts/numba-mlir.env -c conda-forge
+          conda create -y -n wheels-test-env python=${{ matrix.python }} --file ../scripts/numba-mlir.env -c conda-forge
           conda info
           conda activate wheels-test-env
-          conda install --file ../scripts/mkl.env -c https://software.repos.intel.com/python/conda/
+          conda install dpcpp_win-64=2024.2 --file ../scripts/mkl.env -c https://software.repos.intel.com/python/conda/
           conda list
           ls .
           ls *.whl | Foreach-Object { pip install $_.FullName }
@@ -540,10 +540,10 @@ jobs:
 
         run: |
           cd numba_mlir
-          conda create -y -n test-env python=${{ matrix.python }} "dpcpp_linux-64=2024.1" --file ../scripts/numba-mlir.env -c conda-forge
+          conda create -y -n test-env python=${{ matrix.python }} --file ../scripts/numba-mlir.env -c conda-forge
           conda info
           source $CONDA/bin/activate test-env
-          conda install --file ../scripts/mkl.env -c https://software.repos.intel.com/python/conda/
+          conda install dpcpp_linux-64=2024.2 --file ../scripts/mkl.env -c https://software.repos.intel.com/python/conda/
           conda install gxx_linux-64 -c conda-forge
           conda list
           python -c "import numba; print('numba', numba.__version__)"
@@ -615,10 +615,10 @@ jobs:
 
         run: |
           cd numba_mlir_wheels
-          conda create -y -n wheels-test-env python=${{ matrix.python }} "dpcpp_linux-64=2024.1" --file ../scripts/numba-mlir.env -c conda-forge
+          conda create -y -n wheels-test-env python=${{ matrix.python }} --file ../scripts/numba-mlir.env -c conda-forge
           conda info
           source $CONDA/bin/activate wheels-test-env
-          conda install --file ../scripts/mkl.env -c https://software.repos.intel.com/python/conda/
+          conda install dpcpp_linux-64=2024.2 --file ../scripts/mkl.env -c https://software.repos.intel.com/python/conda/
           conda list
           pip install *.whl
           python $GITHUB_WORKSPACE/numba_mlir/conda-recipe/run_package_tests.py verbose smoke
