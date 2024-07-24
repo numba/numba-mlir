@@ -214,8 +214,8 @@ jobs:
           ./vcvars.ps1
           popd
           cd numba_mlir
-          # conda create -y -n test-env python=${{ matrix.python }} "pip>=22" numba=0.59.1 numpy=1.24 "setuptools<65.6" scikit-learn pytest-xdist ninja scipy pybind11 pytest "tbb>=$env:TBB_VER" "tbb-devel>=$env:TBB_VER" cmake https://software.repos.intel.com/python/conda/::mkl https://software.repos.intel.com/python/conda/::mkl-devel "https://software.repos.intel.com/python/conda/::mkl-devel-dpcpp=2024.1" zlib "conda-forge::dpcpp_win-64=2024.1" level-zero-devel -c conda-forge -c numba -c https://software.repos.intel.com/python/conda/ --override-channels
-          conda create -y -n test-env python=${{ matrix.python }} "dpcpp_win-64=2024.1" --file ../scripts/numba-mlir.env -c conda-forge
+          # conda create -y -n test-env python=${{ matrix.python }} "pip>=22" numba=0.59.1 numpy=1.24 "setuptools<65.6" scikit-learn pytest-xdist ninja scipy pybind11 pytest "tbb>=$env:TBB_VER" "tbb-devel>=$env:TBB_VER" cmake https://software.repos.intel.com/python/conda/::mkl https://software.repos.intel.com/python/conda/::mkl-devel "https://software.repos.intel.com/python/conda/::mkl-devel-dpcpp=2024.2" zlib "conda-forge::dpcpp_win-64=2024.2" level-zero-devel -c conda-forge -c numba -c https://software.repos.intel.com/python/conda/ --override-channels
+          conda create -y -n test-env python=${{ matrix.python }} "dpcpp_win-64=2024.2" --file ../scripts/numba-mlir.env -c conda-forge
           conda info
           conda activate test-env
           conda install --file ../scripts/mkl.env -c https://software.repos.intel.com/python/conda/
@@ -247,7 +247,7 @@ jobs:
         run: |
           cd numba_mlir
           conda activate test-env
-          conda install greenlet "dpctl=0.18" "conda-forge::dpcpp-cpp-rt=2024.1" -c dppy/label/dev -c conda-forge -c https://software.repos.intel.com/python/conda/
+          conda install greenlet "dpctl=0.18" dpcpp-cpp-rt -c dppy/label/dev -c conda-forge -c https://software.repos.intel.com/python/conda/
           conda list
           $env:NUMBA_MLIR_DEFAULT_DEVICE="opencl:cpu:0"
           python "$env:GITHUB_WORKSPACE/numba_mlir/conda-recipe/run_package_tests.py" verbose gpu
@@ -291,9 +291,11 @@ jobs:
 
         run: |
           cd numba_mlir_wheels
-          conda create -y -n wheels-test-env python=${{ matrix.python }} numba=0.59.1 numpy=1.24 scikit-learn pytest-xdist scipy pytest "tbb>=$env:TBB_VER" cmake https://software.repos.intel.com/python/conda/::mkl https://software.repos.intel.com/python/conda/::mkl-devel "https://software.repos.intel.com/python/conda/::mkl-devel-dpcpp=2024.1" "conda-forge::dpcpp_win-64=2024.1" -c conda-forge -c numba -c https://software.repos.intel.com/python/conda/ --override-channels
+          # conda create -y -n wheels-test-env python=${{ matrix.python }} numba=0.59.1 numpy=1.24 scikit-learn pytest-xdist scipy pytest "tbb>=$env:TBB_VER" cmake https://software.repos.intel.com/python/conda/::mkl https://software.repos.intel.com/python/conda/::mkl-devel "https://software.repos.intel.com/python/conda/::mkl-devel-dpcpp=2024.2" "conda-forge::dpcpp_win-64=2024.2" -c conda-forge -c numba -c https://software.repos.intel.com/python/conda/ --override-channels
+          conda create -y -n wheels-test-env python=${{ matrix.python }} "dpcpp_win-64=2024.2" --file ../scripts/numba-mlir.env -c conda-forge
           conda info
           conda activate wheels-test-env
+          conda install --file ../scripts/mkl.env -c https://software.repos.intel.com/python/conda/
           conda list
           ls .
           ls *.whl | Foreach-Object { pip install $_.FullName }
@@ -353,10 +355,10 @@ jobs:
 
       - name: Build conda package
         run: |
-          $env:vcvarsPath = (Resolve-Path "$env:GITHUB_WORKSPACE\scripts")
-          pushd $env:vcvarsPath
-          ./vcvars.ps1
-          popd
+          # $env:vcvarsPath = (Resolve-Path "$env:GITHUB_WORKSPACE\scripts")
+          # pushd $env:vcvarsPath
+          # ./vcvars.ps1
+          # popd
           conda create -y -n test-env python=${{ matrix.python }} conda-build conda-verify boa -c conda-forge
           conda info
           mkdir numba_mlir_conda
@@ -557,8 +559,8 @@ jobs:
 
         run: |
           cd numba_mlir
-          # conda create -y -n test-env python=${{ matrix.python }} "pip>=22" numba=0.59.1 numpy=1.24 "setuptools<65.6" scikit-learn pytest-xdist ninja scipy pybind11 pytest "tbb>=${TBB_VER}" "tbb-devel>=${TBB_VER}" cmake https://software.repos.intel.com/python/conda/::mkl https://software.repos.intel.com/python/conda/::mkl-devel "https://software.repos.intel.com/python/conda/::mkl-devel-dpcpp=2024.1" zlib "dpcpp_linux-64=2024.1" level-zero-devel -c conda-forge -c numba -c https://software.repos.intel.com/python/conda/ --override-channels
-          conda create -y -n test-env python=${{ matrix.python }} "dpcpp_linux-64=2024.1" --file ../scripts/numba-mlir.env -c conda-forge
+          # conda create -y -n test-env python=${{ matrix.python }} "pip>=22" numba=0.59.1 numpy=1.24 "setuptools<65.6" scikit-learn pytest-xdist ninja scipy pybind11 pytest "tbb>=${TBB_VER}" "tbb-devel>=${TBB_VER}" cmake https://software.repos.intel.com/python/conda/::mkl https://software.repos.intel.com/python/conda/::mkl-devel "https://software.repos.intel.com/python/conda/::mkl-devel-dpcpp=2024.2" zlib "dpcpp_linux-64=2024.2" level-zero-devel -c conda-forge -c numba -c https://software.repos.intel.com/python/conda/ --override-channels
+          conda create -y -n test-env python=${{ matrix.python }} "dpcpp_linux-64=2024.2" --file ../scripts/numba-mlir.env -c conda-forge
           conda info
           source $CONDA/bin/activate test-env
           conda install --file ../scripts/mkl.env -c https://software.repos.intel.com/python/conda/
@@ -591,7 +593,7 @@ jobs:
         run: |
           cd numba_mlir
           source $CONDA/bin/activate test-env
-          conda install greenlet "dpctl=0.18" "conda-forge::dpcpp-cpp-rt=2024.1" -c dppy/label/dev -c conda-forge -c https://software.repos.intel.com/python/conda/
+          conda install greenlet "dpctl=0.18" dpcpp-cpp-rt -c dppy/label/dev -c conda-forge -c https://software.repos.intel.com/python/conda/
           conda list
           export NUMBA_MLIR_DEFAULT_DEVICE=opencl:cpu:0
           python $GITHUB_WORKSPACE/numba_mlir/conda-recipe/run_package_tests.py verbose gpu
@@ -632,9 +634,11 @@ jobs:
 
         run: |
           cd numba_mlir_wheels
-          conda create -y -n wheels-test-env python=${{ matrix.python }} numba=0.59.1 numpy=1.24 scikit-learn pytest-xdist scipy pytest tbb>=${TBB_VER} cmake https://software.repos.intel.com/python/conda/::mkl https://software.repos.intel.com/python/conda/::mkl-devel "https://software.repos.intel.com/python/conda/::mkl-devel-dpcpp=2024.1" "conda-forge::dpcpp_linux-64=2024.1" -c conda-forge -c numba -c https://software.repos.intel.com/python/conda/ --override-channels
+          # conda create -y -n wheels-test-env python=${{ matrix.python }} numba=0.59.1 numpy=1.24 scikit-learn pytest-xdist scipy pytest tbb>=${TBB_VER} cmake https://software.repos.intel.com/python/conda/::mkl https://software.repos.intel.com/python/conda/::mkl-devel "https://software.repos.intel.com/python/conda/::mkl-devel-dpcpp=2024.2" "conda-forge::dpcpp_linux-64=2024.2" -c conda-forge -c numba -c https://software.repos.intel.com/python/conda/ --override-channels
+          conda create -y -n wheels-test-env python=${{ matrix.python }} "dpcpp_linux-64=2024.2" --file ../scripts/numba-mlir.env -c conda-forge
           conda info
           source $CONDA/bin/activate wheels-test-env
+          conda install --file ../scripts/mkl.env -c https://software.repos.intel.com/python/conda/
           conda list
           pip install *.whl
           python $GITHUB_WORKSPACE/numba_mlir/conda-recipe/run_package_tests.py verbose smoke
