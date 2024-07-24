@@ -47,12 +47,12 @@ jobs:
           Set-MpPreference -DisableRealtimeMonitoring $true
 
       - name: Checkout repo
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
       - name: Cache conda packages
-        uses: actions/cache@v2
+        uses: actions/cache@v3
         env:
           CACHE_NUMBER: 1  # Increase to reset cache
         with:
@@ -95,8 +95,8 @@ jobs:
         if: steps.cache-llvm-mlir.outputs.cache-hit != 'true'
         timeout-minutes: 420
         run: |
-          $vcvarsPath = (Resolve-Path "$env:GITHUB_WORKSPACE\scripts")
-          pushd $vcvarsPath
+          $env:vcvarsPath = (Resolve-Path "$env:GITHUB_WORKSPACE\scripts")
+          pushd $env:vcvarsPath
           ./vcvars.ps1
           popd
           gci env:* | sort-object name
@@ -132,6 +132,10 @@ jobs:
 
       - name: Build Numba-MLIR
         run: |
+          $env:vcvarsPath = (Resolve-Path "$env:GITHUB_WORKSPACE\scripts")
+          pushd $env:vcvarsPath
+          ./vcvars.ps1
+          popd
           $external_lit="$env:GITHUB_WORKSPACE\scripts\runlit.py"
           mkdir -p _build
           cd _build
@@ -165,18 +169,6 @@ jobs:
         python: ["3.9", "3.10", "3.11"]
 
     steps:
-      - name: msvc env
-        shell: cmd
-        run: |
-          ${{ '"C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build\vcvars64.bat"' }}
-      # - uses: microsoft/setup-msbuild@v2
-      #   with:
-      #     msbuild-architecture: x64
-      #     vs-version: '[16.9,17)'
-      # - uses: ilammy/msvc-dev-cmd@v1
-      #   with:
-      #     vsversion : "2019"
-
       - name: Disable Defender
         shell: powershell
         run: |
@@ -192,7 +184,7 @@ jobs:
           channels: conda-forge,https://software.repos.intel.com/python/conda/
 
       - name: Checkout repo
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
@@ -217,11 +209,16 @@ jobs:
 
       - name: Build Python frontend
         run: |
-          Start-Process -FilePath "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build\vcvars64.bat" -Wait -NoNewWindow
+          $env:vcvarsPath = (Resolve-Path "$env:GITHUB_WORKSPACE\scripts")
+          pushd $env:vcvarsPath
+          ./vcvars.ps1
+          popd
           cd numba_mlir
-          conda create -y -n test-env python=${{ matrix.python }} "pip>=22" numba=0.59.1 numpy=1.24 "setuptools<65.6" scikit-learn pytest-xdist ninja scipy pybind11 pytest "tbb>=$env:TBB_VER" "tbb-devel>=$env:TBB_VER" cmake https://software.repos.intel.com/python/conda/::mkl https://software.repos.intel.com/python/conda/::mkl-devel "https://software.repos.intel.com/python/conda/::mkl-devel-dpcpp=2024.1" zlib "conda-forge::dpcpp_win-64=2024.1" level-zero-devel -c conda-forge -c numba -c https://software.repos.intel.com/python/conda/ --override-channels
+          # conda create -y -n test-env python=${{ matrix.python }} "pip>=22" numba=0.59.1 numpy=1.24 "setuptools<65.6" scikit-learn pytest-xdist ninja scipy pybind11 pytest "tbb>=$env:TBB_VER" "tbb-devel>=$env:TBB_VER" cmake https://software.repos.intel.com/python/conda/::mkl https://software.repos.intel.com/python/conda/::mkl-devel "https://software.repos.intel.com/python/conda/::mkl-devel-dpcpp=2024.1" zlib "conda-forge::dpcpp_win-64=2024.1" level-zero-devel -c conda-forge -c numba -c https://software.repos.intel.com/python/conda/ --override-channels
+          conda create -y -n test-env python=${{ matrix.python }} "dpcpp_win-64=2024.1" --file ../scripts/numba-mlir.env -c conda-forge
           conda info
           conda activate test-env
+          conda install --file ../scripts/mkl.env -c https://software.repos.intel.com/python/conda/
           echo "Conda prefix: $env:CONDA_PREFIX"
           echo "Patch broken Windows MKLConfig.cmake"
           cp "$env:GITHUB_WORKSPACE/numba_mlir/conda-recipe/MKLConfig.cmake" "$env:CONDA_PREFIX/Library/lib/cmake/mkl" -Force
@@ -271,7 +268,10 @@ jobs:
       - name: Build wheels
 
         run: |
-          Start-Process -FilePath "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build\vcvars64.bat" -Wait -NoNewWindow
+          $env:vcvarsPath = (Resolve-Path "$env:GITHUB_WORKSPACE\scripts")
+          pushd $env:vcvarsPath
+          ./vcvars.ps1
+          popd
           mkdir numba_mlir_wheels
           pushd numba_mlir_wheels
           conda activate test-env
@@ -329,7 +329,7 @@ jobs:
           channels: conda-forge,https://software.repos.intel.com/python/conda/
 
       - name: Checkout repo
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
@@ -353,6 +353,10 @@ jobs:
 
       - name: Build conda package
         run: |
+          $env:vcvarsPath = (Resolve-Path "$env:GITHUB_WORKSPACE\scripts")
+          pushd $env:vcvarsPath
+          ./vcvars.ps1
+          popd
           conda create -y -n test-env python=${{ matrix.python }} conda-build conda-verify boa -c conda-forge
           conda info
           mkdir numba_mlir_conda
@@ -394,12 +398,12 @@ jobs:
 
     steps:
       - name: Checkout repo
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
       - name: Cache conda packages
-        uses: actions/cache@v2
+        uses: actions/cache@v3
         env:
           CACHE_NUMBER: 1  # Increase to reset cache
         with:
@@ -527,7 +531,7 @@ jobs:
           channels: conda-forge,https://software.repos.intel.com/python/conda/
 
       - name: Checkout repo
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
@@ -553,9 +557,11 @@ jobs:
 
         run: |
           cd numba_mlir
-          conda create -y -n test-env python=${{ matrix.python }} "pip>=22" numba=0.59.1 numpy=1.24 "setuptools<65.6" scikit-learn pytest-xdist ninja scipy pybind11 pytest "tbb>=${TBB_VER}" "tbb-devel>=${TBB_VER}" cmake https://software.repos.intel.com/python/conda/::mkl https://software.repos.intel.com/python/conda/::mkl-devel "https://software.repos.intel.com/python/conda/::mkl-devel-dpcpp=2024.1" zlib "dpcpp_linux-64=2024.1" level-zero-devel -c conda-forge -c numba -c https://software.repos.intel.com/python/conda/ --override-channels
+          # conda create -y -n test-env python=${{ matrix.python }} "pip>=22" numba=0.59.1 numpy=1.24 "setuptools<65.6" scikit-learn pytest-xdist ninja scipy pybind11 pytest "tbb>=${TBB_VER}" "tbb-devel>=${TBB_VER}" cmake https://software.repos.intel.com/python/conda/::mkl https://software.repos.intel.com/python/conda/::mkl-devel "https://software.repos.intel.com/python/conda/::mkl-devel-dpcpp=2024.1" zlib "dpcpp_linux-64=2024.1" level-zero-devel -c conda-forge -c numba -c https://software.repos.intel.com/python/conda/ --override-channels
+          conda create -y -n test-env python=${{ matrix.python }} "dpcpp_linux-64=2024.1" --file ../scripts/numba-mlir.env -c conda-forge
           conda info
           source $CONDA/bin/activate test-env
+          conda install --file ../scripts/mkl.env -c https://software.repos.intel.com/python/conda/
           conda install gxx_linux-64 -c conda-forge
           conda list
           python -c "import numba; print('numba', numba.__version__)"
@@ -658,7 +664,7 @@ jobs:
           channels: conda-forge,https://software.repos.intel.com/python/conda/
 
       - name: Checkout repo
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
@@ -769,7 +775,7 @@ jobs:
         run: conda install anaconda-client
 
       - name: Checkout repo
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           repository: IntelPython/devops-tools
           fetch-depth: 0
