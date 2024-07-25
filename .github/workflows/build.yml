@@ -229,7 +229,7 @@ jobs:
           python "$env:GITHUB_WORKSPACE/numba_mlir/conda-recipe/run_package_tests.py" verbose replace_parfors
 
       - name: Run offload tests
-        if: false # Doesn't work
+        # if: false # Doesn't work
         run: |
           cd numba_mlir
           conda activate test-env
