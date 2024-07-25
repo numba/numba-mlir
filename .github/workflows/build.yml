@@ -680,7 +680,7 @@ jobs:
           export LEVEL_ZERO_VERSION_CHECK_OFF=1
           export NUMBA_MLIR_USE_SYCL=ON
           # conda mambabuild --output-folder=. ../numba_mlir/conda-recipe --python=${{ matrix.python }} -c conda-forge -c numba -c https://software.repos.intel.com/python/conda/ || exit 1
-          conda mambabuild --output-folder=. ../numba_mlir/conda-recipe --python=${{ matrix.python }} -c https://software.repos.intel.com/python/conda/ -c conda-forge -c numba || exit 1
+          conda mambabuild --output-folder=. ../numba_mlir/conda-recipe --python=${{ matrix.python }} -c https://software.repos.intel.com/python/conda/ -c conda-forge -c numba --override-channels || exit 1
           cd linux-64
           ls -l --block-size=M
           popd
