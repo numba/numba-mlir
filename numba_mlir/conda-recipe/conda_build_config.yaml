@@ -3,6 +3,6 @@ cxx_compiler:
 numpy:
   - 1.23
 pin_run_as_build:
+  https://software.repos.intel.com/python/conda/::dpcpp-cpp-rt: x.x
   mkl: x.x
   mkl-dpcpp: x.x
-  conda-forge::dpcpp-cpp-rt: x.x
