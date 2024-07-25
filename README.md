@@ -47,9 +47,9 @@ ninja install
 Building and testing Python package
 ```Bash
 cd numba_mlir
-conda create -n test-env python=3.11 dpcpp_linux-64=2024.2 --file ../scripts/numba-mlir.env -c conda-forge
+conda create -n test-env python=3.11 --file ../scripts/numba-mlir.env -c conda-forge
 conda activate test-env
-conda install --file ../scripts/mkl.env -c https://software.repos.intel.com/python/conda/
+conda install dpcpp_linux-64=2024.2 --file ../scripts/mkl.env -c https://software.repos.intel.com/python/conda/
 export LLVM_PATH=<...>/llvm-install
 export NUMBA_MLIR_USE_SYCL=ON # Optional
 python setup.py develop

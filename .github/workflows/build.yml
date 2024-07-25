@@ -358,7 +358,7 @@ jobs:
           $env:CXX="cl.exe"
           $env:CC="cl.exe"
           $env:VSCMD_DEBUG = 3
-          conda mambabuild --output-folder=. ../numba_mlir/conda-recipe --python=${{ matrix.python }} -c conda-forge -c numba -c https://software.repos.intel.com/python/conda/ --override-channels
+          conda mambabuild --output-folder=. ../numba_mlir/conda-recipe --python=${{ matrix.python }} -c conda-forge -c numba -c https://software.repos.intel.com/python/conda/
           cd win-64
           ls .
           popd
@@ -568,7 +568,6 @@ jobs:
 
 
       - name: Run offload tests
-        if: false # Re-enable after packages update to 2024.2
         shell: bash -l {0}
 
         run: |
@@ -680,7 +679,8 @@ jobs:
           export LLVM_PATH=/home/runner/work/llvm-mlir/_mlir_install
           export LEVEL_ZERO_VERSION_CHECK_OFF=1
           export NUMBA_MLIR_USE_SYCL=ON
-          conda mambabuild --output-folder=. ../numba_mlir/conda-recipe --python=${{ matrix.python }} -c conda-forge -c numba -c https://software.repos.intel.com/python/conda/ --override-channels || exit 1
+          # conda mambabuild --output-folder=. ../numba_mlir/conda-recipe --python=${{ matrix.python }} -c conda-forge -c numba -c https://software.repos.intel.com/python/conda/ || exit 1
+          conda mambabuild --output-folder=. ../numba_mlir/conda-recipe --python=${{ matrix.python }} || exit 1
           cd linux-64
           ls -l --block-size=M
           popd
