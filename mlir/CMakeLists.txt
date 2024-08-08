@@ -29,6 +29,10 @@ add_subdirectory(include/numba/Dialect/numba_util)
 add_subdirectory(include/numba/Dialect/gpu_runtime/IR)
 add_subdirectory(include/numba/Dialect/ntensor/IR)
 add_subdirectory(include/numba/Dialect/math_ext/IR)
+add_subdirectory(include/legacy/Dialect/Arith/Transforms)
+add_subdirectory(include/legacy/Dialect/Bufferization/Transforms)
+add_subdirectory(include/legacy/Dialect/Linalg/Transforms)
+add_subdirectory(include/legacy/Dialect/Tensor/Transforms)
 
 set(SOURCES_LIST
     lib/Analysis/AliasAnalysis.cpp
@@ -56,6 +60,10 @@ set(SOURCES_LIST
     lib/Dialect/numba_util/Dialect.cpp
     lib/Dialect/plier/Dialect.cpp
     lib/ExecutionEngine/ExecutionEngine.cpp
+    lib/legacy/Dialect/Arith/Transforms/Bufferize.cpp
+    lib/legacy/Dialect/Bufferization/Transforms/Bufferize.cpp
+    lib/legacy/Dialect/Linalg/Transforms/Bufferize.cpp
+    lib/legacy/Dialect/Tensor/Transforms/Bufferize.cpp
     lib/Transforms/CallLowering.cpp
     lib/Transforms/CanonicalizeReductions.cpp
     lib/Transforms/CastLowering.cpp
@@ -184,7 +192,17 @@ target_include_directories(${NUMBA_MLIR_LIB} PUBLIC
     ${PROJECT_BINARY_DIR}/numba/include
     )
 
-add_dependencies(${NUMBA_MLIR_LIB} MLIRPlierOpsIncGen MLIRNumbaUtilOpsIncGen MLIRGpuRuntimeOpsIncGen MLIRNTensorOpsIncGen MLIRMathExtOpsIncGen)
+add_dependencies(
+    ${NUMBA_MLIR_LIB}
+    MLIRPlierOpsIncGen
+    MLIRNumbaUtilOpsIncGen
+    MLIRGpuRuntimeOpsIncGen
+    MLIRNTensorOpsIncGen
+    MLIRMathExtOpsIncGen
+    MLIRArithLegacyIncGen
+    MLIRBufferizationLegacyIncGen
+    MLIRLinalgLegacyIncGen
+    MLIRTensorLegacyIncGen)
 
 add_subdirectory(tools)
 if(NUMBA_MLIR_ENABLE_TESTS)

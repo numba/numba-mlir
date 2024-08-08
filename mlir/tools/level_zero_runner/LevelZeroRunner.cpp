@@ -29,6 +29,11 @@
 #include "numba/Conversion/GpuToGpuRuntime.hpp"
 #include "numba/Conversion/UtilToLlvm.hpp"
 
+#include "legacy/Dialect/Arith/Transforms/Passes.h"
+#include "legacy/Dialect/Bufferization/Transforms/Passes.h"
+#include "legacy/Dialect/Linalg/Transforms/Passes.h"
+#include "legacy/Dialect/Tensor/Transforms/Passes.h"
+
 using namespace mlir;
 
 static LogicalResult runMLIRPasses(mlir::Operation *op,
@@ -38,15 +43,16 @@ static LogicalResult runMLIRPasses(mlir::Operation *op,
   if (failed(applyPassManagerCLOptions(passManager)))
     return mlir::failure();
 
-  passManager.addPass(arith::createConstantBufferizePass());
+  passManager.addPass(mlir::arith::legacy::createConstantBufferizePass());
   passManager.addNestedPass<mlir::func::FuncOp>(createSCFBufferizePass());
   passManager.addNestedPass<mlir::func::FuncOp>(
       bufferization::createEmptyTensorToAllocTensorPass());
-  passManager.addNestedPass<mlir::func::FuncOp>(createLinalgBufferizePass());
   passManager.addNestedPass<mlir::func::FuncOp>(
-      bufferization::createBufferizationBufferizePass());
+      mlir::linalg::legacy::createLinalgBufferizePass());
   passManager.addNestedPass<mlir::func::FuncOp>(
-      tensor::createTensorBufferizePass());
+      bufferization::legacy::createBufferizationBufferizePass());
+  passManager.addNestedPass<mlir::func::FuncOp>(
+      mlir::tensor::legacy::createTensorBufferizePass());
   passManager.addPass(func::createFuncBufferizePass());
   passManager.addNestedPass<mlir::func::FuncOp>(
       bufferization::createFinalizingBufferizePass());
@@ -59,7 +65,7 @@ static LogicalResult runMLIRPasses(mlir::Operation *op,
   passManager.addNestedPass<mlir::func::FuncOp>(createParallelLoopToGpuPass());
 
   //  passManager.addNestedPass<mlir::func::FuncOp>(
-  //      gpu_runtime::createInsertGPUAllocsPass());Z
+  //      gpu_runtime::createInsertGPUAllocsPass());
   passManager.addPass(mlir::createCanonicalizerPass());
   passManager.addNestedPass<mlir::func::FuncOp>(
       mlir::createGpuDecomposeMemrefsPass());
