@@ -117,6 +117,8 @@ def _gen_tests():
         "test_issue9256_lower_sroa_conflict",  # using variable outside of parfor
         "test_issue9256_lower_sroa_conflict_variant1",  # using variable outside of parfor
         "test_issue9256_lower_sroa_conflict_variant2",  # using variable outside of parfor
+        "test_call_hoisting",  # list is not supported
+        "test_tuple_hoisting",  # list is not supported
     }
 
     skip_tests = {
@@ -391,6 +393,8 @@ def _gen_replace_parfor_tests():
         "test_issue9256_lower_sroa_conflict_variant1",  # using variable outside of parfor
         "test_issue9256_lower_sroa_conflict_variant2",  # using variable outside of parfor
         "test_allocation_hoisting",  # TODO: investigate
+        "test_call_hoisting",  # list is not supported
+        "test_tuple_hoisting",  # list is not supported
     }
     skip_tests = {
         "test_copy_global_for_parfor",  # flaky test
