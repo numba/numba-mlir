@@ -31,7 +31,7 @@ requirements:
         - https://software.repos.intel.com/python/conda/::dpcpp-cpp-rt {{ dpcpp_version }}
         - tbb-devel >=2021.6.0
         - level-zero-devel
-        - numba >=0.59.1, <0.60
+        - numba >=0.60.0, <0.60.1
         - pybind11
         - python
         - setuptools
@@ -40,7 +40,7 @@ requirements:
     run:
         - https://software.repos.intel.com/python/conda/::mkl
         - https://software.repos.intel.com/python/conda/::mkl-dpcpp {{ dpcpp_version }}
-        - numba >=0.59.1, <0.60
+        - numba >=0.60.0, <0.60.1
         - packaging
         - python
         - tbb >=2021.6.0

@@ -24,7 +24,7 @@ metadata = dict(
     version=versioneer.get_version(),
     cmdclass=versioneer.get_cmdclass(),
     packages=packages,
-    install_requires=["numba>=0.59.1,<0.60"],
+    install_requires=["numba>=0.60.0,<0.60.1"],
     include_package_data=True,
 )
 
