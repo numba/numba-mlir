@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "numba/Conversion/GpuToGpuRuntime.hpp"
+#include "numba/Conversion/GpuAttributes.hpp"
 
 #include "GpuCommon.hpp"
 
@@ -1267,7 +1268,7 @@ struct SerializeSPIRVPass
           llvm::StringRef(reinterpret_cast<const char *>(spvBinary.data()),
                           spvBinary.size() * sizeof(uint32_t));
       auto spvAttr = mlir::StringAttr::get(&getContext(), spvData);
-      gpuMod->setAttr(gpu::getDefaultGpuBinaryAnnotation(), spvAttr);
+      gpuMod->setAttr(gpu_runtime::getGpuBinaryAttrName(), spvAttr);
       spvMod->erase();
     }
   }
@@ -2629,6 +2630,10 @@ struct ApplySPIRVFastmathFlags
   }
 };
 } // namespace
+
+namespace gpu_runtime {
+std::string getGpuBinaryAttrName() { return "gpu.binary"; }
+} // namespace gpu_runtime
 
 // Expose the passes to the outside world
 std::unique_ptr<mlir::Pass> gpu_runtime::createAbiAttrsPass() {

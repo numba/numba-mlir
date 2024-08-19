@@ -5,12 +5,12 @@
 #pragma once
 
 #include <memory>
+#include <mlir/IR/BuiltinTypes.h>
 #include <optional>
 
 namespace mlir {
 class AnalysisManager;
 class Pass;
-struct LogicalResult;
 } // namespace mlir
 
 namespace numba {

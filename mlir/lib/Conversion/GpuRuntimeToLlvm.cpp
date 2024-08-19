@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "numba/Conversion/GpuRuntimeToLlvm.hpp"
+#include "numba/Conversion/GpuAttributes.hpp"
 
 #include "numba/Dialect/gpu_runtime/IR/GpuRuntimeOps.hpp"
 #include "numba/Dialect/numba_util/Dialect.hpp"
@@ -303,7 +304,7 @@ private:
       return mlir::failure();
 
     auto blobAttr = gpuMod->getAttrOfType<mlir::StringAttr>(
-        mlir::gpu::getDefaultGpuBinaryAnnotation());
+        gpu_runtime::getGpuBinaryAttrName());
     if (!blobAttr)
       return mlir::failure();
 

@@ -28,8 +28,9 @@ static bool isSyclMKLSupported() {
 }
 
 static unsigned getVectorLength() {
-  llvm::StringMap<bool, llvm::MallocAllocator> features;
-  if (!llvm::sys::getHostCPUFeatures(features))
+  llvm::StringMap<bool, llvm::MallocAllocator> features =
+      llvm::sys::getHostCPUFeatures();
+  if (features.size() == 0)
     return 128;
 
   auto checkFlag = [&](llvm::StringRef name) -> bool {

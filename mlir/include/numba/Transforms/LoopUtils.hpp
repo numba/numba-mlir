@@ -5,12 +5,7 @@
 #pragma once
 
 #include <llvm/ADT/STLExtras.h>
-
-namespace mlir {
-class Operation;
-class Region;
-struct LogicalResult;
-} // namespace mlir
+#include <mlir/IR/BuiltinTypes.h>
 
 namespace numba {
 mlir::LogicalResult naivelyFuseParallelOps(mlir::Region &region);

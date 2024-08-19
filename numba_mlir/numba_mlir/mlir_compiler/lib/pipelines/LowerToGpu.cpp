@@ -1635,6 +1635,8 @@ static ReduceFuncType getReduceFunc(mlir::gpu::AllReduceOperation op,
   return nullptr;
 }
 
+#include <limits>
+
 class ConvertGroupOpsToSubgroup
     : public mlir::OpRewritePattern<mlir::gpu::AllReduceOp> {
 public:
@@ -1707,7 +1709,9 @@ public:
     mlir::Value subgroupId = [&]() {
       mlir::OpBuilder::InsertionGuard g(rewriter);
       rewriter.setInsertionPointToStart(&launchOp.getBody().front());
-      return rewriter.create<mlir::gpu::SubgroupIdOp>(rewriter.getUnknownLoc());
+      return rewriter.create<mlir::gpu::SubgroupIdOp>(
+          rewriter.getUnknownLoc(),
+          rewriter.getIndexAttr(std::numeric_limits<int64_t>::max()));
     }();
 
     auto loc = op->getLoc();
@@ -1726,7 +1730,8 @@ public:
       mlir::OpBuilder::InsertionGuard g(rewriter);
       rewriter.setInsertionPointToStart(&launchOp.getBody().front());
       return rewriter.create<mlir::gpu::NumSubgroupsOp>(
-          rewriter.getUnknownLoc());
+          rewriter.getUnknownLoc(),
+          rewriter.getIndexAttr(std::numeric_limits<int64_t>::max()));
     }();
 
     mlir::Value zero = rewriter.create<mlir::arith::ConstantIndexOp>(loc, 0);
