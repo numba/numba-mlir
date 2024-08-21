@@ -4,6 +4,8 @@
 
 #include "pipelines/LowerToGpu.hpp"
 
+#include <limits>
+
 #include <mlir/Conversion/AffineToStandard/AffineToStandard.h>
 #include <mlir/Conversion/AsyncToLLVM/AsyncToLLVM.h>
 #include <mlir/Conversion/ComplexToStandard/ComplexToStandard.h>
@@ -1707,7 +1709,9 @@ public:
     mlir::Value subgroupId = [&]() {
       mlir::OpBuilder::InsertionGuard g(rewriter);
       rewriter.setInsertionPointToStart(&launchOp.getBody().front());
-      return rewriter.create<mlir::gpu::SubgroupIdOp>(rewriter.getUnknownLoc());
+      return rewriter.create<mlir::gpu::SubgroupIdOp>(
+          rewriter.getUnknownLoc(),
+          rewriter.getIndexAttr(std::numeric_limits<int64_t>::max()));
     }();
 
     auto loc = op->getLoc();
@@ -1726,7 +1730,8 @@ public:
       mlir::OpBuilder::InsertionGuard g(rewriter);
       rewriter.setInsertionPointToStart(&launchOp.getBody().front());
       return rewriter.create<mlir::gpu::NumSubgroupsOp>(
-          rewriter.getUnknownLoc());
+          rewriter.getUnknownLoc(),
+          rewriter.getIndexAttr(std::numeric_limits<int64_t>::max()));
     }();
 
     mlir::Value zero = rewriter.create<mlir::arith::ConstantIndexOp>(loc, 0);

@@ -1,0 +1,15 @@
+diff --git a/mlir/lib/Conversion/LLVMCommon/TypeConverter.cpp b/mlir/lib/Conversion/LLVMCommon/TypeConverter.cpp
+index 5313a64ed47e..e16a4154c9bf 100644
+--- a/mlir/lib/Conversion/LLVMCommon/TypeConverter.cpp
++++ b/mlir/lib/Conversion/LLVMCommon/TypeConverter.cpp
+@@ -188,6 +188,10 @@ LLVMTypeConverter::LLVMTypeConverter(MLIRContext *ctx,
+       if (!block->isEntryBlock() ||
+           !isa<FunctionOpInterface>(block->getParentOp()))
+         return std::nullopt;
++      if (!mlir::isa<mlir::LLVM::LLVMPointerType>(barePtr.getType()))
++        return std::nullopt;
++      if (!resultType.hasStaticShape())
++        return std::nullopt;
+       desc = MemRefDescriptor::fromStaticShape(builder, loc, *this, resultType,
+                                                inputs[0]);
+     } else {

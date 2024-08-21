@@ -12,15 +12,11 @@
 #include <llvm/ADT/simple_ilist.h>
 #include <llvm/Support/Allocator.h>
 
+#include <mlir/IR/BuiltinTypes.h>
+
 namespace llvm {
 class raw_ostream;
 }
-
-namespace mlir {
-struct LogicalResult;
-class Operation;
-class Region;
-} // namespace mlir
 
 namespace numba {
 

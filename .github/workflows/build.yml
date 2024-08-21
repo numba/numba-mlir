@@ -84,6 +84,7 @@ jobs:
         timeout-minutes: 420
         run: |
           $env:vcvarsPath = (Resolve-Path "$env:GITHUB_WORKSPACE\scripts")
+          $env:patchPath = (Resolve-Path "$env:GITHUB_WORKSPACE\patches\llvm.diff")
           pushd $env:vcvarsPath
           ./vcvars.ps1
           popd
@@ -95,6 +96,7 @@ jobs:
           git clone https://github.com/llvm/llvm-project
           cd llvm-project
           git checkout $env:LLVM_SHA
+          git apply $env:patchPath
           mkdir _build
           cd _build
           $env:CXX="cl.exe"
@@ -436,6 +438,7 @@ jobs:
           git clone https://github.com/llvm/llvm-project || exit 1
           cd llvm-project || exit 1
           git checkout $LLVM_SHA || exit 1
+          git apply $GITHUB_WORKSPACE/patches/llvm.diff
           mkdir _build || exit 1
           cd _build || exit 1
           export CC=$CONDA_PREFIX/bin/x86_64-conda-linux-gnu-cc

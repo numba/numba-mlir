@@ -171,6 +171,7 @@ target_link_libraries(${NUMBA_MLIR_LIB} PRIVATE
     MLIRFuncTransforms
     MLIRIR
     MLIRLLVMDialect
+    MLIRBuiltinToLLVMIRTranslation
     MLIRLinalgTransforms
     MLIRMathToSPIRV
     MLIRTensorTransforms

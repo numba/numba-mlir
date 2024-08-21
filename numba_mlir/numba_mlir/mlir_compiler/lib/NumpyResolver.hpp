@@ -9,6 +9,7 @@
 #include <string>
 
 #include <llvm/ADT/SmallVector.h>
+#include <mlir/IR/BuiltinTypes.h>
 
 namespace llvm {
 class StringRef;
@@ -20,7 +21,6 @@ class Location;
 class OpBuilder;
 class Value;
 class ValueRange;
-struct LogicalResult;
 } // namespace mlir
 
 enum class PrimitiveType { Default = 0, View = 1, SideEffect = 2 };
