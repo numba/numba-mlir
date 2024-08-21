@@ -2632,7 +2632,7 @@ struct ApplySPIRVFastmathFlags
 } // namespace
 
 namespace gpu_runtime {
-std::string getGpuBinaryAttrName() { return "gpu.binary"; }
+mlir::StringRef getGpuBinaryAttrName() { return "gpu.binary"; }
 } // namespace gpu_runtime
 
 // Expose the passes to the outside world

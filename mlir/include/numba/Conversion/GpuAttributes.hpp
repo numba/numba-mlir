@@ -4,10 +4,10 @@
 
 #pragma once
 
-#include <string>
+#include <mlir/Support/LLVM.h>
 
 namespace gpu_runtime {
 
-std::string getGpuBinaryAttrName();
+mlir::StringRef getGpuBinaryAttrName();
 
 } // namespace gpu_runtime

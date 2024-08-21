@@ -4,6 +4,8 @@
 
 #include "pipelines/LowerToGpu.hpp"
 
+#include <limits>
+
 #include <mlir/Conversion/AffineToStandard/AffineToStandard.h>
 #include <mlir/Conversion/AsyncToLLVM/AsyncToLLVM.h>
 #include <mlir/Conversion/ComplexToStandard/ComplexToStandard.h>
@@ -1634,8 +1636,6 @@ static ReduceFuncType getReduceFunc(mlir::gpu::AllReduceOperation op,
   }
   return nullptr;
 }
-
-#include <limits>
 
 class ConvertGroupOpsToSubgroup
     : public mlir::OpRewritePattern<mlir::gpu::AllReduceOp> {
