@@ -25,9 +25,6 @@ struct PassManagerStage {
                    const numba::CompilerContext::Settings &settings,
                    F &&initFunc)
       : pm(&ctx) {
-    // TODO: investigate
-    ctx.disableMultithreading();
-
     pm.enableVerifier(settings.verify);
 
     if (settings.passStatistics)
